@@ -278,6 +278,7 @@ flutter run
 - **Compression**: flutter_image_compress, video_compress
 - **Media Access**: photo_manager
 - **PDF Rendering**: pdfrx
+- **Office Documents**: syncfusion_flutter_pdf for Word/Excel/PowerPoint conversion
 
 ### Project Structure
 
@@ -286,7 +287,6 @@ lib/
   main.dart                 # Application entry point
   models/                   # Data models
     album.dart              # Album and tag models
-    document_file.dart      # Document file model
     vaulted_file.dart       # Vaulted file model
     accent_color.dart      # Accent color model
   providers/                # Riverpod state providers
@@ -296,55 +296,69 @@ lib/
   screens/                  # UI screens
     albums_screen.dart
     album_detail_screen.dart
+    auth_method_selection_screen.dart
+    backup_file_selection_screen.dart
     camera_screen.dart
     document_picker_screen.dart
     document_viewer_screen.dart
     favorites_screen.dart
+    folder_picker_screen.dart
     gallery_vault_screen.dart
     home_screen.dart
+    local_backup_screen.dart
     media_picker_screen.dart
     media_viewer_screen.dart
-    tags_screen.dart
-    unlock_screen.dart
+    performance_settings_screen.dart
     pin_setup_screen.dart
     password_setup_screen.dart
     biometric_setup_screen.dart
     change_security_screen.dart
     accent_color_picker_screen.dart
-    performance_settings_screen.dart
-    local_backup_screen.dart
-    folder_picker_screen.dart
-    ...
+    song_player_screen.dart
+    tags_screen.dart
+    unlock_screen.dart
+    vault_settings_screen.dart
   services/                 # Business logic services
     auth_service.dart       # Authentication handling
     auto_kill_service.dart  # Auto-kill feature
-    encryption_service.dart # File encryption
-    file_import_service.dart # Import/export logic
-    permission_service.dart # Permission handling
-    vault_service.dart      # Core vault operations
-    media_scanner_service.dart # Media scanning
     backup_service.dart    # Backup and restore
     compression_service.dart # Media compression
-    media_compress_service.dart # Video compression
     decoy_service.dart     # Decoy mode
+    encryption_service.dart # File encryption
+    file_import_service.dart # Import/export logic
+    flick_integration_service.dart # Video playback integration
+    improved_compression_service.dart # Enhanced compression
+    improved_vault_operations.dart # Enhanced vault operations
+    media_compress_service.dart # Video compression
+    media_compression_service.dart # Media compression utilities
+    media_scanner_service.dart # Media scanning
     office_converter_service.dart # Office document conversion
+    permission_service.dart # Permission handling
+    screenshot_protection_service.dart # Screenshot prevention
+    vault_service.dart      # Core vault operations
   themes/                   # App theming
     app_colors.dart
     app_theme.dart
   utils/                    # Utility classes
     toast_utils.dart
+    compression_helper.dart # Compression utilities
+    encryption_diagnostics.dart # Encryption diagnostics
     frame_rate_optimizer.dart # Performance optimization
     performance_config.dart # Performance settings
-    compression_helper.dart # Compression utilities
+    responsive_utils.dart  # Responsive layout utilities
     vault_file_checker.dart # File validation
-    encryption_diagnostics.dart # Encryption diagnostics
   widgets/                  # Reusable widgets
-    permission_warning_banner.dart
-    optimized_image_widget.dart
-    performance_overlay_widget.dart
+    auth_method_card.dart
     compression_options_dialog.dart
+    conversion_warning_dialog.dart
+    office_conversion_confirm_dialog.dart
     operation_progress_sheet.dart
-    ...
+    optimized_image_widget.dart
+    optimized_scroll_view.dart
+    permission_warning_banner.dart
+    performance_overlay_widget.dart
+    pin_input_widget.dart
+    vault_operation_progress_dialog.dart
 
 android/
   app/src/main/kotlin/      # Native Kotlin code
@@ -492,6 +506,7 @@ Built with the following open-source libraries:
 - pdfrx for PDF viewing
 - flutter_image_compress for image optimization
 - video_compress for video compression
+- syncfusion_flutter_pdf for Office document conversion
 - archive for ZIP/RAR/7Z support
 - And many other excellent packages
 
