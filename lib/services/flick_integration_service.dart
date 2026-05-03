@@ -4,9 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 class FlickIntegrationService {
-  static const packageName = 'com.ultraelectronica.flick';
+  static const packageName = 'com.mossapps.flick';
   static const MethodChannel _channel =
-      MethodChannel('com.ultraelectronica.locker/flick');
+      MethodChannel('com.mossapps.locker/flick');
 
   static Future<bool> isAvailable() async {
     if (!Platform.isAndroid) return false;

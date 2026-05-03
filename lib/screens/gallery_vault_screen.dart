@@ -2522,9 +2522,19 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
         ),
       );
 
-      final success = await ref
-          .read(vaultNotifierProvider.notifier)
-          .deleteFiles(selectedFiles.toList());
+      final success = await ref.read(vaultNotifierProvider.notifier).deleteFiles(
+            selectedFiles.toList(),
+            onProgress: (current, total, {int? currentSize, int? totalSize}) {
+              progressState.value = progressState.value.copyWith(
+                totalFiles: total,
+                currentFile: current,
+                totalSizeBytes: totalSize ?? 0,
+                processedSizeBytes: currentSize ?? 0,
+                statusMessage:
+                    'Processing file $current of $total...',
+              );
+            },
+          );
 
       if (!mounted) return;
 

@@ -220,9 +220,17 @@ class VaultNotifier extends Notifier<AsyncValue<List<VaultedFile>>> {
     await loadFiles();
   }
 
-  Future<bool> deleteFiles(List<String> fileIds) async {
+  Future<bool> deleteFiles(
+    List<String> fileIds, {
+    void Function(int current, int total, {int currentSize, int totalSize})?
+        onProgress,
+  }) async {
     final isDecoy = ref.read(isDecoyModeProvider);
-    final deleted = await _vaultService.removeFiles(fileIds, isDecoy: isDecoy);
+    final deleted = await _vaultService.removeFiles(
+      fileIds,
+      isDecoy: isDecoy,
+      onProgress: onProgress,
+    );
     if (deleted > 0) {
       await loadFiles();
       // Clear selection
