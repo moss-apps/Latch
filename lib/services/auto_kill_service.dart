@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 
 class AutoKillService {
   static const MethodChannel _channel =
-      MethodChannel('com.ultraelectronica.locker/autokill');
+      MethodChannel('com.mossapps.locker/autokill');
 
   static bool get isSupported =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
