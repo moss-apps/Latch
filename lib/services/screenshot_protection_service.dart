@@ -5,7 +5,7 @@ class ScreenshotProtectionService {
   ScreenshotProtectionService._();
 
   static const MethodChannel _channel =
-      MethodChannel('com.ultraelectronica.locker/screenshot_protection');
+      MethodChannel('com.mossapps.locker/screenshot_protection');
 
   static bool get isSupported =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;

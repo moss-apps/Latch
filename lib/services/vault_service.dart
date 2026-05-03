@@ -842,11 +842,30 @@ class VaultService {
   }
 
   /// Remove multiple files from the vault
-  Future<int> removeFiles(List<String> fileIds, {bool isDecoy = false}) async {
+  Future<int> removeFiles(
+    List<String> fileIds, {
+    bool isDecoy = false,
+    void Function(int current, int total, {int currentSize, int totalSize})?
+        onProgress,
+  }) async {
+    final fileIndex = await _loadFileIndex(isDecoy: isDecoy);
+    final idSet = fileIds.toSet();
+    final filesToDelete = fileIndex.where((f) => idSet.contains(f.id)).toList();
+    final totalSize = filesToDelete.fold<int>(0, (s, f) => s + f.fileSize);
+
     int removed = 0;
+    int currentSize = 0;
     for (final id in fileIds) {
+      final file = filesToDelete.cast<VaultedFile?>().firstWhere(
+        (f) => f?.id == id,
+        orElse: () => null,
+      );
+      final fileSize = file?.fileSize ?? 0;
       if (await removeFile(id, isDecoy: isDecoy)) {
         removed++;
+        currentSize += fileSize;
+        onProgress?.call(removed, fileIds.length,
+            currentSize: currentSize, totalSize: totalSize);
       }
     }
     return removed;
