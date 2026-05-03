@@ -1,4 +1,4 @@
-package com.ultraelectronica.locker
+package com.mossapps.locker
 
 import android.content.ActivityNotFoundException
 import android.content.ClipData
@@ -20,13 +20,13 @@ import io.flutter.plugin.common.MethodChannel
 import java.io.File
 
 class MainActivity: FlutterFragmentActivity() {
-    private val CHANNEL = "com.ultraelectronica.locker/autokill"
+    private val CHANNEL = "com.mossapps.locker/autokill"
     private val AUTO_KILL_PREFS = "locker_auto_kill"
     private val AUTO_KILL_DELAY_KEY = "delay_seconds"
     private val MEDIA_SCANNER_CHANNEL = "com.example.vault/media_scanner"
-    private val SCREENSHOT_PROTECTION_CHANNEL = "com.ultraelectronica.locker/screenshot_protection"
-    private val FLICK_CHANNEL = "com.ultraelectronica.locker/flick"
-    private val FLICK_PACKAGE = "com.ultraelectronica.flick"
+    private val SCREENSHOT_PROTECTION_CHANNEL = "com.mossapps.locker/screenshot_protection"
+    private val FLICK_CHANNEL = "com.mossapps.locker/flick"
+    private val FLICK_PACKAGE = "com.mossapps.flick"
     private val autoKillPreferences by lazy {
         getSharedPreferences(AUTO_KILL_PREFS, MODE_PRIVATE)
     }
