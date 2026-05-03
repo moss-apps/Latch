@@ -1,5 +1,9 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:in_app_update/in_app_update.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../providers/theme_provider.dart';
@@ -26,6 +30,33 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
   static const List<int> _lockoutAttemptOptions = [3, 5, 7, 10];
   static const List<int> _lockoutDurationOptions = [30, 60, 300, 900];
   static const List<int> _wipeAttemptOptions = [10, 15, 20, 30];
+
+  late Future<PackageInfo> _packageInfoFuture;
+  AppUpdateInfo? _updateInfo;
+  bool _isScanning = false;
+  bool _hasScanned = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _packageInfoFuture = PackageInfo.fromPlatform();
+  }
+
+  Future<void> _scanForUpdate() async {
+    if (!Platform.isAndroid) return;
+    setState(() => _isScanning = true);
+    try {
+      _updateInfo = await InAppUpdate.checkForUpdate();
+    } catch (_) {
+      _updateInfo = null;
+    }
+    if (mounted) {
+      setState(() {
+        _isScanning = false;
+        _hasScanned = true;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -378,6 +409,132 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                 },
                 contentPadding: EdgeInsets.zero,
               ),
+              const SizedBox(height: 20),
+              Divider(color: context.borderColor),
+              const SizedBox(height: 20),
+              _buildSectionTitle(context, 'Update'),
+              if (_isScanning)
+                ListTile(
+                  leading: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: context.accentColor,
+                    ),
+                  ),
+                  title: const Text('Scanning...',
+                      style: TextStyle(fontFamily: 'ProductSans')),
+                  subtitle: Text(
+                    'Checking the Play Store for updates',
+                    style: TextStyle(
+                      fontFamily: 'ProductSans',
+                      fontSize: 12,
+                      color: context.textTertiary,
+                    ),
+                  ),
+                  contentPadding: EdgeInsets.zero,
+                )
+              else if (_hasScanned &&
+                  _updateInfo != null &&
+                  _updateInfo!.updateAvailability ==
+                      UpdateAvailability.updateAvailable)
+                ListTile(
+                  leading: Icon(Icons.system_update,
+                      color: context.accentColor),
+                  title: const Text('Update Available',
+                      style: TextStyle(fontFamily: 'ProductSans')),
+                  subtitle: Text(
+                    'A new version is available on the Play Store',
+                    style: TextStyle(
+                      fontFamily: 'ProductSans',
+                      fontSize: 12,
+                      color: context.textTertiary,
+                    ),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _showUpdateDialog(),
+                  contentPadding: EdgeInsets.zero,
+                )
+              else if (_hasScanned)
+                ListTile(
+                  leading: Icon(Icons.check_circle_outline,
+                      color: context.accentColor),
+                  title: const Text('Up to Date',
+                      style: TextStyle(fontFamily: 'ProductSans')),
+                  subtitle: Text(
+                    'No updates available',
+                    style: TextStyle(
+                      fontFamily: 'ProductSans',
+                      fontSize: 12,
+                      color: context.textTertiary,
+                    ),
+                  ),
+                  contentPadding: EdgeInsets.zero,
+                )
+              else
+                ListTile(
+                  leading: Icon(Icons.system_update,
+                      color: context.accentColor),
+                  title: const Text('Scan for Updates',
+                      style: TextStyle(fontFamily: 'ProductSans')),
+                  subtitle: Text(
+                    'No update scan yet',
+                    style: TextStyle(
+                      fontFamily: 'ProductSans',
+                      fontSize: 12,
+                      color: context.textTertiary,
+                    ),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _scanForUpdate(),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              const SizedBox(height: 20),
+              Divider(color: context.borderColor),
+              const SizedBox(height: 20),
+              _buildSectionTitle(context, 'About'),
+              FutureBuilder<PackageInfo>(
+                future: _packageInfoFuture,
+                builder: (context, snapshot) {
+                  final version = snapshot.data?.version ?? '...';
+                  return Column(
+                    children: [
+                      ListTile(
+                        leading: Icon(Icons.info_outline,
+                            color: context.accentColor),
+                        title: const Text('Version',
+                            style: TextStyle(fontFamily: 'ProductSans')),
+                        subtitle: Text(
+                          version,
+                          style: TextStyle(
+                            fontFamily: 'ProductSans',
+                            fontSize: 12,
+                            color: context.textTertiary,
+                          ),
+                        ),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      ListTile(
+                        leading: Icon(Icons.description_outlined,
+                            color: context.accentColor),
+                        title: const Text('License',
+                            style: TextStyle(fontFamily: 'ProductSans')),
+                        subtitle: Text(
+                          'MIT License',
+                          style: TextStyle(
+                            fontFamily: 'ProductSans',
+                            fontSize: 12,
+                            color: context.textTertiary,
+                          ),
+                        ),
+                        onTap: () => _showLicenseDialog(),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ],
+                  );
+                },
+              ),
             ],
           );
         },
@@ -458,6 +615,78 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('Enable'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLicenseDialog() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Theme.of(dialogContext).scaffoldBackgroundColor,
+        title: const Text(
+          'MIT License',
+          style: TextStyle(fontFamily: 'ProductSans'),
+        ),
+        content: const SingleChildScrollView(
+          child: Text(
+            'MIT License\n\n'
+            'Copyright (c) 2025 ultraelectronica\n\n'
+            'Permission is hereby granted, free of charge, to any person '
+            'obtaining a copy of this software and associated documentation '
+            'files (the "Software"), to deal in the Software without '
+            'restriction, including without limitation the rights to use, '
+            'copy, modify, merge, publish, distribute, sublicense, and/or '
+            'sell copies of the Software, and to permit persons to whom the '
+            'Software is furnished to do so, subject to the following '
+            'conditions:\n\n'
+            'The above copyright notice and this permission notice shall be '
+            'included in all copies or substantial portions of the Software.\n\n'
+            'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, '
+            'EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES '
+            'OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND '
+            'NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT '
+            'HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, '
+            'WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING '
+            'FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR '
+            'OTHER DEALINGS IN THE SOFTWARE.',
+            style: TextStyle(fontFamily: 'ProductSans'),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showUpdateDialog() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Theme.of(dialogContext).scaffoldBackgroundColor,
+        title: const Text('Update Available',
+            style: TextStyle(fontFamily: 'ProductSans')),
+        content: const Text(
+          'A new version is available on the Play Store. Update now?',
+          style: TextStyle(fontFamily: 'ProductSans'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Later'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              InAppUpdate.performImmediateUpdate();
+            },
+            child: const Text('Update'),
           ),
         ],
       ),
