@@ -15,8 +15,8 @@ This keeps the two apps feeling like one ecosystem instead of two unrelated apps
 
 Locker now exposes these Android integration points:
 
-- Locker package: `com.ultraelectronica.locker`
-- Flick package: `com.ultraelectronica.flick`
+- Locker package: `com.mossapps.locker`
+- Flick package: `com.mossapps.flick`
 - Return URI: `locker://return`
 - Main activity launch mode: `singleTask`
 - Return intent filter: `ACTION_VIEW` on `locker://return`
@@ -116,7 +116,7 @@ private fun returnToLocker(context: Context) {
         Intent.ACTION_VIEW,
         Uri.parse("locker://return?source=flick")
     ).apply {
-        `package` = "com.ultraelectronica.locker"
+        `package` = "com.mossapps.locker"
         addCategory(Intent.CATEGORY_BROWSABLE)
         addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
     }
@@ -127,7 +127,7 @@ private fun returnToLocker(context: Context) {
 
 Why this is the right shape:
 
-- `package = "com.ultraelectronica.locker"` makes the return deterministic.
+- `package = "com.mossapps.locker"` makes the return deterministic.
 - `locker://return` matches Locker's manifest contract.
 - `CLEAR_TOP` and `SINGLE_TOP` help Android reuse the running Locker activity instead of creating unnecessary duplicates.
 
@@ -137,7 +137,7 @@ If you want to be defensive, wrap the launch in a `try/catch` and fall back to a
 
 Locker now knows Flick's package name and can target it directly:
 
-- Flick package: `com.ultraelectronica.flick`
+- Flick package: `com.mossapps.flick`
 - Locker can detect whether Flick is installed
 - Locker can show a dedicated `Play with Flick` action
 - Locker can skip the generic app chooser when the user explicitly wants Flick
@@ -180,7 +180,7 @@ Locker is configured to support this integration now:
 
 - `locker://return` is registered in Locker's manifest
 - Locker uses `singleTask` so the existing task can be foregrounded again
-- Locker can query `com.ultraelectronica.flick`
+- Locker can query `com.mossapps.flick`
 - Locker can offer a dedicated `Play with Flick` action for songs when Flick is installed
 
 The remaining work is fully on Flick's side: accept the URI, play it, and provide the explicit return affordance.
