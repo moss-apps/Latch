@@ -64,6 +64,7 @@ dependencies:
   video_player: ^2.10.1
   xml: ^6.6.1
   in_app_update: ^4.2.5
+  flutter_markdown: ^0.7.7+1
 
 dev_dependencies:
   flutter_lints: ^6.0.0
@@ -94,6 +95,7 @@ flutter:
     - assets/locker_logo_bg.png
     - assets/locker_logo_nobg.png
     - assets/locker_logo_nobg.svg
+    - assets/privacy_policy.md
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware
   # For details regarding adding assets from package dependencies, see
