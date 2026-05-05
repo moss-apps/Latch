@@ -16,6 +16,7 @@ import '../themes/app_colors.dart';
 import 'accent_color_picker_screen.dart';
 import 'change_security_screen.dart';
 import 'local_backup_screen.dart';
+import 'privacy_policy_screen.dart';
 
 class VaultSettingsScreen extends ConsumerStatefulWidget {
   const VaultSettingsScreen({super.key});
@@ -529,6 +530,30 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                           ),
                         ),
                         onTap: () => _showLicenseDialog(),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      ListTile(
+                        leading: Icon(Icons.privacy_tip_outlined,
+                            color: context.accentColor),
+                        title: const Text('Privacy Policy',
+                            style: TextStyle(fontFamily: 'ProductSans')),
+                        subtitle: Text(
+                          'How we handle your data',
+                          style: TextStyle(
+                            fontFamily: 'ProductSans',
+                            fontSize: 12,
+                            color: context.textTertiary,
+                          ),
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const PrivacyPolicyScreen(),
+                            ),
+                          );
+                        },
                         contentPadding: EdgeInsets.zero,
                       ),
                     ],
