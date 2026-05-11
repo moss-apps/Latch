@@ -74,7 +74,7 @@ dev_dependencies:
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "assets/padlock.png"
+  image_path: "assets/locker_logo_bg.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -95,6 +95,8 @@ flutter:
     - assets/locker_logo_bg.png
     - assets/locker_logo_nobg.png
     - assets/locker_logo_nobg.svg
+    - assets/reverse_locker_logo_nobg.svg
+    - assets/reverse_locker_logo_transparent.png
     - assets/privacy_policy.md
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware
