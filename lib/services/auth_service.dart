@@ -84,13 +84,14 @@ class AuthService {
   }
 
   /// Verify the provided PIN against stored hash
-  Future<bool> verifyPIN(String pin) async {
-    return _verifyCredential(pin, _pinHashKey, _pinSaltKey);
+Future<bool> verifyPIN(String pin) async {
+    if (await _verifyCredential(pin, _pinHashKey, _pinSaltKey)) return true;
+    return _verifyCredential(pin, _backupPinHashKey, _backupPinSaltKey);
   }
 
-  /// Verify the provided password against stored hash
   Future<bool> verifyPassword(String password) async {
-    return _verifyCredential(password, _passwordHashKey, _passwordSaltKey);
+    if (await _verifyCredential(password, _passwordHashKey, _passwordSaltKey)) return true;
+    return _verifyCredential(password, _backupPasswordHashKey, _backupPasswordSaltKey);
   }
 
   /// Verify backup password (used when current auth is biometric)
@@ -104,6 +105,18 @@ class AuthService {
   }
 
   /// Check if biometric authentication is available on the device
+  Future<String?> getBackupAuthMethod() async {
+    try {
+      final backupPinHash = await _storage.read(key: _backupPinHashKey);
+      if (backupPinHash != null) return 'pin';
+      final backupPasswordHash = await _storage.read(key: _backupPasswordHashKey);
+      if (backupPasswordHash != null) return 'password';
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   Future<bool> isBiometricAvailable() async {
     try {
       final isAvailable = await _localAuth.canCheckBiometrics;
@@ -174,6 +187,7 @@ class AuthService {
       final isAuthenticated =
           await AutoKillService.runSafe(() => _localAuth.authenticate(
                 localizedReason: reason,
+                biometricOnly: true,
                 authMessages: [
                   const AndroidAuthMessages(
                     signInTitle: 'Biometric authentication required',
@@ -240,6 +254,7 @@ class AuthService {
       final isAuthenticated =
           await AutoKillService.runSafe(() => _localAuth.authenticate(
                 localizedReason: 'Set up biometric authentication',
+                biometricOnly: true,
                 authMessages: [
                   const AndroidAuthMessages(
                     signInTitle: 'Set up biometric authentication',
