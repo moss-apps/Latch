@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:pointycastle/export.dart';
 import '../models/vaulted_file.dart';
 import 'vault_service.dart';
 
@@ -19,6 +21,8 @@ class DecoyService {
   static const String _decoyEnabledKey = 'decoy_mode_enabled';
   static const String _decoyPinKey = 'decoy_pin_hash';
   static const String _decoyPasswordKey = 'decoy_password_hash';
+  static const String _decoyPinSaltKey = 'decoy_pin_salt';
+  static const String _decoyPasswordSaltKey = 'decoy_password_salt';
   static const String _lastAccessModeKey = 'last_access_mode';
   static const String _decoySettingsKey = 'decoy_settings';
 
@@ -114,8 +118,7 @@ class DecoyService {
     try {
       if (pin.isEmpty || pin.length < 4) return false;
 
-      final pinHash = _hashCredential(pin);
-      await _storage.write(key: _decoyPinKey, value: pinHash);
+      await _createHashedCredential(pin, _decoyPinSaltKey, _decoyPinKey);
 
       _cachedSettings = (_cachedSettings ?? const DecoySettings()).copyWith(
         hasPinSet: true,
@@ -134,8 +137,7 @@ class DecoyService {
     try {
       if (password.isEmpty) return false;
 
-      final passwordHash = _hashCredential(password);
-      await _storage.write(key: _decoyPasswordKey, value: passwordHash);
+      await _createHashedCredential(password, _decoyPasswordSaltKey, _decoyPasswordKey);
 
       _cachedSettings = (_cachedSettings ?? const DecoySettings()).copyWith(
         hasPasswordSet: true,
@@ -151,28 +153,12 @@ class DecoyService {
 
   /// Verify decoy PIN
   Future<bool> verifyDecoyPin(String pin) async {
-    try {
-      final storedHash = await _storage.read(key: _decoyPinKey);
-      if (storedHash == null) return false;
-
-      final pinHash = _hashCredential(pin);
-      return pinHash == storedHash;
-    } catch (e) {
-      return false;
-    }
+    return _verifyCredential(pin, _decoyPinKey, _decoyPinSaltKey);
   }
 
   /// Verify decoy password
   Future<bool> verifyDecoyPassword(String password) async {
-    try {
-      final storedHash = await _storage.read(key: _decoyPasswordKey);
-      if (storedHash == null) return false;
-
-      final passwordHash = _hashCredential(password);
-      return passwordHash == storedHash;
-    } catch (e) {
-      return false;
-    }
+    return _verifyCredential(password, _decoyPasswordKey, _decoyPasswordSaltKey);
   }
 
   /// Check if input is decoy credential
@@ -247,11 +233,61 @@ class DecoyService {
     await _saveSettings();
   }
 
-  /// Hash credential using SHA-256
-  String _hashCredential(String credential) {
+  static const int _kdfIterations = 100000;
+
+  Uint8List _generateSalt() {
+    final random = Random.secure();
+    return Uint8List.fromList(
+      List<int>.generate(32, (_) => random.nextInt(256)),
+    );
+  }
+
+  String _hashCredential(String credential, Uint8List salt) {
+    final pbkdf2 = PBKDF2KeyDerivator(HMac(SHA256Digest(), 64))
+      ..init(Pbkdf2Parameters(salt, _kdfIterations, 32));
+    final hash = pbkdf2.process(Uint8List.fromList(utf8.encode(credential)));
+    return base64Encode(hash);
+  }
+
+  String _hashCredentialLegacy(String credential) {
     final bytes = utf8.encode(credential);
     final digest = sha256.convert(bytes);
     return digest.toString();
+  }
+
+  Future<String> _createHashedCredential(String credential, String saltKey, String hashKey) async {
+    final salt = _generateSalt();
+    final hash = _hashCredential(credential, salt);
+    await _storage.write(key: saltKey, value: base64Encode(salt));
+    await _storage.write(key: hashKey, value: hash);
+    return hash;
+  }
+
+  Future<bool> _verifyCredential(String credential, String hashKey, String saltKey) async {
+    try {
+      final storedHash = await _storage.read(key: hashKey);
+      final storedSalt = await _storage.read(key: saltKey);
+
+      if (storedHash == null) return false;
+
+      if (storedSalt == null) {
+        final legacyHash = _hashCredentialLegacy(credential);
+        if (legacyHash == storedHash) {
+          final salt = _generateSalt();
+          final newHash = _hashCredential(credential, salt);
+          await _storage.write(key: saltKey, value: base64Encode(salt));
+          await _storage.write(key: hashKey, value: newHash);
+          return true;
+        }
+        return false;
+      }
+
+      final salt = base64Decode(storedSalt);
+      final computedHash = _hashCredential(credential, salt);
+      return computedHash == storedHash;
+    } catch (e) {
+      return false;
+    }
   }
 
   /// Check if decoy PIN is set
