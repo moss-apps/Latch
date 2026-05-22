@@ -876,15 +876,18 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
           Icon(icon, size: 36, color: color),
           const SizedBox(height: 4),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Text(
-              file.extension.toUpperCase(),
+              file.originalName,
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
                 color: color,
                 fontFamily: 'ProductSans',
               ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
             ),
           ),
         ],
