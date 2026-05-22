@@ -395,7 +395,7 @@ class OfficeConverterService {
 
     // Set document properties
     document.documentInformation.title = fileName;
-    document.documentInformation.creator = 'Locker App';
+    document.documentInformation.creator = 'Latch App';
 
     // Add a page
     PdfPage page = document.pages.add();

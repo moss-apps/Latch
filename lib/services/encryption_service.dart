@@ -328,7 +328,7 @@ class EncryptionService {
       header[0] = 0x4C; // 'L'
       header[1] = 0x4B; // 'K'
       header[2] = 0x52; // 'R'
-      header[3] = 0x53; // 'S' (Locker Streamed)
+      header[3] = 0x53; // 'S' (Latch Streamed)
       // Store original file size (little-endian)
       header[4] = (totalBytes & 0xFF);
       header[5] = ((totalBytes >> 8) & 0xFF);
