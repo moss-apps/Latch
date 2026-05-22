@@ -24,6 +24,8 @@ class _UnlockScreenState extends State<UnlockScreen> {
   bool _isLoading = true;
   bool _isAuthenticating = false;
   bool _obscurePassword = true;
+  String? _backupAuthMethod;
+  bool _showingBackupAuth = false;
   final TextEditingController _passwordController = TextEditingController();
   final PinInputController _pinController = PinInputController();
   UnlockSecurityState _unlockSecurityState = const UnlockSecurityState();
@@ -45,12 +47,14 @@ class _UnlockScreenState extends State<UnlockScreen> {
   Future<void> _initializeUnlockState() async {
     final method = await _authService.getAuthMethod();
     final unlockState = await _authService.getUnlockSecurityState();
+    final backupMethod = await _authService.getBackupAuthMethod();
 
     if (!mounted) return;
 
     setState(() {
       _authMethod = method;
       _unlockSecurityState = unlockState;
+      _backupAuthMethod = backupMethod;
       _isLoading = false;
     });
 
@@ -390,12 +394,18 @@ class _UnlockScreenState extends State<UnlockScreen> {
   }
 
   Widget _buildInstruction() {
+    final label = _showingBackupAuth && _backupAuthMethod != null
+        ? (_backupAuthMethod == 'pin'
+            ? 'Enter your backup PIN to unlock'
+            : 'Enter your backup password to unlock')
+        : (_authMethod == 'pin'
+            ? 'Enter your PIN to unlock'
+            : _authMethod == 'password'
+                ? 'Enter your password to unlock'
+                : 'Use biometrics to unlock');
+
     return Text(
-      _authMethod == 'pin'
-          ? 'Enter your PIN to unlock'
-          : _authMethod == 'password'
-              ? 'Enter your password to unlock'
-              : 'Use biometrics to unlock',
+      label,
       style: TextStyle(
         fontSize: 16,
         color: context.textSecondary,
@@ -406,6 +416,9 @@ class _UnlockScreenState extends State<UnlockScreen> {
   }
 
   Widget _buildAuthWidget() {
+    if (_authMethod == 'biometric' && _showingBackupAuth) {
+      return _buildBackupAuthWidget();
+    }
     if (_authMethod == 'pin') {
       return _buildPinAuth();
     } else if (_authMethod == 'password') {
@@ -566,6 +579,55 @@ class _UnlockScreenState extends State<UnlockScreen> {
           const SizedBox(height: 24),
         ],
         _buildUnlockButton(isBiometric: true),
+        if (_backupAuthMethod != null) ...[
+          const SizedBox(height: 16),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _showingBackupAuth = true;
+                _errorMessage = null;
+              });
+            },
+            child: Text(
+              _backupAuthMethod == 'pin'
+                  ? 'Use Backup PIN'
+                  : 'Use Backup Password',
+              style: TextStyle(
+                color: context.textSecondary,
+                fontFamily: 'ProductSans',
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildBackupAuthWidget() {
+    final isPin = _backupAuthMethod == 'pin';
+    return Column(
+      children: [
+        TextButton(
+          onPressed: () {
+            setState(() {
+              _showingBackupAuth = false;
+              _errorMessage = null;
+              _passwordController.clear();
+              _pinController.clear();
+            });
+          },
+          child: Text(
+            'Use biometric instead',
+            style: TextStyle(
+              color: context.textSecondary,
+              fontFamily: 'ProductSans',
+              fontSize: 14,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        isPin ? _buildPinAuth() : _buildPasswordAuth(),
       ],
     );
   }

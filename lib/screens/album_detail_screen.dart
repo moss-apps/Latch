@@ -355,15 +355,18 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
           Icon(icon, size: 36, color: color),
           const SizedBox(height: 4),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Text(
-              file.extension.toUpperCase(),
+              file.originalName,
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
                 color: color,
                 fontFamily: 'ProductSans',
               ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
             ),
           ),
         ],
@@ -1270,13 +1273,19 @@ class _AddFilesToAlbumSheetState extends ConsumerState<_AddFilesToAlbumSheet> {
         children: [
           Icon(icon, size: 28, color: color),
           const SizedBox(height: 4),
-          Text(
-            file.extension.toUpperCase(),
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: color,
-              fontFamily: 'ProductSans',
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              file.originalName,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: color,
+                fontFamily: 'ProductSans',
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
             ),
           ),
         ],

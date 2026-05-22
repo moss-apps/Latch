@@ -77,6 +77,7 @@ class VaultedFile {
   final int viewCount;
   final String? notes;
   final List<String> albumIds; // Albums this file belongs to
+  final String? folderId; // Folder this file belongs to
 
   const VaultedFile({
     required this.id,
@@ -99,6 +100,7 @@ class VaultedFile {
     this.viewCount = 0,
     this.notes,
     this.albumIds = const [],
+    this.folderId,
   });
 
   /// Create a copy with updated fields
@@ -123,6 +125,7 @@ class VaultedFile {
     int? viewCount,
     String? notes,
     List<String>? albumIds,
+    String? folderId,
   }) {
     return VaultedFile(
       id: id ?? this.id,
@@ -145,6 +148,7 @@ class VaultedFile {
       viewCount: viewCount ?? this.viewCount,
       notes: notes ?? this.notes,
       albumIds: albumIds ?? List.from(this.albumIds),
+      folderId: folderId ?? this.folderId,
     );
   }
 
@@ -214,6 +218,22 @@ class VaultedFile {
     );
   }
 
+  /// Add to folder
+  VaultedFile addToFolder(String folderId) {
+    return copyWith(
+      folderId: folderId,
+      dateModified: DateTime.now(),
+    );
+  }
+
+  /// Remove from folder
+  VaultedFile removeFromFolder() {
+    return copyWith(
+      folderId: null,
+      dateModified: DateTime.now(),
+    );
+  }
+
   /// Check if file has a specific tag
   bool hasTag(String tag) => tags.contains(tag.toLowerCase().trim());
 
@@ -243,6 +263,7 @@ class VaultedFile {
       'viewCount': viewCount,
       'notes': notes,
       'albumIds': albumIds,
+      'folderId': folderId,
     };
   }
 
@@ -278,6 +299,7 @@ class VaultedFile {
               ?.map((e) => e as String)
               .toList() ??
           [],
+      folderId: json['folderId'] as String?,
     );
   }
 
