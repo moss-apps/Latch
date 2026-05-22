@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:pointycastle/export.dart';
+import '../models/encryption_algorithm.dart';
 
 const int _streamChunkSize = 1024 * 1024;
 
@@ -97,11 +98,11 @@ class EncryptionService {
   }
 
   /// Derive key from password using PBKDF2
-  Uint8List deriveKeyFromPassword(String password, {Uint8List? salt}) {
+  Uint8List deriveKeyFromPassword(String password, {Uint8List? salt, int iterations = 100000}) {
     salt ??= _generateRandomBytes(16);
 
     final pbkdf2 = PBKDF2KeyDerivator(HMac(SHA256Digest(), 64))
-      ..init(Pbkdf2Parameters(salt, 100000, _keySize));
+      ..init(Pbkdf2Parameters(salt, iterations, _keySize));
 
     return pbkdf2.process(Uint8List.fromList(utf8.encode(password)));
   }
@@ -1262,6 +1263,88 @@ class EncryptionService {
     }
   }
 
+  /// Re-encrypt a single file from its current format to a target format
+  /// Returns the new IV (base64) on success
+  Future<String> reEncryptFile(
+    String filePath,
+    String oldIvBase64, {
+    required EncryptionAlgorithm targetAlgorithm,
+    bool isDecoy = false,
+  }) async {
+    final decrypted = await decryptFileToMemory(filePath, oldIvBase64, isDecoy: isDecoy);
+    if (!decrypted.success || decrypted.data == null) {
+      throw Exception('Failed to decrypt file for re-encryption: ${decrypted.error}');
+    }
+
+    final newIv = generateIV();
+    final key = isDecoy ? await _ensureDecoyKey() : await _ensureMasterKey();
+
+    if (targetAlgorithm == EncryptionAlgorithm.aes256Gcm) {
+      final gcm = GCMBlockCipher(AESEngine())
+        ..init(true, AEADParameters(KeyParameter(key), 128, newIv, Uint8List(0)));
+      final encrypted = gcm.process(decrypted.data!);
+
+      final header = Uint8List(8);
+      header[0] = 0x4C;
+      header[1] = 0x4B;
+      header[2] = 0x52;
+      header[3] = 0x47;
+      header[4] = (decrypted.data!.length & 0xFF);
+      header[5] = ((decrypted.data!.length >> 8) & 0xFF);
+      header[6] = ((decrypted.data!.length >> 16) & 0xFF);
+      header[7] = ((decrypted.data!.length >> 24) & 0xFF);
+
+      final sink = File(filePath).openWrite();
+      sink.add(header);
+      sink.add(encrypted);
+      await sink.flush();
+      await sink.close();
+    } else {
+      final ctr = CTRStreamCipher(AESEngine())
+        ..init(true, ParametersWithIV<KeyParameter>(KeyParameter(key), newIv));
+      final encrypted = ctr.process(decrypted.data!);
+
+      final header = Uint8List(8);
+      header[0] = 0x4C;
+      header[1] = 0x4B;
+      header[2] = 0x52;
+      header[3] = 0x53;
+      header[4] = (decrypted.data!.length & 0xFF);
+      header[5] = ((decrypted.data!.length >> 8) & 0xFF);
+      header[6] = ((decrypted.data!.length >> 16) & 0xFF);
+      header[7] = ((decrypted.data!.length >> 24) & 0xFF);
+
+      final sink = File(filePath).openWrite();
+      sink.add(header);
+      sink.add(encrypted);
+      await sink.flush();
+      await sink.close();
+    }
+
+    return base64Encode(newIv);
+  }
+
+  /// Check what encryption format a file uses
+  /// Returns: 0=unknown/legacy CBC, 1=GCM, 2=CTR, 3=CBC with header
+  int detectFileFormat(String filePath) {
+    try {
+      final file = File(filePath);
+      final raf = file.openSync();
+      final header = raf.readSync(4);
+      raf.closeSync();
+
+      if (header.length < 4) return 0;
+
+      final magic = header[0] | (header[1] << 8) | (header[2] << 16) | (header[3] << 24);
+      if (magic == _magicBytesGcm) return 1;
+      if (magic == _magicBytesCtr) return 2;
+      if (magic == _magicBytesCbc) return 3;
+      return 0;
+    } catch (e) {
+      return 0;
+    }
+  }
+
   /// Re-encrypt all files with a new key (for key rotation)
   Future<KeyRotationResult> rotateKey({
     required List<String> encryptedFilePaths,
@@ -1300,11 +1383,26 @@ class EncryptionService {
 
         // Encrypt with new key
         final newIv = generateIV();
-        final cipher = _getCipher(newKey, newIv, true);
-        final reEncrypted = cipher.process(decrypted.data!);
+        final ctr = CTRStreamCipher(AESEngine())
+          ..init(true, ParametersWithIV<KeyParameter>(KeyParameter(newKey), newIv));
+        final reEncrypted = ctr.process(decrypted.data!);
 
-        // Write back
-        await File(path).writeAsBytes(reEncrypted);
+        // Write CTR header + encrypted data
+        final header = Uint8List(8);
+        header[0] = 0x4C;
+        header[1] = 0x4B;
+        header[2] = 0x52;
+        header[3] = 0x53;
+        header[4] = (decrypted.data!.length & 0xFF);
+        header[5] = ((decrypted.data!.length >> 8) & 0xFF);
+        header[6] = ((decrypted.data!.length >> 16) & 0xFF);
+        header[7] = ((decrypted.data!.length >> 24) & 0xFF);
+
+        final sink = File(path).openWrite();
+        sink.add(header);
+        sink.add(reEncrypted);
+        await sink.flush();
+        await sink.close();
         newIvs.add(base64Encode(newIv));
       }
 
