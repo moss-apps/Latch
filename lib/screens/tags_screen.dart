@@ -560,13 +560,19 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
         children: [
           Icon(icon, size: 36, color: color),
           const SizedBox(height: 4),
-          Text(
-            file.extension.toUpperCase(),
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: color,
-              fontFamily: 'ProductSans',
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              file.originalName,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: color,
+                fontFamily: 'ProductSans',
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
             ),
           ),
         ],
