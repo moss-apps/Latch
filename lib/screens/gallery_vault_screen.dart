@@ -1842,7 +1842,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
             ),
             const SizedBox(height: 16),
             const Text(
-              'Locker',
+              'Latch',
               style: TextStyle(
                 fontFamily: 'ProductSans',
                 color: Colors.white,

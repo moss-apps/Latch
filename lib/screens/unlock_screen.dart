@@ -377,7 +377,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
 
   Widget _buildAppName() {
     return Text(
-      'Locker',
+      'Latch',
       style: TextStyle(
         fontSize: 36,
         fontWeight: FontWeight.w700,

@@ -359,7 +359,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Widget _buildTitle() {
     return Text(
-      'Locker',
+      'Latch',
       style: TextStyle(
         fontSize: 36,
         fontWeight: FontWeight.w700,
