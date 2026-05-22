@@ -179,7 +179,7 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                 ),
                 subtitle: Text(
                   screenshotProtectionSupported
-                      ? 'Blocks screenshots and app previews while Locker is open'
+                      ? 'Blocks screenshots and app previews while Latch is open'
                       : 'Available on supported Android devices',
                   style: TextStyle(
                     fontFamily: 'ProductSans',
@@ -204,7 +204,7 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                 context: context,
                 title: 'Auto-Kill Delay',
                 subtitle: autoKillSupported
-                    ? 'How long Locker waits after going to the background before it closes itself'
+                    ? 'How long Latch waits after going to the background before it closes itself'
                     : 'Available on supported Android devices',
                 value: settings.autoKillDelaySeconds,
                 options: _autoKillDelayOptions,
@@ -354,7 +354,7 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                     context: context,
                     title: 'Attempts Before Wipe',
                     subtitle:
-                        'Locker erases all vault files when this failed-attempt total is reached',
+                        'Latch erases all vault files when this failed-attempt total is reached',
                     value: settings.maxFailedAttemptsBeforeWipe,
                     options: _wipeAttemptOptions,
                     labelBuilder: (value) => value.toString(),
@@ -629,7 +629,7 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
           style: TextStyle(fontFamily: 'ProductSans'),
         ),
         content: const Text(
-          'When the failed-attempt limit is reached, Locker will permanently erase the real and decoy vault files on this device. This cannot be undone.',
+          'When the failed-attempt limit is reached, Latch will permanently erase the real and decoy vault files on this device. This cannot be undone.',
           style: TextStyle(fontFamily: 'ProductSans'),
         ),
         actions: [

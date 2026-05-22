@@ -26,7 +26,7 @@
     <uses-permission android:name="android.permission.USE_FINGERPRINT"/>
 
     <application
-        android:label="Locker"
+        android:label="Latch"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon"
         android:requestLegacyExternalStorage="true">
@@ -59,7 +59,7 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
 
-            <!-- Lets Flick return the user to the running Locker task. -->
+            <!-- Lets Flick return the user to the running Latch task. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
 

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 /// App Color Palette
-/// Contains all color definitions used throughout the Locker app
+/// Contains all color definitions used throughout the Latch app
 /// Follows golden design rules with eye-friendly colors
 class AppColors {
   AppColors._(); // Private constructor to prevent instantiation

@@ -81,6 +81,12 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
 
   PreferredSizeWidget _buildAppBar() {
     if (_isSelectionMode) {
+      final files = _selectedTag != null
+          ? (ref.read(filesByTagProvider(_selectedTag!)).value ?? [])
+          : <VaultedFile>[];
+      final allSelected = files.isNotEmpty &&
+          files.every((f) => _selectedFiles.contains(f.id));
+
       return AppBar(
         backgroundColor: context.accentColor,
         leading: IconButton(
@@ -95,6 +101,17 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
           ),
         ),
         actions: [
+          if (files.isNotEmpty)
+            TextButton(
+              onPressed: _toggleSelectAll,
+              child: Text(
+                allSelected ? 'Deselect All' : 'Select All',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'ProductSans',
+                ),
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.label_off_outlined, color: Colors.white),
             onPressed: _removeTagFromSelected,
@@ -580,6 +597,24 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
         }
       } else {
         _selectedFiles.add(fileId);
+      }
+    });
+  }
+
+  void _toggleSelectAll() {
+    final files = _selectedTag != null
+        ? (ref.read(filesByTagProvider(_selectedTag!)).value ?? [])
+        : <VaultedFile>[];
+    final allSelected =
+        files.isNotEmpty && files.every((f) => _selectedFiles.contains(f.id));
+
+    setState(() {
+      if (allSelected) {
+        _selectedFiles.clear();
+        _isSelectionMode = false;
+      } else {
+        _selectedFiles.addAll(files.map((f) => f.id));
+        _isSelectionMode = true;
       }
     });
   }

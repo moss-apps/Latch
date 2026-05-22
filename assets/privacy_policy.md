@@ -4,11 +4,11 @@
 
 ## Our Commitment
 
-Locker is built with privacy as its core principle. We believe your personal data should stay on your device, not on our servers. This app does not collect, store, transmit, or share any personal information.
+Latch is built with privacy as its core principle. We believe your personal data should stay on your device, not on our servers. This app does not collect, store, transmit, or share any personal information.
 
 ## Data We Do Not Collect
 
-Locker does not collect any data whatsoever. Specifically:
+Latch does not collect any data whatsoever. Specifically:
 
 - No personal information (name, email, phone number, etc.)
 - No usage analytics or telemetry
@@ -19,11 +19,11 @@ Locker does not collect any data whatsoever. Specifically:
 - No contacts, messages, or call logs
 - No browsing history or app usage data
 
-Everything you do in Locker stays on your device.
+Everything you do in Latch stays on your device.
 
 ## Camera Access
 
-Locker may request camera permission only when you choose to scan a QR code or take a photo to import into your vault. The camera is used solely for these purposes:
+Latch may request camera permission only when you choose to scan a QR code or take a photo to import into your vault. The camera is used solely for these purposes:
 
 - QR code scanning for quick vault access
 - Capturing photos to store in your vault
@@ -32,7 +32,7 @@ Camera access is never used in the background. No photos or video from your came
 
 ## Media & Files
 
-Locker is a secure media vault. Files you import into Locker are encrypted using AES-256 encryption and stored locally on your device. We do not:
+Latch is a secure media vault. Files you import into Latch are encrypted using AES-256 encryption and stored locally on your device. We do not:
 
 - Upload your files to any cloud or server
 - Scan or analyze your files
@@ -43,28 +43,28 @@ Your vault key never leaves your device.
 
 ## Storage Permission
 
-Locker requires storage permission to read files you want to vault and to save encrypted files to your device. This permission is used only when you explicitly choose to import or export files.
+Latch requires storage permission to read files you want to vault and to save encrypted files to your device. This permission is used only when you explicitly choose to import or export files.
 
 ## Biometric Authentication
 
-If you choose to use fingerprint or face unlock, biometric data is handled entirely by your device operating system. Locker only receives a success or failure signal — it never stores or accesses your biometric data.
+If you choose to use fingerprint or face unlock, biometric data is handled entirely by your device operating system. Latch only receives a success or failure signal — it never stores or accesses your biometric data.
 
 ## Third-Party Services
 
-Locker does not integrate with any third-party analytics, advertising, or tracking services. The only external connection is:
+Latch does not integrate with any third-party analytics, advertising, or tracking services. The only external connection is:
 
 - Play Store update check (optional, triggered by you)
 - Donation link to Ko-fi (optional, opened in your browser)
 
-Neither of these transmits any personal data from Locker.
+Neither of these transmits any personal data from Latch.
 
 ## Local Backups
 
-If you choose to create a local backup, the backup file is saved to a location you select on your device. Locker does not upload backups anywhere. You are responsible for securing your backup files.
+If you choose to create a local backup, the backup file is saved to a location you select on your device. Latch does not upload backups anywhere. You are responsible for securing your backup files.
 
 ## Children's Privacy
 
-Locker does not knowingly collect any information from anyone, including children under 13. Since no data is collected at all, there is no risk of personal information being gathered from minors.
+Latch does not knowingly collect any information from anyone, including children under 13. Since no data is collected at all, there is no risk of personal information being gathered from minors.
 
 ## Changes to This Policy
 

@@ -46,7 +46,7 @@ class _AuthMethodSelectionScreenState extends State<AuthMethodSelectionScreen> {
 
               // Welcome Title
               Text(
-                'Welcome to Locker',
+                'Welcome to Latch',
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.w700,

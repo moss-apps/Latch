@@ -112,6 +112,10 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
   PreferredSizeWidget _buildAppBar(
       bool isSelectionMode, Set<String> selectedFiles) {
     if (isSelectionMode) {
+      final visibleFiles = _getVisibleFiles();
+      final allSelected = visibleFiles.isNotEmpty &&
+          visibleFiles.every((f) => selectedFiles.contains(f.id));
+
       return AppBar(
         backgroundColor: context.accentColor,
         leading: IconButton(
@@ -126,6 +130,16 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
           ),
         ),
         actions: [
+          TextButton(
+            onPressed: _toggleSelectAll,
+            child: Text(
+              allSelected ? 'Deselect All' : 'Select All',
+              style: const TextStyle(
+                color: Colors.white,
+                fontFamily: 'ProductSans',
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.visibility_outlined, color: Colors.white),
             onPressed: () => _unhideSelectedFiles(selectedFiles),
@@ -941,6 +955,63 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
   void _exitSelectionMode() {
     ref.read(isSelectionModeProvider.notifier).state = false;
     ref.read(selectedFilesProvider.notifier).state = {};
+  }
+
+  List<VaultedFile> _getVisibleFiles() {
+    final allFiles = ref.read(vaultNotifierProvider).value ?? [];
+    final filterType = switch (_tabController.index) {
+      1 => VaultedFileType.image,
+      2 => VaultedFileType.video,
+      3 => VaultedFileType.song,
+      4 => VaultedFileType.document,
+      _ => null,
+    };
+
+    List<VaultedFile> files;
+    if (filterType == null) {
+      files = allFiles;
+    } else if (filterType == VaultedFileType.document) {
+      files = allFiles
+          .where((f) =>
+              f.type == VaultedFileType.document ||
+              f.type == VaultedFileType.other)
+          .toList();
+    } else {
+      files = allFiles.where((f) => f.type == filterType).toList();
+    }
+
+    final searchQuery = ref.read(searchQueryProvider);
+    if (searchQuery.isNotEmpty) {
+      files = files
+          .where((f) => f.originalName
+              .toLowerCase()
+              .contains(searchQuery.toLowerCase()))
+          .toList();
+    }
+
+    final sortOption = ref.read(sortOptionProvider);
+    return ref.read(vaultServiceProvider).sortFiles(files, sortOption);
+  }
+
+  void _toggleSelectAll() {
+    final visible = _getVisibleFiles();
+    final selected = ref.read(selectedFilesProvider);
+    final allSelected =
+        visible.isNotEmpty && visible.every((f) => selected.contains(f.id));
+
+    if (allSelected) {
+      final newSelection = Set<String>.from(selected)
+        ..removeAll(visible.map((f) => f.id));
+      ref.read(selectedFilesProvider.notifier).state = newSelection;
+      if (newSelection.isEmpty) {
+        ref.read(isSelectionModeProvider.notifier).state = false;
+      }
+    } else {
+      final newSelection = Set<String>.from(selected)
+        ..addAll(visible.map((f) => f.id));
+      ref.read(selectedFilesProvider.notifier).state = newSelection;
+      ref.read(isSelectionModeProvider.notifier).state = true;
+    }
   }
 
   void _openFile(VaultedFile file) {
@@ -1771,7 +1842,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
             ),
             const SizedBox(height: 16),
             const Text(
-              'Locker',
+              'Latch',
               style: TextStyle(
                 fontFamily: 'ProductSans',
                 color: Colors.white,

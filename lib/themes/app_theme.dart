@@ -4,7 +4,7 @@ import 'app_colors.dart';
 import '../models/accent_color.dart';
 
 /// App Theme Configuration
-/// Provides light and dark theme configurations for the Locker app
+/// Provides light and dark theme configurations for the Latch app
 class AppTheme {
   AppTheme._(); // Private constructor to prevent instantiation
 
