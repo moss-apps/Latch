@@ -76,6 +76,10 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     final fileCount = favoritesAsync.value?.length ?? 0;
 
     if (_isSelectionMode) {
+      final files = (ref.read(favoriteFilesProvider).value ?? []);
+      final allSelected = files.isNotEmpty &&
+          files.every((f) => _selectedFiles.contains(f.id));
+
       return AppBar(
         backgroundColor: context.accentColor,
         leading: IconButton(
@@ -90,6 +94,17 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
           ),
         ),
         actions: [
+          if (files.isNotEmpty)
+            TextButton(
+              onPressed: _toggleSelectAll,
+              child: Text(
+                allSelected ? 'Deselect All' : 'Select All',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'ProductSans',
+                ),
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.favorite_border, color: Colors.white),
             onPressed: _unfavoriteSelected,
@@ -456,6 +471,22 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         }
       } else {
         _selectedFiles.add(fileId);
+      }
+    });
+  }
+
+  void _toggleSelectAll() {
+    final files = (ref.read(favoriteFilesProvider).value ?? []);
+    final allSelected =
+        files.isNotEmpty && files.every((f) => _selectedFiles.contains(f.id));
+
+    setState(() {
+      if (allSelected) {
+        _selectedFiles.clear();
+        _isSelectionMode = false;
+      } else {
+        _selectedFiles.addAll(files.map((f) => f.id));
+        _isSelectionMode = true;
       }
     });
   }
