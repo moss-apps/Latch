@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import '../models/album.dart';
 import '../models/encryption_algorithm.dart';
+import '../models/vault_folder.dart';
 import '../models/vaulted_file.dart';
 import '../services/vault_service.dart';
 import '../services/decoy_service.dart';
@@ -132,6 +133,42 @@ final filesInAlbumProvider =
   final sortOption = ref.watch(sortOptionProvider);
 
   final files = await vaultService.getFilesInAlbum(albumId);
+  return vaultService.sortFiles(files, sortOption);
+});
+
+/// Provider for all folders
+final foldersProvider = FutureProvider<List<VaultFolder>>((ref) async {
+  final vaultService = ref.watch(vaultServiceProvider);
+  return await vaultService.getAllFolders();
+});
+
+/// Provider for folder by ID
+final folderProvider =
+    FutureProvider.family<VaultFolder?, String>((ref, folderId) async {
+  final vaultService = ref.watch(vaultServiceProvider);
+  return await vaultService.getFolderById(folderId);
+});
+
+/// Provider for root folders
+final rootFoldersProvider = FutureProvider<List<VaultFolder>>((ref) async {
+  final vaultService = ref.watch(vaultServiceProvider);
+  return await vaultService.getRootFolders();
+});
+
+/// Provider for subfolders of a folder
+final subfoldersProvider =
+    FutureProvider.family<List<VaultFolder>, String>((ref, parentId) async {
+  final vaultService = ref.watch(vaultServiceProvider);
+  return await vaultService.getSubfolders(parentId);
+});
+
+/// Provider for files in folder
+final filesInFolderProvider =
+    FutureProvider.family<List<VaultedFile>, String>((ref, folderId) async {
+  final vaultService = ref.watch(vaultServiceProvider);
+  final sortOption = ref.watch(sortOptionProvider);
+
+  final files = await vaultService.getFilesInFolder(folderId);
   return vaultService.sortFiles(files, sortOption);
 });
 
@@ -288,6 +325,22 @@ class VaultNotifier extends Notifier<AsyncValue<List<VaultedFile>>> {
     }
     return result;
   }
+
+  Future<bool> addToFolder(String fileId, String folderId) async {
+    final result = await _vaultService.addFileToFolder(fileId, folderId);
+    if (result) {
+      await loadFiles();
+    }
+    return result;
+  }
+
+  Future<bool> removeFromFolder(String fileId, String folderId) async {
+    final result = await _vaultService.removeFileFromFolder(fileId, folderId);
+    if (result) {
+      await loadFiles();
+    }
+    return result;
+  }
 }
 
 /// Provider for vault notifier
@@ -353,6 +406,81 @@ class AlbumsNotifier extends Notifier<AsyncValue<List<Album>>> {
 final albumsNotifierProvider =
     NotifierProvider<AlbumsNotifier, AsyncValue<List<Album>>>(() {
   return AlbumsNotifier();
+});
+
+/// Notifier for managing folders
+class FoldersNotifier extends Notifier<AsyncValue<List<VaultFolder>>> {
+  @override
+  AsyncValue<List<VaultFolder>> build() {
+    loadFolders();
+    return const AsyncValue.loading();
+  }
+
+  VaultService get _vaultService => ref.read(vaultServiceProvider);
+
+  Future<void> loadFolders() async {
+    state = const AsyncValue.loading();
+    try {
+      final folders = await _vaultService.getAllFolders();
+      state = AsyncValue.data(folders);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<VaultFolder?> createFolder({
+    required String name,
+    String? parentId,
+    String? description,
+  }) async {
+    final folder = await _vaultService.createFolder(
+      name: name,
+      parentId: parentId,
+      description: description,
+    );
+    if (folder != null) {
+      await loadFolders();
+    }
+    return folder;
+  }
+
+  Future<VaultFolder?> updateFolder(VaultFolder folder) async {
+    final updated = await _vaultService.updateFolder(folder);
+    if (updated != null) {
+      await loadFolders();
+    }
+    return updated;
+  }
+
+  Future<bool> deleteFolder(String folderId, {bool deleteContents = false}) async {
+    final deleted = await _vaultService.deleteFolder(folderId, deleteContents: deleteContents);
+    if (deleted) {
+      await loadFolders();
+    }
+    return deleted;
+  }
+
+  Future<bool> addFileToFolder(String fileId, String folderId) async {
+    final result = await _vaultService.addFileToFolder(fileId, folderId);
+    if (result) {
+      await loadFolders();
+    }
+    return result;
+  }
+
+  Future<bool> removeFileFromFolder(String fileId, String folderId) async {
+    final result = await _vaultService.removeFileFromFolder(fileId, folderId);
+    if (result) {
+      await loadFolders();
+    }
+    return result;
+  }
+}
+
+/// Provider for folders notifier
+final foldersNotifierProvider =
+    NotifierProvider<FoldersNotifier, AsyncValue<List<VaultFolder>>>(() {
+  return FoldersNotifier();
 });
 
 // ========== UTILITY PROVIDERS ==========
