@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:crypto/crypto.dart';
 import '../models/vaulted_file.dart';
 import '../models/album.dart';
+import '../models/encryption_algorithm.dart';
 import 'encryption_service.dart';
 import 'compression_service.dart';
 
@@ -604,14 +605,21 @@ class VaultService {
 
         if (shouldEncrypt) {
           onEncryptionProgress?.call(0, fileSize);
-          final encResult = await _encryptionService.encryptBytesStreamed(
-            compressedImageBytes,
-            vaultPath,
-            isDecoy: isDecoy,
-            onProgress: (processed, total) {
-              onEncryptionProgress?.call(processed, total);
-            },
-          );
+          final useGcm = _cachedSettings?.encryptionAlgorithm == EncryptionAlgorithm.aes256Gcm;
+          final encResult = useGcm
+              ? await _encryptionService.encryptBytesStreamedGcm(
+                  compressedImageBytes,
+                  vaultPath,
+                  isDecoy: isDecoy,
+                )
+              : await _encryptionService.encryptBytesStreamed(
+                  compressedImageBytes,
+                  vaultPath,
+                  isDecoy: isDecoy,
+                  onProgress: (processed, total) {
+                    onEncryptionProgress?.call(processed, total);
+                  },
+                );
           onEncryptionProgress?.call(fileSize, fileSize);
 
           if (!encResult.success) {
@@ -636,6 +644,7 @@ class VaultService {
 
         if (shouldEncrypt) {
           onEncryptionProgress?.call(0, fileSize);
+          final useGcm = _cachedSettings?.encryptionAlgorithm == EncryptionAlgorithm.aes256Gcm;
           final useIsolateEncryption =
               fileSize >= _largeFileIsolateThresholdBytes &&
                   onEncryptionProgress == null;
@@ -644,19 +653,28 @@ class VaultService {
                   sourcePathToUse,
                   vaultPath,
                   isDecoy: isDecoy,
-                  useGcm: false,
+                  useGcm: useGcm,
                   onProgress: (processed, total) {
                     onEncryptionProgress?.call(processed, total);
                   },
                 )
-              : await _encryptionService.encryptFileStreamed(
-                  sourcePathToUse,
-                  vaultPath,
-                  isDecoy: isDecoy,
-                  onProgress: (processed, total) {
-                    onEncryptionProgress?.call(processed, total);
-                  },
-                );
+              : useGcm
+                  ? await _encryptionService.encryptFileStreamedGcm(
+                      sourcePathToUse,
+                      vaultPath,
+                      isDecoy: isDecoy,
+                      onProgress: (processed, total) {
+                        onEncryptionProgress?.call(processed, total);
+                      },
+                    )
+                  : await _encryptionService.encryptFileStreamed(
+                      sourcePathToUse,
+                      vaultPath,
+                      isDecoy: isDecoy,
+                      onProgress: (processed, total) {
+                        onEncryptionProgress?.call(processed, total);
+                      },
+                    );
           onEncryptionProgress?.call(fileSize, fileSize);
 
           if (!encResult.success) {
@@ -1535,6 +1553,62 @@ class VaultService {
     }
   }
 
+  /// Re-encrypt all vault files to a target algorithm
+  /// Returns the number of files re-encrypted, or -1 on failure
+  Future<int> reEncryptVault(
+    EncryptionAlgorithm targetAlgorithm, {
+    bool isDecoy = false,
+    Function(int current, int total)? onProgress,
+  }) async {
+    try {
+      final files = isDecoy
+          ? (await getAllFiles(isDecoy: true))
+          : (await getAllFiles(isDecoy: false));
+      final encryptedFiles = files.where((f) => f.isEncrypted).toList();
+
+      if (encryptedFiles.isEmpty) return 0;
+
+      int reEncryptedCount = 0;
+      for (int i = 0; i < encryptedFiles.length; i++) {
+        onProgress?.call(i + 1, encryptedFiles.length);
+
+        final file = encryptedFiles[i];
+        if (!await File(file.vaultPath).exists()) continue;
+
+        final currentFormat = _encryptionService.detectFileFormat(file.vaultPath);
+        final targetIsGcm = targetAlgorithm == EncryptionAlgorithm.aes256Gcm;
+        final currentIsGcm = currentFormat == 1;
+
+        if (currentIsGcm == targetIsGcm && currentFormat != 0 && currentFormat != 3) continue;
+
+        final newIv = await _encryptionService.reEncryptFile(
+          file.vaultPath,
+          file.encryptionIv ?? '',
+          targetAlgorithm: targetAlgorithm,
+          isDecoy: isDecoy,
+        );
+
+        final fileIndex = files.indexWhere((f) => f.id == file.id);
+        if (fileIndex >= 0) {
+          files[fileIndex] = file.copyWith(encryptionIv: newIv);
+          reEncryptedCount++;
+        }
+      }
+
+      if (isDecoy) {
+        _cachedDecoyFiles = files;
+      } else {
+        _cachedFiles = files;
+      }
+
+      await _saveFileIndex(isDecoy: isDecoy);
+      return reEncryptedCount;
+    } catch (e) {
+      debugPrint('Re-encryption error: $e');
+      return -1;
+    }
+  }
+
   /// Clear all vault data (use with caution!)
   Future<void> clearVault({bool isDecoy = false}) async {
     try {
@@ -1610,6 +1684,8 @@ class FileToVault {
 /// Vault settings
 class VaultSettings {
   final bool encryptionEnabled;
+  final EncryptionAlgorithm encryptionAlgorithm;
+  final int kdfIterations;
   final bool secureDelete;
   final bool screenshotProtectionEnabled;
   final int autoKillDelaySeconds;
@@ -1628,6 +1704,8 @@ class VaultSettings {
 
   const VaultSettings({
     this.encryptionEnabled = false,
+    this.encryptionAlgorithm = EncryptionAlgorithm.aes256Ctr,
+    this.kdfIterations = 100000,
     this.secureDelete = true,
     this.screenshotProtectionEnabled = false,
     this.autoKillDelaySeconds = 0,
@@ -1647,6 +1725,8 @@ class VaultSettings {
 
   VaultSettings copyWith({
     bool? encryptionEnabled,
+    EncryptionAlgorithm? encryptionAlgorithm,
+    int? kdfIterations,
     bool? secureDelete,
     bool? screenshotProtectionEnabled,
     int? autoKillDelaySeconds,
@@ -1665,6 +1745,8 @@ class VaultSettings {
   }) {
     return VaultSettings(
       encryptionEnabled: encryptionEnabled ?? this.encryptionEnabled,
+      encryptionAlgorithm: encryptionAlgorithm ?? this.encryptionAlgorithm,
+      kdfIterations: kdfIterations ?? this.kdfIterations,
       secureDelete: secureDelete ?? this.secureDelete,
       screenshotProtectionEnabled:
           screenshotProtectionEnabled ?? this.screenshotProtectionEnabled,
@@ -1691,6 +1773,8 @@ class VaultSettings {
 
   Map<String, dynamic> toJson() => {
         'encryptionEnabled': encryptionEnabled,
+        'encryptionAlgorithm': encryptionAlgorithm.name,
+        'kdfIterations': kdfIterations,
         'secureDelete': secureDelete,
         'screenshotProtectionEnabled': screenshotProtectionEnabled,
         'autoKillDelaySeconds': autoKillDelaySeconds,
@@ -1711,6 +1795,11 @@ class VaultSettings {
   factory VaultSettings.fromJson(Map<String, dynamic> json) {
     return VaultSettings(
       encryptionEnabled: json['encryptionEnabled'] as bool? ?? false,
+      encryptionAlgorithm: EncryptionAlgorithm.values.firstWhere(
+        (a) => a.name == (json['encryptionAlgorithm'] as String? ?? 'aes256Ctr'),
+        orElse: () => EncryptionAlgorithm.aes256Ctr,
+      ),
+      kdfIterations: json['kdfIterations'] as int? ?? 100000,
       secureDelete: json['secureDelete'] as bool? ?? true,
       screenshotProtectionEnabled:
           json['screenshotProtectionEnabled'] as bool? ?? false,
