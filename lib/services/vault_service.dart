@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:crypto/crypto.dart';
 import '../models/vaulted_file.dart';
 import '../models/album.dart';
+import '../models/vault_folder.dart';
 import '../models/encryption_algorithm.dart';
 import 'encryption_service.dart';
 import 'compression_service.dart';
@@ -72,6 +73,7 @@ class VaultService {
   static const String _settingsKey = 'vault_settings';
   static const String _vaultFolderName = '.locker_vault';
   static const String _decoyFolderName = '.locker_decoy';
+  static const String _foldersKey = 'vault_folders';
 
   final EncryptionService _encryptionService = EncryptionService.instance;
 
@@ -80,6 +82,7 @@ class VaultService {
   List<VaultedFile>? _cachedFiles;
   List<VaultedFile>? _cachedDecoyFiles;
   List<Album>? _cachedAlbums;
+  List<VaultFolder>? _cachedFolders;
   List<TagInfo>? _cachedTags;
   VaultSettings? _cachedSettings;
 
@@ -89,6 +92,7 @@ class VaultService {
     await _ensureVaultDirectory();
     await _loadFileIndex();
     await _loadAlbums();
+    await _loadFolders();
     await _loadTags();
     await _loadSettings();
   }
@@ -280,6 +284,40 @@ class VaultService {
       await _storage.write(key: _albumsKey, value: jsonEncode(jsonList));
     } catch (e) {
       debugPrint('Error saving albums: $e');
+    }
+  }
+
+  /// Load folders from secure storage
+  Future<List<VaultFolder>> _loadFolders() async {
+    if (_cachedFolders != null) return _cachedFolders!;
+
+    try {
+      final foldersJson = await _storage.read(key: _foldersKey);
+      if (foldersJson == null || foldersJson.isEmpty) {
+        _cachedFolders = [];
+        return _cachedFolders!;
+      }
+
+      final List<dynamic> jsonList = jsonDecode(foldersJson);
+      _cachedFolders = jsonList
+          .map((json) => VaultFolder.fromJson(json as Map<String, dynamic>))
+          .toList();
+
+      return _cachedFolders!;
+    } catch (e) {
+      debugPrint('Error loading folders: $e');
+      _cachedFolders = [];
+      return _cachedFolders!;
+    }
+  }
+
+  /// Save folders to secure storage
+  Future<void> _saveFolders() async {
+    try {
+      final jsonList = _cachedFolders?.map((f) => f.toJson()).toList() ?? [];
+      await _storage.write(key: _foldersKey, value: jsonEncode(jsonList));
+    } catch (e) {
+      debugPrint('Error saving folders: $e');
     }
   }
 
@@ -1145,6 +1183,361 @@ class VaultService {
     return files.where((f) => album.fileIds.contains(f.id)).toList();
   }
 
+  // ========== FOLDER OPERATIONS ==========
+
+  /// Get all folders
+  Future<List<VaultFolder>> getAllFolders() async {
+    return await _loadFolders();
+  }
+
+  /// Get folder by ID
+  Future<VaultFolder?> getFolderById(String folderId) async {
+    final folders = await _loadFolders();
+    try {
+      return folders.firstWhere((f) => f.id == folderId);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Get root folders (no parent)
+  Future<List<VaultFolder>> getRootFolders() async {
+    final folders = await _loadFolders();
+    return folders.where((f) => f.isRoot).toList();
+  }
+
+  /// Get subfolders of a folder
+  Future<List<VaultFolder>> getSubfolders(String parentId) async {
+    final folders = await _loadFolders();
+    return folders.where((f) => f.parentId == parentId).toList();
+  }
+
+  /// Create a new folder
+  Future<VaultFolder?> createFolder({
+    required String name,
+    String? parentId,
+    String? description,
+  }) async {
+    try {
+      final now = DateTime.now();
+      final id = sha256
+          .convert(utf8.encode('$name${now.millisecondsSinceEpoch}'))
+          .toString()
+          .substring(0, 16);
+
+      final folder = VaultFolder(
+        id: id,
+        name: name,
+        parentId: parentId,
+        description: description,
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      _cachedFolders ??= [];
+      _cachedFolders!.add(folder);
+
+      if (parentId != null) {
+        final parentIndex =
+            _cachedFolders!.indexWhere((f) => f.id == parentId);
+        if (parentIndex != -1) {
+          _cachedFolders![parentIndex] =
+              _cachedFolders![parentIndex].addSubfolder(id);
+        }
+      }
+
+      await _saveFolders();
+
+      return folder;
+    } catch (e) {
+      debugPrint('Error creating folder: $e');
+      return null;
+    }
+  }
+
+  /// Update a folder
+  Future<VaultFolder?> updateFolder(VaultFolder updatedFolder) async {
+    try {
+      final folders = await _loadFolders();
+      final index = folders.indexWhere((f) => f.id == updatedFolder.id);
+
+      if (index == -1) return null;
+
+      _cachedFolders![index] =
+          updatedFolder.copyWith(updatedAt: DateTime.now());
+      await _saveFolders();
+
+      return _cachedFolders![index];
+    } catch (e) {
+      debugPrint('Error updating folder: $e');
+      return null;
+    }
+  }
+
+  /// Delete a folder and optionally its subfolders
+  Future<bool> deleteFolder(String folderId, {bool deleteContents = false}) async {
+    try {
+      final folders = await _loadFolders();
+      final folder = folders.firstWhere(
+        (f) => f.id == folderId,
+        orElse: () => throw Exception('Folder not found'),
+      );
+
+      if (deleteContents) {
+        for (final subfolderId in folder.subfolderIds) {
+          await deleteFolder(subfolderId, deleteContents: true);
+        }
+
+        for (final fileId in folder.fileIds) {
+          await removeFile(fileId);
+        }
+      } else {
+        for (final fileId in folder.fileIds) {
+          final file = await getFileById(fileId);
+          if (file != null) {
+            await updateFile(file.removeFromFolder());
+          }
+        }
+
+        for (final subfolderId in folder.subfolderIds) {
+          final subfolder = await getFolderById(subfolderId);
+          if (subfolder != null) {
+            await updateFolder(subfolder.copyWith(parentId: folder.parentId));
+            if (folder.parentId != null) {
+              final parentIndex =
+                  _cachedFolders!.indexWhere((f) => f.id == folder.parentId);
+              if (parentIndex != -1) {
+                _cachedFolders![parentIndex] =
+                    _cachedFolders![parentIndex].addSubfolder(subfolderId);
+              }
+            }
+          }
+        }
+      }
+
+      if (folder.parentId != null) {
+        final parentIndex =
+            _cachedFolders!.indexWhere((f) => f.id == folder.parentId);
+        if (parentIndex != -1) {
+          _cachedFolders![parentIndex] =
+              _cachedFolders![parentIndex].removeSubfolder(folderId);
+        }
+      }
+
+      _cachedFolders!.removeWhere((f) => f.id == folderId);
+      await _saveFolders();
+
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting folder: $e');
+      return false;
+    }
+  }
+
+  /// Add file to folder
+  Future<bool> addFileToFolder(String fileId, String folderId) async {
+    try {
+      final file = await getFileById(fileId);
+      if (file == null) return false;
+
+      final folders = await _loadFolders();
+      final folderIndex = folders.indexWhere((f) => f.id == folderId);
+      if (folderIndex == -1) return false;
+
+      if (file.folderId != null && file.folderId != folderId) {
+        final oldFolderIndex =
+            _cachedFolders!.indexWhere((f) => f.id == file.folderId);
+        if (oldFolderIndex != -1) {
+          _cachedFolders![oldFolderIndex] =
+              _cachedFolders![oldFolderIndex].removeFile(fileId);
+        }
+      }
+
+      _cachedFolders![folderIndex] =
+          _cachedFolders![folderIndex].addFile(fileId);
+      await _saveFolders();
+
+      final updatedFile = file.addToFolder(folderId);
+      await updateFile(updatedFile);
+
+      return true;
+    } catch (e) {
+      debugPrint('Error adding file to folder: $e');
+      return false;
+    }
+  }
+
+  /// Remove file from folder
+  Future<bool> removeFileFromFolder(String fileId, String folderId) async {
+    try {
+      final folders = await _loadFolders();
+      final folderIndex = folders.indexWhere((f) => f.id == folderId);
+      if (folderIndex == -1) return false;
+
+      _cachedFolders![folderIndex] =
+          _cachedFolders![folderIndex].removeFile(fileId);
+      await _saveFolders();
+
+      final file = await getFileById(fileId);
+      if (file != null && file.folderId == folderId) {
+        await updateFile(file.removeFromFolder());
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('Error removing file from folder: $e');
+      return false;
+    }
+  }
+
+  /// Get files in folder
+  Future<List<VaultedFile>> getFilesInFolder(String folderId) async {
+    final folder = await getFolderById(folderId);
+    if (folder == null) return [];
+
+    final files = await getAllFiles();
+    return files.where((f) => folder.fileIds.contains(f.id)).toList();
+  }
+
+  /// Import a device folder: create a VaultFolder from a filesystem path
+  /// and import all files within it
+  Future<FolderImportResult> importDeviceFolder(
+    String deviceFolderPath, {
+    String? parentFolderId,
+    bool recursive = true,
+    bool deleteOriginals = false,
+    bool encrypt = false,
+    bool isDecoy = false,
+    Function(int current, int total)? onProgress,
+    Function(String fileName, int fileNumber, int total)? onFileProgress,
+  }) async {
+    final deviceDir = Directory(deviceFolderPath);
+    if (!await deviceDir.exists()) {
+      return FolderImportResult(foldersCreated: 0, filesImported: 0, errors: ['Directory does not exist: $deviceFolderPath']);
+    }
+
+    final folderName = deviceDir.path.split('/').last;
+    final folder = await createFolder(
+      name: folderName,
+      parentId: parentFolderId,
+    );
+    if (folder == null) {
+      return FolderImportResult(foldersCreated: 0, filesImported: 0, errors: ['Failed to create folder']);
+    }
+
+    int foldersCreated = 1;
+    int filesImported = 0;
+    final errors = <String>[];
+
+    final allFiles = <FileToVault>[];
+    final subfolderPaths = <String>[];
+
+    await _collectFilesFromDirectory(
+      deviceDir,
+      allFiles: allFiles,
+      subfolderPaths: subfolderPaths,
+      recursive: recursive,
+    );
+
+    final totalFiles = allFiles.length;
+    if (totalFiles > 0) {
+      final importedFiles = await addFiles(
+        files: allFiles,
+        deleteOriginals: deleteOriginals,
+        encrypt: encrypt,
+        isDecoy: isDecoy,
+        onProgress: onProgress,
+        onFileProgress: onFileProgress != null
+            ? (info) => onFileProgress(info.fileName, info.current, info.total)
+            : null,
+      );
+
+      for (final importedFile in importedFiles) {
+        await addFileToFolder(importedFile.id, folder.id);
+        filesImported++;
+      }
+    }
+
+    if (recursive) {
+      for (final subPath in subfolderPaths) {
+        final subResult = await importDeviceFolder(
+          subPath,
+          parentFolderId: folder.id,
+          recursive: true,
+          deleteOriginals: deleteOriginals,
+          encrypt: encrypt,
+          isDecoy: isDecoy,
+        );
+        foldersCreated += subResult.foldersCreated;
+        filesImported += subResult.filesImported;
+        errors.addAll(subResult.errors);
+      }
+    }
+
+    return FolderImportResult(
+      foldersCreated: foldersCreated,
+      filesImported: filesImported,
+      errors: errors,
+      rootFolder: folder,
+    );
+  }
+
+  Future<void> _collectFilesFromDirectory(
+    Directory dir, {
+    required List<FileToVault> allFiles,
+    required List<String> subfolderPaths,
+    required bool recursive,
+  }) async {
+    try {
+      await for (final entity in dir.list()) {
+        if (entity is File) {
+          final file = entity;
+          final fileName = file.path.split('/').last;
+          if (fileName.startsWith('.')) continue;
+
+          final extension = fileName.contains('.')
+              ? fileName.split('.').last.toLowerCase()
+              : '';
+          final mimeType = _getMimeTypeFromExtension(extension);
+          final fileType = getFileTypeFromExtension(extension);
+
+          allFiles.add(FileToVault(
+            sourcePath: file.path,
+            originalName: fileName,
+            type: fileType,
+            mimeType: mimeType,
+          ));
+        } else if (entity is Directory && recursive) {
+          final dirName = entity.path.split('/').last;
+          if (dirName.startsWith('.')) continue;
+          subfolderPaths.add(entity.path);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error collecting files from directory: $e');
+    }
+  }
+
+  String _getMimeTypeFromExtension(String extension) {
+    const mimeMap = {
+      'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png',
+      'gif': 'image/gif', 'webp': 'image/webp', 'bmp': 'image/bmp',
+      'heic': 'image/heic', 'heif': 'image/heif',
+      'mp4': 'video/mp4', 'mov': 'video/quicktime', 'avi': 'video/x-msvideo',
+      'mkv': 'video/x-matroska', 'webm': 'video/webm',
+      'mp3': 'audio/mpeg', 'wav': 'audio/wav', 'flac': 'audio/flac',
+      'aac': 'audio/aac', 'ogg': 'audio/ogg', 'm4a': 'audio/mp4',
+      'pdf': 'application/pdf', 'doc': 'application/msword',
+      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'txt': 'text/plain', 'rtf': 'application/rtf',
+      'zip': 'application/zip', 'rar': 'application/x-rar-compressed',
+      '7z': 'application/x-7z-compressed',
+      'json': 'application/json', 'xml': 'application/xml',
+      'csv': 'text/csv', 'html': 'text/html', 'htm': 'text/html',
+    };
+    return mimeMap[extension.toLowerCase()] ?? 'application/octet-stream';
+  }
+
   // ========== TAG OPERATIONS ==========
 
   /// Get all unique tags
@@ -1628,9 +2021,11 @@ class VaultService {
       } else {
         _cachedFiles = [];
         _cachedAlbums = null;
+        _cachedFolders = null;
         _cachedTags = null;
         await _storage.delete(key: _vaultIndexKey);
         await _storage.delete(key: _albumsKey);
+        await _storage.delete(key: _foldersKey);
         await _storage.delete(key: _tagsKey);
         _vaultDirectory = null;
       }
@@ -1644,9 +2039,11 @@ class VaultService {
     _cachedFiles = null;
     _cachedDecoyFiles = null;
     _cachedAlbums = null;
+    _cachedFolders = null;
     _cachedTags = null;
     await _loadFileIndex();
     await _loadAlbums();
+    await _loadFolders();
     await _loadTags();
   }
 
@@ -1678,6 +2075,21 @@ class FileToVault {
     required this.originalName,
     required this.type,
     required this.mimeType,
+  });
+}
+
+/// Result of importing a device folder
+class FolderImportResult {
+  final int foldersCreated;
+  final int filesImported;
+  final List<String> errors;
+  final VaultFolder? rootFolder;
+
+  const FolderImportResult({
+    required this.foldersCreated,
+    required this.filesImported,
+    this.errors = const [],
+    this.rootFolder,
   });
 }
 
