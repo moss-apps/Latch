@@ -15,6 +15,7 @@ import '../services/vault_service.dart';
 import '../themes/app_colors.dart';
 import 'accent_color_picker_screen.dart';
 import 'change_security_screen.dart';
+import 'encryption_settings_screen.dart';
 import 'local_backup_screen.dart';
 import 'privacy_policy_screen.dart';
 
@@ -29,7 +30,7 @@ class VaultSettingsScreen extends ConsumerStatefulWidget {
 class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
   static const List<int> _autoKillDelayOptions = [0, 5, 10, 30, 60];
   static const List<int> _lockoutAttemptOptions = [3, 5, 7, 10];
-  static const List<int> _lockoutDurationOptions = [30, 60, 300, 900];
+  static const List<int> _lockoutDurationOptions = [30, 60, 300, 900, 1800, 3600, 7200];
   static const List<int> _wipeAttemptOptions = [10, 15, 20, 30];
 
   late Future<PackageInfo> _packageInfoFuture;
@@ -123,6 +124,33 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (context) => const ChangeSecurityScreen(),
+                    ),
+                  );
+                },
+                contentPadding: EdgeInsets.zero,
+              ),
+              ListTile(
+                leading: Icon(
+                  Icons.enhanced_encryption_outlined,
+                  color: context.accentColor,
+                ),
+                title: const Text(
+                  'Encryption Settings',
+                  style: TextStyle(fontFamily: 'ProductSans'),
+                ),
+                subtitle: Text(
+                  'Algorithm, KDF iterations, re-encryption',
+                  style: TextStyle(
+                    fontFamily: 'ProductSans',
+                    fontSize: 12,
+                    color: context.textTertiary,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const EncryptionSettingsScreen(),
                     ),
                   );
                 },
@@ -768,8 +796,13 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
       return '${seconds}s';
     }
 
-    final minutes = seconds ~/ 60;
-    return minutes == 1 ? '1 min' : '$minutes min';
+    if (seconds < 3600) {
+      final minutes = seconds ~/ 60;
+      return minutes == 1 ? '1 min' : '$minutes min';
+    }
+
+    final hours = seconds ~/ 3600;
+    return hours == 1 ? '1 hr' : '$hours hr';
   }
 
   String _autoKillDelayLabel(int seconds) {
