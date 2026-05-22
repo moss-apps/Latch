@@ -6,6 +6,7 @@ import 'package:mime/mime.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:photo_manager/photo_manager.dart';
 import '../models/vaulted_file.dart';
+import '../models/vault_folder.dart';
 import 'auto_kill_service.dart';
 import 'decoy_service.dart';
 import 'media_scanner_service.dart';
@@ -1583,6 +1584,75 @@ class FileImportService {
     return null;
   }
 
+  /// Import a folder from the device filesystem
+  Future<FolderImportResult> importFolder({
+    required String folderPath,
+    String? parentFolderId,
+    bool recursive = true,
+    bool deleteOriginals = false,
+    Function(int current, int total)? onProgress,
+    Function(String fileName, int fileNumber, int total)? onFileProgress,
+  }) async {
+    try {
+      final hasAllFilesAccess = await _permissionService.hasAllFilesAccess();
+      if (!hasAllFilesAccess) {
+        return FolderImportResult(
+          success: false,
+          error: 'All Files Access permission required to import folders',
+          foldersCreated: 0,
+          filesImported: 0,
+          importedFiles: [],
+          importedFolders: [],
+        );
+      }
+
+      final dir = Directory(folderPath);
+      if (!await dir.exists()) {
+        return FolderImportResult(
+          success: false,
+          error: 'Directory does not exist: $folderPath',
+          foldersCreated: 0,
+          filesImported: 0,
+          importedFiles: [],
+          importedFolders: [],
+        );
+      }
+
+      final result = await _vaultService.importDeviceFolder(
+        folderPath,
+        parentFolderId: parentFolderId,
+        recursive: recursive,
+        deleteOriginals: deleteOriginals,
+        encrypt: false,
+        isDecoy: _decoyService.isDecoyModeActive,
+        onProgress: onProgress,
+        onFileProgress: onFileProgress,
+      );
+
+      return FolderImportResult(
+        success: true,
+        foldersCreated: result.foldersCreated,
+        filesImported: result.filesImported,
+        errors: result.errors,
+        rootFolder: result.rootFolder,
+        importedFiles: [],
+        importedFolders: [],
+        message: 'Imported ${result.filesImported} file(s) into ${result.foldersCreated} folder(s)',
+      );
+    } catch (e, stackTrace) {
+      debugPrint('[FileImport] Error importing folder: $e');
+      debugPrint('[FileImport] Stack trace: $stackTrace');
+      return FolderImportResult(
+        success: false,
+        error: 'Failed to import folder: $e',
+        foldersCreated: 0,
+        filesImported: 0,
+        importedFiles: [],
+        importedFolders: [],
+      );
+    }
+  }
+
   /// Delete files directly (for non-gallery files)
   Future<void> _deleteFiles(List<String> paths) async {
     for (final path in paths) {
@@ -1725,5 +1795,38 @@ class OfficeImportResult {
       return 'OfficeImportResult: Success - ${message ?? "Imported $importedCount file(s), converted $convertedCount, skipped $skippedCount"}';
     }
     return 'OfficeImportResult: Failed - $error';
+  }
+}
+
+/// Result of a folder import operation
+class FolderImportResult {
+  final bool success;
+  final String? error;
+  final String? message;
+  final int foldersCreated;
+  final int filesImported;
+  final List<VaultedFile> importedFiles;
+  final List<VaultFolder> importedFolders;
+  final VaultFolder? rootFolder;
+  final List<String> errors;
+
+  const FolderImportResult({
+    required this.success,
+    this.error,
+    this.message,
+    required this.foldersCreated,
+    required this.filesImported,
+    required this.importedFiles,
+    required this.importedFolders,
+    this.rootFolder,
+    this.errors = const [],
+  });
+
+  @override
+  String toString() {
+    if (success) {
+      return 'FolderImportResult: Success - ${message ?? "Imported $filesImported file(s) into $foldersCreated folder(s)"}';
+    }
+    return 'FolderImportResult: Failed - $error';
   }
 }
