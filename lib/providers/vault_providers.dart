@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import '../models/album.dart';
+import '../models/encryption_algorithm.dart';
 import '../models/vaulted_file.dart';
 import '../services/vault_service.dart';
 import '../services/decoy_service.dart';
@@ -376,4 +377,61 @@ final fileCountSummaryProvider = FutureProvider<String>((ref) async {
   final counts = await ref.watch(fileCountsProvider.future);
   final total = counts.values.fold<int>(0, (sum, count) => sum + count);
   return '$total files';
+});
+
+class ReEncryptProgress {
+  final bool isInProgress;
+  final int current;
+  final int total;
+  final String? error;
+
+  const ReEncryptProgress({
+    this.isInProgress = false,
+    this.current = 0,
+    this.total = 0,
+    this.error,
+  });
+}
+
+class ReEncryptNotifier extends Notifier<ReEncryptProgress> {
+  @override
+  ReEncryptProgress build() {
+    return const ReEncryptProgress();
+  }
+
+  VaultService get _vaultService => ref.read(vaultServiceProvider);
+
+  Future<int> reEncryptVault(EncryptionAlgorithm targetAlgorithm) async {
+    state = const ReEncryptProgress(isInProgress: true, current: 0, total: 0);
+    try {
+      final result = await _vaultService.reEncryptVault(
+        targetAlgorithm,
+        onProgress: (current, total) {
+          state = ReEncryptProgress(
+            isInProgress: true,
+            current: current,
+            total: total,
+          );
+        },
+      );
+
+      if (result < 0) {
+        state = const ReEncryptProgress(error: 'Re-encryption failed');
+      } else {
+        state = ReEncryptProgress(current: result, total: result);
+      }
+
+      ref.invalidate(vaultSettingsProvider);
+      ref.invalidate(allFilesProvider);
+      return result;
+    } catch (e) {
+      state = ReEncryptProgress(error: e.toString());
+      return -1;
+    }
+  }
+}
+
+final reEncryptProvider =
+    NotifierProvider<ReEncryptNotifier, ReEncryptProgress>(() {
+  return ReEncryptNotifier();
 });
