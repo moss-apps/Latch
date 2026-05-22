@@ -19,6 +19,7 @@ import 'albums_screen.dart';
 import 'favorites_screen.dart';
 import 'tags_screen.dart';
 import 'folders_screen.dart';
+import 'vault_explorer_screen.dart';
 import 'media_viewer_screen.dart';
 import 'document_viewer_screen.dart';
 import 'song_player_screen.dart';
@@ -1744,6 +1745,19 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
                             context,
                             MaterialPageRoute(
                                 builder: (context) => const FoldersScreen()),
+                          );
+                        },
+                      ),
+                      _buildDrawerItem(
+                        icon: Icons.explore_outlined,
+                        title: 'File Explorer',
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) =>
+                                    const VaultExplorerScreen()),
                           );
                         },
                       ),
