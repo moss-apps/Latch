@@ -34,11 +34,11 @@ Future<void> main() async {
     settings.screenshotProtectionEnabled,
   );
 
-  runApp(const ProviderScope(child: LockerApp()));
+  runApp(const ProviderScope(child: LatchApp()));
 }
 
-class LockerApp extends ConsumerWidget {
-  const LockerApp({super.key});
+class LatchApp extends ConsumerWidget {
+  const LatchApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -47,7 +47,7 @@ class LockerApp extends ConsumerWidget {
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Locker',
+      title: 'Latch',
       theme: AppTheme.getLightTheme(accentColor),
       darkTheme: AppTheme.getDarkTheme(accentColor),
       themeMode: themeMode,

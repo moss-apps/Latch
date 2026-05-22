@@ -1,12 +1,12 @@
-# Locker
+# Latch
 
 <p align="center">
-  <img src="assets/banner_locker.png" alt="Locker Banner" width="100%">
+  <img src="assets/banner_locker.png" alt="Latch Banner" width="100%">
 </p>
 
 ---
 
-Locker is a secure, private media vault application built with Flutter for Android. It provides a safe space to hide and protect your sensitive photos, videos, and documents from prying eyes, with multiple layers of security including biometric authentication, optional AES-256 encryption, and an auto-kill feature that removes the app from the recent apps list when you leave.
+Latch is a secure, private media vault application built with Flutter for Android. It provides a safe space to hide and protect your sensitive photos, videos, and documents from prying eyes, with multiple layers of security including biometric authentication, optional AES-256 encryption, and an auto-kill feature that removes the app from the recent apps list when you leave.
 
 ## Key Features
 
@@ -54,20 +54,20 @@ Locker is a secure, private media vault application built with Flutter for Andro
 
 ## Moss Ecosystem
 
-Locker is part of the **Moss ecosystem** by Ultra Electronica, a suite of interconnected apps that share infrastructure and capabilities.
+Latch is part of the **Moss ecosystem** by Ultra Electronica, a suite of interconnected apps that share infrastructure and capabilities.
 
 ### Apps in the Ecosystem
-- **Locker**: Secure media vault for hiding photos, videos, and documents
+- **Latch**: Secure media vault for hiding photos, videos, and documents
 - **Flick Player**: High-performance audiophile music player with UAC 2.0 support
 
 ### Cross-App Integration
-Locker integrates with Flick Player through platform channels:
-- **Playback Handoff**: Locker can hand off audio playback to Flick for advanced audio engine features (EQ, effects, UAC 2.0 DAC output)
+Latch integrates with Flick Player through platform channels:
+- **Playback Handoff**: Latch can hand off audio playback to Flick for advanced audio engine features (EQ, effects, UAC 2.0 DAC output)
 - **Shared Infrastructure**: Last.fm scrobbling, adaptive theming, and library scanning are shared across Moss apps
 
-### Using Locker with Flick
-When you want to play an audio file stored in Locker using Flick's advanced audio capabilities:
-1. Select the audio file in Locker
+### Using Latch with Flick
+When you want to play an audio file stored in Latch using Flick's advanced audio capabilities:
+1. Select the audio file in Latch
 2. Choose to open with Flick Player
 3. Flick handles playback with its high-performance engine
 4. Last.fm scrobbling continues uninterrupted
@@ -199,7 +199,7 @@ flutter build apk --release
 ## Platform-Specific Notes
 
 ### Android
-Locker is designed exclusively for Android, using Flutter for UI and Kotlin for native features:
+Latch is designed exclusively for Android, using Flutter for UI and Kotlin for native features:
 - **Auto-Kill**: Uses Android's activity lifecycle to remove the app from recent tasks when backgrounded
 - **Biometrics**: Leverages Android's BiometricPrompt API for fingerprint/face authentication
 - **Media Access**: Uses `photo_manager` to access device gallery media (requires storage permissions)
@@ -218,7 +218,7 @@ Locker is designed exclusively for Android, using Flutter for UI and Kotlin for 
 | USE_BIOMETRIC | Biometric authentication |
 
 ## Architecture
-Locker follows a service-based architecture with clear separation of concerns:
+Latch follows a service-based architecture with clear separation of concerns:
 - **Services Layer**: Business logic for authentication, encryption, file operations, and media handling
 - **Providers Layer**: Riverpod providers for reactive state management across UI components
 - **Screens**: Feature-specific UI screens for authentication, vault management, settings, and media viewing
@@ -229,12 +229,12 @@ All sensitive data (PIN, passwords, encryption keys) is stored via `flutter_secu
 ## Documentation
 Additional documentation available:
 - [Architecture Diagram](docs/architecture_media.md) - Detailed system architecture design covering compression, encryption, and file operations
-- [Flick Integration Guide](docs/flick_integration.md) - Contract and implementation notes for making Flick a first-class Locker playback companion
+- [Flick Integration Guide](docs/flick_integration.md) - Contract and implementation notes for making Flick a first-class Latch playback companion
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-Locker is purely open-source and free. There are no premium features, ads, or paid components.
+Latch is purely open-source and free. There are no premium features, ads, or paid components.
 
 ## Contributors
 - [@heimin22](https://github.com/heimin22) (Project creator)

@@ -157,7 +157,7 @@ class _PermissionWarningBannerState extends State<PermissionWarningBanner>
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'To hide files from other apps, Locker needs permission to access all files on your device.',
+                          'To hide files from other apps, Latch needs permission to access all files on your device.',
                           style: TextStyle(
                             fontFamily: 'ProductSans',
                             fontSize: 13,
