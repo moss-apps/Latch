@@ -18,6 +18,7 @@ import '../widgets/office_conversion_confirm_dialog.dart';
 import 'albums_screen.dart';
 import 'favorites_screen.dart';
 import 'tags_screen.dart';
+import 'folders_screen.dart';
 import 'media_viewer_screen.dart';
 import 'document_viewer_screen.dart';
 import 'song_player_screen.dart';
@@ -1735,6 +1736,18 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
                         },
                       ),
                       _buildDrawerItem(
+                        icon: Icons.folder_copy_outlined,
+                        title: 'Folders',
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => const FoldersScreen()),
+                          );
+                        },
+                      ),
+                      _buildDrawerItem(
                         icon: Icons.favorite_outline,
                         title: 'Favorites',
                         onTap: () {
@@ -1966,6 +1979,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
         onImportSongs: _importSongs,
         onImportDocuments: _importDocuments,
         onImportAnyFiles: _importAnyFiles,
+        onImportFolder: _importFolderFromDevice,
       ),
     );
   }
@@ -3385,6 +3399,55 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
       ToastUtils.showInfo('No files selected');
     }
   }
+
+  Future<void> _importFolderFromDevice() async {
+    Navigator.pop(context);
+
+    final selectedPath = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const _FolderImportPickerScreen(),
+      ),
+    );
+
+    if (selectedPath == null || !mounted) return;
+
+    setState(() {
+      _isImporting = true;
+      _importProgress = 0;
+      _importTotal = 1;
+    });
+
+    try {
+      final result = await _importService.importFolder(
+        folderPath: selectedPath,
+        recursive: true,
+        deleteOriginals: false,
+        onProgress: (current, total) {
+          setState(() {
+            _importProgress = current;
+            _importTotal = total;
+          });
+        },
+      );
+
+      setState(() => _isImporting = false);
+
+      if (result.success && result.filesImported > 0) {
+        ToastUtils.showSuccess(result.message ??
+            'Imported ${result.filesImported} file(s) into ${result.foldersCreated} folder(s)');
+        ref.read(vaultNotifierProvider.notifier).loadFiles();
+        ref.invalidate(foldersNotifierProvider);
+      } else if (!result.success) {
+        ToastUtils.showError(result.error ?? 'Import failed');
+      } else {
+        ToastUtils.showInfo('No files found in folder');
+      }
+    } catch (e) {
+      setState(() => _isImporting = false);
+      ToastUtils.showError('Failed to import folder: $e');
+    }
+  }
 }
 
 /// Import options bottom sheet
@@ -3397,6 +3460,7 @@ class _ImportOptionsSheet extends StatelessWidget {
   final VoidCallback onImportSongs;
   final VoidCallback onImportDocuments;
   final VoidCallback onImportAnyFiles;
+  final VoidCallback onImportFolder;
 
   const _ImportOptionsSheet({
     required this.onImportImages,
@@ -3407,6 +3471,7 @@ class _ImportOptionsSheet extends StatelessWidget {
     required this.onImportSongs,
     required this.onImportDocuments,
     required this.onImportAnyFiles,
+    required this.onImportFolder,
   });
 
   @override
@@ -3544,6 +3609,25 @@ class _ImportOptionsSheet extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 24),
+                _buildSectionHeader(context, 'From Device'),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _ImportOptionTile(
+                        icon: Icons.drive_folder_upload_outlined,
+                        label: 'Import Folder',
+                        color: Colors.indigo,
+                        onTap: onImportFolder,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(child: SizedBox()),
+                    const SizedBox(width: 12),
+                    const Expanded(child: SizedBox()),
+                  ],
+                ),
+                const SizedBox(height: 24),
               ],
             ),
           ),
@@ -3634,6 +3718,221 @@ class _ImageLoadingPlaceholder extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _FolderImportPickerScreen extends StatefulWidget {
+  const _FolderImportPickerScreen();
+
+  @override
+  State<_FolderImportPickerScreen> createState() => _FolderImportPickerScreenState();
+}
+
+class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
+  String? _currentPath;
+  List<String> _pathStack = [];
+  List<FileSystemEntity> _subdirs = [];
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRoots();
+  }
+
+  Future<void> _loadRoots() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final roots = <String>[];
+      if (Platform.isAndroid) {
+        roots.add('/storage/emulated/0');
+      }
+      final appDir = await getApplicationDocumentsDirectory();
+      if (!roots.contains(appDir.path)) {
+        roots.add(appDir.path);
+      }
+
+      if (roots.isEmpty) {
+        setState(() {
+          _isLoading = false;
+          _error = 'No accessible storage found';
+        });
+        return;
+      }
+      _navigateInto(roots.first);
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _error = e.toString();
+      });
+    }
+  }
+
+  Future<void> _navigateInto(String path) async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final dir = Directory(path);
+      if (!await dir.exists()) {
+        setState(() {
+          _isLoading = false;
+          _error = 'Directory does not exist';
+        });
+        return;
+      }
+
+      final entities = await dir.list().toList();
+      final subdirs = entities
+          .whereType<Directory>()
+          .where((d) => !d.path.split('/').last.startsWith('.'))
+          .where((d) => d.path.split('/').last != 'Android')
+          .toList()
+        ..sort((a, b) => a.path.split('/').last.toLowerCase().compareTo(b.path.split('/').last.toLowerCase()));
+
+      setState(() {
+        if (_currentPath != null) {
+          _pathStack.add(_currentPath!);
+        }
+        _currentPath = path;
+        _subdirs = subdirs;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _error = e.toString();
+      });
+    }
+  }
+
+  void _goBack() {
+    if (_pathStack.isEmpty) {
+      Navigator.pop(context);
+      return;
+    }
+    final previousPath = _pathStack.removeLast();
+    _currentPath = null;
+    _navigateInto(previousPath);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        leading: _pathStack.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: _goBack,
+                color: context.textPrimary,
+              )
+            : null,
+        title: const Text(
+          'Select Folder to Import',
+          style: TextStyle(fontFamily: 'ProductSans', fontWeight: FontWeight.w600),
+        ),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        foregroundColor: context.textPrimary,
+        elevation: 0,
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.error_outline, size: 64, color: AppColors.error),
+                      const SizedBox(height: 16),
+                      Text(_error!, style: TextStyle(fontFamily: 'ProductSans', color: context.textSecondary), textAlign: TextAlign.center),
+                    ],
+                  ),
+                )
+              : Column(
+                  children: [
+                    if (_pathStack.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: InkWell(
+                          onTap: _goBack,
+                          borderRadius: BorderRadius.circular(8),
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.arrow_back, size: 14, color: AppColors.accent),
+                                const SizedBox(width: 8),
+                                Icon(Icons.folder, size: 16, color: context.accentColor),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _currentPath ?? '',
+                                    style: TextStyle(fontFamily: 'ProductSans', fontSize: 12, color: context.textTertiary),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    Expanded(
+                      child: _subdirs.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.folder_off_outlined, size: 48, color: context.textTertiary),
+                                  const SizedBox(height: 16),
+                                  Text('No subfolders', style: TextStyle(fontFamily: 'ProductSans', color: context.textSecondary)),
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.all(8),
+                              itemCount: _subdirs.length,
+                              itemBuilder: (context, index) {
+                                final dir = _subdirs[index];
+                                final name = dir.path.split('/').last;
+                                return ListTile(
+                                  leading: Icon(Icons.folder, color: context.accentColor),
+                                  title: Text(name, style: TextStyle(fontFamily: 'ProductSans', color: context.textPrimary)),
+                                  trailing: Icon(Icons.chevron_right, color: context.textTertiary),
+                                  onTap: () => _navigateInto(dir.path),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+      bottomNavigationBar: _currentPath != null
+          ? SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: ElevatedButton.icon(
+                  onPressed: () => Navigator.pop(context, _currentPath),
+                  icon: const Icon(Icons.check),
+                  label: const Text('Import This Folder', style: TextStyle(fontFamily: 'ProductSans', fontWeight: FontWeight.w600)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: context.accentColor,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 48),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            )
+          : null,
     );
   }
 }
