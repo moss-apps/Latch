@@ -326,6 +326,29 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
   Widget _buildTabBar(AsyncValue<List<VaultedFile>> filesAsync) {
     final files = filesAsync.value ?? [];
 
+    // Compute counts once to avoid O(n) scans on every build
+    int imageCount = 0;
+    int videoCount = 0;
+    int songCount = 0;
+    int docCount = 0;
+    for (final f in files) {
+      switch (f.type) {
+        case VaultedFileType.image:
+          imageCount++;
+          break;
+        case VaultedFileType.video:
+          videoCount++;
+          break;
+        case VaultedFileType.song:
+          songCount++;
+          break;
+        case VaultedFileType.document:
+        case VaultedFileType.other:
+          docCount++;
+          break;
+      }
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: context.backgroundColor,
@@ -367,8 +390,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
               children: [
                 const Icon(Icons.image_outlined, size: 18),
                 const SizedBox(width: 6),
-                Text(
-                    'Images (${files.where((f) => f.type == VaultedFileType.image).length})'),
+                Text('Images ($imageCount)'),
               ],
             ),
           ),
@@ -378,8 +400,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
               children: [
                 const Icon(Icons.videocam_outlined, size: 18),
                 const SizedBox(width: 6),
-                Text(
-                    'Videos (${files.where((f) => f.type == VaultedFileType.video).length})'),
+                Text('Videos ($videoCount)'),
               ],
             ),
           ),
@@ -389,8 +410,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
               children: [
                 const Icon(Icons.music_note_outlined, size: 18),
                 const SizedBox(width: 6),
-                Text(
-                    'Songs (${files.where((f) => f.type == VaultedFileType.song).length})'),
+                Text('Songs ($songCount)'),
               ],
             ),
           ),
@@ -400,8 +420,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
               children: [
                 const Icon(Icons.description_outlined, size: 18),
                 const SizedBox(width: 6),
-                Text(
-                    'Docs (${files.where((f) => f.type == VaultedFileType.document || f.type == VaultedFileType.other).length})'),
+                Text('Docs ($docCount)'),
               ],
             ),
           ),
@@ -509,181 +528,186 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
   }
 
   Widget _buildFileItem(VaultedFile file, String tabKey) {
-    final selectedFiles = ref.watch(selectedFilesProvider);
-    final isSelectionMode = ref.watch(isSelectionModeProvider);
-    final isSelected = selectedFiles.contains(file.id);
     final tileKey = _selectionTileKey(tabKey, file.id);
 
-    return GestureDetector(
-      onTap: () {
-        if (isSelectionMode) {
-          _toggleSelection(file.id);
-        } else {
-          _openFile(file);
-        }
-      },
-      onLongPressStart: (_) => _startSlidingSelection(file.id, tabKey),
-      onLongPressMoveUpdate: (details) =>
-          _updateSlidingSelection(details.globalPosition),
-      onLongPressEnd: (_) => _stopSlidingSelection(),
-      onLongPressCancel: _stopSlidingSelection,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Container(
-            key: _tileKeyFor(tileKey),
-            decoration: BoxDecoration(
-              color: context.backgroundSecondary,
-              borderRadius: BorderRadius.circular(8),
-              border: isSelected
-                  ? Border.all(color: context.accentColor, width: 3)
-                  : null,
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(isSelected ? 5 : 8),
-              child: _buildFileThumbnail(file),
-            ),
+    return Consumer(
+      builder: (context, ref, child) {
+        final selectedFiles = ref.watch(selectedFilesProvider);
+        final isSelectionMode = ref.watch(isSelectionModeProvider);
+        final isSelected = selectedFiles.contains(file.id);
+
+        return GestureDetector(
+          onTap: () {
+            if (isSelectionMode) {
+              _toggleSelection(file.id);
+            } else {
+              _openFile(file);
+            }
+          },
+          onLongPressStart: (_) => _startSlidingSelection(file.id, tabKey),
+          onLongPressMoveUpdate: (details) =>
+              _updateSlidingSelection(details.globalPosition),
+          onLongPressEnd: (_) => _stopSlidingSelection(),
+          onLongPressCancel: _stopSlidingSelection,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Container(
+                key: _tileKeyFor(tileKey),
+                decoration: BoxDecoration(
+                  color: context.backgroundSecondary,
+                  borderRadius: BorderRadius.circular(8),
+                  border: isSelected
+                      ? Border.all(color: context.accentColor, width: 3)
+                      : null,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(isSelected ? 5 : 8),
+                  child: child!,
+                ),
+              ),
+              // Selection indicator
+              if (isSelectionMode)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isSelected ? context.accentColor : Colors.white,
+                      border: Border.all(
+                        color: isSelected ? context.accentColor : context.borderColor,
+                        width: 2,
+                      ),
+                    ),
+                    child: isSelected
+                        ? const Icon(Icons.check, size: 16, color: Colors.white)
+                        : const SizedBox.shrink(),
+                  ),
+                ),
+              // Favorite indicator
+              if (file.isFavorite && !isSelectionMode)
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Icon(
+                      Icons.favorite,
+                      size: 14,
+                      color: Colors.red,
+                    ),
+                  ),
+                ),
+              // Encrypted indicator
+              if (file.isEncrypted && !isSelectionMode)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Icon(
+                      Icons.lock,
+                      size: 14,
+                      color: Colors.green,
+                    ),
+                  ),
+                ),
+              // Tags indicator
+              if (file.hasTags && !isSelectionMode)
+                Positioned(
+                  bottom: 8,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.label, size: 12, color: Colors.white),
+                        const SizedBox(width: 2),
+                        Text(
+                          '${file.tagCount}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontFamily: 'ProductSans',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              // Video duration indicator
+              if (file.isVideo)
+                Positioned(
+                  bottom: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.play_arrow, size: 14, color: Colors.white),
+                        const SizedBox(width: 2),
+                        Text(
+                          file.formattedSize,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontFamily: 'ProductSans',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              // File type badge for non-visual files
+              if (file.isDocument || file.isSong)
+                Positioned(
+                  bottom: 8,
+                  left: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      file.originalName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontFamily: 'ProductSans',
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+            ],
           ),
-          // Selection indicator
-          if (isSelectionMode)
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isSelected ? context.accentColor : Colors.white,
-                  border: Border.all(
-                    color:
-                        isSelected ? context.accentColor : context.borderColor,
-                    width: 2,
-                  ),
-                ),
-                child: isSelected
-                    ? const Icon(Icons.check, size: 16, color: Colors.white)
-                    : const SizedBox.shrink(),
-              ),
-            ),
-          // Favorite indicator
-          if (file.isFavorite && !isSelectionMode)
-            Positioned(
-              top: 8,
-              left: 8,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Icon(
-                  Icons.favorite,
-                  size: 14,
-                  color: Colors.red,
-                ),
-              ),
-            ),
-          // Encrypted indicator
-          if (file.isEncrypted && !isSelectionMode)
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Icon(
-                  Icons.lock,
-                  size: 14,
-                  color: Colors.green,
-                ),
-              ),
-            ),
-          // Tags indicator
-          if (file.hasTags && !isSelectionMode)
-            Positioned(
-              bottom: 8,
-              left: 8,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.label, size: 12, color: Colors.white),
-                    const SizedBox(width: 2),
-                    Text(
-                      '${file.tagCount}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontFamily: 'ProductSans',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          // Video duration indicator
-          if (file.isVideo)
-            Positioned(
-              bottom: 8,
-              right: 8,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.play_arrow, size: 14, color: Colors.white),
-                    const SizedBox(width: 2),
-                    Text(
-                      file.formattedSize,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontFamily: 'ProductSans',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          // File type badge for non-visual files
-          if (file.isDocument || file.isSong)
-            Positioned(
-              bottom: 8,
-              left: 8,
-              right: 8,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  file.originalName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontFamily: 'ProductSans',
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ),
-        ],
-      ),
+        );
+      },
+      child: _buildFileThumbnail(file),
     );
   }
 
@@ -960,6 +984,8 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
   void _exitSelectionMode() {
     ref.read(isSelectionModeProvider.notifier).state = false;
     ref.read(selectedFilesProvider.notifier).state = {};
+    // Clean up selection tile keys to prevent memory leak
+    _selectionTileKeys.clear();
   }
 
   List<VaultedFile> _getVisibleFiles() {
