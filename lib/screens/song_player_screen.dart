@@ -52,7 +52,17 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
       AutoKillService.setEnabled(true);
     }
     _player.dispose();
+    // Clean up temp decrypted files to prevent disk leaks
+    _cleanupTempFiles();
     super.dispose();
+  }
+
+  void _cleanupTempFiles() {
+    try {
+      ref.read(vaultServiceProvider).cleanupTemp();
+    } catch (e) {
+      debugPrint('Error cleaning up temp files: $e');
+    }
   }
 
   @override
