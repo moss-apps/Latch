@@ -1803,16 +1803,9 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
           border: Border.all(
             color: context.isDarkMode
                 ? Colors.white.withValues(alpha: 0.15)
-                : Colors.white.withValues(alpha: 0.2),
+                : context.accentColor.withValues(alpha: 0.3),
             width: 2,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: context.accentColor.withValues(alpha: 0.2),
-              blurRadius: 30,
-              offset: const Offset(0, 10),
-            ),
-          ],
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
