@@ -1882,7 +1882,7 @@ class VaultService {
             header[0] == 0x4C &&
             header[1] == 0x4B &&
             header[2] == 0x52 &&
-            header[3] == 0x53;
+            (header[3] == 0x53 || header[3] == 0x47);
 
         FileDecryptionResult result;
         if (isStreamedFile || isLargeFile) {
