@@ -114,7 +114,6 @@ locker/
 │   │   └── performance_provider.dart # Performance settings
 │   ├── screens/                  # UI screens
 │   │   ├── unlock_screen.dart    # Authentication unlock screen
-│   │   ├── home_screen.dart      # Main vault home screen
 │   │   ├── gallery_vault_screen.dart # Gallery import screen
 │   │   ├── media_viewer_screen.dart # Image/video viewer
 │   │   ├── document_viewer_screen.dart # PDF/Office document viewer

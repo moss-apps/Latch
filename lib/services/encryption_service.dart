@@ -503,6 +503,38 @@ class EncryptionService {
           header[0] == 0x4C &&
           header[1] == 0x4B &&
           header[2] == 0x52 &&
+          header[3] == 0x47) {
+        // GCM-encrypted file - decrypt to memory and write to destination
+        debugPrint('[Encryption] Using GCM format for decryptFile');
+        onProgress?.call(1, 3);
+
+        final result = await decryptStreamedFileToMemoryGcm(
+          encryptedPath,
+          ivBase64,
+          isDecoy: isDecoy,
+        );
+        onProgress?.call(2, 3);
+
+        if (!result.success || result.data == null) {
+          return FileDecryptionResult(
+            success: false,
+            error: result.error ?? 'GCM decryption failed',
+          );
+        }
+
+        final destFile = File(destinationPath);
+        await destFile.writeAsBytes(result.data!);
+        onProgress?.call(3, 3);
+
+        return FileDecryptionResult(
+          success: true,
+          decryptedPath: destinationPath,
+          decryptedSize: result.data!.length,
+        );
+      } else if (header.length >= 4 &&
+          header[0] == 0x4C &&
+          header[1] == 0x4B &&
+          header[2] == 0x52 &&
           header[3] == 0x53) {
         // CTR-encrypted streamed file - use streaming decryption
         debugPrint('[Encryption] Using CTR format for decryptFile');
@@ -518,9 +550,26 @@ class EncryptionService {
         onProgress?.call(3, 3);
         return result;
       } else {
-        // CBC-encrypted file
+        // CBC-encrypted file (with or without header)
         onProgress?.call(1, 3);
-        final encryptedData = await encryptedFile.readAsBytes();
+        late final Uint8List encryptedData;
+
+        if (header.length >= 4 &&
+            header[0] == 0x4C &&
+            header[1] == 0x4B &&
+            header[2] == 0x52 &&
+            header[3] == 0x44) {
+          // CBC with header - skip the 8-byte header
+          debugPrint('[Encryption] Using CBC-with-header format for decryptFile');
+          final raf2 = await encryptedFile.open();
+          await raf2.setPosition(8);
+          encryptedData = Uint8List.fromList(
+              await raf2.read(await encryptedFile.length() - 8));
+          await raf2.close();
+        } else {
+          // Legacy CBC without header
+          encryptedData = await encryptedFile.readAsBytes();
+        }
 
         final result = await decryptData(
           encryptedData,
@@ -556,7 +605,7 @@ class EncryptionService {
   }
 
   /// Decrypt a file using chunked streaming (memory-efficient for large files)
-  /// Matches the format created by encryptFileStreamed (8-byte header + CTR encrypted data)
+  /// Handles CTR and GCM formats (8-byte header + ciphertext)
   Future<FileDecryptionResult> decryptFileStreamed(
     String encryptedPath,
     String destinationPath,
@@ -581,16 +630,26 @@ class EncryptionService {
       final raf = await encryptedFile.open();
       final header = await raf.read(8);
 
-      // Verify magic bytes
+      // Validate magic bytes
       if (header.length < 8 ||
           header[0] != 0x4C ||
           header[1] != 0x4B ||
-          header[2] != 0x52 ||
-          header[3] != 0x53) {
+          header[2] != 0x52) {
         await raf.close();
         return FileDecryptionResult(
           success: false,
           error: 'Invalid encrypted file format (not a streamed file)',
+        );
+      }
+
+      final bool isGcm = header[3] == 0x47;
+      final bool isCtr = header[3] == 0x53;
+
+      if (!isGcm && !isCtr) {
+        await raf.close();
+        return FileDecryptionResult(
+          success: false,
+          error: 'Unsupported streamed format',
         );
       }
 
@@ -600,10 +659,6 @@ class EncryptionService {
 
       await raf.close();
 
-      // Use CTR mode for streaming decryption
-      final ctr = CTRStreamCipher(AESEngine())
-        ..init(false, ParametersWithIV<KeyParameter>(KeyParameter(key), iv));
-
       final destFile = File(destinationPath);
       final sink = destFile.openWrite();
 
@@ -612,14 +667,24 @@ class EncryptionService {
 
       onProgress?.call(0, totalBytes);
 
-      // Read encrypted data after header - use chunked stream
       final inputStream = _createChunkedStream(encryptedFile.openRead(8));
-      await for (final chunk in inputStream) {
-        final decrypted = ctr.process(chunk);
-        sink.add(decrypted);
 
-        bytesProcessed += chunk.length;
-        onProgress?.call(bytesProcessed, totalBytes);
+      if (isGcm) {
+        final gcm = GCMBlockCipher(AESEngine())
+          ..init(false, AEADParameters(KeyParameter(key), 128, iv, Uint8List(0)));
+        await for (final chunk in inputStream) {
+          sink.add(gcm.process(chunk));
+          bytesProcessed += chunk.length;
+          onProgress?.call(bytesProcessed, totalBytes);
+        }
+      } else {
+        final ctr = CTRStreamCipher(AESEngine())
+          ..init(false, ParametersWithIV<KeyParameter>(KeyParameter(key), iv));
+        await for (final chunk in inputStream) {
+          sink.add(ctr.process(chunk));
+          bytesProcessed += chunk.length;
+          onProgress?.call(bytesProcessed, totalBytes);
+        }
       }
 
       onProgress?.call(totalBytes, totalBytes);
@@ -665,6 +730,18 @@ class EncryptionService {
       await raf.close();
 
       if (header.length >= 4 &&
+          header[0] == 0x4C &&
+          header[1] == 0x4B &&
+          header[2] == 0x52 &&
+          header[3] == 0x47) {
+        // GCM-encrypted streamed file
+        debugPrint('[Encryption] Detected GCM format');
+        return decryptStreamedFileToMemoryGcm(
+          encryptedPath,
+          ivBase64,
+          isDecoy: isDecoy,
+        );
+      } else if (header.length >= 4 &&
           header[0] == 0x4C &&
           header[1] == 0x4B &&
           header[2] == 0x52 &&

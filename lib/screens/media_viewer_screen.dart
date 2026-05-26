@@ -67,11 +67,26 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   @override
   void dispose() {
     _videoUpdateTimer?.cancel();
+    _videoUpdateTimer = null;
     _videoController?.dispose();
+    _videoController = null;
     _pageController.dispose();
+    // Clear decrypted cache to free memory immediately
+    _decryptedCache.clear();
+    // Clean up temp decrypted files in background
+    _cleanupTempFiles();
     // Restore system UI
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
+  }
+
+  /// Clean up temporary decrypted files to prevent disk space leaks
+  void _cleanupTempFiles() {
+    try {
+      ref.read(vaultServiceProvider).cleanupTemp();
+    } catch (e) {
+      debugPrint('Error cleaning up temp files: $e');
+    }
   }
 
   Future<void> _loadCurrentMedia() async {
@@ -79,10 +94,13 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
 
     if (file.isVideo) {
       await _initializeVideo(file);
+      // Don't load video bytes into memory - videos are streamed from temp file.
+      // This prevents massive memory pressure (e.g. 128MB+ videos).
+      return;
     }
 
-    // Pre-load decrypted data for encrypted files
-    if (file.isEncrypted && !_decryptedCache.containsKey(file.id)) {
+    // Pre-load decrypted data for encrypted images only
+    if (file.isEncrypted && file.isImage && !_decryptedCache.containsKey(file.id)) {
       final data =
           await ref.read(vaultServiceProvider).getDecryptedFileData(file.id);
       if (mounted) {

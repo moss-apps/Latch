@@ -17,6 +17,7 @@ import 'accent_color_picker_screen.dart';
 import 'change_security_screen.dart';
 import 'encryption_settings_screen.dart';
 import 'local_backup_screen.dart';
+import 'performance_settings_screen.dart';
 import 'privacy_policy_screen.dart';
 
 class VaultSettingsScreen extends ConsumerStatefulWidget {
@@ -244,6 +245,34 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                     settings.copyWith(autoKillDelaySeconds: value),
                   );
                 },
+              ),
+              const SizedBox(height: 20),
+              Divider(color: context.borderColor),
+              const SizedBox(height: 20),
+              _buildSectionTitle(context, 'Performance'),
+              ListTile(
+                leading: Icon(Icons.speed, color: context.accentColor),
+                title: const Text(
+                  'Performance Settings',
+                  style: TextStyle(fontFamily: 'ProductSans'),
+                ),
+                subtitle: Text(
+                  'Adjust performance mode and view metrics',
+                  style: TextStyle(
+                    fontFamily: 'ProductSans',
+                    fontSize: 12,
+                    color: context.textTertiary,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const PerformanceSettingsScreen(),
+                    ),
+                  );
+                },
+                contentPadding: EdgeInsets.zero,
               ),
               const SizedBox(height: 20),
               Divider(color: context.borderColor),

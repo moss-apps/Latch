@@ -58,7 +58,20 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
 
   @override
   void dispose() {
+    // Clear decrypted data from memory
+    _decryptedData = null;
+    _convertedPdfData = null;
+    // Clean up temp decrypted files to prevent disk leaks
+    _cleanupTempFiles();
     super.dispose();
+  }
+
+  void _cleanupTempFiles() {
+    try {
+      ref.read(vaultServiceProvider).cleanupTemp();
+    } catch (e) {
+      debugPrint('Error cleaning up temp files: $e');
+    }
   }
 
   /// Show conversion warning dialog for Office documents

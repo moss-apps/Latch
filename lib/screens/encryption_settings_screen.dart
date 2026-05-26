@@ -156,6 +156,7 @@ class _EncryptionSettingsScreenState
     final isSelected = settings.encryptionAlgorithm == algo;
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
+      elevation: 0,
       color: isSelected
           ? context.accentColor.withValues(alpha: 0.15)
           : context.surfaceColor,
@@ -208,6 +209,7 @@ class _EncryptionSettingsScreenState
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
+      elevation: 0,
       color: isSelected
           ? context.accentColor.withValues(alpha: 0.15)
           : context.surfaceColor,
@@ -265,6 +267,7 @@ class _EncryptionSettingsScreenState
 
   Widget _buildInfoCard(BuildContext context, VaultSettings settings) {
     return Card(
+      elevation: 0,
       color: context.surfaceColor,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
