@@ -36,9 +36,10 @@
     │  └─────────────────────┘ │   │  └────────────────────┘ │
     │           ↓               │   │           ↓              │
     │  ┌─────────────────────┐ │   │  ┌────────────────────┐ │
-    │  │   Background Isolate│ │   │  │   CTR/CBC Cipher   │ │
+    │  │   Background Isolate│ │   │  │   CTR/CBC/GCM Cipher   │ │
     │  │  • FFmpeg process   │ │   │  │  • Chunk streaming │ │
     │  │  • Progress parsing │ │   │  │  • Memory efficient│ │
+    │  │  • Auth tag (GCM)  │ │
     │  │  • SendPort comms   │ │   │  └────────────────────┘ │
     │  └─────────────────────┘ │   └──────────────────────────┘
     └───────────────────────────┘
@@ -297,6 +298,8 @@ Update UI: "Compressing video... 7%"
 
 ### Encryption Progress
 
+For both CTR and GCM modes, progress is tracked by chunk count:
+
 ```
 File size: 100MB
 Chunk size: 1MB
@@ -307,6 +310,8 @@ Progress: 45 / 100 = 0.45 = 45%
                            ↓
 Update UI: "Encrypting file... 45%"
 ```
+
+GCM additionally writes a 16-byte authentication tag at the end of each file for integrity verification on decryption.
 
 ## Rollback Stack
 
@@ -392,3 +397,125 @@ This architecture provides:
 - ✅ Automatic cleanup
 - ✅ Memory efficiency
 - ✅ Thread safety
+
+---
+
+## Encryption Modes
+
+Latch supports two AES-256 encryption modes, selectable via the Encryption Settings screen:
+
+### AES-256-CTR (Counter Mode)
+- **Speed**: Fast, no integrity verification
+- **Parallelizable**: Encryption and decryption can be parallelized
+- **Magic bytes**: `0x4C4B5253`
+- **Use case**: Default mode for performance
+
+### AES-256-GCM (Galois/Counter Mode)
+- **Speed**: Slightly slower due to authentication overhead
+- **Integrity**: Authenticated encryption with built-in integrity verification
+- **Magic bytes**: `0x4C4B5247`
+- **Use case**: Recommended for security-sensitive vaults
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                     Encryption Flow                          │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│  ┌──────────────┐                                            │
+│  │ Source File  │                                            │
+│  └──────┬───────┘                                            │
+│         ↓                                                    │
+│  ┌──────────────────────────────────────────────────┐       │
+│  │              Algorithm Selection                  │       │
+│  │  ┌─────────────────┐   ┌─────────────────────┐   │       │
+│  │  │   AES-256-CTR   │   │    AES-256-GCM      │   │       │
+│  │  │  16-byte IV     │   │   12-byte nonce     │   │       │
+│  │  │  No auth tag    │   │   16-byte auth tag  │   │       │
+│  │  └────────┬────────┘   └──────────┬──────────┘   │       │
+│  └───────────┼───────────────────────┼──────────────┘       │
+│              ↓                       ↓                       │
+│  ┌─────────────────┐   ┌─────────────────────────┐         │
+│  │ Stream encrypt  │   │ Encrypt + auth tag      │         │
+│  │ in 1MB chunks   │   │ appended to each file   │         │
+│  └────────┬────────┘   └────────────┬────────────┘         │
+│           ↓                          ↓                      │
+│  ┌────────────────────────────────────────────────┐         │
+│  │              Vault Storage                     │         │
+│  │  [magic][IV/nonce][ciphertext][auth tag (GCM)]│         │
+│  └────────────────────────────────────────────────┘         │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## PBKDF2 Key Derivation
+
+All password-based secrets (master key, decoy credentials, PIN/password hashes) use PBKDF2 with SHA-256 for key derivation:
+
+```
+User Password/PIN
+        │
+        ↓
+┌──────────────────────────────┐
+│  PBKDF2-HMAC-SHA256          │
+│  • Iteration count: 100,000  │
+│  • Salt: 32-byte random      │
+│  • Key length: 32 bytes      │
+│  • Configurable iterations   │
+└──────────────┬───────────────┘
+               ↓
+        Derived 256-bit Key
+```
+
+### Salt Generation
+- Each credential gets a unique 32-byte random salt
+- Salt is stored alongside the derived hash for verification
+- Prevents rainbow table attacks across vaults
+
+### Legacy Migration
+- Pre-PBKDF2 vaults stored passwords using plain SHA-256
+- On unlock, legacy hashes are detected and automatically migrated to PBKDF2
+- Decoy credentials migrated with separate salted hashing
+
+---
+
+## Re-Encryption (Algorithm Migration)
+
+When the user changes the encryption algorithm (e.g., CTR → GCM), existing vault files are re-encrypted:
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                  Re-Encryption Flow                          │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│  1. Select new algorithm in Encryption Settings              │
+│              ↓                                               │
+│  2. Decrypt each vault file with old algorithm               │
+│              ↓                                               │
+│  3. Encrypt plaintext with new algorithm                     │
+│              ↓                                               │
+│  4. Verify integrity (GCM auth tag validation)              │
+│              ↓                                               │
+│  5. Replace vault file with new-format file                  │
+│              ↓                                               │
+│  6. Update vault index metadata                              │
+│              ↓                                               │
+│  7. Clean up temporary plaintext                             │
+│                                                              │
+│  Rollback: If any file fails, operation is aborted           │
+│  and original files are preserved.                           │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### ReEncryptNotifier
+- Manages re-encryption state across all vault files
+- Provides progress tracking per file
+- Reports success, failure, and progress to UI
+
+### Security Guarantees
+- Plaintext is never written to persistent storage
+- Temporary decrypted data is held in memory only
+- On cancellation or failure, the original vault files are untouched
+- GCM auth tag validation catches corruption during migration

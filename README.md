@@ -22,6 +22,8 @@ Latch is a secure, private media vault application built with Flutter for Androi
 - **Compression Options**: Choose compression levels for media files to save storage space
 
 ### Organization
+- **Folders**: Create nested folder structures with drag-and-drop import, breadcrumb navigation, and expandable tree view
+- **File Explorer**: Browse vault contents with grid/list views, filtering, multi-select, and sort controls
 - **Albums**: Create custom albums to organize your hidden files
 - **Tags**: Add color-coded tags to files for easy categorization and filtering
 - **Favorites**: Mark files as favorites for quick access
@@ -40,7 +42,9 @@ Latch is a secure, private media vault application built with Flutter for Androi
 - **PIN Authentication**: 6-digit PIN lock with secure storage
 - **Password Authentication**: Traditional password protection option
 - **Biometric Authentication**: Fingerprint and face recognition support
-- **Optional Encryption**: AES-256-CBC/CTR encryption for stored files (off by default for performance)
+- **Encryption**: AES-256-GCM (authenticated) and AES-256-CTR (fast) encryption for stored files
+- **Encryption Settings**: Choose encryption algorithm, re-encrypt existing files, manage keys
+- **PBKDF2 Key Derivation**: Configurable iteration count for master key derivation with salted hashing
 - **Auto-Kill**: Automatically removes app from recent apps when leaving
 - **Decoy Mode**: Set up a fake vault with a separate PIN to show if forced to unlock
 - **Secure Delete**: Overwrite files before deletion to prevent recovery
@@ -107,23 +111,28 @@ locker/
 │   ├── main.dart                 # Application entry point
 │   ├── models/                   # Data models
 │   │   ├── album.dart            # Album and tag models
-│   │   └── vaulted_file.dart    # Vaulted file model
+│   │   ├── vaulted_file.dart     # Vaulted file model
+│   │   ├── vault_folder.dart     # Folder model
+│   │   └── encryption_algorithm.dart # Encryption algorithm enum
 │   ├── providers/                # Riverpod state providers
 │   │   ├── vault_providers.dart  # Vault state management
 │   │   ├── theme_provider.dart   # Theme management
-│   │   └── performance_provider.dart # Performance settings
+│   │   ├── performance_provider.dart # Performance settings
+│   │   └── explorer_providers.dart # Explorer state management
 │   ├── screens/                  # UI screens
 │   │   ├── unlock_screen.dart    # Authentication unlock screen
 │   │   ├── gallery_vault_screen.dart # Gallery import screen
 │   │   ├── media_viewer_screen.dart # Image/video viewer
 │   │   ├── document_viewer_screen.dart # PDF/Office document viewer
 │   │   ├── song_player_screen.dart # Audio player screen
-│   │   └── settings/             # Settings screens
-│   │       ├── vault_settings_screen.dart # Vault configuration
-│   │       └── performance_settings_screen.dart # Performance tweaks
+│   │   ├── vault_explorer_screen.dart # Vault explorer with folder management
+│   │   ├── folders_screen.dart   # Folder management screen
+│   │   ├── folder_detail_screen.dart # Folder detail with file management
+│   │   ├── encryption_settings_screen.dart # Encryption algorithm settings
+│   │   └── vault_settings_screen.dart # Vault configuration
 │   ├── services/                 # Business logic services
 │   │   ├── auth_service.dart     # Authentication handling
-│   │   ├── encryption_service.dart # AES-256 encryption/decryption
+│   │   ├── encryption_service.dart # AES-256-GCM/CTR encryption/decryption
 │   │   ├── vault_service.dart    # Core vault operations
 │   │   ├── backup_service.dart   # Backup and restore
 │   │   └── flick_integration_service.dart # Flick Player handoff
@@ -132,10 +141,14 @@ locker/
 │   │   └── app_theme.dart        # Theme configuration
 │   └── widgets/                  # Reusable widgets
 │       ├── pin_input_widget.dart # PIN entry widget
-│       └── performance_overlay_widget.dart # FPS overlay
+│       ├── performance_overlay_widget.dart # FPS overlay
+│       ├── explorer_file_grid.dart # Explorer grid widget
+│       ├── explorer_toolbar.dart  # Explorer toolbar widget
+│       ├── folder_breadcrumb_widget.dart # Breadcrumb navigation
+│       └── folder_tree_widget.dart # Expandable folder tree
 ├── android/                      # Android platform code
-│   └── app/src/main/kotlin/com/ultraelectronica/locker/
-│       └── MainActivity.kt       # Auto-kill and performance
+│   └── app/src/main/kotlin/com/mossapps/locker/
+│       └── MainActivity.kt       # Auto-kill, performance, content URI handling
 ├── assets/                       # Static assets
 │   ├── banner_locker.png         # App banner
 │   └── ...
@@ -155,11 +168,12 @@ locker/
 - Android device with Android 6.0 (API 23) or higher
 
 ### Installation
-#### From Release APK
-1. Download the latest APK from the [Releases page](https://github.com/heimin22/Locker/releases)
-2. Enable "Install from unknown sources" in your device settings
-3. Install the APK
-4. Launch and set up your authentication method
+
+> **GitHub Releases are deprecated.** Latch is distributed through the **Google Play Store** as a Closed Beta Test.
+>
+> To join the Closed Beta, email: `moss_apps@proton.me`
+>
+> Old release APKs and tags on GitHub are kept for historical reference only.
 
 ### Running
 ```bash
