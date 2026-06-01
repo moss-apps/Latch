@@ -287,11 +287,7 @@ class VaultNotifier extends Notifier<AsyncValue<List<VaultedFile>>> {
   }
 
   Future<bool> addToAlbum(List<String> fileIds, String albumId) async {
-    bool success = true;
-    for (final fileId in fileIds) {
-      final result = await _vaultService.addFileToAlbum(fileId, albumId);
-      if (!result) success = false;
-    }
+    final success = await _vaultService.addFilesToAlbum(fileIds, albumId);
     if (success) {
       await loadFiles();
     }
@@ -299,11 +295,8 @@ class VaultNotifier extends Notifier<AsyncValue<List<VaultedFile>>> {
   }
 
   Future<bool> removeFromAlbum(List<String> fileIds, String albumId) async {
-    bool success = true;
-    for (final fileId in fileIds) {
-      final result = await _vaultService.removeFileFromAlbum(fileId, albumId);
-      if (!result) success = false;
-    }
+    final success =
+        await _vaultService.removeFilesFromAlbum(fileIds, albumId);
     if (success) {
       await loadFiles();
     }

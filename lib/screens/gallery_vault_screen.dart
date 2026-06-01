@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:open_filex/open_filex.dart';
@@ -30,6 +31,8 @@ import 'package:photo_manager/photo_manager.dart' hide AlbumType;
 import 'camera_screen.dart';
 import 'vault_settings_screen.dart';
 import '../widgets/operation_progress_sheet.dart';
+import '../widgets/media_hold_action_sheet.dart';
+import '../widgets/media_multi_select_action_sheet.dart';
 
 /// Gallery vault screen - main screen after authentication
 class GalleryVaultScreen extends ConsumerStatefulWidget {
@@ -54,6 +57,11 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
   bool? _slidingSelectionValue;
   String? _slidingTabKey;
   final Set<String> _slidingTouchedTileKeys = {};
+
+  // Hold-action UX state
+  bool _didDragDuringHold = false;
+  String? _holdActionFileId;
+  String? _pressedFileId;
 
   @override
   void initState() {
@@ -143,28 +151,9 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.visibility_outlined, color: Colors.white),
-            onPressed: () => _unhideSelectedFiles(selectedFiles),
-            tooltip: 'Unhide (restore to gallery)',
-          ),
-          IconButton(
-            icon: const Icon(Icons.folder_outlined, color: Colors.white),
-            onPressed: () => _showAddToAlbumSheet(selectedFiles),
-            tooltip: 'Add to album',
-          ),
-          IconButton(
-            icon: const Icon(Icons.favorite_outline, color: Colors.white),
-            onPressed: () => _toggleFavoriteSelected(selectedFiles),
-            tooltip: 'Toggle favorite',
-          ),
-          IconButton(
-            icon: const Icon(Icons.label_outline, color: Colors.white),
-            onPressed: () => _showAddTagsSheet(selectedFiles),
-            tooltip: 'Add tags',
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.white),
-            onPressed: () => _deleteSelectedFiles(selectedFiles),
+            icon: const Icon(Icons.more_vert, color: Colors.white),
+            onPressed: () => _showMultiSelectActionSheet(selectedFiles),
+            tooltip: 'Actions',
           ),
         ],
       );
@@ -536,36 +525,42 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
         final isSelectionMode = ref.watch(isSelectionModeProvider);
         final isSelected = selectedFiles.contains(file.id);
 
-        return GestureDetector(
-          onTap: () {
-            if (isSelectionMode) {
-              _toggleSelection(file.id);
-            } else {
-              _openFile(file);
-            }
-          },
-          onLongPressStart: (_) => _startSlidingSelection(file.id, tabKey),
-          onLongPressMoveUpdate: (details) =>
-              _updateSlidingSelection(details.globalPosition),
-          onLongPressEnd: (_) => _stopSlidingSelection(),
-          onLongPressCancel: _stopSlidingSelection,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Container(
-                key: _tileKeyFor(tileKey),
-                decoration: BoxDecoration(
-                  color: context.backgroundSecondary,
-                  borderRadius: BorderRadius.circular(8),
-                  border: isSelected
-                      ? Border.all(color: context.accentColor, width: 3)
-                      : null,
+        final isPressed = _pressedFileId == file.id;
+
+        return AnimatedScale(
+          scale: isPressed ? 0.95 : 1.0,
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOut,
+          child: GestureDetector(
+            onTap: () {
+              if (isSelectionMode) {
+                _toggleSelection(file.id);
+              } else {
+                _showMediaHoldActionSheet(file);
+              }
+            },
+            onLongPressStart: (_) => _startSlidingSelection(file.id, tabKey),
+            onLongPressMoveUpdate: (details) =>
+                _updateSlidingSelection(details.globalPosition),
+            onLongPressEnd: (_) => _stopSlidingSelection(),
+            onLongPressCancel: _stopSlidingSelection,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Container(
+                  key: _tileKeyFor(tileKey),
+                  decoration: BoxDecoration(
+                    color: context.backgroundSecondary,
+                    borderRadius: BorderRadius.circular(8),
+                    border: isSelected
+                        ? Border.all(color: context.accentColor, width: 3)
+                        : null,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(isSelected ? 5 : 8),
+                    child: child!,
+                  ),
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(isSelected ? 5 : 8),
-                  child: child!,
-                ),
-              ),
               // Selection indicator
               if (isSelectionMode)
                 Positioned(
@@ -705,7 +700,8 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
                 ),
             ],
           ),
-        );
+        ),
+      );
       },
       child: _buildFileThumbnail(file),
     );
@@ -746,8 +742,12 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
       _slidingTouchedTileKeys
         ..clear()
         ..add(tileKey);
+      _didDragDuringHold = false;
+      _holdActionFileId = fileId;
+      _pressedFileId = fileId;
     });
 
+    HapticFeedback.mediumImpact();
     _setSelection(fileId, shouldSelect, keepSelectionMode: true);
   }
 
@@ -764,6 +764,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
 
     setState(() {
       _slidingTouchedTileKeys.add(tileKey);
+      _didDragDuringHold = true;
     });
 
     _setSelection(fileId, _slidingSelectionValue!, keepSelectionMode: true);
@@ -772,16 +773,83 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
   void _stopSlidingSelection() {
     if (!_isSlidingSelection) return;
 
+    final holdFileId = _holdActionFileId;
+    final didDrag = _didDragDuringHold;
+
     setState(() {
       _isSlidingSelection = false;
       _slidingSelectionValue = null;
       _slidingTabKey = null;
       _slidingTouchedTileKeys.clear();
+      _didDragDuringHold = false;
+      _holdActionFileId = null;
+      _pressedFileId = null;
     });
 
     final selectedFiles = ref.read(selectedFilesProvider);
     if (selectedFiles.isEmpty) {
       ref.read(isSelectionModeProvider.notifier).state = false;
+    } else if (!didDrag && holdFileId != null) {
+      // User held without dragging: show contextual action sheet
+      if (selectedFiles.length == 1 && selectedFiles.contains(holdFileId)) {
+        _exitSelectionMode();
+        final file = _findFileById(holdFileId);
+        if (file != null && mounted) {
+          _showMediaHoldActionSheet(file);
+        }
+      }
+    }
+  }
+
+  VaultedFile? _findFileById(String id) {
+    final allFiles = ref.read(vaultNotifierProvider).value ?? [];
+    try {
+      return allFiles.firstWhere((f) => f.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _showMediaHoldActionSheet(VaultedFile file) {
+    MediaHoldActionSheet.show(
+      context,
+      file: file,
+      onFavorite: () => _toggleFavoriteSelected({file.id}),
+      onShare: () => _exportFileToDownloads(file),
+      onDelete: () => _deleteSelectedFiles({file.id}),
+      onInfo: () => _showFileInfo(file),
+      onSelect: () {
+        setState(() {
+          _pressedFileId = null;
+        });
+        _setSelection(file.id, true);
+      },
+      onOpen: () => _openFile(file),
+      onTags: () => _showAddTagsSheet({file.id}),
+      onAddToAlbum: () => _showAddToAlbumSheet({file.id}),
+      onExport: () => _exportFileToDownloads(file),
+    );
+  }
+
+  void _showMultiSelectActionSheet(Set<String> selectedFiles) {
+    MediaMultiSelectActionSheet.show(
+      context,
+      fileCount: selectedFiles.length,
+      onFavorite: () => _toggleFavoriteSelected(selectedFiles),
+      onShare: () => _bulkExportToDownloads(selectedFiles),
+      onDelete: () => _deleteSelectedFiles(selectedFiles),
+      onTags: () => _showAddTagsSheet(selectedFiles),
+      onAddToAlbum: () => _showAddToAlbumSheet(selectedFiles),
+      onUnhide: () => _unhideSelectedFiles(selectedFiles),
+      onCancelSelection: _exitSelectionMode,
+    );
+  }
+
+  Future<void> _bulkExportToDownloads(Set<String> selectedFiles) async {
+    final files = ref.read(vaultNotifierProvider).value ?? [];
+    final selected = files.where((f) => selectedFiles.contains(f.id)).toList();
+    for (final file in selected) {
+      await _exportFileToDownloads(file);
     }
   }
 

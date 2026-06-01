@@ -8,6 +8,8 @@
 
 Latch is a secure, private media vault application built with Flutter for Android. It provides a safe space to hide and protect your sensitive photos, videos, and documents from prying eyes, with multiple layers of security including biometric authentication, optional AES-256 encryption, and an auto-kill feature that removes the app from the recent apps list when you leave.
 
+> **Closed Beta** — Latch is currently in a closed beta test. To join, email `moss_apps@proton.me`.
+
 ## Key Features
 
 ### Core Functionality

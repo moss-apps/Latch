@@ -58,7 +58,7 @@ class VaultService {
   VaultService._();
   static final VaultService instance = VaultService._();
 
-  static const int _largeFileIsolateThresholdBytes = 5 * 1024 * 1024;
+  static const int _largeFileIsolateThresholdBytes = 2 * 1024 * 1024;
   static const int _maxConcurrentBatchAdds = 3;
 
   static const _storage = FlutterSecureStorage(
@@ -194,9 +194,26 @@ class VaultService {
       }
 
       final List<dynamic> jsonList = jsonDecode(indexJson);
-      final files = jsonList
-          .map((json) => VaultedFile.fromJson(json as Map<String, dynamic>))
-          .toList();
+      final files = <VaultedFile>[];
+      for (int i = 0; i < jsonList.length; i++) {
+        try {
+          files.add(
+            VaultedFile.fromJson(jsonList[i] as Map<String, dynamic>),
+          );
+        } catch (e) {
+          debugPrint('Error parsing vault entry $i: $e');
+        }
+      }
+
+      if (files.length < jsonList.length) {
+        debugPrint(
+          'Vault index: recovered ${files.length}/${jsonList.length} entries',
+        );
+        await _storage.write(
+          key: key,
+          value: jsonEncode(files.map((f) => f.toJson()).toList()),
+        );
+      }
 
       if (isDecoy) {
         _cachedDecoyFiles = files;
@@ -221,6 +238,21 @@ class VaultService {
       final files = isDecoy ? _cachedDecoyFiles : _cachedFiles;
       final key = isDecoy ? _decoyIndexKey : _vaultIndexKey;
       final jsonList = files?.map((file) => file.toJson()).toList() ?? [];
+
+      if (jsonList.isEmpty) {
+        final existing = await _storage.read(key: key);
+        if (existing != null && existing.isNotEmpty) {
+          final existingCount =
+              (jsonDecode(existing) as List<dynamic>).length;
+          if (existingCount > 0) {
+            debugPrint(
+              'WARNING: Attempted to save empty index over $existingCount existing entries. Aborting save.',
+            );
+            return;
+          }
+        }
+      }
+
       await _storage.write(key: key, value: jsonEncode(jsonList));
     } catch (e) {
       debugPrint('Error saving vault index: $e');
@@ -684,8 +716,7 @@ class VaultService {
           onEncryptionProgress?.call(0, fileSize);
           final useGcm = _cachedSettings?.encryptionAlgorithm == EncryptionAlgorithm.aes256Gcm;
           final useIsolateEncryption =
-              fileSize >= _largeFileIsolateThresholdBytes &&
-                  onEncryptionProgress == null;
+              fileSize >= _largeFileIsolateThresholdBytes;
           final encResult = useIsolateEncryption
               ? await _encryptionService.encryptFileInIsolate(
                   sourcePathToUse,
@@ -881,6 +912,18 @@ class VaultService {
         }
       }
 
+      // Remove from folder
+      if (!isDecoy && file.folderId != null) {
+        _cachedFolders ??= await _loadFolders();
+        final folderIndex =
+            _cachedFolders!.indexWhere((f) => f.id == file.folderId);
+        if (folderIndex != -1) {
+          _cachedFolders![folderIndex] =
+              _cachedFolders![folderIndex].removeFile(fileId);
+          await _saveFolders();
+        }
+      }
+
       // Remove from index
       if (isDecoy) {
         _cachedDecoyFiles!.removeAt(fileIndex);
@@ -897,7 +940,7 @@ class VaultService {
     }
   }
 
-  /// Remove multiple files from the vault
+  /// Remove multiple files from the vault (batch optimized: single index save)
   Future<int> removeFiles(
     List<String> fileIds, {
     bool isDecoy = false,
@@ -909,21 +952,92 @@ class VaultService {
     final filesToDelete = fileIndex.where((f) => idSet.contains(f.id)).toList();
     final totalSize = filesToDelete.fold<int>(0, (s, f) => s + f.fileSize);
 
+    final albumUpdates = <String, Set<String>>{};
+    final folderUpdates = <String, Set<String>>{};
     int removed = 0;
     int currentSize = 0;
-    for (final id in fileIds) {
-      final file = filesToDelete.cast<VaultedFile?>().firstWhere(
-        (f) => f?.id == id,
-        orElse: () => null,
-      );
-      final fileSize = file?.fileSize ?? 0;
-      if (await removeFile(id, isDecoy: isDecoy)) {
+
+    for (final file in filesToDelete) {
+      try {
+        final vaultFile = File(file.vaultPath);
+        if (await vaultFile.exists()) {
+          if (_cachedSettings?.secureDelete == true) {
+            await _encryptionService.secureDelete(file.vaultPath);
+          } else {
+            await vaultFile.delete();
+          }
+        }
+
+        if (file.thumbnailPath != null) {
+          final thumbFile = File(file.thumbnailPath!);
+          if (await thumbFile.exists()) {
+            await thumbFile.delete();
+          }
+        }
+
+        if (!isDecoy && file.albumIds.isNotEmpty) {
+          for (final albumId in file.albumIds) {
+            albumUpdates.putIfAbsent(albumId, () => {}).add(file.id);
+          }
+        }
+
+        if (!isDecoy && file.folderId != null) {
+          folderUpdates.putIfAbsent(file.folderId!, () => {}).add(file.id);
+        }
+
         removed++;
-        currentSize += fileSize;
+        currentSize += file.fileSize;
         onProgress?.call(removed, fileIds.length,
             currentSize: currentSize, totalSize: totalSize);
+      } catch (e) {
+        debugPrint('Error deleting file ${file.id}: $e');
       }
     }
+
+    if (!isDecoy && albumUpdates.isNotEmpty) {
+      final albums = await _loadAlbums();
+      bool albumsChanged = false;
+      for (final entry in albumUpdates.entries) {
+        final albumIdx = albums.indexWhere((a) => a.id == entry.key);
+        if (albumIdx != -1) {
+          var album = albums[albumIdx];
+          for (final fid in entry.value) {
+            album = album.removeFile(fid);
+          }
+          albums[albumIdx] = album;
+          albumsChanged = true;
+        }
+      }
+      if (albumsChanged) await _saveAlbums();
+    }
+
+    if (!isDecoy && folderUpdates.isNotEmpty) {
+      _cachedFolders ??= await _loadFolders();
+      bool foldersChanged = false;
+      for (final entry in folderUpdates.entries) {
+        final folderIdx =
+            _cachedFolders!.indexWhere((f) => f.id == entry.key);
+        if (folderIdx != -1) {
+          var folder = _cachedFolders![folderIdx];
+          for (final fid in entry.value) {
+            folder = folder.removeFile(fid);
+          }
+          _cachedFolders![folderIdx] = folder;
+          foldersChanged = true;
+        }
+      }
+      if (foldersChanged) await _saveFolders();
+    }
+
+    final deleteIdSet = filesToDelete.map((f) => f.id).toSet();
+    if (isDecoy) {
+      _cachedDecoyFiles!.removeWhere((f) => deleteIdSet.contains(f.id));
+      await _saveFileIndex(isDecoy: true);
+    } else {
+      _cachedFiles!.removeWhere((f) => deleteIdSet.contains(f.id));
+      await _saveFileIndex();
+    }
+
     return removed;
   }
 
@@ -1141,6 +1255,77 @@ class VaultService {
       return true;
     } catch (e) {
       debugPrint('Error adding file to album: $e');
+      return false;
+    }
+  }
+
+  Future<bool> addFilesToAlbum(List<String> fileIds, String albumId) async {
+    try {
+      final albums = await _loadAlbums();
+      final albumIndex = albums.indexWhere((a) => a.id == albumId);
+      if (albumIndex == -1) return false;
+
+      final files = await _loadFileIndex();
+      bool changed = false;
+
+      for (final fileId in fileIds) {
+        final fileIdx = files.indexWhere((f) => f.id == fileId);
+        if (fileIdx == -1) continue;
+
+        _cachedAlbums![albumIndex] =
+            _cachedAlbums![albumIndex].addFile(fileId);
+
+        VaultedFile updatedFile = files[fileIdx].addToAlbum(albumId);
+        if (albumId == 'favorites') {
+          updatedFile = updatedFile.copyWith(isFavorite: true);
+        }
+        _cachedFiles![fileIdx] = updatedFile;
+        changed = true;
+      }
+
+      if (changed) {
+        await _saveAlbums();
+        await _saveFileIndex();
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Error adding files to album: $e');
+      return false;
+    }
+  }
+
+  Future<bool> removeFilesFromAlbum(
+      List<String> fileIds, String albumId) async {
+    try {
+      final albums = await _loadAlbums();
+      final albumIndex = albums.indexWhere((a) => a.id == albumId);
+      if (albumIndex == -1) return false;
+
+      final files = await _loadFileIndex();
+      bool changed = false;
+
+      for (final fileId in fileIds) {
+        _cachedAlbums![albumIndex] =
+            _cachedAlbums![albumIndex].removeFile(fileId);
+
+        final fileIdx = files.indexWhere((f) => f.id == fileId);
+        if (fileIdx != -1) {
+          VaultedFile updatedFile = files[fileIdx].removeFromAlbum(albumId);
+          if (albumId == 'favorites') {
+            updatedFile = updatedFile.copyWith(isFavorite: false);
+          }
+          _cachedFiles![fileIdx] = updatedFile;
+        }
+        changed = true;
+      }
+
+      if (changed) {
+        await _saveAlbums();
+        await _saveFileIndex();
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Error removing files from album: $e');
       return false;
     }
   }
@@ -1853,7 +2038,6 @@ class VaultService {
     return files.fold<int>(0, (sum, file) => sum + file.fileSize);
   }
 
-  /// Export a file from vault to a location
   Future<File?> exportFile(
     String fileId,
     String destinationPath, {
@@ -1867,51 +2051,12 @@ class VaultService {
       final sourceFile = File(vaultedFile.vaultPath);
       if (!await sourceFile.exists()) return null;
 
-      final fileSize = await sourceFile.length();
-      const largeFileThreshold = 10 * 1024 * 1024; // 10MB
-      final isLargeFile = fileSize > largeFileThreshold;
-
-      // If encrypted, decrypt first
       if (vaultedFile.isEncrypted && vaultedFile.encryptionIv != null) {
-        // Check if it's a streamed CTR file by reading magic bytes
-        final raf = await sourceFile.open();
-        final header = await raf.read(4);
-        await raf.close();
-
-        final isStreamedFile = header.length >= 4 &&
-            header[0] == 0x4C &&
-            header[1] == 0x4B &&
-            header[2] == 0x52 &&
-            (header[3] == 0x53 || header[3] == 0x47);
+        final format = _encryptionService.detectFileFormat(vaultedFile.vaultPath);
+        final isLegacyCbc = (format == 0 || format == 3);
 
         FileDecryptionResult result;
-        if (isStreamedFile || isLargeFile) {
-          // Use streaming decryption for CTR files or large files
-          if (isStreamedFile) {
-            result = await _encryptionService.decryptFileStreamed(
-              vaultedFile.vaultPath,
-              destinationPath,
-              vaultedFile.encryptionIv!,
-              onProgress: onProgress,
-            );
-          } else {
-            // Legacy CBC file but large - still use regular method
-            // (CBC can't be streamed without the full file)
-            result = await _encryptionService.decryptFile(
-              vaultedFile.vaultPath,
-              destinationPath,
-              vaultedFile.encryptionIv!,
-              onProgress: onProgress == null
-                  ? null
-                  : (current, total) {
-                      final estimatedProcessed = total > 0
-                          ? (current / total * vaultedFile.fileSize).round()
-                          : 0;
-                      onProgress(estimatedProcessed, vaultedFile.fileSize);
-                    },
-            );
-          }
-        } else {
+        if (isLegacyCbc) {
           result = await _encryptionService.decryptFile(
             vaultedFile.vaultPath,
             destinationPath,
@@ -1925,6 +2070,18 @@ class VaultService {
                     onProgress(estimatedProcessed, vaultedFile.fileSize);
                   },
           );
+        } else {
+          result = await _encryptionService.decryptFileInIsolate(
+            vaultedFile.vaultPath,
+            destinationPath,
+            vaultedFile.encryptionIv!,
+            isDecoy: isDecoy,
+            onProgress: onProgress == null
+                ? null
+                : (bytesProcessed, totalBytes) {
+                    onProgress(bytesProcessed, totalBytes);
+                  },
+          );
         }
 
         if (result.success && result.decryptedPath != null) {
@@ -1933,7 +2090,6 @@ class VaultService {
         return null;
       }
 
-      // Non-encrypted file - stream the copy so we can report progress.
       await _streamCopyFile(
         sourceFile,
         File(destinationPath),
@@ -1946,8 +2102,8 @@ class VaultService {
     }
   }
 
-  /// Re-encrypt all vault files to a target algorithm
-  /// Returns the number of files re-encrypted, or -1 on failure
+  static const String _reEncryptJournalKey = 'reencrypt_journal';
+
   Future<int> reEncryptVault(
     EncryptionAlgorithm targetAlgorithm, {
     bool isDecoy = false,
@@ -1961,7 +2117,26 @@ class VaultService {
 
       if (encryptedFiles.isEmpty) return 0;
 
+      final journalStr = await _storage.read(key: _reEncryptJournalKey);
+      if (journalStr != null) {
+        try {
+          final journal = jsonDecode(journalStr) as Map<String, dynamic>;
+          final ivMap = (journal['ivs'] as Map<String, dynamic>).cast<String, String>();
+          for (final entry in ivMap.entries) {
+            final idx = files.indexWhere((f) => f.vaultPath == entry.key);
+            if (idx >= 0) {
+              files[idx] = files[idx].copyWith(encryptionIv: entry.value);
+            }
+          }
+          if (isDecoy) { _cachedDecoyFiles = files; } else { _cachedFiles = files; }
+          await _saveFileIndex(isDecoy: isDecoy);
+        } catch (_) {}
+        await _storage.delete(key: _reEncryptJournalKey);
+      }
+
+      final journalIvs = <String, String>{};
       int reEncryptedCount = 0;
+
       for (int i = 0; i < encryptedFiles.length; i++) {
         onProgress?.call(i + 1, encryptedFiles.length);
 
@@ -1970,7 +2145,7 @@ class VaultService {
 
         final currentFormat = _encryptionService.detectFileFormat(file.vaultPath);
         final targetIsGcm = targetAlgorithm == EncryptionAlgorithm.aes256Gcm;
-        final currentIsGcm = currentFormat == 1;
+        final currentIsGcm = (currentFormat == 1 || currentFormat == 4);
 
         if (currentIsGcm == targetIsGcm && currentFormat != 0 && currentFormat != 3) continue;
 
@@ -1979,6 +2154,12 @@ class VaultService {
           file.encryptionIv ?? '',
           targetAlgorithm: targetAlgorithm,
           isDecoy: isDecoy,
+        );
+
+        journalIvs[file.vaultPath] = newIv;
+        await _storage.write(
+          key: _reEncryptJournalKey,
+          value: jsonEncode({'ivs': journalIvs}),
         );
 
         final fileIndex = files.indexWhere((f) => f.id == file.id);
@@ -1995,6 +2176,7 @@ class VaultService {
       }
 
       await _saveFileIndex(isDecoy: isDecoy);
+      await _storage.delete(key: _reEncryptJournalKey);
       return reEncryptedCount;
     } catch (e) {
       debugPrint('Re-encryption error: $e');

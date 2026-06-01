@@ -78,6 +78,7 @@ class VaultedFile {
   final String? notes;
   final List<String> albumIds; // Albums this file belongs to
   final String? folderId; // Folder this file belongs to
+  final bool needsMigration; // Legacy GCM v1 files need re-encryption to v2
 
   const VaultedFile({
     required this.id,
@@ -101,6 +102,7 @@ class VaultedFile {
     this.notes,
     this.albumIds = const [],
     this.folderId,
+    this.needsMigration = false,
   });
 
   /// Create a copy with updated fields
@@ -126,6 +128,7 @@ class VaultedFile {
     String? notes,
     List<String>? albumIds,
     String? folderId,
+    bool? needsMigration,
   }) {
     return VaultedFile(
       id: id ?? this.id,
@@ -149,6 +152,7 @@ class VaultedFile {
       notes: notes ?? this.notes,
       albumIds: albumIds ?? List.from(this.albumIds),
       folderId: folderId ?? this.folderId,
+      needsMigration: needsMigration ?? this.needsMigration,
     );
   }
 
@@ -264,6 +268,7 @@ class VaultedFile {
       'notes': notes,
       'albumIds': albumIds,
       'folderId': folderId,
+      'needsMigration': needsMigration,
     };
   }
 
@@ -276,7 +281,7 @@ class VaultedFile {
       originalPath: json['originalPath'] as String?,
       type: VaultedFileType.fromString(json['type'] as String),
       mimeType: json['mimeType'] as String,
-      fileSize: json['fileSize'] as int,
+      fileSize: (json['fileSize'] as num).toInt(),
       dateAdded: DateTime.parse(json['dateAdded'] as String),
       dateModified: json['dateModified'] != null
           ? DateTime.parse(json['dateModified'] as String)
@@ -293,13 +298,14 @@ class VaultedFile {
       lastViewed: json['lastViewed'] != null
           ? DateTime.parse(json['lastViewed'] as String)
           : null,
-      viewCount: json['viewCount'] as int? ?? 0,
+      viewCount: (json['viewCount'] as num?)?.toInt() ?? 0,
       notes: json['notes'] as String?,
       albumIds: (json['albumIds'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
           [],
       folderId: json['folderId'] as String?,
+      needsMigration: json['needsMigration'] as bool? ?? false,
     );
   }
 

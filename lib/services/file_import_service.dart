@@ -339,17 +339,14 @@ class FileImportService {
       debugPrint('[FileImport] Unhiding ${fileIds.length} files');
       final isDecoy = _decoyService.isDecoyModeActive;
 
-      // Check if we have all files access
       final hasAllFilesAccess = await _permissionService.hasAllFilesAccess();
       if (!hasAllFilesAccess) {
         debugPrint(
             '[FileImport] Warning: All Files Access not granted. Unhiding may fail.');
       }
 
-      // First pass: get all vaulted files and calculate total size
       final vaultedFiles = <MapEntry<String, VaultedFile>>[];
       int totalSize = 0;
-      int processedSize = 0;
 
       for (final fileId in fileIds) {
         try {
@@ -370,80 +367,103 @@ class FileImportService {
       onProgress?.call(0, vaultedFiles.length,
           currentSize: 0, totalSize: totalSize);
 
-      // Get the destination directory (DCIM/Restored)
       final dcimDir = Directory('/storage/emulated/0/DCIM/Restored');
       if (!await dcimDir.exists()) {
         await dcimDir.create(recursive: true);
       }
 
-      int successCount = 0;
-      int errorCount = 0;
-      final List<String> restoredPaths = [];
+      final destinationPaths = <String, String>{};
+      final usedPaths = <String>{};
+      for (final entry in vaultedFiles) {
+        final vaultedFile = entry.value;
+        String destPath = '${dcimDir.path}/${vaultedFile.originalName}';
+        int counter = 1;
+        while (usedPaths.contains(destPath) ||
+            await File(destPath).exists()) {
+          final extension = vaultedFile.extension;
+          final nameWithoutExt =
+              vaultedFile.originalName.replaceAll('.$extension', '');
+          destPath = '${dcimDir.path}/${nameWithoutExt}_$counter.$extension';
+          counter++;
+        }
+        usedPaths.add(destPath);
+        destinationPaths[entry.key] = destPath;
+      }
 
-      for (int i = 0; i < vaultedFiles.length; i++) {
-        try {
-          final entry = vaultedFiles[i];
+      final fileProgress = <int, int>{};
+      final exportResults = <int, File?>{};
+
+      await Future.wait(
+        vaultedFiles.asMap().entries.map((e) async {
+          final index = e.key;
+          final entry = e.value;
           final fileId = entry.key;
           final vaultedFile = entry.value;
-          final bytesBeforeFile = processedSize;
+          final destPath = destinationPaths[fileId]!;
 
-          // Determine destination path with original filename
-          String destinationPath =
-              '${dcimDir.path}/${vaultedFile.originalName}';
-
-          // Handle duplicate filenames
-          int counter = 1;
-          while (await File(destinationPath).exists()) {
-            final extension = vaultedFile.extension;
-            final nameWithoutExt =
-                vaultedFile.originalName.replaceAll('.$extension', '');
-            destinationPath =
-                '${dcimDir.path}/${nameWithoutExt}_$counter.$extension';
-            counter++;
+          try {
+            final exported = await _vaultService.exportFile(
+              fileId,
+              destPath,
+              isDecoy: isDecoy,
+              onProgress: (processed, total) {
+                final safeTotal =
+                    total > 0 ? total : vaultedFile.fileSize;
+                fileProgress[index] =
+                    processed.clamp(0, safeTotal).toInt();
+                final totalProcessed =
+                    fileProgress.values.fold(0, (a, b) => a + b);
+                onProgress?.call(
+                  index + 1,
+                  vaultedFiles.length,
+                  currentSize: totalProcessed,
+                  totalSize: totalSize,
+                );
+              },
+            );
+            exportResults[index] = exported;
+          } catch (e) {
+            debugPrint('[FileImport] Error exporting ${vaultedFile.originalName}: $e');
+            exportResults[index] = null;
           }
+        }),
+      );
 
-          // Export the file from vault
-          final exportedFile = await _vaultService.exportFile(
-            fileId,
-            destinationPath,
-            isDecoy: isDecoy,
-            onProgress: (fileProcessed, fileTotal) {
-              final safeTotal =
-                  fileTotal > 0 ? fileTotal : vaultedFile.fileSize;
-              final clampedProcessed =
-                  fileProcessed.clamp(0, safeTotal).toInt();
-              onProgress?.call(i + 1, vaultedFiles.length,
-                  currentSize: bytesBeforeFile + clampedProcessed,
-                  totalSize: totalSize);
-            },
-          );
+      int successCount = 0;
+      int errorCount = 0;
+      final restoredPaths = <String>[];
+      final successFileIds = <String>[];
 
-          if (exportedFile != null && await exportedFile.exists()) {
-            processedSize = bytesBeforeFile + vaultedFile.fileSize;
-            debugPrint('[FileImport] Exported file to: $destinationPath');
+      for (int i = 0; i < vaultedFiles.length; i++) {
+        final entry = vaultedFiles[i];
+        final fileId = entry.key;
+        final vaultedFile = entry.value;
+        final destPath = destinationPaths[fileId]!;
+        final exported = exportResults[i];
 
-            // Notify MediaStore to scan the file (without creating duplicates)
-            await _notifyMediaStore(destinationPath);
-
-            restoredPaths.add(destinationPath);
-            successCount++;
-
-            // Remove from vault if requested
-            if (removeFromVault) {
-              await _vaultService.removeFile(fileId, isDecoy: isDecoy);
-              debugPrint('[FileImport] Removed file from vault: $fileId');
-            }
-          } else {
-            debugPrint(
-                '[FileImport] Failed to export file: ${vaultedFile.originalName}');
-            errorCount++;
-          }
-
-          onProgress?.call(i + 1, vaultedFiles.length,
-              currentSize: processedSize, totalSize: totalSize);
-        } catch (e) {
-          debugPrint('[FileImport] Error unhiding file: $e');
+        if (exported != null && await exported.exists()) {
+          debugPrint('[FileImport] Exported file to: $destPath');
+          await _notifyMediaStore(destPath);
+          restoredPaths.add(destPath);
+          successFileIds.add(fileId);
+          successCount++;
+        } else {
+          debugPrint(
+              '[FileImport] Failed to export: ${vaultedFile.originalName}');
           errorCount++;
+        }
+
+        onProgress?.call(i + 1, vaultedFiles.length,
+            currentSize: totalSize, totalSize: totalSize);
+      }
+
+      if (removeFromVault) {
+        for (final fileId in successFileIds) {
+          try {
+            await _vaultService.removeFile(fileId, isDecoy: isDecoy);
+          } catch (e) {
+            debugPrint('[FileImport] Failed to remove $fileId from vault: $e');
+          }
         }
       }
 

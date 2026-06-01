@@ -7,12 +7,16 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:pointycastle/export.dart';
 import '../models/encryption_algorithm.dart';
+import 'crypto_isolate_pool.dart';
 
 const int _streamChunkSize = 1024 * 1024;
 
 const int _magicBytesGcm = 0x4C4B5247;
+const int _magicBytesGcmV2 = 0x4C4B5232;
 const int _magicBytesCtr = 0x4C4B5253;
 const int _magicBytesCbc = 0x4C4B5244;
+const int _gcmTagSize = 16;
+const int _v2HeaderSize = 9;
 
 /// AES-256 Encryption Service for secure file encryption
 /// Uses AES-256-CBC mode with PKCS7 padding
@@ -36,10 +40,18 @@ class EncryptionService {
   Uint8List? _cachedMasterKey;
   Uint8List? _cachedDecoyKey;
 
-  /// Initialize the encryption service
-  /// Creates master key if not exists
+  CryptoIsolatePool? _pool;
+
   Future<void> initialize() async {
     await _ensureMasterKey();
+    _pool = CryptoIsolatePool();
+    await _pool!.initialize();
+    await _checkKeyRotationRecovery();
+  }
+
+  Future<void> dispose() async {
+    await _pool?.dispose();
+    _pool = null;
   }
 
   /// Ensure master key exists, create if not
@@ -142,38 +154,11 @@ class EncryptionService {
     if (bytes.length < 4) return 0;
     final magic =
         bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24);
-    if (magic == _magicBytesGcm) return 1; // GCM
+    if (magic == _magicBytesGcmV2) return 4; // GCM v2 (authenticated)
+    if (magic == _magicBytesGcm) return 1; // GCM v1 (legacy)
     if (magic == _magicBytesCtr) return 2; // CTR (streamed)
     if (magic == _magicBytesCbc) return 3; // CBC (legacy)
     return 0;
-  }
-
-  /// Encrypt data using AES-256-CBC
-  Future<EncryptionResult> encryptData(
-    Uint8List data, {
-    bool isDecoy = false,
-    Uint8List? customKey,
-  }) async {
-    try {
-      final key = customKey ??
-          (isDecoy ? await _ensureDecoyKey() : await _ensureMasterKey());
-      final iv = generateIV();
-
-      final cipher = _getCipher(key, iv, true);
-      final encrypted = cipher.process(data);
-
-      return EncryptionResult(
-        success: true,
-        data: encrypted,
-        iv: base64Encode(iv),
-      );
-    } catch (e) {
-      debugPrint('Encryption error: $e');
-      return EncryptionResult(
-        success: false,
-        error: 'Encryption failed: $e',
-      );
-    }
   }
 
   /// Decrypt data using AES-256-CBC
@@ -241,55 +226,6 @@ class EncryptionService {
       return DecryptionResult(
         success: false,
         error: 'Decryption failed: $e',
-      );
-    }
-  }
-
-  /// Encrypt a file and return the encrypted file path
-  Future<FileEncryptionResult> encryptFile(
-    String sourcePath,
-    String destinationPath, {
-    bool isDecoy = false,
-    Function(int current, int total)? onProgress,
-  }) async {
-    try {
-      final sourceFile = File(sourcePath);
-      if (!await sourceFile.exists()) {
-        return FileEncryptionResult(
-          success: false,
-          error: 'Source file does not exist',
-        );
-      }
-
-      final data = await sourceFile.readAsBytes();
-      onProgress?.call(1, 3);
-
-      final result = await encryptData(data, isDecoy: isDecoy);
-      onProgress?.call(2, 3);
-
-      if (!result.success || result.data == null) {
-        return FileEncryptionResult(
-          success: false,
-          error: result.error ?? 'Encryption failed',
-        );
-      }
-
-      final destFile = File(destinationPath);
-      await destFile.writeAsBytes(result.data!);
-      onProgress?.call(3, 3);
-
-      return FileEncryptionResult(
-        success: true,
-        encryptedPath: destinationPath,
-        iv: result.iv,
-        originalSize: data.length,
-        encryptedSize: result.data!.length,
-      );
-    } catch (e) {
-      debugPrint('File encryption error: $e');
-      return FileEncryptionResult(
-        success: false,
-        error: 'File encryption failed: $e',
       );
     }
   }
@@ -426,7 +362,7 @@ class EncryptionService {
     }
   }
 
-  /// Encrypt in-memory bytes using GCM and write to file
+  /// Encrypt in-memory bytes using GCM v2 and write to file
   Future<FileEncryptionResult> encryptBytesStreamedGcm(
     Uint8List data,
     String destinationPath, {
@@ -441,15 +377,16 @@ class EncryptionService {
 
       final encrypted = gcm.process(data);
 
-      final header = Uint8List(8);
+      final header = Uint8List(_v2HeaderSize);
       header[0] = 0x4C;
       header[1] = 0x4B;
       header[2] = 0x52;
-      header[3] = 0x47;
-      header[4] = (data.length & 0xFF);
-      header[5] = ((data.length >> 8) & 0xFF);
-      header[6] = ((data.length >> 16) & 0xFF);
-      header[7] = ((data.length >> 24) & 0xFF);
+      header[3] = 0x32;
+      header[4] = 0x02;
+      header[5] = (data.length & 0xFF);
+      header[6] = ((data.length >> 8) & 0xFF);
+      header[7] = ((data.length >> 16) & 0xFF);
+      header[8] = ((data.length >> 24) & 0xFF);
 
       final destFile = File(destinationPath);
       final sink = destFile.openWrite();
@@ -503,9 +440,9 @@ class EncryptionService {
           header[0] == 0x4C &&
           header[1] == 0x4B &&
           header[2] == 0x52 &&
-          header[3] == 0x47) {
-        // GCM-encrypted file - decrypt to memory and write to destination
-        debugPrint('[Encryption] Using GCM format for decryptFile');
+          (header[3] == 0x47 || header[3] == 0x32)) {
+        // GCM-encrypted file (v1 legacy or v2 authenticated)
+        debugPrint('[Encryption] Using GCM format for decryptFile (byte3=0x${header[3].toRadixString(16)})');
         onProgress?.call(1, 3);
 
         final result = await decryptStreamedFileToMemoryGcm(
@@ -530,6 +467,7 @@ class EncryptionService {
           success: true,
           decryptedPath: destinationPath,
           decryptedSize: result.data!.length,
+          needsMigration: result.needsMigration,
         );
       } else if (header.length >= 4 &&
           header[0] == 0x4C &&
@@ -605,7 +543,7 @@ class EncryptionService {
   }
 
   /// Decrypt a file using chunked streaming (memory-efficient for large files)
-  /// Handles CTR and GCM formats (8-byte header + ciphertext)
+  /// Handles CTR, GCM v2 (authenticated), and GCM v1 (legacy unauthenticated) formats
   Future<FileDecryptionResult> decryptFileStreamed(
     String encryptedPath,
     String destinationPath,
@@ -626,11 +564,9 @@ class EncryptionService {
       final iv = base64Decode(ivBase64);
       final encryptedSize = await encryptedFile.length();
 
-      // Open file and read header
       final raf = await encryptedFile.open();
       final header = await raf.read(8);
 
-      // Validate magic bytes
       if (header.length < 8 ||
           header[0] != 0x4C ||
           header[1] != 0x4B ||
@@ -642,10 +578,11 @@ class EncryptionService {
         );
       }
 
-      final bool isGcm = header[3] == 0x47;
+      final bool isGcmV2 = header[3] == 0x32;
+      final bool isGcmV1 = header[3] == 0x47;
       final bool isCtr = header[3] == 0x53;
 
-      if (!isGcm && !isCtr) {
+      if (!isGcmV2 && !isGcmV1 && !isCtr) {
         await raf.close();
         return FileDecryptionResult(
           success: false,
@@ -653,49 +590,103 @@ class EncryptionService {
         );
       }
 
-      // Read original file size from header (little-endian)
-      final originalSize =
-          header[4] | (header[5] << 8) | (header[6] << 16) | (header[7] << 24);
+      int headerSize;
+      int originalSize;
+
+      if (isGcmV2) {
+        await raf.read(1);
+        headerSize = _v2HeaderSize;
+        final sizeBytes = await raf.read(4);
+        originalSize = sizeBytes[0] | (sizeBytes[1] << 8) | (sizeBytes[2] << 16) | (sizeBytes[3] << 24);
+      } else {
+        headerSize = 8;
+        originalSize = header[4] | (header[5] << 8) | (header[6] << 16) | (header[7] << 24);
+      }
 
       await raf.close();
 
-      final destFile = File(destinationPath);
-      final sink = destFile.openWrite();
-
-      final totalBytes = encryptedSize - 8; // Subtract header size
+      final totalBytes = encryptedSize - headerSize - (isGcmV2 ? _gcmTagSize : 0);
       int bytesProcessed = 0;
 
       onProgress?.call(0, totalBytes);
 
-      final inputStream = _createChunkedStream(encryptedFile.openRead(8));
+      if (isCtr) {
+        final destFile = File(destinationPath);
+        final sink = destFile.openWrite();
 
-      if (isGcm) {
-        final gcm = GCMBlockCipher(AESEngine())
-          ..init(false, AEADParameters(KeyParameter(key), 128, iv, Uint8List(0)));
-        await for (final chunk in inputStream) {
-          sink.add(gcm.process(chunk));
-          bytesProcessed += chunk.length;
-          onProgress?.call(bytesProcessed, totalBytes);
-        }
-      } else {
         final ctr = CTRStreamCipher(AESEngine())
           ..init(false, ParametersWithIV<KeyParameter>(KeyParameter(key), iv));
+
+        final inputStream = _createChunkedStream(encryptedFile.openRead(headerSize));
+
         await for (final chunk in inputStream) {
           sink.add(ctr.process(chunk));
           bytesProcessed += chunk.length;
           onProgress?.call(bytesProcessed, totalBytes);
         }
+
+        onProgress?.call(totalBytes, totalBytes);
+        await sink.flush();
+        await sink.close();
+
+        return FileDecryptionResult(
+          success: true,
+          decryptedPath: destinationPath,
+          decryptedSize: originalSize,
+        );
       }
 
-      onProgress?.call(totalBytes, totalBytes);
+      // GCM path (v2 authenticated or v1 legacy)
+      final tempPath = '$destinationPath.tmp';
+      final tempFile = File(tempPath);
+      final sink = tempFile.openWrite();
+
+      final gcm = GCMBlockCipher(AESEngine())
+        ..init(false, AEADParameters(KeyParameter(key), 128, iv, Uint8List(0)));
+
+      final inputStream = _createChunkedStream(encryptedFile.openRead(headerSize));
+      final outBuf = Uint8List(_streamChunkSize + 16);
+      bool authFailed = false;
+
+      try {
+        await for (final chunk in inputStream) {
+          final outLen = gcm.processBytes(chunk, 0, chunk.length, outBuf, 0);
+          if (outLen > 0) {
+            sink.add(Uint8List.view(outBuf.buffer, 0, outLen));
+          }
+          bytesProcessed += chunk.length;
+          onProgress?.call(bytesProcessed, totalBytes);
+        }
+
+        final finalBuf = Uint8List(32);
+        final finalLen = gcm.doFinal(finalBuf, 0);
+        if (finalLen > 0) {
+          sink.add(Uint8List.view(finalBuf.buffer, 0, finalLen));
+        }
+      } on InvalidCipherTextException {
+        authFailed = true;
+      }
 
       await sink.flush();
       await sink.close();
+
+      if (authFailed) {
+        try { await tempFile.delete(); } catch (_) {}
+        return FileDecryptionResult(
+          success: false,
+          error: 'GCM authentication failed — file may be tampered or encrypted with a legacy broken implementation',
+        );
+      }
+
+      await tempFile.rename(destinationPath);
+
+      onProgress?.call(totalBytes, totalBytes);
 
       return FileDecryptionResult(
         success: true,
         decryptedPath: destinationPath,
         decryptedSize: originalSize,
+        needsMigration: isGcmV1,
       );
     } catch (e) {
       debugPrint('File streaming decryption error: $e');
@@ -733,9 +724,9 @@ class EncryptionService {
           header[0] == 0x4C &&
           header[1] == 0x4B &&
           header[2] == 0x52 &&
-          header[3] == 0x47) {
-        // GCM-encrypted streamed file
-        debugPrint('[Encryption] Detected GCM format');
+          (header[3] == 0x47 || header[3] == 0x32)) {
+        // GCM-encrypted streamed file (v1 legacy or v2 authenticated)
+        debugPrint('[Encryption] Detected GCM format (byte3=0x${header[3].toRadixString(16)})');
         return decryptStreamedFileToMemoryGcm(
           encryptedPath,
           ivBase64,
@@ -843,34 +834,6 @@ class EncryptionService {
     );
   }
 
-  /// Encrypt data using AES-256-GCM (faster + authenticated)
-  Future<EncryptionResult> encryptDataGcm(
-    Uint8List data, {
-    bool isDecoy = false,
-    Uint8List? customKey,
-  }) async {
-    try {
-      final key = customKey ??
-          (isDecoy ? await _ensureDecoyKey() : await _ensureMasterKey());
-      final iv = generateIV();
-
-      final cipher = _getGcmCipher(key, iv, true);
-      final encrypted = cipher.process(data);
-
-      return EncryptionResult(
-        success: true,
-        data: encrypted,
-        iv: base64Encode(iv),
-      );
-    } catch (e) {
-      debugPrint('GCM Encryption error: $e');
-      return EncryptionResult(
-        success: false,
-        error: 'GCM Encryption failed: $e',
-      );
-    }
-  }
-
   /// Decrypt data using AES-256-GCM (faster + authenticated)
   Future<DecryptionResult> decryptDataGcm(
     Uint8List encryptedData,
@@ -899,75 +862,8 @@ class EncryptionService {
     }
   }
 
-  /// Encrypt file using AES-256-GCM (faster + authenticated)
-  Future<FileEncryptionResult> encryptFileGcm(
-    String sourcePath,
-    String destinationPath, {
-    bool isDecoy = false,
-    Function(int current, int total)? onProgress,
-  }) async {
-    try {
-      final sourceFile = File(sourcePath);
-      if (!await sourceFile.exists()) {
-        return FileEncryptionResult(
-          success: false,
-          error: 'Source file does not exist',
-        );
-      }
-
-      final data = await sourceFile.readAsBytes();
-      onProgress?.call(1, 3);
-
-      final result = await encryptDataGcm(
-        data,
-        isDecoy: isDecoy,
-      );
-      onProgress?.call(2, 3);
-
-      if (!result.success || result.data == null) {
-        return FileEncryptionResult(
-          success: false,
-          error: result.error ?? 'GCM Encryption failed',
-        );
-      }
-
-      final destFile = File(destinationPath);
-      final sink = destFile.openWrite();
-
-      // Write GCM header: 4 bytes magic + 4 bytes original file size
-      final header = Uint8List(8);
-      header[0] = 0x4C; // 'L'
-      header[1] = 0x4B; // 'K'
-      header[2] = 0x52; // 'R'
-      header[3] = 0x47; // 'G' (GCM)
-      header[4] = (data.length & 0xFF);
-      header[5] = ((data.length >> 8) & 0xFF);
-      header[6] = ((data.length >> 16) & 0xFF);
-      header[7] = ((data.length >> 24) & 0xFF);
-      sink.add(header);
-      sink.add(result.data!);
-
-      await sink.flush();
-      await sink.close();
-      onProgress?.call(3, 3);
-
-      return FileEncryptionResult(
-        success: true,
-        encryptedPath: destinationPath,
-        iv: result.iv,
-        originalSize: data.length,
-        encryptedSize: result.data!.length + 8,
-      );
-    } catch (e) {
-      debugPrint('GCM File encryption error: $e');
-      return FileEncryptionResult(
-        success: false,
-        error: 'GCM File encryption failed: $e',
-      );
-    }
-  }
-
   /// Decrypt file using AES-256-GCM (faster + authenticated)
+  /// Handles both v2 (LKR2) and v1 legacy (LKRG) formats
   Future<FileDecryptionResult> decryptFileGcm(
     String encryptedPath,
     String destinationPath,
@@ -985,14 +881,13 @@ class EncryptionService {
       }
 
       final raf = await encryptedFile.open();
-      final header = await raf.read(8);
+      final magic = await raf.read(4);
 
-      // Verify GCM magic bytes
-      if (header.length < 8 ||
-          header[0] != 0x4C ||
-          header[1] != 0x4B ||
-          header[2] != 0x52 ||
-          header[3] != 0x47) {
+      if (magic.length < 4 ||
+          magic[0] != 0x4C ||
+          magic[1] != 0x4B ||
+          magic[2] != 0x52 ||
+          (magic[3] != 0x47 && magic[3] != 0x32)) {
         await raf.close();
         return FileDecryptionResult(
           success: false,
@@ -1000,10 +895,21 @@ class EncryptionService {
         );
       }
 
-      final originalSize =
-          header[4] | (header[5] << 8) | (header[6] << 16) | (header[7] << 24);
+      final bool isV2 = magic[3] == 0x32;
+      int headerSize;
+      int originalSize;
 
-      final encryptedData = await raf.read(await encryptedFile.length() - 8);
+      if (isV2) {
+        final rest = await raf.read(5);
+        headerSize = _v2HeaderSize;
+        originalSize = rest[1] | (rest[2] << 8) | (rest[3] << 16) | (rest[4] << 24);
+      } else {
+        final rest = await raf.read(4);
+        headerSize = 8;
+        originalSize = rest[0] | (rest[1] << 8) | (rest[2] << 16) | (rest[3] << 24);
+      }
+
+      final encryptedData = await raf.read(await encryptedFile.length() - headerSize);
       await raf.close();
 
       onProgress?.call(1, 2);
@@ -1022,13 +928,15 @@ class EncryptionService {
         );
       }
 
-      final destFile = File(destinationPath);
-      await destFile.writeAsBytes(result.data!);
+      final tempPath = '$destinationPath.tmp';
+      await File(tempPath).writeAsBytes(result.data!);
+      await File(tempPath).rename(destinationPath);
 
       return FileDecryptionResult(
         success: true,
         decryptedPath: destinationPath,
         decryptedSize: originalSize,
+        needsMigration: !isV2,
       );
     } catch (e) {
       debugPrint('GCM File decryption error: $e');
@@ -1039,7 +947,8 @@ class EncryptionService {
     }
   }
 
-  /// Encrypt file using GCM with streaming (memory-efficient for large files)
+  /// Encrypt file using GCM v2 with streaming (memory-efficient for large files)
+  /// Uses processBytes per chunk + doFinal once at end for correct GCM authentication
   Future<FileEncryptionResult> encryptFileStreamedGcm(
     String sourcePath,
     String destinationPath, {
@@ -1065,27 +974,36 @@ class EncryptionService {
       final destFile = File(destinationPath);
       final sink = destFile.openWrite();
 
-      // Write GCM header
-      final header = Uint8List(8);
+      final header = Uint8List(_v2HeaderSize);
       header[0] = 0x4C;
       header[1] = 0x4B;
       header[2] = 0x52;
-      header[3] = 0x47;
-      header[4] = (totalBytes & 0xFF);
-      header[5] = ((totalBytes >> 8) & 0xFF);
-      header[6] = ((totalBytes >> 16) & 0xFF);
-      header[7] = ((totalBytes >> 24) & 0xFF);
+      header[3] = 0x32;
+      header[4] = 0x02;
+      header[5] = (totalBytes & 0xFF);
+      header[6] = ((totalBytes >> 8) & 0xFF);
+      header[7] = ((totalBytes >> 16) & 0xFF);
+      header[8] = ((totalBytes >> 24) & 0xFF);
       sink.add(header);
 
       int bytesProcessed = 0;
       final inputStream = _createChunkedStream(sourceFile.openRead());
+      final outBuf = Uint8List(_streamChunkSize + 16);
 
       await for (final chunk in inputStream) {
-        final encrypted = gcm.process(chunk);
-        sink.add(encrypted);
+        final outLen = gcm.processBytes(chunk, 0, chunk.length, outBuf, 0);
+        if (outLen > 0) {
+          sink.add(Uint8List.view(outBuf.buffer, 0, outLen));
+        }
 
         bytesProcessed += chunk.length;
         onProgress?.call(bytesProcessed, totalBytes);
+      }
+
+      final finalBuf = Uint8List(32);
+      final finalLen = gcm.doFinal(finalBuf, 0);
+      if (finalLen > 0) {
+        sink.add(Uint8List.view(finalBuf.buffer, 0, finalLen));
       }
 
       await sink.flush();
@@ -1099,7 +1017,7 @@ class EncryptionService {
         encryptedSize: await destFile.length(),
       );
     } catch (e) {
-      debugPrint('GCM streaming encryption error: $e');
+      debugPrint('GCM v2 streaming encryption error: $e');
       return FileEncryptionResult(
         success: false,
         error: 'GCM streaming encryption failed: $e',
@@ -1108,6 +1026,7 @@ class EncryptionService {
   }
 
   /// Decrypt GCM streamed file to memory
+  /// Handles both v2 (authenticated) and v1 (legacy) GCM formats
   Future<DecryptionResult> decryptStreamedFileToMemoryGcm(
     String encryptedPath,
     String ivBase64, {
@@ -1125,21 +1044,52 @@ class EncryptionService {
       final key = isDecoy ? await _ensureDecoyKey() : await _ensureMasterKey();
       final iv = base64Decode(ivBase64);
 
+      final raf = await encryptedFile.open();
+      final magic = await raf.read(4);
+      final bool isV2 = magic.length >= 4 && magic[3] == 0x32;
+
+      int dataOffset;
+      if (isV2) {
+        await raf.read(5);
+        dataOffset = _v2HeaderSize;
+      } else {
+        await raf.read(4);
+        dataOffset = 8;
+      }
+
+      final fileSize = await encryptedFile.length();
+      final dataLen = fileSize - dataOffset;
+      final encryptedData = await raf.read(dataLen);
+      await raf.close();
+
       final gcm = GCMBlockCipher(AESEngine())
         ..init(false, AEADParameters(KeyParameter(key), 128, iv, Uint8List(0)));
 
-      final raf = await encryptedFile.open();
-      await raf.read(8); // Skip header
+      final outBuf = Uint8List(dataLen);
+      final outLen = gcm.processBytes(encryptedData, 0, encryptedData.length, outBuf, 0);
 
-      final encryptedData = await raf.read(await encryptedFile.length() - 8);
-      await raf.close();
+      try {
+        final finalBuf = Uint8List(32);
+        final finalLen = gcm.doFinal(finalBuf, 0);
 
-      final decrypted = gcm.process(encryptedData);
+        final result = Uint8List(outLen + finalLen);
+        result.setRange(0, outLen, outBuf);
+        if (finalLen > 0) {
+          result.setRange(outLen, outLen + finalLen, finalBuf);
+        }
 
-      return DecryptionResult(
-        success: true,
-        data: decrypted,
-      );
+        return DecryptionResult(
+          success: true,
+          data: result,
+          needsMigration: !isV2,
+        );
+      } on InvalidCipherTextException {
+        return DecryptionResult(
+          success: false,
+          error: 'GCM authentication failed — file may be tampered or encrypted with a legacy broken implementation',
+          needsMigration: true,
+        );
+      }
     } catch (e) {
       debugPrint('GCM streamed decryption error: $e');
       return DecryptionResult(
@@ -1149,7 +1099,7 @@ class EncryptionService {
     }
   }
 
-  /// Encrypt file in isolate (for large files)
+  /// Encrypt file in isolate pool (for large files, with real progress)
   Future<FileEncryptionResult> encryptFileInIsolate(
     String sourcePath,
     String destinationPath, {
@@ -1167,30 +1117,23 @@ class EncryptionService {
       }
 
       final key = isDecoy ? await _ensureDecoyKey() : await _ensureMasterKey();
-      final iv = generateIV();
-      final totalBytes = await sourceFile.length();
 
-      onProgress?.call(0, totalBytes);
-
-      final result = await compute(
-        _encryptFileIsolate,
-        _IsolateEncryptParams(
-          sourcePath: sourcePath,
-          destinationPath: destinationPath,
-          keyBase64: base64Encode(key),
-          ivBase64: base64Encode(iv),
-          useGcm: useGcm,
-        ),
+      final job = _pool!.encryptFile(
+        sourcePath: sourcePath,
+        destinationPath: destinationPath,
+        key: key,
+        useGcm: useGcm,
+        onProgress: onProgress,
       );
 
-      onProgress?.call(totalBytes, totalBytes);
+      final result = await job.future;
 
       if (result.success) {
         return FileEncryptionResult(
           success: true,
           encryptedPath: destinationPath,
-          iv: base64Encode(iv),
-          originalSize: totalBytes,
+          iv: result.ivBase64,
+          originalSize: result.originalSize,
           encryptedSize: result.encryptedSize,
         );
       } else {
@@ -1200,7 +1143,7 @@ class EncryptionService {
         );
       }
     } catch (e) {
-      debugPrint('Isolate encryption error: $e');
+      debugPrint('Isolate pool encryption error: $e');
       return FileEncryptionResult(
         success: false,
         error: 'Isolate encryption failed: $e',
@@ -1208,13 +1151,12 @@ class EncryptionService {
     }
   }
 
-  /// Decrypt file in isolate (for large files)
+  /// Decrypt file in isolate pool (for large files, with real progress)
   Future<FileDecryptionResult> decryptFileInIsolate(
     String encryptedPath,
     String destinationPath,
     String ivBase64, {
     bool isDecoy = false,
-    bool useGcm = false,
     Function(int bytesProcessed, int totalBytes)? onProgress,
   }) async {
     try {
@@ -1228,22 +1170,22 @@ class EncryptionService {
 
       final key = isDecoy ? await _ensureDecoyKey() : await _ensureMasterKey();
 
-      final result = await compute(
-        _decryptFileIsolate,
-        _IsolateDecryptParams(
-          encryptedPath: encryptedPath,
-          destinationPath: destinationPath,
-          keyBase64: base64Encode(key),
-          ivBase64: ivBase64,
-          useGcm: useGcm,
-        ),
+      final job = _pool!.decryptFile(
+        encryptedPath: encryptedPath,
+        destinationPath: destinationPath,
+        key: key,
+        ivBase64: ivBase64,
+        onProgress: onProgress,
       );
+
+      final result = await job.future;
 
       if (result.success) {
         return FileDecryptionResult(
           success: true,
           decryptedPath: destinationPath,
           decryptedSize: result.decryptedSize,
+          needsMigration: result.needsMigration,
         );
       } else {
         return FileDecryptionResult(
@@ -1252,7 +1194,7 @@ class EncryptionService {
         );
       }
     } catch (e) {
-      debugPrint('Isolate decryption error: $e');
+      debugPrint('Isolate pool decryption error: $e');
       return FileDecryptionResult(
         success: false,
         error: 'Isolate decryption failed: $e',
@@ -1340,65 +1282,52 @@ class EncryptionService {
     }
   }
 
-  /// Re-encrypt a single file from its current format to a target format
-  /// Returns the new IV (base64) on success
   Future<String> reEncryptFile(
     String filePath,
     String oldIvBase64, {
     required EncryptionAlgorithm targetAlgorithm,
     bool isDecoy = false,
   }) async {
-    final decrypted = await decryptFileToMemory(filePath, oldIvBase64, isDecoy: isDecoy);
-    if (!decrypted.success || decrypted.data == null) {
-      throw Exception('Failed to decrypt file for re-encryption: ${decrypted.error}');
-    }
+    final format = detectFileFormat(filePath);
+    final isLegacyCbc = (format == 0 || format == 3);
 
-    final newIv = generateIV();
     final key = isDecoy ? await _ensureDecoyKey() : await _ensureMasterKey();
+    final tempDir = await Directory.systemTemp.createTemp('lkr_reencrypt_');
+    final tempDecPath = '${tempDir.path}/decrypted';
 
-    if (targetAlgorithm == EncryptionAlgorithm.aes256Gcm) {
-      final gcm = GCMBlockCipher(AESEngine())
-        ..init(true, AEADParameters(KeyParameter(key), 128, newIv, Uint8List(0)));
-      final encrypted = gcm.process(decrypted.data!);
+    try {
+      if (isLegacyCbc) {
+        final decrypted = await decryptFileToMemory(filePath, oldIvBase64, isDecoy: isDecoy);
+        if (!decrypted.success || decrypted.data == null) {
+          throw Exception('Failed to decrypt CBC file for re-encryption: ${decrypted.error}');
+        }
+        await File(tempDecPath).writeAsBytes(decrypted.data!);
+      } else {
+        final decJob = _pool!.decryptFile(
+          encryptedPath: filePath,
+          destinationPath: tempDecPath,
+          key: key,
+          ivBase64: oldIvBase64,
+        );
+        final decResult = await decJob.future;
+        if (decResult.needsMigration) {
+          debugPrint('reEncryptFile: v1 GCM decrypted (will be upgraded to v2)');
+        }
+      }
 
-      final header = Uint8List(8);
-      header[0] = 0x4C;
-      header[1] = 0x4B;
-      header[2] = 0x52;
-      header[3] = 0x47;
-      header[4] = (decrypted.data!.length & 0xFF);
-      header[5] = ((decrypted.data!.length >> 8) & 0xFF);
-      header[6] = ((decrypted.data!.length >> 16) & 0xFF);
-      header[7] = ((decrypted.data!.length >> 24) & 0xFF);
+      final useGcm = targetAlgorithm == EncryptionAlgorithm.aes256Gcm;
+      final encJob = _pool!.encryptFile(
+        sourcePath: tempDecPath,
+        destinationPath: filePath,
+        key: key,
+        useGcm: useGcm,
+      );
+      final encResult = await encJob.future;
 
-      final sink = File(filePath).openWrite();
-      sink.add(header);
-      sink.add(encrypted);
-      await sink.flush();
-      await sink.close();
-    } else {
-      final ctr = CTRStreamCipher(AESEngine())
-        ..init(true, ParametersWithIV<KeyParameter>(KeyParameter(key), newIv));
-      final encrypted = ctr.process(decrypted.data!);
-
-      final header = Uint8List(8);
-      header[0] = 0x4C;
-      header[1] = 0x4B;
-      header[2] = 0x52;
-      header[3] = 0x53;
-      header[4] = (decrypted.data!.length & 0xFF);
-      header[5] = ((decrypted.data!.length >> 8) & 0xFF);
-      header[6] = ((decrypted.data!.length >> 16) & 0xFF);
-      header[7] = ((decrypted.data!.length >> 24) & 0xFF);
-
-      final sink = File(filePath).openWrite();
-      sink.add(header);
-      sink.add(encrypted);
-      await sink.flush();
-      await sink.close();
+      return encResult.ivBase64!;
+    } finally {
+      try { await tempDir.delete(recursive: true); } catch (_) {}
     }
-
-    return base64Encode(newIv);
   }
 
   /// Check what encryption format a file uses
@@ -1413,6 +1342,7 @@ class EncryptionService {
       if (header.length < 4) return 0;
 
       final magic = header[0] | (header[1] << 8) | (header[2] << 16) | (header[3] << 24);
+      if (magic == _magicBytesGcmV2) return 4;
       if (magic == _magicBytesGcm) return 1;
       if (magic == _magicBytesCtr) return 2;
       if (magic == _magicBytesCbc) return 3;
@@ -1422,7 +1352,86 @@ class EncryptionService {
     }
   }
 
-  /// Re-encrypt all files with a new key (for key rotation)
+  static const String _rotationJournalKey = 'key_rotation_journal';
+  static const String _oldMasterKeyKey = 'vault_master_key_old';
+
+  Future<void> _checkKeyRotationRecovery() async {
+    try {
+      final journalStr = await _storage.read(key: _rotationJournalKey);
+      if (journalStr == null) return;
+
+      debugPrint('Key rotation recovery: found journal');
+      final journal = jsonDecode(journalStr) as Map<String, dynamic>;
+      final oldKeyB64 = await _storage.read(key: _oldMasterKeyKey);
+      if (oldKeyB64 == null) {
+        await _storage.delete(key: _rotationJournalKey);
+        return;
+      }
+
+      final oldKey = base64Decode(oldKeyB64);
+      final newKey = await _ensureMasterKey();
+      final files = (journal['files'] as List).cast<String>();
+      final doneSet = (journal['done'] as List).cast<String>().toSet();
+      final ivs = (journal['ivs'] as Map<String, dynamic>).cast<String, String>();
+
+      final tempDir = await Directory.systemTemp.createTemp('lkr_rot_recovery_');
+      try {
+        for (final path in files) {
+          if (doneSet.contains(path)) continue;
+          if (!await File(path).exists()) continue;
+
+          final format = detectFileFormat(path);
+          final isLegacyCbc = (format == 0 || format == 3);
+          final oldIv = ivs[path] ?? '';
+
+          final tempDecPath = '${tempDir.path}/recovery_dec';
+          if (isLegacyCbc) {
+            final dec = await decryptFileToMemory(path, oldIv);
+            if (!dec.success || dec.data == null) continue;
+            await File(tempDecPath).writeAsBytes(dec.data!);
+          } else {
+            final decJob = _pool!.decryptFile(
+              encryptedPath: path,
+              destinationPath: tempDecPath,
+              key: oldKey,
+              ivBase64: oldIv,
+            );
+            try {
+              await decJob.future;
+            } catch (_) {
+              final decJob2 = _pool!.decryptFile(
+                encryptedPath: path,
+                destinationPath: tempDecPath,
+                key: newKey,
+                ivBase64: oldIv,
+              );
+              await decJob2.future;
+            }
+          }
+
+          final useGcm = (format == 1 || format == 4);
+          final encJob = _pool!.encryptFile(
+            sourcePath: tempDecPath,
+            destinationPath: path,
+            key: newKey,
+            useGcm: useGcm,
+          );
+          await encJob.future;
+
+          try { await File(tempDecPath).delete(); } catch (_) {}
+        }
+      } finally {
+        try { await tempDir.delete(recursive: true); } catch (_) {}
+      }
+
+      await _storage.delete(key: _oldMasterKeyKey);
+      await _storage.delete(key: _rotationJournalKey);
+      debugPrint('Key rotation recovery: complete');
+    } catch (e) {
+      debugPrint('Key rotation recovery error: $e');
+    }
+  }
+
   Future<KeyRotationResult> rotateKey({
     required List<String> encryptedFilePaths,
     required List<String> ivs,
@@ -1437,55 +1446,94 @@ class EncryptionService {
         );
       }
 
-      // Generate new key
+      await _checkKeyRotationRecovery();
+
+      final oldKey = await _ensureMasterKey();
       final newKey = _generateRandomBytes(_keySize);
       final newIvs = <String>[];
 
-      // Re-encrypt each file
+      final ivMap = <String, String>{};
       for (int i = 0; i < encryptedFilePaths.length; i++) {
-        onProgress?.call(i + 1, encryptedFilePaths.length);
-
-        final path = encryptedFilePaths[i];
-        final oldIv = ivs[i];
-
-        // Decrypt with old key
-        final decrypted = await decryptFileToMemory(path, oldIv);
-        if (!decrypted.success || decrypted.data == null) {
-          return KeyRotationResult(
-            success: false,
-            error: 'Failed to decrypt file at index $i',
-            processedCount: i,
-          );
-        }
-
-        // Encrypt with new key
-        final newIv = generateIV();
-        final ctr = CTRStreamCipher(AESEngine())
-          ..init(true, ParametersWithIV<KeyParameter>(KeyParameter(newKey), newIv));
-        final reEncrypted = ctr.process(decrypted.data!);
-
-        // Write CTR header + encrypted data
-        final header = Uint8List(8);
-        header[0] = 0x4C;
-        header[1] = 0x4B;
-        header[2] = 0x52;
-        header[3] = 0x53;
-        header[4] = (decrypted.data!.length & 0xFF);
-        header[5] = ((decrypted.data!.length >> 8) & 0xFF);
-        header[6] = ((decrypted.data!.length >> 16) & 0xFF);
-        header[7] = ((decrypted.data!.length >> 24) & 0xFF);
-
-        final sink = File(path).openWrite();
-        sink.add(header);
-        sink.add(reEncrypted);
-        await sink.flush();
-        await sink.close();
-        newIvs.add(base64Encode(newIv));
+        ivMap[encryptedFilePaths[i]] = ivs[i];
       }
 
-      // Save new key
+      await _storage.write(key: _oldMasterKeyKey, value: base64Encode(oldKey));
       _cachedMasterKey = newKey;
       await _storage.write(key: _masterKeyKey, value: base64Encode(newKey));
+
+      final journal = {
+        'files': encryptedFilePaths,
+        'ivs': ivMap,
+        'done': <String>[],
+      };
+      await _storage.write(key: _rotationJournalKey, value: jsonEncode(journal));
+
+      final tempDir = await Directory.systemTemp.createTemp('lkr_rotate_');
+      try {
+        for (int i = 0; i < encryptedFilePaths.length; i++) {
+          onProgress?.call(i + 1, encryptedFilePaths.length);
+
+          final path = encryptedFilePaths[i];
+          final oldIv = ivs[i];
+
+          if (!await File(path).exists()) {
+            newIvs.add(oldIv);
+            continue;
+          }
+
+          final format = detectFileFormat(path);
+          final isLegacyCbc = (format == 0 || format == 3);
+          final tempDecPath = '${tempDir.path}/dec_$i';
+
+          if (isLegacyCbc) {
+            final dec = await decryptFileToMemory(path, oldIv);
+            if (!dec.success || dec.data == null) {
+              return KeyRotationResult(
+                success: false,
+                error: 'Failed to decrypt file at index $i',
+                processedCount: i,
+              );
+            }
+            await File(tempDecPath).writeAsBytes(dec.data!);
+          } else {
+            final decJob = _pool!.decryptFile(
+              encryptedPath: path,
+              destinationPath: tempDecPath,
+              key: oldKey,
+              ivBase64: oldIv,
+            );
+            try {
+              await decJob.future;
+            } catch (e) {
+              return KeyRotationResult(
+                success: false,
+                error: 'Failed to decrypt file at index $i: $e',
+                processedCount: i,
+              );
+            }
+          }
+
+          final useGcm = (format == 1 || format == 4);
+          final encJob = _pool!.encryptFile(
+            sourcePath: tempDecPath,
+            destinationPath: path,
+            key: newKey,
+            useGcm: useGcm,
+          );
+          final encResult = await encJob.future;
+          newIvs.add(encResult.ivBase64!);
+
+          try { await File(tempDecPath).delete(); } catch (_) {}
+
+          journal['done'] = encryptedFilePaths.sublist(0, i + 1);
+          await _storage.write(key: _rotationJournalKey, value: jsonEncode(journal));
+        }
+      } finally {
+        try { await tempDir.delete(recursive: true); } catch (_) {}
+      }
+
+      await _storage.delete(key: _oldMasterKeyKey);
+      await _storage.delete(key: _rotationJournalKey);
 
       return KeyRotationResult(
         success: true,
@@ -1511,195 +1559,13 @@ class EncryptionService {
     }
   }
 
-  /// Reset encryption keys (dangerous - all encrypted data will be lost!)
   Future<void> resetKeys() async {
     _cachedMasterKey = null;
     _cachedDecoyKey = null;
     await _storage.delete(key: _masterKeyKey);
     await _storage.delete(key: _decoyKeyKey);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Isolate helpers (top-level so they can be passed to compute())
-// ---------------------------------------------------------------------------
-
-class _IsolateEncryptParams {
-  final String sourcePath;
-  final String destinationPath;
-  final String keyBase64;
-  final String ivBase64;
-  final bool useGcm;
-
-  const _IsolateEncryptParams({
-    required this.sourcePath,
-    required this.destinationPath,
-    required this.keyBase64,
-    required this.ivBase64,
-    required this.useGcm,
-  });
-}
-
-class _IsolateDecryptParams {
-  final String encryptedPath;
-  final String destinationPath;
-  final String keyBase64;
-  final String ivBase64;
-  final bool useGcm;
-
-  const _IsolateDecryptParams({
-    required this.encryptedPath,
-    required this.destinationPath,
-    required this.keyBase64,
-    required this.ivBase64,
-    required this.useGcm,
-  });
-}
-
-class _IsolateEncryptResult {
-  final bool success;
-  final int encryptedSize;
-  final String? error;
-
-  const _IsolateEncryptResult({
-    required this.success,
-    this.encryptedSize = 0,
-    this.error,
-  });
-}
-
-class _IsolateDecryptResult {
-  final bool success;
-  final int decryptedSize;
-  final String? error;
-
-  const _IsolateDecryptResult({
-    required this.success,
-    this.decryptedSize = 0,
-    this.error,
-  });
-}
-
-Future<_IsolateEncryptResult> _encryptFileIsolate(
-    _IsolateEncryptParams params) async {
-  try {
-    final key = base64Decode(params.keyBase64);
-    final iv = base64Decode(params.ivBase64);
-    final sourceFile = File(params.sourcePath);
-    final destFile = File(params.destinationPath);
-    final totalBytes = await sourceFile.length();
-    final sink = destFile.openWrite();
-
-    if (params.useGcm) {
-      final gcm = GCMBlockCipher(AESEngine())
-        ..init(true, AEADParameters(KeyParameter(key), 128, iv, Uint8List(0)));
-
-      final header = Uint8List(8);
-      header[0] = 0x4C;
-      header[1] = 0x4B;
-      header[2] = 0x52;
-      header[3] = 0x47;
-      header[4] = (totalBytes & 0xFF);
-      header[5] = ((totalBytes >> 8) & 0xFF);
-      header[6] = ((totalBytes >> 16) & 0xFF);
-      header[7] = ((totalBytes >> 24) & 0xFF);
-      sink.add(header);
-
-      await for (final chunk in sourceFile
-          .openRead()
-          .transform(_ChunkedStreamTransformer(1024 * 1024))) {
-        sink.add(gcm.process(chunk));
-      }
-    } else {
-      final ctr = CTRStreamCipher(AESEngine())
-        ..init(true, ParametersWithIV<KeyParameter>(KeyParameter(key), iv));
-
-      final header = Uint8List(8);
-      header[0] = 0x4C;
-      header[1] = 0x4B;
-      header[2] = 0x52;
-      header[3] = 0x53;
-      header[4] = (totalBytes & 0xFF);
-      header[5] = ((totalBytes >> 8) & 0xFF);
-      header[6] = ((totalBytes >> 16) & 0xFF);
-      header[7] = ((totalBytes >> 24) & 0xFF);
-      sink.add(header);
-
-      await for (final chunk in sourceFile
-          .openRead()
-          .transform(_ChunkedStreamTransformer(1024 * 1024))) {
-        sink.add(ctr.process(chunk));
-      }
-    }
-
-    await sink.flush();
-    await sink.close();
-
-    return _IsolateEncryptResult(
-      success: true,
-      encryptedSize: await destFile.length(),
-    );
-  } catch (e) {
-    return _IsolateEncryptResult(success: false, error: e.toString());
-  }
-}
-
-Future<_IsolateDecryptResult> _decryptFileIsolate(
-    _IsolateDecryptParams params) async {
-  try {
-    final key = base64Decode(params.keyBase64);
-    final iv = base64Decode(params.ivBase64);
-    final encryptedFile = File(params.encryptedPath);
-    final destFile = File(params.destinationPath);
-    final sink = destFile.openWrite();
-
-    final raf = await encryptedFile.open();
-    final header = await raf.read(8);
-    await raf.close();
-
-    if (header.length < 8) {
-      return _IsolateDecryptResult(
-          success: false, error: 'File too short to contain header');
-    }
-
-    final originalSize =
-        header[4] | (header[5] << 8) | (header[6] << 16) | (header[7] << 24);
-
-    if (params.useGcm &&
-        header[0] == 0x4C &&
-        header[1] == 0x4B &&
-        header[2] == 0x52 &&
-        header[3] == 0x47) {
-      final gcm = GCMBlockCipher(AESEngine())
-        ..init(false, AEADParameters(KeyParameter(key), 128, iv, Uint8List(0)));
-      await for (final chunk in encryptedFile
-          .openRead(8)
-          .transform(_ChunkedStreamTransformer(1024 * 1024))) {
-        sink.add(gcm.process(chunk));
-      }
-    } else if (header[0] == 0x4C &&
-        header[1] == 0x4B &&
-        header[2] == 0x52 &&
-        header[3] == 0x53) {
-      final ctr = CTRStreamCipher(AESEngine())
-        ..init(false, ParametersWithIV<KeyParameter>(KeyParameter(key), iv));
-      await for (final chunk in encryptedFile
-          .openRead(8)
-          .transform(_ChunkedStreamTransformer(1024 * 1024))) {
-        sink.add(ctr.process(chunk));
-      }
-    } else {
-      await sink.close();
-      return _IsolateDecryptResult(
-          success: false, error: 'Unknown file format');
-    }
-
-    await sink.flush();
-    await sink.close();
-
-    return _IsolateDecryptResult(success: true, decryptedSize: originalSize);
-  } catch (e) {
-    return _IsolateDecryptResult(success: false, error: e.toString());
+    await _storage.delete(key: _oldMasterKeyKey);
+    await _storage.delete(key: _rotationJournalKey);
   }
 }
 
@@ -1723,11 +1589,13 @@ class DecryptionResult {
   final bool success;
   final Uint8List? data;
   final String? error;
+  final bool needsMigration;
 
   const DecryptionResult({
     required this.success,
     this.data,
     this.error,
+    this.needsMigration = false,
   });
 }
 
@@ -1756,12 +1624,14 @@ class FileDecryptionResult {
   final String? decryptedPath;
   final int? decryptedSize;
   final String? error;
+  final bool needsMigration;
 
   const FileDecryptionResult({
     required this.success,
     this.decryptedPath,
     this.decryptedSize,
     this.error,
+    this.needsMigration = false,
   });
 }
 

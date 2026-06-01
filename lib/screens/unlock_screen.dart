@@ -189,19 +189,14 @@ class _UnlockScreenState extends State<UnlockScreen> {
       return;
     }
 
-    // Batch state update for loading state
     setState(() {
-      _isLoading = true;
       _isAuthenticating = true;
       _errorMessage = null;
     });
 
     if (await _tryOpenDecoyVault(password)) {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _isAuthenticating = false;
-        });
+        setState(() => _isAuthenticating = false);
       }
       return;
     }
@@ -216,10 +211,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
     }
 
     if (mounted) {
-      setState(() {
-        _isLoading = false;
-        _isAuthenticating = false;
-      });
+      setState(() => _isAuthenticating = false);
     }
   }
 
@@ -307,7 +299,33 @@ class _UnlockScreenState extends State<UnlockScreen> {
               ),
             ),
           ),
+          if (_isAuthenticating) _buildAuthenticatingOverlay(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAuthenticatingOverlay() {
+    return IgnorePointer(
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.4),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: context.accentColor),
+              const SizedBox(height: 16),
+              Text(
+                'Unlocking\u2026',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontFamily: 'ProductSans',
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
