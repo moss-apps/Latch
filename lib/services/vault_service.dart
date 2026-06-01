@@ -194,9 +194,26 @@ class VaultService {
       }
 
       final List<dynamic> jsonList = jsonDecode(indexJson);
-      final files = jsonList
-          .map((json) => VaultedFile.fromJson(json as Map<String, dynamic>))
-          .toList();
+      final files = <VaultedFile>[];
+      for (int i = 0; i < jsonList.length; i++) {
+        try {
+          files.add(
+            VaultedFile.fromJson(jsonList[i] as Map<String, dynamic>),
+          );
+        } catch (e) {
+          debugPrint('Error parsing vault entry $i: $e');
+        }
+      }
+
+      if (files.length < jsonList.length) {
+        debugPrint(
+          'Vault index: recovered ${files.length}/${jsonList.length} entries',
+        );
+        await _storage.write(
+          key: key,
+          value: jsonEncode(files.map((f) => f.toJson()).toList()),
+        );
+      }
 
       if (isDecoy) {
         _cachedDecoyFiles = files;
@@ -221,6 +238,21 @@ class VaultService {
       final files = isDecoy ? _cachedDecoyFiles : _cachedFiles;
       final key = isDecoy ? _decoyIndexKey : _vaultIndexKey;
       final jsonList = files?.map((file) => file.toJson()).toList() ?? [];
+
+      if (jsonList.isEmpty) {
+        final existing = await _storage.read(key: key);
+        if (existing != null && existing.isNotEmpty) {
+          final existingCount =
+              (jsonDecode(existing) as List<dynamic>).length;
+          if (existingCount > 0) {
+            debugPrint(
+              'WARNING: Attempted to save empty index over $existingCount existing entries. Aborting save.',
+            );
+            return;
+          }
+        }
+      }
+
       await _storage.write(key: key, value: jsonEncode(jsonList));
     } catch (e) {
       debugPrint('Error saving vault index: $e');
@@ -878,6 +910,18 @@ class VaultService {
       if (!isDecoy && file.albumIds.isNotEmpty) {
         for (final albumId in file.albumIds) {
           await removeFileFromAlbum(fileId, albumId);
+        }
+      }
+
+      // Remove from folder
+      if (!isDecoy && file.folderId != null) {
+        _cachedFolders ??= await _loadFolders();
+        final folderIndex =
+            _cachedFolders!.indexWhere((f) => f.id == file.folderId);
+        if (folderIndex != -1) {
+          _cachedFolders![folderIndex] =
+              _cachedFolders![folderIndex].removeFile(fileId);
+          await _saveFolders();
         }
       }
 
