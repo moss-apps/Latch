@@ -23,6 +23,8 @@ class DecoyService {
   static const String _decoyPasswordKey = 'decoy_password_hash';
   static const String _decoyPinSaltKey = 'decoy_pin_salt';
   static const String _decoyPasswordSaltKey = 'decoy_password_salt';
+  static const String _decoyPinIterationsKey = 'decoy_pin_iterations';
+  static const String _decoyPasswordIterationsKey = 'decoy_password_iterations';
   static const String _lastAccessModeKey = 'last_access_mode';
   static const String _decoySettingsKey = 'decoy_settings';
 
@@ -118,7 +120,7 @@ class DecoyService {
     try {
       if (pin.isEmpty || pin.length < 4) return false;
 
-      await _createHashedCredential(pin, _decoyPinSaltKey, _decoyPinKey);
+      await _createHashedCredential(pin, _decoyPinSaltKey, _decoyPinKey, _decoyPinIterationsKey);
 
       _cachedSettings = (_cachedSettings ?? const DecoySettings()).copyWith(
         hasPinSet: true,
@@ -137,7 +139,7 @@ class DecoyService {
     try {
       if (password.isEmpty) return false;
 
-      await _createHashedCredential(password, _decoyPasswordSaltKey, _decoyPasswordKey);
+      await _createHashedCredential(password, _decoyPasswordSaltKey, _decoyPasswordKey, _decoyPasswordIterationsKey);
 
       _cachedSettings = (_cachedSettings ?? const DecoySettings()).copyWith(
         hasPasswordSet: true,
@@ -153,12 +155,12 @@ class DecoyService {
 
   /// Verify decoy PIN
   Future<bool> verifyDecoyPin(String pin) async {
-    return _verifyCredential(pin, _decoyPinKey, _decoyPinSaltKey);
+    return _verifyCredential(pin, _decoyPinKey, _decoyPinSaltKey, _decoyPinIterationsKey);
   }
 
   /// Verify decoy password
   Future<bool> verifyDecoyPassword(String password) async {
-    return _verifyCredential(password, _decoyPasswordKey, _decoyPasswordSaltKey);
+    return _verifyCredential(password, _decoyPasswordKey, _decoyPasswordSaltKey, _decoyPasswordIterationsKey);
   }
 
   /// Check if input is decoy credential
@@ -233,7 +235,12 @@ class DecoyService {
     await _saveSettings();
   }
 
-  static const int _kdfIterations = 100000;
+  static const int _defaultKdfIterations = 100000;
+
+  Future<int> _getCurrentKdfIterations() async {
+    final settings = await _vaultService.getSettings();
+    return settings.kdfIterations;
+  }
 
   Uint8List _generateSalt() {
     final random = Random.secure();
@@ -248,15 +255,17 @@ class DecoyService {
     return digest.toString();
   }
 
-  Future<String> _createHashedCredential(String credential, String saltKey, String hashKey) async {
+  Future<String> _createHashedCredential(String credential, String saltKey, String hashKey, String iterationsKey) async {
     final salt = _generateSalt();
-    final hash = await computePbkdf2Hash(credential, salt, iterations: _kdfIterations);
+    final iterations = await _getCurrentKdfIterations();
+    final hash = await computePbkdf2Hash(credential, salt, iterations: iterations);
     await _storage.write(key: saltKey, value: base64Encode(salt));
     await _storage.write(key: hashKey, value: hash);
+    await _storage.write(key: iterationsKey, value: iterations.toString());
     return hash;
   }
 
-  Future<bool> _verifyCredential(String credential, String hashKey, String saltKey) async {
+  Future<bool> _verifyCredential(String credential, String hashKey, String saltKey, String iterationsKey) async {
     try {
       final storedHash = await _storage.read(key: hashKey);
       final storedSalt = await _storage.read(key: saltKey);
@@ -267,17 +276,33 @@ class DecoyService {
         final legacyHash = _hashCredentialLegacy(credential);
         if (legacyHash == storedHash) {
           final salt = _generateSalt();
-          final newHash = await computePbkdf2Hash(credential, salt, iterations: _kdfIterations);
+          final iterations = await _getCurrentKdfIterations();
+          final newHash = await computePbkdf2Hash(credential, salt, iterations: iterations);
           await _storage.write(key: saltKey, value: base64Encode(salt));
           await _storage.write(key: hashKey, value: newHash);
+          await _storage.write(key: iterationsKey, value: iterations.toString());
           return true;
         }
         return false;
       }
 
+      final storedIterationsStr = await _storage.read(key: iterationsKey);
+      final storedIterations = storedIterationsStr != null
+          ? int.tryParse(storedIterationsStr) ?? _defaultKdfIterations
+          : _defaultKdfIterations;
+
       final salt = base64Decode(storedSalt);
-      final computedHash = await computePbkdf2Hash(credential, salt, iterations: _kdfIterations);
-      return computedHash == storedHash;
+      final computedHash = await computePbkdf2Hash(credential, salt, iterations: storedIterations);
+      if (computedHash != storedHash) return false;
+
+      final currentIterations = await _getCurrentKdfIterations();
+      if (currentIterations != storedIterations) {
+        final newHash = await computePbkdf2Hash(credential, salt, iterations: currentIterations);
+        await _storage.write(key: hashKey, value: newHash);
+        await _storage.write(key: iterationsKey, value: currentIterations.toString());
+      }
+
+      return true;
     } catch (e) {
       return false;
     }
@@ -313,6 +338,10 @@ class DecoyService {
     try {
       await _storage.delete(key: _decoyPinKey);
       await _storage.delete(key: _decoyPasswordKey);
+      await _storage.delete(key: _decoyPinSaltKey);
+      await _storage.delete(key: _decoyPasswordSaltKey);
+      await _storage.delete(key: _decoyPinIterationsKey);
+      await _storage.delete(key: _decoyPasswordIterationsKey);
       _cachedSettings = (_cachedSettings ?? const DecoySettings()).copyWith(
         hasPinSet: false,
         hasPasswordSet: false,
