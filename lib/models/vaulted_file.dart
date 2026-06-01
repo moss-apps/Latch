@@ -276,7 +276,7 @@ class VaultedFile {
       originalPath: json['originalPath'] as String?,
       type: VaultedFileType.fromString(json['type'] as String),
       mimeType: json['mimeType'] as String,
-      fileSize: json['fileSize'] as int,
+      fileSize: (json['fileSize'] as num).toInt(),
       dateAdded: DateTime.parse(json['dateAdded'] as String),
       dateModified: json['dateModified'] != null
           ? DateTime.parse(json['dateModified'] as String)
@@ -293,7 +293,7 @@ class VaultedFile {
       lastViewed: json['lastViewed'] != null
           ? DateTime.parse(json['lastViewed'] as String)
           : null,
-      viewCount: json['viewCount'] as int? ?? 0,
+      viewCount: (json['viewCount'] as num?)?.toInt() ?? 0,
       notes: json['notes'] as String?,
       albumIds: (json['albumIds'] as List<dynamic>?)
               ?.map((e) => e as String)
