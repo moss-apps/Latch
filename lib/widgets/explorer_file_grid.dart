@@ -1,6 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models/vault_folder.dart';
 import '../models/vaulted_file.dart';
 import '../providers/vault_providers.dart';
@@ -8,8 +11,11 @@ import '../providers/explorer_providers.dart';
 import '../screens/media_viewer_screen.dart';
 import '../screens/document_viewer_screen.dart';
 import '../screens/song_player_screen.dart';
+import '../services/auto_kill_service.dart';
 import '../themes/app_colors.dart';
 import '../utils/responsive_utils.dart';
+import '../utils/toast_utils.dart';
+import '../widgets/media_hold_action_sheet.dart';
 import 'optimized_image_widget.dart';
 
 class ExplorerFileGrid extends ConsumerWidget {
@@ -270,32 +276,36 @@ class ExplorerFileGrid extends ConsumerWidget {
         if (isSelectionMode) {
           _toggleSelection(ref, file.id);
         } else {
-          _openFile(context, ref, file, allFiles);
+          _showMediaHoldActionSheet(context, ref, file, allFiles);
         }
       },
       onLongPress: () {
         if (!isSelectionMode) {
-          ref.read(isSelectionModeProvider.notifier).state = true;
-          ref.read(selectedFilesProvider.notifier).state = {file.id};
+          HapticFeedback.mediumImpact();
+          _showMediaHoldActionSheet(context, ref, file, allFiles);
         }
       },
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Thumbnail / Content
-          Container(
-            decoration: BoxDecoration(
-              color: context.backgroundSecondary,
-              borderRadius: BorderRadius.circular(12),
-              border: isSelected
-                  ? Border.all(color: context.accentColor, width: 3)
-                  : Border.all(color: context.borderColor.withValues(alpha: 0.5), width: 1),
+      child: AnimatedScale(
+        scale: 1.0,
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Thumbnail / Content
+            Container(
+              decoration: BoxDecoration(
+                color: context.backgroundSecondary,
+                borderRadius: BorderRadius.circular(12),
+                border: isSelected
+                    ? Border.all(color: context.accentColor, width: 3)
+                    : Border.all(color: context.borderColor.withValues(alpha: 0.5), width: 1),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(isSelected ? 9 : 11),
+                child: _buildFileThumbnail(file, context),
+              ),
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(isSelected ? 9 : 11),
-              child: _buildFileThumbnail(file, context),
-            ),
-          ),
 
           // Favorite badge
           if (file.isFavorite)
@@ -389,7 +399,8 @@ class ExplorerFileGrid extends ConsumerWidget {
             ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildFileThumbnail(VaultedFile file, BuildContext context) {
@@ -485,6 +496,549 @@ class ExplorerFileGrid extends ConsumerWidget {
           builder: (context) => DocumentViewerScreen(file: file),
         ),
       );
+    } else {
+      _showFileOptionsSheet(context, ref, file);
+    }
+  }
+
+  void _showFileOptionsSheet(
+    BuildContext ctx,
+    WidgetRef ref,
+    VaultedFile file,
+  ) {
+    showModalBottomSheet(
+      context: ctx,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: ctx.backgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: ctx.borderColor,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          _getFileIcon(file.extension),
+                          size: 32,
+                          color: _getFileColor(ctx, file.extension),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              file.originalName,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: ctx.textPrimary,
+                                fontFamily: 'ProductSans',
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${file.extension.toUpperCase()} \u2022 ${file.formattedSize}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: ctx.textSecondary,
+                                fontFamily: 'ProductSans',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Preview not available',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: ctx.textSecondary,
+                      fontFamily: 'ProductSans',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ListTile(
+                    leading: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: ctx.accentColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.download_outlined,
+                        color: ctx.accentColor,
+                      ),
+                    ),
+                    title: const Text(
+                      'Export to Downloads',
+                      style: TextStyle(
+                        fontFamily: 'ProductSans',
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Save decrypted file to Downloads folder',
+                      style: TextStyle(
+                        fontFamily: 'ProductSans',
+                        fontSize: 12,
+                        color: ctx.textSecondary,
+                      ),
+                    ),
+                    contentPadding: EdgeInsets.zero,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _exportFileToDownloads(ctx, ref, file);
+                    },
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: ctx.accentColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.open_in_new,
+                        color: ctx.accentColor,
+                      ),
+                    ),
+                    title: const Text(
+                      'Open with...',
+                      style: TextStyle(
+                        fontFamily: 'ProductSans',
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Open file with an external app',
+                      style: TextStyle(
+                        fontFamily: 'ProductSans',
+                        fontSize: 12,
+                        color: ctx.textSecondary,
+                      ),
+                    ),
+                    contentPadding: EdgeInsets.zero,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _openWithExternalApp(ctx, ref, file);
+                    },
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.info_outline,
+                        color: ctx.textSecondary,
+                      ),
+                    ),
+                    title: const Text(
+                      'File Info',
+                      style: TextStyle(
+                        fontFamily: 'ProductSans',
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'View file details',
+                      style: TextStyle(
+                        fontFamily: 'ProductSans',
+                        fontSize: 12,
+                        color: ctx.textSecondary,
+                      ),
+                    ),
+                    contentPadding: EdgeInsets.zero,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _showFileInfo(ctx, file);
+                    },
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: MediaQuery.of(ctx).padding.bottom),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showMediaHoldActionSheet(
+    BuildContext ctx,
+    WidgetRef ref,
+    VaultedFile file,
+    List<VaultedFile> allFiles,
+  ) {
+    MediaHoldActionSheet.show(
+      ctx,
+      file: file,
+      onFavorite: () async {
+        await ref.read(vaultNotifierProvider.notifier).toggleFavorite(file.id);
+        ToastUtils.showSuccess(
+          file.isFavorite ? 'Removed from favorites' : 'Added to favorites',
+        );
+      },
+      onShare: () => _exportFileToDownloads(ctx, ref, file),
+      onDelete: () => _confirmDeleteFile(ctx, ref, file),
+      onInfo: () => _showFileInfo(ctx, file),
+      onSelect: () {
+        ref.read(isSelectionModeProvider.notifier).state = true;
+        ref.read(selectedFilesProvider.notifier).state = {file.id};
+      },
+      onOpen: () => _openFile(ctx, ref, file, allFiles),
+      onExport: () => _exportFileToDownloads(ctx, ref, file),
+    );
+  }
+
+  Future<void> _confirmDeleteFile(
+    BuildContext ctx,
+    WidgetRef ref,
+    VaultedFile file,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: ctx,
+      builder: (context) => AlertDialog(
+        backgroundColor: Theme.of(ctx).scaffoldBackgroundColor,
+        title: Text(
+          'Delete File',
+          style: TextStyle(
+            fontFamily: 'ProductSans',
+            color: ctx.textPrimary,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to delete "${file.originalName}"?',
+          style: TextStyle(
+            fontFamily: 'ProductSans',
+            color: ctx.textSecondary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                fontFamily: 'ProductSans',
+                color: ctx.textSecondary,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text(
+              'Delete',
+              style: TextStyle(fontFamily: 'ProductSans'),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final success = await ref.read(vaultNotifierProvider.notifier).deleteFiles([file.id]);
+      if (success) {
+        ToastUtils.showSuccess('File deleted');
+      } else {
+        ToastUtils.showError('Failed to delete file');
+      }
+    }
+  }
+
+  Future<void> _exportFileToDownloads(
+    BuildContext ctx,
+    WidgetRef ref,
+    VaultedFile file,
+  ) async {
+    try {
+      showDialog(
+        context: ctx,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: Theme.of(ctx).scaffoldBackgroundColor,
+          content: Row(
+            children: [
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation(ctx.accentColor),
+              ),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Text(
+                  'Exporting ${file.originalName}...',
+                  style: const TextStyle(fontFamily: 'ProductSans'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      Directory? downloadsDir;
+      if (Platform.isAndroid) {
+        downloadsDir = Directory('/storage/emulated/0/Download');
+        if (!await downloadsDir.exists()) {
+          downloadsDir = await getExternalStorageDirectory();
+        }
+      } else {
+        downloadsDir = await getDownloadsDirectory();
+      }
+
+      if (downloadsDir == null) {
+        if (ctx.mounted) Navigator.pop(ctx);
+        ToastUtils.showError('Could not access Downloads folder');
+        return;
+      }
+
+      final destinationPath = '${downloadsDir.path}/${file.originalName}';
+
+      final vaultService = ref.read(vaultServiceProvider);
+      final exportedFile =
+          await vaultService.exportFile(file.id, destinationPath);
+
+      if (ctx.mounted) Navigator.pop(ctx);
+
+      if (exportedFile != null) {
+        ToastUtils.showSuccess('Exported to Downloads/${file.originalName}');
+      } else {
+        ToastUtils.showError('Failed to export file');
+      }
+    } catch (e) {
+      if (ctx.mounted) Navigator.pop(ctx);
+      debugPrint('Error exporting file: $e');
+      ToastUtils.showError('Failed to export file: $e');
+    }
+  }
+
+  Future<void> _openWithExternalApp(
+    BuildContext ctx,
+    WidgetRef ref,
+    VaultedFile file,
+  ) async {
+    try {
+      showDialog(
+        context: ctx,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: Theme.of(ctx).scaffoldBackgroundColor,
+          content: Row(
+            children: [
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation(ctx.accentColor),
+              ),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Text(
+                  'Preparing ${file.originalName}...',
+                  style: const TextStyle(fontFamily: 'ProductSans'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      final vaultService = ref.read(vaultServiceProvider);
+      final decryptedFile = await vaultService.getVaultedFile(file.id);
+
+      if (ctx.mounted) Navigator.pop(ctx);
+
+      if (decryptedFile != null && await decryptedFile.exists()) {
+        final result = await AutoKillService.runSafe(
+            () => OpenFilex.open(decryptedFile.path));
+        if (result.type != ResultType.done) {
+          ToastUtils.showError('No app found to open this file type');
+        }
+      } else {
+        ToastUtils.showError('Failed to prepare file');
+      }
+    } catch (e) {
+      if (ctx.mounted) Navigator.pop(ctx);
+      debugPrint('Error opening file: $e');
+      ToastUtils.showError('Failed to open file: $e');
+    }
+  }
+
+  void _showFileInfo(BuildContext ctx, VaultedFile file) {
+    String formatDate(DateTime date) {
+      return '${date.day}/${date.month}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    }
+
+    showDialog(
+      context: ctx,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Theme.of(ctx).scaffoldBackgroundColor,
+        title: Text(
+          'File Info',
+          style: TextStyle(
+            fontFamily: 'ProductSans',
+            color: ctx.textPrimary,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildInfoRow(ctx, 'Name', file.originalName),
+            const SizedBox(height: 12),
+            _buildInfoRow(ctx, 'Type', file.extension.toUpperCase()),
+            const SizedBox(height: 12),
+            _buildInfoRow(ctx, 'Size', file.formattedSize),
+            const SizedBox(height: 12),
+            _buildInfoRow(
+                ctx, 'Added', formatDate(file.dateAdded)),
+            const SizedBox(height: 12),
+            _buildInfoRow(ctx, 'Encrypted',
+                file.isEncrypted ? 'Yes' : 'No'),
+            if (file.lastViewed != null) ...[
+              const SizedBox(height: 12),
+              _buildInfoRow(
+                  ctx, 'Last Viewed', formatDate(file.lastViewed!)),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Close',
+              style: TextStyle(
+                fontFamily: 'ProductSans',
+                color: ctx.accentColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(BuildContext context, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 80,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'ProductSans',
+              color: context.textSecondary,
+              fontSize: 14,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontFamily: 'ProductSans',
+              color: context.textPrimary,
+              fontSize: 14,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  IconData _getFileIcon(String extension) {
+    switch (extension.toLowerCase()) {
+      case 'zip':
+      case 'rar':
+      case '7z':
+      case 'tar':
+      case 'gz':
+        return Icons.folder_zip;
+      case 'apk':
+        return Icons.android;
+      case 'exe':
+      case 'msi':
+        return Icons.computer;
+      case 'mp3':
+      case 'wav':
+      case 'flac':
+      case 'aac':
+      case 'ogg':
+        return Icons.music_note;
+      case 'json':
+      case 'xml':
+      case 'html':
+      case 'css':
+      case 'js':
+        return Icons.code;
+      default:
+        return Icons.insert_drive_file;
+    }
+  }
+
+  Color _getFileColor(BuildContext context, String extension) {
+    switch (extension.toLowerCase()) {
+      case 'zip':
+      case 'rar':
+      case '7z':
+      case 'tar':
+      case 'gz':
+        return Colors.amber;
+      case 'apk':
+        return Colors.green;
+      case 'exe':
+      case 'msi':
+        return context.accentColor;
+      case 'mp3':
+      case 'wav':
+      case 'flac':
+      case 'aac':
+      case 'ogg':
+        return Colors.purple;
+      case 'json':
+      case 'xml':
+      case 'html':
+      case 'css':
+      case 'js':
+        return Colors.orange;
+      default:
+        return Colors.grey;
     }
   }
 
