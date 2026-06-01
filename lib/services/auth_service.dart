@@ -7,7 +7,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:local_auth_android/local_auth_android.dart';
 import 'package:local_auth_darwin/local_auth_darwin.dart';
-import 'package:pointycastle/export.dart';
+import '../utils/pbkdf2_isolate.dart';
 import 'auto_kill_service.dart';
 import 'decoy_service.dart';
 import 'vault_service.dart';
@@ -536,13 +536,6 @@ Future<bool> verifyPIN(String pin) async {
     );
   }
 
-  String _hashCredential(String credential, Uint8List salt) {
-    final pbkdf2 = PBKDF2KeyDerivator(HMac(SHA256Digest(), 64))
-      ..init(Pbkdf2Parameters(salt, _kdfIterations, 32));
-    final hash = pbkdf2.process(Uint8List.fromList(utf8.encode(credential)));
-    return base64Encode(hash);
-  }
-
   String _hashCredentialLegacy(String credential) {
     final bytes = utf8.encode(credential);
     final digest = sha256.convert(bytes);
@@ -551,7 +544,7 @@ Future<bool> verifyPIN(String pin) async {
 
   Future<String> _createHashedCredential(String credential, String saltKey, String hashKey) async {
     final salt = _generateSalt();
-    final hash = _hashCredential(credential, salt);
+    final hash = await computePbkdf2Hash(credential, salt, iterations: _kdfIterations);
     await _storage.write(key: saltKey, value: base64Encode(salt));
     await _storage.write(key: hashKey, value: hash);
     return hash;
@@ -568,7 +561,7 @@ Future<bool> verifyPIN(String pin) async {
         final legacyHash = _hashCredentialLegacy(credential);
         if (legacyHash == storedHash) {
           final salt = _generateSalt();
-          final newHash = _hashCredential(credential, salt);
+          final newHash = await computePbkdf2Hash(credential, salt, iterations: _kdfIterations);
           await _storage.write(key: saltKey, value: base64Encode(salt));
           await _storage.write(key: hashKey, value: newHash);
           return true;
@@ -577,7 +570,7 @@ Future<bool> verifyPIN(String pin) async {
       }
 
       final salt = base64Decode(storedSalt);
-      final computedHash = _hashCredential(credential, salt);
+      final computedHash = await computePbkdf2Hash(credential, salt, iterations: _kdfIterations);
       return computedHash == storedHash;
     } catch (e) {
       return false;
