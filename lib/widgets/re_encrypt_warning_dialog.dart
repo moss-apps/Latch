@@ -207,7 +207,7 @@ class ReEncryptWarningDialog extends StatelessWidget {
                 ctx,
                 Icons.history,
                 'Recovery is not guaranteed',
-                'Locker keeps a recovery journal that lets it resume an interrupted re-encryption on the next launch, and it can roll back files that did not finish rewriting. However, if the journal itself is lost — for example due to storage corruption or an uninstall — any files that were caught mid-rewrite cannot be recovered.',
+                'Latch keeps a recovery journal that lets it resume an interrupted re-encryption on the next launch, and it can roll back files that did not finish rewriting. However, if the journal itself is lost — for example due to storage corruption or an uninstall — any files that were caught mid-rewrite cannot be recovered.',
               ),
               const SizedBox(height: 16),
               _buildExplanationItem(
