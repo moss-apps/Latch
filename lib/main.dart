@@ -1,28 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:in_app_update/in_app_update.dart';
 import 'services/auto_kill_service.dart';
 import 'services/screenshot_protection_service.dart';
+import 'services/update_service.dart';
 import 'services/vault_service.dart';
 import 'themes/app_theme.dart';
 import 'providers/theme_provider.dart';
+import 'providers/vault_providers.dart';
 import 'services/auth_service.dart';
 import 'screens/auth_method_selection_screen.dart';
 import 'screens/unlock_screen.dart';
 import 'utils/frame_rate_optimizer.dart';
 import 'utils/performance_config.dart';
 
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Configure high frame rate support
   PerformanceConfig.configureHighFrameRate();
   PerformanceConfig.optimizeImageCache();
 
-  // Start frame rate monitoring
   FrameRateOptimizer().startMonitoring();
 
-  // Set preferred orientations and system UI
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -33,6 +35,8 @@ Future<void> main() async {
   await ScreenshotProtectionService.setEnabled(
     settings.screenshotProtectionEnabled,
   );
+
+  UpdateService.instance.start();
 
   runApp(const ProviderScope(child: LatchApp()));
 }
@@ -46,6 +50,7 @@ class LatchApp extends ConsumerWidget {
     final accentColor = ref.watch(accentColorProvider);
 
     return MaterialApp(
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'Latch',
       theme: AppTheme.getLightTheme(accentColor),
@@ -56,15 +61,14 @@ class LatchApp extends ConsumerWidget {
   }
 }
 
-/// Initialize app and determine initial route based on authentication state
-class AppInitializer extends StatefulWidget {
+class AppInitializer extends ConsumerStatefulWidget {
   const AppInitializer({super.key});
 
   @override
-  State<AppInitializer> createState() => _AppInitializerState();
+  ConsumerState<AppInitializer> createState() => _AppInitializerState();
 }
 
-class _AppInitializerState extends State<AppInitializer> {
+class _AppInitializerState extends ConsumerState<AppInitializer> {
   final AuthService _authService = AuthService();
   bool _isLoading = true;
   bool _isFirstTime = true;
@@ -73,6 +77,45 @@ class _AppInitializerState extends State<AppInitializer> {
   void initState() {
     super.initState();
     _checkAuthStatus();
+
+    final updateService = ref.read(updateServiceProvider);
+    updateService.onUpdateCheck.listen((info) {
+      if (info != null &&
+          info.updateAvailability == UpdateAvailability.updateAvailable) {
+        _showUpdateDialog();
+      }
+    });
+  }
+
+  void _showUpdateDialog() {
+    final context = navigatorKey.currentContext;
+    if (context == null) return;
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor:
+            Theme.of(dialogContext).scaffoldBackgroundColor,
+        title: const Text('Update Available',
+            style: TextStyle(fontFamily: 'ProductSans')),
+        content: const Text(
+          'A new version is available on the Play Store. Update now?',
+          style: TextStyle(fontFamily: 'ProductSans'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Later'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              InAppUpdate.performImmediateUpdate();
+            },
+            child: const Text('Update'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _checkAuthStatus() async {
@@ -100,7 +143,6 @@ class _AppInitializerState extends State<AppInitializer> {
       );
     }
 
-    // Route to appropriate screen
     if (_isFirstTime) {
       return const AuthMethodSelectionScreen();
     } else {
