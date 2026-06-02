@@ -2,6 +2,41 @@
 
 All notable changes to Latch are documented in this file.
 
+## 0.14.1-beta.2
+
+### Encryption & Crypto Hardening
+- **AES-256-GCM v2** authenticated encryption format with crypto isolate pool support
+- **Isolate-based crypto worker pool** for AES encryption/decryption, offloading heavy crypto from the UI thread
+- **PBKDF2 hashing** moved entirely to Dart isolates — no more direct Pointy Castle dependency on the main thread
+- **Dynamic KDF iterations** for password and PIN hashing, stored per-credential with automatic rotation on config changes
+- **Decoy credential migration**: KDF iteration counts stored per credential, rotate when vault settings change
+- **Re-encryption warning dialog**: detailed risk explanations shown before the confirmation dialog
+- **`needsMigration`** field added to `VaultedFile` for tracking files that need re-encryption
+
+### Media Selection & UX
+- New **hold-to-action** gesture: long-press triggers an action sheet instead of immediate selection
+- **Media multi-select action bottom sheet** with batch operations
+- Refactored selection mode with improved multi-select actions
+
+### In-App Updates
+- **In-app update service** with update state providers (Riverpod)
+- **Update dialog** with in-app update support
+- Vault settings auto-scan for update info on init
+- `connectivity_plus` dependency for network availability checks
+
+### Reliability & Error Handling
+- Error handling for vault entry parsing and empty index saves
+- Parallel file export refactored with improved progress tracking
+- Type cast fix for `fileSize` and `viewCount`
+- Removed unused loading state from unlock logic
+- Removed redundant vault operation and diagnostic utilities
+
+### Housekeeping
+- README updated with closed beta sign-up info
+- Removed outdated example files
+
+---
+
 ## 0.14.0-beta.1
 
 ### Rebranding
