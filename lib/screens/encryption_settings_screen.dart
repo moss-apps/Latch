@@ -4,6 +4,7 @@ import '../models/encryption_algorithm.dart';
 import '../providers/vault_providers.dart';
 import '../services/vault_service.dart';
 import '../themes/app_colors.dart';
+import '../widgets/re_encrypt_warning_dialog.dart';
 
 class EncryptionSettingsScreen extends ConsumerStatefulWidget {
   const EncryptionSettingsScreen({super.key});
@@ -387,6 +388,11 @@ class _EncryptionSettingsScreenState
     BuildContext context,
     VaultSettings settings,
   ) async {
+    final warningAcknowledged = await showReEncryptWarningDialog(
+      context: context,
+    );
+    if (warningAcknowledged != true || !mounted) return;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
