@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:in_app_update/in_app_update.dart';
 import '../models/album.dart';
 import '../models/encryption_algorithm.dart';
 import '../models/vault_folder.dart';
@@ -7,6 +8,7 @@ import '../models/vaulted_file.dart';
 import '../services/vault_service.dart';
 import '../services/decoy_service.dart';
 import '../services/encryption_service.dart';
+import '../services/update_service.dart';
 
 // ========== SERVICE PROVIDERS ==========
 
@@ -555,4 +557,15 @@ class ReEncryptNotifier extends Notifier<ReEncryptProgress> {
 final reEncryptProvider =
     NotifierProvider<ReEncryptNotifier, ReEncryptProgress>(() {
   return ReEncryptNotifier();
+});
+
+// ========== UPDATE PROVIDERS ==========
+
+final updateServiceProvider = Provider<UpdateService>((ref) {
+  return UpdateService.instance;
+});
+
+final updateInfoProvider = StateProvider<AppUpdateInfo?>((ref) {
+  final service = ref.watch(updateServiceProvider);
+  return service.lastUpdateInfo;
 });
