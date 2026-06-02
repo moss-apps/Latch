@@ -43,15 +43,28 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
   void initState() {
     super.initState();
     _packageInfoFuture = PackageInfo.fromPlatform();
+    _syncWithAutoScan();
+  }
+
+  void _syncWithAutoScan() {
+    final updateService = ref.read(updateServiceProvider);
+    final info = updateService.lastUpdateInfo;
+    if (info != null) {
+      _updateInfo = info;
+      _hasScanned = true;
+    }
   }
 
   Future<void> _scanForUpdate() async {
     if (!Platform.isAndroid) return;
     setState(() => _isScanning = true);
     try {
-      _updateInfo = await InAppUpdate.checkForUpdate();
+      final updateService = ref.read(updateServiceProvider);
+      _updateInfo = await updateService.checkForUpdate();
+      ref.read(updateInfoProvider.notifier).state = _updateInfo;
     } catch (_) {
       _updateInfo = null;
+      ref.read(updateInfoProvider.notifier).state = null;
     }
     if (mounted) {
       setState(() {
