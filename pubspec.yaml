@@ -1,4 +1,4 @@
-name: latch
+name: locker
 description: "A secure media vault."
 publish_to: "none"
 
