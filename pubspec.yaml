@@ -64,6 +64,7 @@ dependencies:
   video_player: ^2.10.1
   xml: ^6.6.1
   in_app_update: ^4.2.5
+  connectivity_plus: ^6.0.0
   flutter_markdown: ^0.7.7+1
 
 dev_dependencies:
