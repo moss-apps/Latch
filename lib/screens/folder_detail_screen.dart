@@ -463,33 +463,51 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                 ),
               ),
             ),
-          if (file.isVideo)
-            Positioned(
-              bottom: 8,
-              right: 8,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+          // Filename overlay for all file types
+          Positioned(
+            bottom: 8,
+            left: 8,
+            right: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (file.isVideo) ...[
                     const Icon(Icons.play_arrow, size: 14, color: Colors.white),
                     const SizedBox(width: 2),
-                    Text(
-                      file.formattedSize,
+                  ],
+                  Expanded(
+                    child: Text(
+                      file.originalName,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 10,
                         fontFamily: 'ProductSans',
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (file.isVideo) ...[
+                    const SizedBox(width: 4),
+                    Text(
+                      file.formattedSize,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 10,
+                        fontFamily: 'ProductSans',
+                      ),
                     ),
                   ],
-                ),
+                ],
               ),
             ),
+          ),
         ],
       ),
     );
@@ -519,23 +537,52 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
 
   Widget _buildFilePlaceholder(VaultedFile file) {
     IconData icon;
+    Color color;
     switch (file.type) {
+      case VaultedFileType.image:
+        icon = Icons.image;
+        color = context.accentColor;
+        break;
       case VaultedFileType.video:
-        icon = Icons.play_circle_outline;
+        icon = Icons.videocam;
+        color = Colors.red;
         break;
       case VaultedFileType.song:
-        icon = Icons.audiotrack;
+        icon = Icons.music_note;
+        color = Colors.purple;
         break;
       case VaultedFileType.document:
         icon = Icons.description;
+        color = Colors.green;
         break;
-      default:
+      case VaultedFileType.other:
         icon = Icons.insert_drive_file;
+        color = Colors.grey;
+        break;
     }
     return Container(
-      color: context.accentColor.withValues(alpha: 0.1),
-      child: Center(
-        child: Icon(icon, size: 32, color: context.accentColor),
+      color: color.withValues(alpha: 0.1),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 28, color: color),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              file.originalName,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: color,
+                fontFamily: 'ProductSans',
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1036,8 +1083,8 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                     ),
                     const SizedBox(height: 20),
                     ListTile(
-                      leading: Icon(Icons.edit_outlined, color: AppColors.lightTextPrimary),
-                      title: Text('Rename', style: TextStyle(fontFamily: 'ProductSans', color: AppColors.lightTextPrimary)),
+                      leading: Icon(Icons.edit_outlined, color: context.textPrimary),
+                      title: Text('Rename', style: TextStyle(fontFamily: 'ProductSans', color: context.textPrimary)),
                       contentPadding: EdgeInsets.zero,
                       onTap: () {
                         Navigator.pop(context);
@@ -1467,22 +1514,53 @@ class _AddFilesToFolderSheetState extends ConsumerState<_AddFilesToFolderSheet> 
 
   Widget _buildPlaceholder(VaultedFile file) {
     IconData icon;
+    Color color;
     switch (file.type) {
+      case VaultedFileType.image:
+        icon = Icons.image;
+        color = context.accentColor;
+        break;
       case VaultedFileType.video:
-        icon = Icons.play_circle_outline;
+        icon = Icons.videocam;
+        color = Colors.red;
         break;
       case VaultedFileType.song:
-        icon = Icons.audiotrack;
+        icon = Icons.music_note;
+        color = Colors.purple;
         break;
       case VaultedFileType.document:
         icon = Icons.description;
+        color = Colors.green;
         break;
-      default:
+      case VaultedFileType.other:
         icon = Icons.insert_drive_file;
+        color = Colors.grey;
+        break;
     }
     return Container(
-      color: context.accentColor.withValues(alpha: 0.1),
-      child: Center(child: Icon(icon, size: 32, color: context.accentColor)),
+      color: color.withValues(alpha: 0.1),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 28, color: color),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              file.originalName,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: color,
+                fontFamily: 'ProductSans',
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
