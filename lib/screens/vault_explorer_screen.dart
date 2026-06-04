@@ -130,43 +130,60 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
   }
 
   Widget _buildBody(ExplorerViewMode viewMode) {
-    if (viewMode == ExplorerViewMode.sidebar) {
-      return Row(
-        children: [
-          SizedBox(
-            width: 240,
-            child: FolderTreeWidget(
-              onFolderLongPress: (folder) => _showFolderOptions(folder),
-            ),
-          ),
-          const VerticalDivider(width: 1, thickness: 1),
-          Expanded(
-            child: Column(
-              children: [
-                const ExplorerToolbar(),
-                Expanded(
-                  child: ExplorerFileGrid(
-                    onFolderLongPress: (folder) => _showFolderOptions(folder),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      );
-    }
+    final isSidebar = viewMode == ExplorerViewMode.sidebar;
 
-    // Navigation mode
-    return Column(
-      children: [
-        const FolderBreadcrumbWidget(),
-        const ExplorerToolbar(),
-        Expanded(
-          child: ExplorerFileGrid(
-            onFolderLongPress: (folder) => _showFolderOptions(folder),
+    final child = isSidebar
+        ? Row(
+            key: const ValueKey('sidebar-layout'),
+            children: [
+              SizedBox(
+                width: 240,
+                child: FolderTreeWidget(
+                  onFolderLongPress: (folder) => _showFolderOptions(folder),
+                ),
+              ),
+              const VerticalDivider(width: 1, thickness: 1),
+              Expanded(
+                child: Column(
+                  children: [
+                    const ExplorerToolbar(),
+                    Expanded(
+                      child: ExplorerFileGrid(
+                        onFolderLongPress: (folder) => _showFolderOptions(folder),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          )
+        : Column(
+            key: const ValueKey('navigation-layout'),
+            children: [
+              const FolderBreadcrumbWidget(),
+              const ExplorerToolbar(),
+              Expanded(
+                child: ExplorerFileGrid(
+                  onFolderLongPress: (folder) => _showFolderOptions(folder),
+                ),
+              ),
+            ],
+          );
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      switchInCurve: Curves.easeInOut,
+      switchOutCurve: Curves.easeInOut,
+      transitionBuilder: (child, animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.98, end: 1.0).animate(animation),
+            child: child,
           ),
-        ),
-      ],
+        );
+      },
+      child: child,
     );
   }
 
