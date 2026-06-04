@@ -326,55 +326,53 @@ class ExplorerFileGrid extends ConsumerWidget {
               ),
             ),
 
-          // File Extension/Type text tag for non-images
-          if (!file.isImage && !file.isVideo)
-            Positioned(
-              bottom: 6,
-              left: 6,
-              right: 6,
-              child: Text(
-                file.originalName,
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 8,
-                  fontFamily: 'ProductSans',
-                  fontWeight: FontWeight.w500,
-                  shadows: [Shadow(blurRadius: 3, color: Colors.black54)],
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
+          // Filename overlay for all file types
+          Positioned(
+            bottom: 6,
+            left: 6,
+            right: 6,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(4),
               ),
-            ),
-
-          // Video length/size badge
-          if (file.isVideo)
-            Positioned(
-              bottom: 6,
-              right: 6,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (file.isVideo) ...[
                     const Icon(Icons.play_arrow, size: 10, color: Colors.white),
                     const SizedBox(width: 1),
+                  ],
+                  Expanded(
+                    child: Text(
+                      file.originalName,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 8,
+                        fontFamily: 'ProductSans',
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  if (file.isVideo) ...[
+                    const SizedBox(width: 2),
                     Text(
                       file.formattedSize,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: Colors.white70,
                         fontSize: 8,
                         fontFamily: 'ProductSans',
                       ),
                     ),
                   ],
-                ),
+                ],
               ),
             ),
+          ),
 
           // Checkbox overlaid in Selection Mode
           if (isSelectionMode)
