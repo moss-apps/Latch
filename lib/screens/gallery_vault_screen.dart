@@ -646,58 +646,51 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
                     ),
                   ),
                 ),
-              // Video duration indicator
-              if (file.isVideo)
-                Positioned(
-                  bottom: 8,
-                  right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
+              // Filename overlay for all file types
+              Positioned(
+                bottom: 8,
+                left: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (file.isVideo) ...[
                         const Icon(Icons.play_arrow, size: 14, color: Colors.white),
                         const SizedBox(width: 2),
-                        Text(
-                          file.formattedSize,
+                      ],
+                      Expanded(
+                        child: Text(
+                          file.originalName,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 10,
                             fontFamily: 'ProductSans',
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (file.isVideo) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          file.formattedSize,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 10,
+                            fontFamily: 'ProductSans',
+                          ),
                         ),
                       ],
-                    ),
+                    ],
                   ),
                 ),
-              // File type badge for non-visual files
-              if (file.isDocument || file.isSong)
-                Positioned(
-                  bottom: 8,
-                  left: 8,
-                  right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      file.originalName,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontFamily: 'ProductSans',
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
+              ),
             ],
           ),
         ),
