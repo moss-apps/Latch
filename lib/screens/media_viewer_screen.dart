@@ -298,11 +298,11 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                                         () => _slideshowDuration = seconds);
                                   }
                                 },
-                                selectedColor: AppColors.accent,
+                                selectedColor: context.accentColor,
                                 labelStyle: TextStyle(
                                   color: _slideshowDuration == seconds
                                       ? Colors.white
-                                      : AppColors.lightTextPrimary,
+                                      : context.textSecondary,
                                   fontFamily: 'ProductSans',
                                 ),
                               ),
@@ -319,7 +319,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                           _startSlideshow();
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.accent,
+                          backgroundColor: context.accentColor,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
