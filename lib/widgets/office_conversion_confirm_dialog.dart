@@ -22,7 +22,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
     final nonConvertibleCount = officeFiles.length - convertibleCount;
 
     return AlertDialog(
-      backgroundColor: AppColors.lightBackground,
+      backgroundColor: context.backgroundColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: Row(
         children: [
@@ -41,7 +41,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
               style: TextStyle(
                 fontFamily: 'ProductSans',
                 fontWeight: FontWeight.bold,
-                color: AppColors.lightTextPrimary,
+                color: context.textPrimary,
                 fontSize: 18,
               ),
             ),
@@ -57,7 +57,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
               'The following Office documents will be converted to PDF for secure storage and easy viewing:',
               style: TextStyle(
                 fontFamily: 'ProductSans',
-                color: AppColors.lightTextSecondary,
+                color: context.textSecondary,
                 fontSize: 14,
                 height: 1.4,
               ),
@@ -68,7 +68,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
             Container(
               constraints: const BoxConstraints(maxHeight: 200),
               decoration: BoxDecoration(
-                color: AppColors.lightBackgroundSecondary,
+                color: context.backgroundSecondary,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: ListView.separated(
@@ -95,7 +95,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
                               style: TextStyle(
                                 fontFamily: 'ProductSans',
                                 fontWeight: FontWeight.w500,
-                                color: AppColors.lightTextPrimary,
+                                color: context.textPrimary,
                                 fontSize: 13,
                               ),
                               maxLines: 1,
@@ -105,7 +105,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
                               file.typeName,
                               style: TextStyle(
                                 fontFamily: 'ProductSans',
-                                color: AppColors.lightTextTertiary,
+                                color: context.textTertiary,
                                 fontSize: 11,
                               ),
                             ),
@@ -159,6 +159,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
             // Summary
             if (convertibleCount > 0)
               _buildSummaryItem(
+                context,
                 Icons.check_circle_outline,
                 Colors.green,
                 '$convertibleCount file(s) will be converted to PDF',
@@ -166,6 +167,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
             if (nonConvertibleCount > 0) ...[
               const SizedBox(height: 8),
               _buildSummaryItem(
+                context,
                 Icons.warning_amber,
                 Colors.orange,
                 '$nonConvertibleCount file(s) cannot be converted (unsupported format)',
@@ -213,7 +215,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
             'Cancel',
             style: TextStyle(
               fontFamily: 'ProductSans',
-              color: AppColors.lightTextSecondary,
+              color: context.textSecondary,
             ),
           ),
         ),
@@ -233,7 +235,8 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
     );
   }
 
-  Widget _buildSummaryItem(IconData icon, Color color, String text) {
+  Widget _buildSummaryItem(
+      BuildContext context, IconData icon, Color color, String text) {
     return Row(
       children: [
         Icon(icon, color: color, size: 18),
@@ -243,7 +246,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
             text,
             style: TextStyle(
               fontFamily: 'ProductSans',
-              color: AppColors.lightTextSecondary,
+              color: context.textSecondary,
               fontSize: 12,
             ),
           ),
@@ -256,7 +259,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.lightBackground,
+        backgroundColor: context.backgroundColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
@@ -267,7 +270,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
               style: TextStyle(
                 fontFamily: 'ProductSans',
                 fontWeight: FontWeight.bold,
-                color: AppColors.lightTextPrimary,
+                color: context.textPrimary,
                 fontSize: 18,
               ),
             ),
@@ -278,24 +281,28 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildExplanationItem(
+              context,
               Icons.security,
               'Secure & Private',
               'Conversion happens entirely on your device. No data is sent to external servers.',
             ),
             const SizedBox(height: 16),
             _buildExplanationItem(
+              context,
               Icons.visibility,
               'Easy Viewing',
               'PDF files can be viewed directly in the app without requiring external software.',
             ),
             const SizedBox(height: 16),
             _buildExplanationItem(
+              context,
               Icons.devices,
               'Universal Format',
               'PDF works consistently across all devices and platforms.',
             ),
             const SizedBox(height: 16),
             _buildExplanationItem(
+              context,
               Icons.warning_amber,
               'Limitations',
               'Complex formatting, images, and special fonts may not be perfectly preserved.',
@@ -320,7 +327,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
   }
 
   Widget _buildExplanationItem(
-      IconData icon, String title, String description) {
+      BuildContext context, IconData icon, String title, String description) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -342,7 +349,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
                 style: TextStyle(
                   fontFamily: 'ProductSans',
                   fontWeight: FontWeight.w600,
-                  color: AppColors.lightTextPrimary,
+                  color: context.textPrimary,
                   fontSize: 14,
                 ),
               ),
@@ -351,7 +358,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
                 description,
                 style: TextStyle(
                   fontFamily: 'ProductSans',
-                  color: AppColors.lightTextSecondary,
+                  color: context.textSecondary,
                   fontSize: 12,
                   height: 1.4,
                 ),
