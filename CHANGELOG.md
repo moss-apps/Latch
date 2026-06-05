@@ -2,6 +2,31 @@
 
 All notable changes to Latch are documented in this file.
 
+## 0.14.2-beta.3
+
+### What's New & Changelog
+- **"What's New" bottom sheet** — in-app version highlights shown on first launch after update
+- **Changelog screen** accessible from vault settings
+- **WhatsNewService** for delivering version-specific feature highlights
+
+### Theming & Visual Consistency
+- Hardcoded light theme colors replaced with **context-aware theme colors** across the app
+- Document viewer colors migrated to theme context
+- File overlay badges unified into a single container
+- File names and **type-specific icons** shown in grid thumbnails for all file types
+- **AnimatedSwitcher** for smooth view mode transitions
+
+### Encryption Reliability
+- **Crash recovery** added to re-encryption journal — interrupted re-encryption operations can now resume safely
+- Encrypt output now written to a **temp file** and renamed on success, preventing corrupt vaulted files on failure
+- Temp file cleanup on re-encryption success
+- **Non-empty final block** handling in GCM decryption worker
+
+### Settings
+- **Permission warning** setting added to vault settings
+
+---
+
 ## 0.14.1-beta.2
 
 ### Encryption & Crypto Hardening
