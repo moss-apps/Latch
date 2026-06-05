@@ -344,6 +344,28 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                 activeThumbColor: context.accentColor,
                 contentPadding: EdgeInsets.zero,
               ),
+              SwitchListTile(
+                title: const Text(
+                  'Show Permission Warning',
+                  style: TextStyle(fontFamily: 'ProductSans'),
+                ),
+                subtitle: Text(
+                  'Display a banner when All Files Access is not granted',
+                  style: TextStyle(
+                    fontFamily: 'ProductSans',
+                    fontSize: 12,
+                    color: context.textTertiary,
+                  ),
+                ),
+                value: settings.showPermissionWarning,
+                onChanged: (value) async {
+                  await _saveVaultSettings(
+                    settings.copyWith(showPermissionWarning: value),
+                  );
+                },
+                activeThumbColor: context.accentColor,
+                contentPadding: EdgeInsets.zero,
+              ),
               const SizedBox(height: 20),
               Divider(color: context.borderColor),
               const SizedBox(height: 20),

@@ -2316,6 +2316,7 @@ class VaultSettings {
   final int lockoutDurationSeconds;
   final bool wipeVaultOnMaxFailedAttempts;
   final int maxFailedAttemptsBeforeWipe;
+  final bool showPermissionWarning;
 
   const VaultSettings({
     this.encryptionEnabled = false,
@@ -2336,6 +2337,7 @@ class VaultSettings {
     this.lockoutDurationSeconds = 30,
     this.wipeVaultOnMaxFailedAttempts = false,
     this.maxFailedAttemptsBeforeWipe = 12,
+    this.showPermissionWarning = true,
   });
 
   VaultSettings copyWith({
@@ -2357,6 +2359,7 @@ class VaultSettings {
     int? lockoutDurationSeconds,
     bool? wipeVaultOnMaxFailedAttempts,
     int? maxFailedAttemptsBeforeWipe,
+    bool? showPermissionWarning,
   }) {
     return VaultSettings(
       encryptionEnabled: encryptionEnabled ?? this.encryptionEnabled,
@@ -2383,6 +2386,8 @@ class VaultSettings {
           wipeVaultOnMaxFailedAttempts ?? this.wipeVaultOnMaxFailedAttempts,
       maxFailedAttemptsBeforeWipe:
           maxFailedAttemptsBeforeWipe ?? this.maxFailedAttemptsBeforeWipe,
+      showPermissionWarning:
+          showPermissionWarning ?? this.showPermissionWarning,
     );
   }
 
@@ -2405,6 +2410,7 @@ class VaultSettings {
         'lockoutDurationSeconds': lockoutDurationSeconds,
         'wipeVaultOnMaxFailedAttempts': wipeVaultOnMaxFailedAttempts,
         'maxFailedAttemptsBeforeWipe': maxFailedAttemptsBeforeWipe,
+        'showPermissionWarning': showPermissionWarning,
       };
 
   factory VaultSettings.fromJson(Map<String, dynamic> json) {
@@ -2438,6 +2444,8 @@ class VaultSettings {
           json['wipeVaultOnMaxFailedAttempts'] as bool? ?? false,
       maxFailedAttemptsBeforeWipe:
           json['maxFailedAttemptsBeforeWipe'] as int? ?? 12,
+      showPermissionWarning:
+          json['showPermissionWarning'] as bool? ?? true,
     );
   }
 }
