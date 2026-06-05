@@ -1,12 +1,14 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../providers/vault_providers.dart';
 import '../services/auto_kill_service.dart';
 import '../services/permission_service.dart';
 
 /// A warning banner that displays when "All Files Access" permission is not granted.
 /// This permission is required on Android 11+ for the app to hide files.
-class PermissionWarningBanner extends StatefulWidget {
+class PermissionWarningBanner extends ConsumerStatefulWidget {
   /// Callback when the permission status changes
   final VoidCallback? onPermissionChanged;
 
@@ -16,11 +18,11 @@ class PermissionWarningBanner extends StatefulWidget {
   });
 
   @override
-  State<PermissionWarningBanner> createState() =>
+  ConsumerState<PermissionWarningBanner> createState() =>
       _PermissionWarningBannerState();
 }
 
-class _PermissionWarningBannerState extends State<PermissionWarningBanner>
+class _PermissionWarningBannerState extends ConsumerState<PermissionWarningBanner>
     with WidgetsBindingObserver {
   bool _hasPermission = true;
   bool _isLoading = true;
@@ -97,6 +99,10 @@ class _PermissionWarningBannerState extends State<PermissionWarningBanner>
 
     // Don't show if permission is granted or dismissed
     if (_hasPermission || _isDismissed) return const SizedBox.shrink();
+
+    // Respect user preference to hide permission warning
+    final showWarning = ref.watch(vaultSettingsProvider).value?.showPermissionWarning ?? true;
+    if (!showWarning) return const SizedBox.shrink();
 
     return Container(
       margin: const EdgeInsets.all(12),
@@ -237,7 +243,7 @@ class _PermissionWarningBannerState extends State<PermissionWarningBanner>
 }
 
 /// A compact version of the permission warning for use in app bars or smaller spaces
-class CompactPermissionWarning extends StatefulWidget {
+class CompactPermissionWarning extends ConsumerStatefulWidget {
   final VoidCallback? onTap;
 
   const CompactPermissionWarning({
@@ -246,11 +252,11 @@ class CompactPermissionWarning extends StatefulWidget {
   });
 
   @override
-  State<CompactPermissionWarning> createState() =>
+  ConsumerState<CompactPermissionWarning> createState() =>
       _CompactPermissionWarningState();
 }
 
-class _CompactPermissionWarningState extends State<CompactPermissionWarning>
+class _CompactPermissionWarningState extends ConsumerState<CompactPermissionWarning>
     with WidgetsBindingObserver {
   bool _hasPermission = true;
   bool _isLoading = true;
@@ -298,6 +304,10 @@ class _CompactPermissionWarningState extends State<CompactPermissionWarning>
     if (!Platform.isAndroid || _isLoading || _hasPermission) {
       return const SizedBox.shrink();
     }
+
+    // Respect user preference to hide permission warning
+    final showWarning = ref.watch(vaultSettingsProvider).value?.showPermissionWarning ?? true;
+    if (!showWarning) return const SizedBox.shrink();
 
     return GestureDetector(
       onTap: widget.onTap ??

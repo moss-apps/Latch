@@ -12,6 +12,7 @@ import '../models/album.dart';
 import '../providers/vault_providers.dart';
 import '../services/auto_kill_service.dart';
 import '../services/file_import_service.dart';
+import '../services/whats_new_service.dart';
 import '../themes/app_colors.dart';
 import '../utils/toast_utils.dart';
 import '../utils/responsive_utils.dart';
@@ -33,6 +34,7 @@ import 'vault_settings_screen.dart';
 import '../widgets/operation_progress_sheet.dart';
 import '../widgets/media_hold_action_sheet.dart';
 import '../widgets/media_multi_select_action_sheet.dart';
+import '../widgets/whats_new_bottom_sheet.dart';
 
 /// Gallery vault screen - main screen after authentication
 class GalleryVaultScreen extends ConsumerStatefulWidget {
@@ -82,6 +84,29 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
     ref.read(isDecoyModeProvider.notifier).state =
         ref.read(decoyServiceProvider).isDecoyModeActive;
     ref.read(vaultNotifierProvider.notifier).loadFiles();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeShowWhatsNew();
+    });
+  }
+
+  Future<void> _maybeShowWhatsNew() async {
+    // Decoy persona stays quiet to avoid leaking that a real vault exists.
+    if (ref.read(isDecoyModeProvider)) return;
+
+    final service = WhatsNewService.instance;
+    if (!await service.shouldShow()) return;
+
+    final version = await service.currentVersion();
+    final sections = service.highlightsFor(version);
+    if (sections.isEmpty || !mounted) return;
+
+    await WhatsNewBottomSheet.show(
+      context,
+      version: version,
+      sections: sections,
+    );
+    await service.markSeen();
   }
 
   @override

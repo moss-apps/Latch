@@ -12,9 +12,12 @@ import '../services/auth_service.dart';
 import '../services/auto_kill_service.dart';
 import '../services/screenshot_protection_service.dart';
 import '../services/vault_service.dart';
+import '../services/whats_new_service.dart';
 import '../themes/app_colors.dart';
+import '../widgets/whats_new_bottom_sheet.dart';
 import 'accent_color_picker_screen.dart';
 import 'change_security_screen.dart';
+import 'changelog_screen.dart';
 import 'encryption_settings_screen.dart';
 import 'local_backup_screen.dart';
 import 'performance_settings_screen.dart';
@@ -344,6 +347,28 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                 activeThumbColor: context.accentColor,
                 contentPadding: EdgeInsets.zero,
               ),
+              SwitchListTile(
+                title: const Text(
+                  'Show Permission Warning',
+                  style: TextStyle(fontFamily: 'ProductSans'),
+                ),
+                subtitle: Text(
+                  'Display a banner when All Files Access is not granted',
+                  style: TextStyle(
+                    fontFamily: 'ProductSans',
+                    fontSize: 12,
+                    color: context.textTertiary,
+                  ),
+                ),
+                value: settings.showPermissionWarning,
+                onChanged: (value) async {
+                  await _saveVaultSettings(
+                    settings.copyWith(showPermissionWarning: value),
+                  );
+                },
+                activeThumbColor: context.accentColor,
+                contentPadding: EdgeInsets.zero,
+              ),
               const SizedBox(height: 20),
               Divider(color: context.borderColor),
               const SizedBox(height: 20),
@@ -587,6 +612,43 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                         contentPadding: EdgeInsets.zero,
                       ),
                       ListTile(
+                        leading: Icon(Icons.auto_awesome_outlined,
+                            color: context.accentColor),
+                        title: const Text("What's New",
+                            style: TextStyle(fontFamily: 'ProductSans')),
+                        subtitle: Text(
+                          'Highlights from this release',
+                          style: TextStyle(
+                            fontFamily: 'ProductSans',
+                            fontSize: 12,
+                            color: context.textTertiary,
+                          ),
+                        ),
+                        onTap: _openWhatsNew,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      ListTile(
+                        leading: Icon(Icons.menu_book_outlined,
+                            color: context.accentColor),
+                        title: const Text('Changelog',
+                            style: TextStyle(fontFamily: 'ProductSans')),
+                        subtitle: Text(
+                          'Full version history',
+                          style: TextStyle(
+                            fontFamily: 'ProductSans',
+                            fontSize: 12,
+                            color: context.textTertiary,
+                          ),
+                        ),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ChangelogScreen(),
+                          ),
+                        ),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      ListTile(
                         leading: Icon(Icons.description_outlined,
                             color: context.accentColor),
                         title: const Text('License',
@@ -714,6 +776,30 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _openWhatsNew() async {
+    final service = WhatsNewService.instance;
+    final version = await service.currentVersion();
+    final sections = service.highlightsFor(version);
+
+    if (!mounted) return;
+
+    if (sections.isEmpty) {
+      // Nothing curated for this build — fall back to the raw changelog.
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ChangelogScreen()),
+      );
+      return;
+    }
+
+    await WhatsNewBottomSheet.show(
+      context,
+      version: version,
+      sections: sections,
+    );
+    await service.markSeen();
   }
 
   void _showLicenseDialog() {
