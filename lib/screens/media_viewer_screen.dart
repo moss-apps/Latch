@@ -14,6 +14,8 @@ import '../services/auto_kill_service.dart';
 import '../themes/app_colors.dart';
 import '../utils/toast_utils.dart';
 
+enum _VideoLoadPhase { idle, decrypting, initializing, ready }
+
 // Full-screen media viewer: images, videos, slideshow.
 class MediaViewerScreen extends ConsumerStatefulWidget {
   final VaultedFile initialFile;
@@ -40,11 +42,15 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
 
   // Video player for current video
   VideoPlayerController? _videoController;
-  bool _isVideoInitialized = false;
+  _VideoLoadPhase _videoPhase = _VideoLoadPhase.idle;
   bool _isVideoPlaying = false;
   double _playbackSpeed = 1.0;
   bool _isLooping = false;
   bool _isMuted = false;
+  double? _decryptProgress;
+
+  // Cancel token for in-flight video loads
+  Completer<void>? _videoLoadCancel;
 
   // For encrypted files
   final Map<String, Uint8List?> _decryptedCache = {};
@@ -66,6 +72,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
 
   @override
   void dispose() {
+    _videoLoadCancel?.complete();
+    _videoLoadCancel = null;
     _videoUpdateTimer?.cancel();
     _videoUpdateTimer = null;
     _videoController?.dispose();
@@ -112,49 +120,99 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   }
 
   Future<void> _initializeVideo(VaultedFile file) async {
-    // Dispose previous controller
-    await _videoController?.dispose();
-    _videoController = null;
-    _isVideoInitialized = false;
-    _isVideoPlaying = false;
+    // Cancel any previous load
+    _videoLoadCancel?.complete();
+    final cancel = Completer<void>();
+    _videoLoadCancel = cancel;
 
     if (!file.isVideo) return;
 
     try {
-      File videoFile;
-
+      // Phase 1: decrypt
       if (file.isEncrypted && file.encryptionIv != null) {
-        // Get decrypted file
+        if (mounted && !cancel.isCompleted) {
+          setState(() {
+            _videoPhase = _VideoLoadPhase.decrypting;
+            _decryptProgress = 0.0;
+          });
+        }
+
         final decryptedFile =
-            await ref.read(vaultServiceProvider).getVaultedFile(file.id);
-        if (decryptedFile == null) {
-          ToastUtils.showError('Failed to decrypt video');
+            await ref.read(vaultServiceProvider).getVaultedFile(
+          file.id,
+          onProgress: (processed, total) {
+            if (!cancel.isCompleted && mounted && total > 0) {
+              setState(() {
+                _decryptProgress = processed / total;
+              });
+            }
+          },
+        );
+
+        if (cancel.isCompleted || decryptedFile == null) {
+          if (decryptedFile == null) {
+            ToastUtils.showError('Failed to decrypt video');
+          }
           return;
         }
-        videoFile = decryptedFile;
-      } else {
-        videoFile = File(file.vaultPath);
+
+        // Phase 2: init player
+        if (mounted && !cancel.isCompleted) {
+          setState(() {
+            _videoPhase = _VideoLoadPhase.initializing;
+            _decryptProgress = null;
+          });
+        }
+
+        final controller = VideoPlayerController.file(decryptedFile);
+        await controller.initialize();
+
+        if (cancel.isCompleted) {
+          controller.dispose();
+          return;
+        }
+
+        await _setupController(controller);
+        return;
       }
 
-      _videoController = VideoPlayerController.file(videoFile);
-      await _videoController!.initialize();
-
-      // Apply current settings
-      await _videoController!.setLooping(_isLooping);
-      await _videoController!.setPlaybackSpeed(_playbackSpeed);
-      await _videoController!.setVolume(_isMuted ? 0.0 : 1.0);
-
-      // Debounced listener for progress; avoids setState every frame.
-      _videoController!.addListener(_onVideoUpdate);
-
-      if (mounted) {
+      // Plain file (not encrypted)
+      if (mounted && !cancel.isCompleted) {
         setState(() {
-          _isVideoInitialized = true;
+          _videoPhase = _VideoLoadPhase.initializing;
         });
       }
+
+      final controller = VideoPlayerController.file(File(file.vaultPath));
+      await controller.initialize();
+
+      if (cancel.isCompleted) {
+        controller.dispose();
+        return;
+      }
+
+      await _setupController(controller);
     } catch (e) {
       debugPrint('Error initializing video: $e');
-      ToastUtils.showError('Failed to load video');
+      if (!cancel.isCompleted) {
+        ToastUtils.showError('Failed to load video');
+      }
+    }
+  }
+
+  Future<void> _setupController(VideoPlayerController controller) async {
+    _videoController = controller;
+
+    await controller.setLooping(_isLooping);
+    await controller.setPlaybackSpeed(_playbackSpeed);
+    await controller.setVolume(_isMuted ? 0.0 : 1.0);
+
+    controller.addListener(_onVideoUpdate);
+
+    if (mounted) {
+      setState(() {
+        _videoPhase = _VideoLoadPhase.ready;
+      });
     }
   }
 
@@ -170,17 +228,28 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   }
 
   void _onPageChanged(int index) {
-    // Pause current video if playing
     _videoController?.pause();
-    _isVideoPlaying = false;
+    _videoController?.removeListener(_onVideoUpdate);
+
+    // Cancel in-flight video load
+    _videoLoadCancel?.complete();
+    _videoLoadCancel = null;
+
+    final oldController = _videoController;
 
     setState(() {
       _currentIndex = index;
+      _videoController = null;
+      _videoPhase = _VideoLoadPhase.idle;
+      _isVideoPlaying = false;
+      _decryptProgress = null;
     });
+
+    // Dispose old controller after rebuild to avoid blocking swipe animation
+    oldController?.dispose();
 
     _loadCurrentMedia();
 
-    // Mark as viewed
     final file = widget.files[index];
     ref.read(vaultServiceProvider).updateFile(file.markViewed());
   }
@@ -341,7 +410,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   }
 
   void _toggleVideoPlayback() {
-    if (_videoController == null || !_isVideoInitialized) return;
+    if (_videoController == null || _videoPhase != _VideoLoadPhase.ready) return;
 
     setState(() {
       if (_isVideoPlaying) {
@@ -354,12 +423,12 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   }
 
   void _seekVideo(Duration position) {
-    if (_videoController == null || !_isVideoInitialized) return;
+    if (_videoController == null || _videoPhase != _VideoLoadPhase.ready) return;
     _videoController!.seekTo(position);
   }
 
   void _skipForward() {
-    if (_videoController == null || !_isVideoInitialized) return;
+    if (_videoController == null || _videoPhase != _VideoLoadPhase.ready) return;
     final newPos =
         _videoController!.value.position + const Duration(seconds: 10);
     final duration = _videoController!.value.duration;
@@ -367,7 +436,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   }
 
   void _skipBackward() {
-    if (_videoController == null || !_isVideoInitialized) return;
+    if (_videoController == null || _videoPhase != _VideoLoadPhase.ready) return;
     final newPos =
         _videoController!.value.position - const Duration(seconds: 10);
     _seekVideo(newPos < Duration.zero ? Duration.zero : newPos);
@@ -864,9 +933,46 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   }
 
   Widget _buildVideoPlayer(VaultedFile file) {
-    if (!_isVideoInitialized || _videoController == null) {
-      return const Center(
-        child: CircularProgressIndicator(color: Colors.white),
+    if (_videoPhase != _VideoLoadPhase.ready || _videoController == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (_videoPhase == _VideoLoadPhase.decrypting && _decryptProgress != null) ...[
+              SizedBox(
+                width: 200,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: _decryptProgress,
+                    backgroundColor: Colors.white24,
+                    valueColor: const AlwaysStoppedAnimation(Colors.white),
+                    minHeight: 6,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                '${(_decryptProgress! * 100).round()}%',
+                style: const TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Decrypting video...',
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+            ] else ...[
+              const CircularProgressIndicator(color: Colors.white),
+              const SizedBox(height: 12),
+              Text(
+                _videoPhase == _VideoLoadPhase.initializing
+                    ? 'Loading video...'
+                    : 'Preparing...',
+                style: const TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+            ],
+          ],
+        ),
       );
     }
 
