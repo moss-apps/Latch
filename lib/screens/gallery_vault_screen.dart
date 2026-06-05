@@ -86,6 +86,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
     ref.read(vaultNotifierProvider.notifier).loadFiles();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      WhatsNewService.instance.startRemoteRefresh();
       _maybeShowWhatsNew();
     });
   }
@@ -586,70 +587,104 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
                     child: child!,
                   ),
                 ),
-              // Selection indicator
-              if (isSelectionMode)
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isSelected ? context.accentColor : Colors.white,
-                      border: Border.all(
-                        color: isSelected ? context.accentColor : context.borderColor,
-                        width: 2,
+                // Selection indicator
+                if (isSelectionMode)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isSelected ? context.accentColor : Colors.white,
+                        border: Border.all(
+                          color: isSelected
+                              ? context.accentColor
+                              : context.borderColor,
+                          width: 2,
+                        ),
+                      ),
+                      child: isSelected
+                          ? const Icon(Icons.check,
+                              size: 16, color: Colors.white)
+                          : const SizedBox.shrink(),
+                    ),
+                  ),
+                // Favorite indicator
+                if (file.isFavorite && !isSelectionMode)
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Icon(
+                        Icons.favorite,
+                        size: 14,
+                        color: Colors.red,
                       ),
                     ),
-                    child: isSelected
-                        ? const Icon(Icons.check, size: 16, color: Colors.white)
-                        : const SizedBox.shrink(),
                   ),
-                ),
-              // Favorite indicator
-              if (file.isFavorite && !isSelectionMode)
-                Positioned(
-                  top: 8,
-                  left: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Icon(
-                      Icons.favorite,
-                      size: 14,
-                      color: Colors.red,
+                // Encrypted indicator
+                if (file.isEncrypted && !isSelectionMode)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Icon(
+                        Icons.lock,
+                        size: 14,
+                        color: Colors.green,
+                      ),
                     ),
                   ),
-                ),
-              // Encrypted indicator
-              if (file.isEncrypted && !isSelectionMode)
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Icon(
-                      Icons.lock,
-                      size: 14,
-                      color: Colors.green,
+                // Tags indicator
+                if (file.hasTags && !isSelectionMode)
+                  Positioned(
+                    bottom: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.label,
+                              size: 12, color: Colors.white),
+                          const SizedBox(width: 2),
+                          Text(
+                            '${file.tagCount}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontFamily: 'ProductSans',
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              // Tags indicator
-              if (file.hasTags && !isSelectionMode)
+                // Filename overlay for all file types
                 Positioned(
                   bottom: 8,
                   left: 8,
+                  right: 8,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.black54,
                       borderRadius: BorderRadius.circular(4),
@@ -657,69 +692,42 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.label, size: 12, color: Colors.white),
-                        const SizedBox(width: 2),
-                        Text(
-                          '${file.tagCount}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontFamily: 'ProductSans',
+                        if (file.isVideo) ...[
+                          const Icon(Icons.play_arrow,
+                              size: 14, color: Colors.white),
+                          const SizedBox(width: 2),
+                        ],
+                        Expanded(
+                          child: Text(
+                            file.originalName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontFamily: 'ProductSans',
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        if (file.isVideo) ...[
+                          const SizedBox(width: 4),
+                          Text(
+                            file.formattedSize,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 10,
+                              fontFamily: 'ProductSans',
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
                 ),
-              // Filename overlay for all file types
-              Positioned(
-                bottom: 8,
-                left: 8,
-                right: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (file.isVideo) ...[
-                        const Icon(Icons.play_arrow, size: 14, color: Colors.white),
-                        const SizedBox(width: 2),
-                      ],
-                      Expanded(
-                        child: Text(
-                          file.originalName,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontFamily: 'ProductSans',
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (file.isVideo) ...[
-                        const SizedBox(width: 4),
-                        Text(
-                          file.formattedSize,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 10,
-                            fontFamily: 'ProductSans',
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      );
+        );
       },
       child: _buildFileThumbnail(file),
     );
@@ -1100,9 +1108,8 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
     final searchQuery = ref.read(searchQueryProvider);
     if (searchQuery.isNotEmpty) {
       files = files
-          .where((f) => f.originalName
-              .toLowerCase()
-              .contains(searchQuery.toLowerCase()))
+          .where((f) =>
+              f.originalName.toLowerCase().contains(searchQuery.toLowerCase()))
           .toList();
     }
 
@@ -2736,19 +2743,19 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
         ),
       );
 
-      final success = await ref.read(vaultNotifierProvider.notifier).deleteFiles(
-            selectedFiles.toList(),
-            onProgress: (current, total, {int? currentSize, int? totalSize}) {
-              progressState.value = progressState.value.copyWith(
-                totalFiles: total,
-                currentFile: current,
-                totalSizeBytes: totalSize ?? 0,
-                processedSizeBytes: currentSize ?? 0,
-                statusMessage:
-                    'Processing file $current of $total...',
-              );
-            },
+      final success =
+          await ref.read(vaultNotifierProvider.notifier).deleteFiles(
+        selectedFiles.toList(),
+        onProgress: (current, total, {int? currentSize, int? totalSize}) {
+          progressState.value = progressState.value.copyWith(
+            totalFiles: total,
+            currentFile: current,
+            totalSizeBytes: totalSize ?? 0,
+            processedSizeBytes: currentSize ?? 0,
+            statusMessage: 'Processing file $current of $total...',
           );
+        },
+      );
 
       if (!mounted) return;
 
@@ -3852,7 +3859,8 @@ class _FolderImportPickerScreen extends StatefulWidget {
   const _FolderImportPickerScreen();
 
   @override
-  State<_FolderImportPickerScreen> createState() => _FolderImportPickerScreenState();
+  State<_FolderImportPickerScreen> createState() =>
+      _FolderImportPickerScreenState();
 }
 
 class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
@@ -3922,7 +3930,11 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
           .where((d) => !d.path.split('/').last.startsWith('.'))
           .where((d) => d.path.split('/').last != 'Android')
           .toList()
-        ..sort((a, b) => a.path.split('/').last.toLowerCase().compareTo(b.path.split('/').last.toLowerCase()));
+        ..sort((a, b) => a.path
+            .split('/')
+            .last
+            .toLowerCase()
+            .compareTo(b.path.split('/').last.toLowerCase()));
 
       setState(() {
         if (_currentPath != null) {
@@ -3964,7 +3976,8 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
             : null,
         title: const Text(
           'Select Folder to Import',
-          style: TextStyle(fontFamily: 'ProductSans', fontWeight: FontWeight.w600),
+          style:
+              TextStyle(fontFamily: 'ProductSans', fontWeight: FontWeight.w600),
         ),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         foregroundColor: context.textPrimary,
@@ -3977,9 +3990,14 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.error_outline, size: 64, color: AppColors.error),
+                      Icon(Icons.error_outline,
+                          size: 64, color: AppColors.error),
                       const SizedBox(height: 16),
-                      Text(_error!, style: TextStyle(fontFamily: 'ProductSans', color: context.textSecondary), textAlign: TextAlign.center),
+                      Text(_error!,
+                          style: TextStyle(
+                              fontFamily: 'ProductSans',
+                              color: context.textSecondary),
+                          textAlign: TextAlign.center),
                     ],
                   ),
                 )
@@ -3987,7 +4005,8 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
                   children: [
                     if (_pathStack.isNotEmpty)
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
                         child: InkWell(
                           onTap: _goBack,
                           borderRadius: BorderRadius.circular(8),
@@ -3995,14 +4014,19 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
                             padding: const EdgeInsets.all(8),
                             child: Row(
                               children: [
-                                const Icon(Icons.arrow_back, size: 14, color: AppColors.accent),
+                                const Icon(Icons.arrow_back,
+                                    size: 14, color: AppColors.accent),
                                 const SizedBox(width: 8),
-                                Icon(Icons.folder, size: 16, color: context.accentColor),
+                                Icon(Icons.folder,
+                                    size: 16, color: context.accentColor),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
                                     _currentPath ?? '',
-                                    style: TextStyle(fontFamily: 'ProductSans', fontSize: 12, color: context.textTertiary),
+                                    style: TextStyle(
+                                        fontFamily: 'ProductSans',
+                                        fontSize: 12,
+                                        color: context.textTertiary),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -4018,9 +4042,13 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.folder_off_outlined, size: 48, color: context.textTertiary),
+                                  Icon(Icons.folder_off_outlined,
+                                      size: 48, color: context.textTertiary),
                                   const SizedBox(height: 16),
-                                  Text('No subfolders', style: TextStyle(fontFamily: 'ProductSans', color: context.textSecondary)),
+                                  Text('No subfolders',
+                                      style: TextStyle(
+                                          fontFamily: 'ProductSans',
+                                          color: context.textSecondary)),
                                 ],
                               ),
                             )
@@ -4031,9 +4059,14 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
                                 final dir = _subdirs[index];
                                 final name = dir.path.split('/').last;
                                 return ListTile(
-                                  leading: Icon(Icons.folder, color: context.accentColor),
-                                  title: Text(name, style: TextStyle(fontFamily: 'ProductSans', color: context.textPrimary)),
-                                  trailing: Icon(Icons.chevron_right, color: context.textTertiary),
+                                  leading: Icon(Icons.folder,
+                                      color: context.accentColor),
+                                  title: Text(name,
+                                      style: TextStyle(
+                                          fontFamily: 'ProductSans',
+                                          color: context.textPrimary)),
+                                  trailing: Icon(Icons.chevron_right,
+                                      color: context.textTertiary),
                                   onTap: () => _navigateInto(dir.path),
                                 );
                               },
@@ -4048,12 +4081,16 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
                 child: ElevatedButton.icon(
                   onPressed: () => Navigator.pop(context, _currentPath),
                   icon: const Icon(Icons.check),
-                  label: const Text('Import This Folder', style: TextStyle(fontFamily: 'ProductSans', fontWeight: FontWeight.w600)),
+                  label: const Text('Import This Folder',
+                      style: TextStyle(
+                          fontFamily: 'ProductSans',
+                          fontWeight: FontWeight.w600)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: context.accentColor,
                     foregroundColor: Colors.white,
                     minimumSize: const Size(double.infinity, 48),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
               ),

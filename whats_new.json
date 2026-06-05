@@ -1,0 +1,54 @@
+{
+  "0.14.2-beta.3": [
+    {
+      "title": "Encryption & Crypto",
+      "items": [
+        {
+          "icon": "shield_outlined",
+          "title": "AES-256-GCM v2",
+          "description": "Authenticated encryption with an isolate-based crypto worker pool — heavy work runs off the UI thread."
+        },
+        {
+          "icon": "key_outlined",
+          "title": "Dynamic KDF iterations",
+          "description": "Password and PIN hashing now uses per-credential PBKDF2 iteration counts that rotate automatically when vault settings change."
+        },
+        {
+          "icon": "warning_amber_outlined",
+          "title": "Re-encryption safeguards",
+          "description": "Detailed risk explanations are surfaced before any re-encryption begins."
+        }
+      ]
+    },
+    {
+      "title": "Selection & Gestures",
+      "items": [
+        {
+          "icon": "touch_app_outlined",
+          "title": "Hold-to-action",
+          "description": "Long-press a file to open an action sheet instead of immediately entering selection mode."
+        },
+        {
+          "icon": "checklist_outlined",
+          "title": "Multi-select action sheet",
+          "description": "Batch operations are now organised into a clean quick-action grid."
+        }
+      ]
+    },
+    {
+      "title": "Updates & Reliability",
+      "items": [
+        {
+          "icon": "system_update_outlined",
+          "title": "In-app updates",
+          "description": "Latch now checks the Play Store on launch and offers to update without leaving the app."
+        },
+        {
+          "icon": "bug_report_outlined",
+          "title": "Sturdier exports",
+          "description": "Parallel file export with improved progress tracking, plus fixes for vault entry parsing and empty index saves."
+        }
+      ]
+    }
+  ]
+}

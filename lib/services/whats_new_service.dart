@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -28,18 +32,29 @@ class WhatsNewSection {
 
 /// Tracks app version transitions and serves the highlights shown to the
 /// user the first time they open a freshly-updated build.
+///
+/// Highlights are fetched from the GitHub repo on launch and cached
+/// locally. If the network is unavailable the cached copy is used; if no
+/// cache exists the built-in fallback is served instead.
 class WhatsNewService {
   WhatsNewService._();
   static final WhatsNewService instance = WhatsNewService._();
 
   static const String _lastSeenVersionKey = 'whats_new_last_seen_version';
+  static const String _cachedHighlightsKey = 'whats_new_cached_highlights';
+  static const String _cachedEtagKey = 'whats_new_cached_etag';
 
-  /// Version-keyed highlights. The key MUST match `PackageInfo.version`
-  /// exactly (the `+buildNumber` suffix is ignored).
+  static const String _remoteUrl =
+      'https://raw.githubusercontent.com/moss-apps/Latch/main/whats_new.json';
+
+  static const _fetchTimeout = Duration(seconds: 8);
+
+  /// Built-in highlights shipped with the app. Used as the ultimate
+  /// fallback when there is no cached data and the network is unavailable.
   ///
-  /// Add a new entry here whenever the app version in `pubspec.yaml` is
-  /// bumped to surface the changes to users on first launch.
-  static const Map<String, List<WhatsNewSection>> _highlights = {
+  /// The key MUST match `PackageInfo.version` exactly (the `+buildNumber`
+  /// suffix is ignored).
+  static const Map<String, List<WhatsNewSection>> _builtIn = {
     '0.14.2-beta.3': [
       WhatsNewSection(
         title: 'Encryption & Crypto',
@@ -102,6 +117,48 @@ class WhatsNewService {
   };
 
   String? _currentVersion;
+  Map<String, List<WhatsNewSection>>? _fetchedHighlights;
+  bool _fetchInitiated = false;
+
+  /// Maps icon names used in the remote JSON to Flutter [IconData].
+  static IconData _iconFor(String name) {
+    switch (name) {
+      case 'shield_outlined':
+        return Icons.shield_outlined;
+      case 'key_outlined':
+        return Icons.key_outlined;
+      case 'warning_amber_outlined':
+        return Icons.warning_amber_outlined;
+      case 'touch_app_outlined':
+        return Icons.touch_app_outlined;
+      case 'checklist_outlined':
+        return Icons.checklist_outlined;
+      case 'system_update_outlined':
+        return Icons.system_update_outlined;
+      case 'bug_report_outlined':
+        return Icons.bug_report_outlined;
+      case 'auto_awesome_outlined':
+        return Icons.auto_awesome_outlined;
+      case 'lock_outlined':
+        return Icons.lock_outlined;
+      case 'folder_outlined':
+        return Icons.folder_outlined;
+      case 'palette_outlined':
+        return Icons.palette_outlined;
+      case 'speed':
+        return Icons.speed;
+      case 'photo_library_outlined':
+        return Icons.photo_library_outlined;
+      case 'new_releases_outlined':
+        return Icons.new_releases_outlined;
+      case 'build_outlined':
+        return Icons.build_outlined;
+      case 'info_outlined':
+        return Icons.info_outlined;
+      default:
+        return Icons.info_outlined;
+    }
+  }
 
   /// Resolves and caches the running app's version string.
   Future<String> currentVersion() async {
@@ -111,10 +168,98 @@ class WhatsNewService {
     return _currentVersion!;
   }
 
-  /// Returns the highlight sections for [version], or an empty list if no
-  /// entry exists for it.
+  /// Returns the highlight sections for [version], preferring the
+  /// remotely-fetched set when available, then checking the built-in
+  /// fallback.
   List<WhatsNewSection> highlightsFor(String version) {
-    return _highlights[version] ?? const [];
+    if (_fetchedHighlights != null) {
+      return _fetchedHighlights![version] ?? const [];
+    }
+    return _builtIn[version] ?? const [];
+  }
+
+  /// Kicks off a non-blocking fetch of the remote highlights JSON.
+  ///
+  /// Call once early in the app lifecycle. The result is ingested on a
+  /// best-effort basis — if the network call fails the service silently
+  /// keeps using the built-in fallback.
+  void startRemoteRefresh() {
+    if (_fetchInitiated) return;
+    _fetchInitiated = true;
+    _loadFromCache();
+    unawaited(_fetchAndCache());
+  }
+
+  Future<void> _fetchAndCache() async {
+    try {
+      final client = HttpClient();
+      client.connectionTimeout = _fetchTimeout;
+      final prefs = await SharedPreferences.getInstance();
+      final cachedEtag = prefs.getString(_cachedEtagKey);
+
+      final request = await client.getUrl(Uri.parse(_remoteUrl));
+      if (cachedEtag != null) {
+        request.headers.set(HttpHeaders.ifNoneMatchHeader, cachedEtag);
+      }
+
+      final response = await request.close().timeout(_fetchTimeout);
+      client.close();
+
+      if (response.statusCode == 304) return; // not modified
+      if (response.statusCode != 200) return;
+
+      final body = await response.transform(utf8.decoder).join();
+
+      final parsed = _parseJson(body);
+      if (parsed.isEmpty) return;
+
+      _fetchedHighlights = parsed;
+      await prefs.setString(_cachedHighlightsKey, body);
+
+      final etag = response.headers.value(HttpHeaders.etagHeader);
+      if (etag != null) {
+        await prefs.setString(_cachedEtagKey, etag);
+      }
+    } catch (_) {
+      _loadFromCache();
+    }
+  }
+
+  void _loadFromCache() {
+    SharedPreferences.getInstance().then((prefs) {
+      final raw = prefs.getString(_cachedHighlightsKey);
+      if (raw != null) {
+        final parsed = _parseJson(raw);
+        if (parsed.isNotEmpty) _fetchedHighlights = parsed;
+      }
+    });
+  }
+
+  Map<String, List<WhatsNewSection>> _parseJson(String raw) {
+    try {
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      final result = <String, List<WhatsNewSection>>{};
+      for (final entry in decoded.entries) {
+        final sections = (entry.value as List<dynamic>).map((s) {
+          final map = s as Map<String, dynamic>;
+          return WhatsNewSection(
+            title: map['title'] as String,
+            items: (map['items'] as List<dynamic>).map((i) {
+              final item = i as Map<String, dynamic>;
+              return WhatsNewItem(
+                icon: _iconFor(item['icon'] as String? ?? 'info_outlined'),
+                title: item['title'] as String,
+                description: item['description'] as String,
+              );
+            }).toList(),
+          );
+        }).toList();
+        result[entry.key] = sections;
+      }
+      return result;
+    } catch (_) {
+      return {};
+    }
   }
 
   /// Whether the "What's New" sheet should be shown on this launch.
@@ -128,7 +273,6 @@ class WhatsNewService {
     final current = await currentVersion();
 
     if (lastSeen == null) {
-      // Fresh install — record the current version and stay silent.
       await prefs.setString(_lastSeenVersionKey, current);
       return false;
     }

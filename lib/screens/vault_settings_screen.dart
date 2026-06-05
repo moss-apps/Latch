@@ -34,7 +34,15 @@ class VaultSettingsScreen extends ConsumerStatefulWidget {
 class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
   static const List<int> _autoKillDelayOptions = [0, 5, 10, 30, 60];
   static const List<int> _lockoutAttemptOptions = [3, 5, 7, 10];
-  static const List<int> _lockoutDurationOptions = [30, 60, 300, 900, 1800, 3600, 7200];
+  static const List<int> _lockoutDurationOptions = [
+    30,
+    60,
+    300,
+    900,
+    1800,
+    3600,
+    7200
+  ];
   static const List<int> _wipeAttemptOptions = [10, 15, 20, 30];
 
   late Future<PackageInfo> _packageInfoFuture;
@@ -487,9 +495,15 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
               const SizedBox(height: 20),
               _buildSectionTitle(context, 'Support'),
               ListTile(
-                leading: Icon(Icons.favorite_outline, color: context.accentColor),
-                title: const Text('Donate', style: TextStyle(fontFamily: 'ProductSans')),
-                subtitle: Text('Support development via Ko-fi', style: TextStyle(fontFamily: 'ProductSans', fontSize: 12, color: context.textTertiary)),
+                leading:
+                    Icon(Icons.favorite_outline, color: context.accentColor),
+                title: const Text('Donate',
+                    style: TextStyle(fontFamily: 'ProductSans')),
+                subtitle: Text('Support development via Ko-fi',
+                    style: TextStyle(
+                        fontFamily: 'ProductSans',
+                        fontSize: 12,
+                        color: context.textTertiary)),
                 trailing: Icon(Icons.open_in_new, color: context.textTertiary),
                 onTap: () async {
                   final url = Uri.parse('https://ko-fi.com/ultraelectronica');
@@ -498,7 +512,8 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                   } catch (e) {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Could not open donation page')),
+                        const SnackBar(
+                            content: Text('Could not open donation page')),
                       );
                     }
                   }
@@ -536,8 +551,8 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                   _updateInfo!.updateAvailability ==
                       UpdateAvailability.updateAvailable)
                 ListTile(
-                  leading: Icon(Icons.system_update,
-                      color: context.accentColor),
+                  leading:
+                      Icon(Icons.system_update, color: context.accentColor),
                   title: const Text('Update Available',
                       style: TextStyle(fontFamily: 'ProductSans')),
                   subtitle: Text(
@@ -570,8 +585,8 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                 )
               else
                 ListTile(
-                  leading: Icon(Icons.system_update,
-                      color: context.accentColor),
+                  leading:
+                      Icon(Icons.system_update, color: context.accentColor),
                   title: const Text('Scan for Updates',
                       style: TextStyle(fontFamily: 'ProductSans')),
                   subtitle: Text(
@@ -681,8 +696,7 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) =>
-                                  const PrivacyPolicyScreen(),
+                              builder: (context) => const PrivacyPolicyScreen(),
                             ),
                           );
                         },
@@ -779,6 +793,7 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
   }
 
   Future<void> _openWhatsNew() async {
+    WhatsNewService.instance.startRemoteRefresh();
     final service = WhatsNewService.instance;
     final version = await service.currentVersion();
     final sections = service.highlightsFor(version);
