@@ -1067,7 +1067,11 @@ class VaultService {
   }
 
   /// Get the actual file from vault (decrypts if needed)
-  Future<File?> getVaultedFile(String fileId, {bool isDecoy = false}) async {
+  Future<File?> getVaultedFile(
+    String fileId, {
+    bool isDecoy = false,
+    Function(int processed, int total)? onProgress,
+  }) async {
     final vaultedFile = await getFileById(fileId, isDecoy: isDecoy);
     if (vaultedFile == null) return null;
 
@@ -1080,12 +1084,34 @@ class VaultService {
       final tempPath =
           '${tempDir.path}/temp/${vaultedFile.id}_${vaultedFile.originalName}';
 
-      final result = await _encryptionService.decryptFile(
-        vaultedFile.vaultPath,
-        tempPath,
-        vaultedFile.encryptionIv!,
-        isDecoy: isDecoy,
-      );
+      final format = _encryptionService.detectFileFormat(vaultedFile.vaultPath);
+      final isLegacyCbc = (format == 0 || format == 3);
+
+      FileDecryptionResult result;
+      if (isLegacyCbc) {
+        result = await _encryptionService.decryptFile(
+          vaultedFile.vaultPath,
+          tempPath,
+          vaultedFile.encryptionIv!,
+          isDecoy: isDecoy,
+          onProgress: onProgress == null
+              ? null
+              : (current, total) {
+                  final estimatedProcessed = total > 0
+                      ? (current / total * vaultedFile.fileSize).round()
+                      : 0;
+                  onProgress(estimatedProcessed, vaultedFile.fileSize);
+                },
+        );
+      } else {
+        result = await _encryptionService.decryptFileInIsolate(
+          vaultedFile.vaultPath,
+          tempPath,
+          vaultedFile.encryptionIv!,
+          isDecoy: isDecoy,
+          onProgress: onProgress,
+        );
+      }
 
       if (result.success && result.decryptedPath != null) {
         return File(result.decryptedPath!);

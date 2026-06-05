@@ -2,6 +2,24 @@
 
 All notable changes to Latch are documented in this file.
 
+## 0.14.3-beta.4
+
+### Always Up-to-Date Content
+- **"What's New"** highlights and **full changelog** now fetch from the GitHub repo on launch with ETag caching — new release notes propagate without an APK update
+- Bundled assets serve as instant fallback when offline
+
+### Video Player Improvements
+- **Video load phases** with cancellation support and progress tracking
+
+### Encryption Reliability
+- **CTR decryption** now writes to a temporary file and renames on success, preventing data loss on failure
+- **Progress callback** added to `getVaultedFile` for better UX during decryption
+
+### Bug Fixes
+- Fixed `Uint8List.view` shared buffer issue in encryption workers — prevents corrupted output when iterating across views
+
+---
+
 ## 0.14.2-beta.3
 
 ### What's New & Changelog

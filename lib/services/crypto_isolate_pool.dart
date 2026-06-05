@@ -466,7 +466,7 @@ Future<void> _workerDoEncrypt(
           if (chunk.isEmpty) break;
           final outLen = gcm.processBytes(chunk, 0, chunk.length, outBuf, 0);
           if (outLen > 0) {
-            sink.add(Uint8List.view(outBuf.buffer, 0, outLen));
+            sink.add(Uint8List.fromList(Uint8List.view(outBuf.buffer, 0, outLen)));
           }
           bytesProcessed += chunk.length;
           replyPort.send({
@@ -598,7 +598,7 @@ Future<void> _workerDoDecrypt(
         if (chunk.isEmpty) break;
         final outLen = gcm.processBytes(chunk, 0, chunk.length, outBuf, 0);
         if (outLen > 0) {
-          sink.add(Uint8List.view(outBuf.buffer, 0, outLen));
+          sink.add(Uint8List.fromList(Uint8List.view(outBuf.buffer, 0, outLen)));
         }
         bytesProcessed += chunk.length;
         replyPort.send({
