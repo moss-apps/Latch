@@ -435,99 +435,109 @@ Future<void> _workerDoEncrypt(
   final iv = Uint8List.fromList(
       List<int>.generate(16, (_) => random.nextInt(256)));
 
-  final destFile = File(destPath);
-  final sink = destFile.openWrite();
+  final tempPath = '$destPath.tmp';
+  final tempFile = File(tempPath);
+  final sink = tempFile.openWrite();
 
-  if (useGcm) {
-    final gcm = GCMBlockCipher(AESEngine())
-      ..init(true, AEADParameters(KeyParameter(key), 128, iv, Uint8List(0)));
+  try {
+    if (useGcm) {
+      final gcm = GCMBlockCipher(AESEngine())
+        ..init(true, AEADParameters(KeyParameter(key), 128, iv, Uint8List(0)));
 
-    final header = Uint8List(9);
-    header[0] = 0x4C;
-    header[1] = 0x4B;
-    header[2] = 0x52;
-    header[3] = 0x32;
-    header[4] = 0x02;
-    header[5] = (totalBytes & 0xFF);
-    header[6] = ((totalBytes >> 8) & 0xFF);
-    header[7] = ((totalBytes >> 16) & 0xFF);
-    header[8] = ((totalBytes >> 24) & 0xFF);
-    sink.add(header);
+      final header = Uint8List(9);
+      header[0] = 0x4C;
+      header[1] = 0x4B;
+      header[2] = 0x52;
+      header[3] = 0x32;
+      header[4] = 0x02;
+      header[5] = (totalBytes & 0xFF);
+      header[6] = ((totalBytes >> 8) & 0xFF);
+      header[7] = ((totalBytes >> 16) & 0xFF);
+      header[8] = ((totalBytes >> 24) & 0xFF);
+      sink.add(header);
 
-    final outBuf = Uint8List(_kChunkSize + 16);
-    int bytesProcessed = 0;
+      final outBuf = Uint8List(_kChunkSize + 16);
+      int bytesProcessed = 0;
 
-    final raf = sourceFile.openSync();
-    try {
-      while (true) {
-        final chunk = raf.readSync(_kChunkSize);
-        if (chunk.isEmpty) break;
-        final outLen = gcm.processBytes(chunk, 0, chunk.length, outBuf, 0);
-        if (outLen > 0) {
-          sink.add(Uint8List.view(outBuf.buffer, 0, outLen));
+      final raf = sourceFile.openSync();
+      try {
+        while (true) {
+          final chunk = raf.readSync(_kChunkSize);
+          if (chunk.isEmpty) break;
+          final outLen = gcm.processBytes(chunk, 0, chunk.length, outBuf, 0);
+          if (outLen > 0) {
+            sink.add(Uint8List.view(outBuf.buffer, 0, outLen));
+          }
+          bytesProcessed += chunk.length;
+          replyPort.send({
+            'type': 'progress',
+            'jobId': jobId,
+            'bytesProcessed': bytesProcessed,
+            'totalBytes': totalBytes,
+          });
         }
-        bytesProcessed += chunk.length;
-        replyPort.send({
-          'type': 'progress',
-          'jobId': jobId,
-          'bytesProcessed': bytesProcessed,
-          'totalBytes': totalBytes,
-        });
+      } finally {
+        raf.closeSync();
       }
-    } finally {
-      raf.closeSync();
-    }
 
-    final finalBuf = Uint8List(32);
-    final finalLen = gcm.doFinal(finalBuf, 0);
-    if (finalLen > 0) {
-      sink.add(Uint8List.view(finalBuf.buffer, 0, finalLen));
-    }
-  } else {
-    final ctr = CTRStreamCipher(AESEngine())
-      ..init(true, ParametersWithIV<KeyParameter>(KeyParameter(key), iv));
-
-    final header = Uint8List(8);
-    header[0] = 0x4C;
-    header[1] = 0x4B;
-    header[2] = 0x52;
-    header[3] = 0x53;
-    header[4] = (totalBytes & 0xFF);
-    header[5] = ((totalBytes >> 8) & 0xFF);
-    header[6] = ((totalBytes >> 16) & 0xFF);
-    header[7] = ((totalBytes >> 24) & 0xFF);
-    sink.add(header);
-
-    int bytesProcessed = 0;
-    final raf = sourceFile.openSync();
-    try {
-      while (true) {
-        final chunk = raf.readSync(_kChunkSize);
-        if (chunk.isEmpty) break;
-        sink.add(ctr.process(chunk));
-        bytesProcessed += chunk.length;
-        replyPort.send({
-          'type': 'progress',
-          'jobId': jobId,
-          'bytesProcessed': bytesProcessed,
-          'totalBytes': totalBytes,
-        });
+      final finalBuf = Uint8List(32);
+      final finalLen = gcm.doFinal(finalBuf, 0);
+      if (finalLen > 0) {
+        sink.add(Uint8List.view(finalBuf.buffer, 0, finalLen));
       }
-    } finally {
-      raf.closeSync();
+    } else {
+      final ctr = CTRStreamCipher(AESEngine())
+        ..init(true, ParametersWithIV<KeyParameter>(KeyParameter(key), iv));
+
+      final header = Uint8List(8);
+      header[0] = 0x4C;
+      header[1] = 0x4B;
+      header[2] = 0x52;
+      header[3] = 0x53;
+      header[4] = (totalBytes & 0xFF);
+      header[5] = ((totalBytes >> 8) & 0xFF);
+      header[6] = ((totalBytes >> 16) & 0xFF);
+      header[7] = ((totalBytes >> 24) & 0xFF);
+      sink.add(header);
+
+      int bytesProcessed = 0;
+      final raf = sourceFile.openSync();
+      try {
+        while (true) {
+          final chunk = raf.readSync(_kChunkSize);
+          if (chunk.isEmpty) break;
+          sink.add(ctr.process(chunk));
+          bytesProcessed += chunk.length;
+          replyPort.send({
+            'type': 'progress',
+            'jobId': jobId,
+            'bytesProcessed': bytesProcessed,
+            'totalBytes': totalBytes,
+          });
+        }
+      } finally {
+        raf.closeSync();
+      }
     }
+
+    await sink.flush();
+    await sink.close();
+
+    await tempFile.rename(destPath);
+
+    replyPort.send({
+      'type': 'encrypt_complete',
+      'jobId': jobId,
+      'ivBase64': base64Encode(iv),
+      'originalSize': totalBytes,
+      'encryptedSize': File(destPath).lengthSync(),
+    });
+  } catch (e) {
+    try { await sink.flush(); } catch (_) {}
+    try { await sink.close(); } catch (_) {}
+    try { await tempFile.delete(); } catch (_) {}
+    rethrow;
   }
-
-  await sink.flush();
-  await sink.close();
-
-  replyPort.send({
-    'type': 'encrypt_complete',
-    'jobId': jobId,
-    'ivBase64': base64Encode(iv),
-    'originalSize': totalBytes,
-    'encryptedSize': destFile.lengthSync(),
-  });
 }
 
 Future<void> _workerDoDecrypt(
