@@ -662,7 +662,7 @@ class EncryptionService {
         await for (final chunk in inputStream) {
           final outLen = gcm.processBytes(chunk, 0, chunk.length, outBuf, 0);
           if (outLen > 0) {
-            sink.add(Uint8List.view(outBuf.buffer, 0, outLen));
+            sink.add(Uint8List.fromList(Uint8List.view(outBuf.buffer, 0, outLen)));
           }
           bytesProcessed += chunk.length;
           onProgress?.call(bytesProcessed, totalBytes);
@@ -1003,7 +1003,7 @@ class EncryptionService {
       await for (final chunk in inputStream) {
         final outLen = gcm.processBytes(chunk, 0, chunk.length, outBuf, 0);
         if (outLen > 0) {
-          sink.add(Uint8List.view(outBuf.buffer, 0, outLen));
+          sink.add(Uint8List.fromList(Uint8List.view(outBuf.buffer, 0, outLen)));
         }
 
         bytesProcessed += chunk.length;
