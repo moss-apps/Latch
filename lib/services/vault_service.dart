@@ -2113,28 +2113,39 @@ class VaultService {
       final files = isDecoy
           ? (await getAllFiles(isDecoy: true))
           : (await getAllFiles(isDecoy: false));
-      final encryptedFiles = files.where((f) => f.isEncrypted).toList();
+      var encryptedFiles = files.where((f) => f.isEncrypted).toList();
 
       if (encryptedFiles.isEmpty) return 0;
+
+      final journalIvs = <String, String>{};
+      String? priorInProgress;
 
       final journalStr = await _storage.read(key: _reEncryptJournalKey);
       if (journalStr != null) {
         try {
           final journal = jsonDecode(journalStr) as Map<String, dynamic>;
-          final ivMap = (journal['ivs'] as Map<String, dynamic>).cast<String, String>();
-          for (final entry in ivMap.entries) {
+          final savedIvs = (journal['ivs'] as Map<String, dynamic>?)?.cast<String, String>() ?? {};
+          journalIvs.addAll(savedIvs);
+          priorInProgress = journal['inProgress'] as String?;
+
+          for (final entry in journalIvs.entries) {
             final idx = files.indexWhere((f) => f.vaultPath == entry.key);
             if (idx >= 0) {
               files[idx] = files[idx].copyWith(encryptionIv: entry.value);
             }
           }
+
+          if (priorInProgress != null) {
+            try { await File('$priorInProgress.tmp').delete(); } catch (_) {}
+          }
+
+          encryptedFiles = files.where((f) => f.isEncrypted).toList();
+
           if (isDecoy) { _cachedDecoyFiles = files; } else { _cachedFiles = files; }
           await _saveFileIndex(isDecoy: isDecoy);
         } catch (_) {}
-        await _storage.delete(key: _reEncryptJournalKey);
       }
 
-      final journalIvs = <String, String>{};
       int reEncryptedCount = 0;
 
       for (int i = 0; i < encryptedFiles.length; i++) {
@@ -2149,6 +2160,14 @@ class VaultService {
 
         if (currentIsGcm == targetIsGcm && currentFormat != 0 && currentFormat != 3) continue;
 
+        await _storage.write(
+          key: _reEncryptJournalKey,
+          value: jsonEncode({
+            'ivs': journalIvs,
+            'inProgress': file.vaultPath,
+          }),
+        );
+
         final newIv = await _encryptionService.reEncryptFile(
           file.vaultPath,
           file.encryptionIv ?? '',
@@ -2159,7 +2178,9 @@ class VaultService {
         journalIvs[file.vaultPath] = newIv;
         await _storage.write(
           key: _reEncryptJournalKey,
-          value: jsonEncode({'ivs': journalIvs}),
+          value: jsonEncode({
+            'ivs': journalIvs,
+          }),
         );
 
         final fileIndex = files.indexWhere((f) => f.id == file.id);
