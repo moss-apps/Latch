@@ -614,7 +614,10 @@ Future<void> _workerDoDecrypt(
 
     try {
       final finalBuf = Uint8List(32);
-      gcm.doFinal(finalBuf, 0);
+      final finalLen = gcm.doFinal(finalBuf, 0);
+      if (finalLen > 0) {
+        sink.add(Uint8List.view(finalBuf.buffer, 0, finalLen));
+      }
     } on InvalidCipherTextException {
       authFailed = true;
     }
