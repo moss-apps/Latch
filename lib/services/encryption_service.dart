@@ -611,23 +611,33 @@ class EncryptionService {
       onProgress?.call(0, totalBytes);
 
       if (isCtr) {
-        final destFile = File(destinationPath);
-        final sink = destFile.openWrite();
+        final tempCtrPath = '$destinationPath.tmp';
+        final tempCtrFile = File(tempCtrPath);
+        final sink = tempCtrFile.openWrite();
 
         final ctr = CTRStreamCipher(AESEngine())
           ..init(false, ParametersWithIV<KeyParameter>(KeyParameter(key), iv));
 
         final inputStream = _createChunkedStream(encryptedFile.openRead(headerSize));
 
-        await for (final chunk in inputStream) {
-          sink.add(ctr.process(chunk));
-          bytesProcessed += chunk.length;
-          onProgress?.call(bytesProcessed, totalBytes);
+        try {
+          await for (final chunk in inputStream) {
+            sink.add(ctr.process(chunk));
+            bytesProcessed += chunk.length;
+            onProgress?.call(bytesProcessed, totalBytes);
+          }
+        } catch (e) {
+          await sink.flush();
+          await sink.close();
+          try { await tempCtrFile.delete(); } catch (_) {}
+          rethrow;
         }
 
         onProgress?.call(totalBytes, totalBytes);
         await sink.flush();
         await sink.close();
+
+        await tempCtrFile.rename(destinationPath);
 
         return FileDecryptionResult(
           success: true,
