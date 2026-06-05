@@ -370,7 +370,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.lightTextPrimary,
+                        color: context.textPrimary,
                         fontFamily: 'ProductSans',
                       ),
                     ),
@@ -406,7 +406,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
               label,
               style: TextStyle(
                 fontFamily: 'ProductSans',
-                color: AppColors.lightTextTertiary,
+                color: context.textTertiary,
               ),
             ),
           ),
@@ -415,7 +415,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
               value,
               style: TextStyle(
                 fontFamily: 'ProductSans',
-                color: AppColors.lightTextPrimary,
+                color: context.textPrimary,
               ),
             ),
           ),
@@ -430,7 +430,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        foregroundColor: AppColors.lightTextPrimary,
+        foregroundColor: context.textPrimary,
         elevation: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -451,7 +451,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
                 style: TextStyle(
                   fontFamily: 'ProductSans',
                   fontSize: 12,
-                  color: AppColors.lightTextTertiary,
+                  color: context.textTertiary,
                 ),
               ),
           ],
@@ -486,7 +486,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
               _isConverting ? 'Converting to PDF...' : 'Loading document...',
               style: TextStyle(
                 fontFamily: 'ProductSans',
-                color: AppColors.lightTextSecondary,
+                color: context.textSecondary,
               ),
             ),
             if (_isConverting) ...[
@@ -496,7 +496,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
                 style: TextStyle(
                   fontFamily: 'ProductSans',
                   fontSize: 12,
-                  color: AppColors.lightTextTertiary,
+                  color: context.textTertiary,
                 ),
               ),
             ],
@@ -520,7 +520,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
               _error!,
               style: TextStyle(
                 fontFamily: 'ProductSans',
-                color: AppColors.lightTextSecondary,
+                color: context.textSecondary,
               ),
               textAlign: TextAlign.center,
             ),
@@ -556,7 +556,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
           'No PDF data available',
           style: TextStyle(
             fontFamily: 'ProductSans',
-            color: AppColors.lightTextSecondary,
+            color: context.textSecondary,
           ),
         ),
       );
@@ -643,7 +643,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
 
   Widget _buildTextViewer() {
     return Container(
-      color: Colors.white,
+      color: context.backgroundColor,
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: SelectableText(
@@ -651,7 +651,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
           style: TextStyle(
             fontFamily: 'monospace',
             fontSize: 14,
-            color: AppColors.lightTextPrimary,
+            color: context.textPrimary,
             height: 1.5,
           ),
         ),
@@ -676,7 +676,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
               fontFamily: 'ProductSans',
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: AppColors.lightTextPrimary,
+              color: context.textPrimary,
             ),
             textAlign: TextAlign.center,
           ),
@@ -685,7 +685,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
             widget.file.formattedSize,
             style: TextStyle(
               fontFamily: 'ProductSans',
-              color: AppColors.lightTextTertiary,
+              color: context.textTertiary,
             ),
           ),
           const SizedBox(height: 16),
@@ -709,7 +709,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
             'Preview not available for this document type',
             style: TextStyle(
               fontFamily: 'ProductSans',
-              color: AppColors.lightTextSecondary,
+              color: context.textSecondary,
             ),
           ),
           const SizedBox(height: 24),

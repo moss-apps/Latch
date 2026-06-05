@@ -25,7 +25,7 @@ class ConversionWarningDialog extends StatelessWidget {
     final canConvert = OfficeConverterService.canConvertOnDevice(extension);
 
     return AlertDialog(
-      backgroundColor: AppColors.lightBackground,
+      backgroundColor: context.backgroundColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: Row(
         children: [
@@ -41,7 +41,7 @@ class ConversionWarningDialog extends StatelessWidget {
               style: TextStyle(
                 fontFamily: 'ProductSans',
                 fontWeight: FontWeight.bold,
-                color: AppColors.lightTextPrimary,
+                color: context.textPrimary,
                 fontSize: 20,
               ),
             ),
@@ -56,7 +56,7 @@ class ConversionWarningDialog extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColors.lightBackgroundSecondary,
+              color: context.backgroundSecondary,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -84,7 +84,7 @@ class ConversionWarningDialog extends StatelessWidget {
                         style: TextStyle(
                           fontFamily: 'ProductSans',
                           fontWeight: FontWeight.w600,
-                          color: AppColors.lightTextPrimary,
+                          color: context.textPrimary,
                           fontSize: 14,
                         ),
                         maxLines: 1,
@@ -95,7 +95,7 @@ class ConversionWarningDialog extends StatelessWidget {
                         fileTypeName,
                         style: TextStyle(
                           fontFamily: 'ProductSans',
-                          color: AppColors.lightTextSecondary,
+                          color: context.textSecondary,
                           fontSize: 12,
                         ),
                       ),
@@ -114,7 +114,7 @@ class ConversionWarningDialog extends StatelessWidget {
                 : 'This document format cannot be converted on-device. Would you like to open it with an external app?',
             style: TextStyle(
               fontFamily: 'ProductSans',
-              color: AppColors.lightTextSecondary,
+              color: context.textSecondary,
               fontSize: 14,
               height: 1.4,
             ),
@@ -194,7 +194,7 @@ class ConversionWarningDialog extends StatelessWidget {
             'Cancel',
             style: TextStyle(
               fontFamily: 'ProductSans',
-              color: AppColors.lightTextSecondary,
+              color: context.textSecondary,
             ),
           ),
         ),
@@ -232,7 +232,7 @@ class ConversionWarningDialog extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.lightBackground,
+        backgroundColor: context.backgroundColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
@@ -243,7 +243,7 @@ class ConversionWarningDialog extends StatelessWidget {
               style: TextStyle(
                 fontFamily: 'ProductSans',
                 fontWeight: FontWeight.bold,
-                color: AppColors.lightTextPrimary,
+                color: context.textPrimary,
                 fontSize: 18,
               ),
             ),
@@ -254,24 +254,28 @@ class ConversionWarningDialog extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildExplanationItem(
+              context,
               Icons.security,
               'Security First',
               'Converting documents locally keeps your files secure. No data is sent to external servers.',
             ),
             const SizedBox(height: 16),
             _buildExplanationItem(
+              context,
               Icons.devices,
               'Universal Viewing',
               'PDF is a universal format that works consistently across all devices without needing special software.',
             ),
             const SizedBox(height: 16),
             _buildExplanationItem(
+              context,
               Icons.lock,
               'Vault Protection',
               'Your original encrypted document remains safe in the vault. Only a temporary PDF is created for viewing.',
             ),
             const SizedBox(height: 16),
             _buildExplanationItem(
+              context,
               Icons.warning_amber,
               'Limitations',
               'Complex formatting, images, charts, and special fonts may not be perfectly preserved during conversion.',
@@ -296,7 +300,7 @@ class ConversionWarningDialog extends StatelessWidget {
   }
 
   Widget _buildExplanationItem(
-      IconData icon, String title, String description) {
+      BuildContext context, IconData icon, String title, String description) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -318,7 +322,7 @@ class ConversionWarningDialog extends StatelessWidget {
                 style: TextStyle(
                   fontFamily: 'ProductSans',
                   fontWeight: FontWeight.w600,
-                  color: AppColors.lightTextPrimary,
+                  color: context.textPrimary,
                   fontSize: 14,
                 ),
               ),
@@ -327,7 +331,7 @@ class ConversionWarningDialog extends StatelessWidget {
                 description,
                 style: TextStyle(
                   fontFamily: 'ProductSans',
-                  color: AppColors.lightTextSecondary,
+                  color: context.textSecondary,
                   fontSize: 12,
                   height: 1.4,
                 ),

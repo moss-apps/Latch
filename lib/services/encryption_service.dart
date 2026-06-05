@@ -1296,6 +1296,8 @@ class EncryptionService {
     final tempDecPath = '${tempDir.path}/decrypted';
 
     try {
+      try { await File('$filePath.tmp').delete(); } catch (_) {}
+
       if (isLegacyCbc) {
         final decrypted = await decryptFileToMemory(filePath, oldIvBase64, isDecoy: isDecoy);
         if (!decrypted.success || decrypted.data == null) {
@@ -1323,6 +1325,11 @@ class EncryptionService {
         useGcm: useGcm,
       );
       final encResult = await encJob.future;
+
+      final outFile = File(filePath);
+      if (!await outFile.exists() || await outFile.length() == 0) {
+        throw Exception('Re-encrypted output file is missing or empty');
+      }
 
       return encResult.ivBase64!;
     } finally {
