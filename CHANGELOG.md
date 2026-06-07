@@ -15,6 +15,14 @@ All notable changes to Latch are documented in this file.
 - **CTR decryption** now writes to a temporary file and renames on success, preventing data loss on failure
 - **Progress callback** added to `getVaultedFile` for better UX during decryption
 
+### Per-File Encryption
+- **Per-file encryption configuration** — each file can now have its own encryption algorithm and KDF settings
+- **Encryption settings prompt** on every import flow, letting users choose per-file options
+- **Re-encrypt file picker screen** with selection UI and progress tracking, replacing the old dialog
+- **`derivedKey` parameter** for per-file key derivation
+- `encryptionAlgorithm` and `kdfIterations` fields added to `VaultedFile`
+- Optional `fileFilter` parameter added to `reEncryptVault`
+
 ### Bug Fixes
 - Fixed `Uint8List.view` shared buffer issue in encryption workers — prevents corrupted output when iterating across views
 
