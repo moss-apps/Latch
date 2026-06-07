@@ -4,7 +4,7 @@ import '../models/encryption_algorithm.dart';
 import '../providers/vault_providers.dart';
 import '../services/vault_service.dart';
 import '../themes/app_colors.dart';
-import '../widgets/re_encrypt_warning_dialog.dart';
+import 're_encrypt_file_picker_screen.dart';
 
 class EncryptionSettingsScreen extends ConsumerStatefulWidget {
   const EncryptionSettingsScreen({super.key});
@@ -17,12 +17,10 @@ class EncryptionSettingsScreen extends ConsumerStatefulWidget {
 class _EncryptionSettingsScreenState
     extends ConsumerState<EncryptionSettingsScreen> {
   static const List<int> _kdfIterationOptions = [100000, 200000, 500000];
-  bool _isReEncrypting = false;
 
   @override
   Widget build(BuildContext context) {
     final settingsAsync = ref.watch(vaultSettingsProvider);
-    final reEncryptProgress = ref.watch(reEncryptProvider);
 
     return Scaffold(
       backgroundColor: context.backgroundColor,
@@ -95,27 +93,11 @@ class _EncryptionSettingsScreenState
                 ),
               ),
               const SizedBox(height: 12),
-              if (reEncryptProgress.isInProgress && _isReEncrypting)
-                _buildProgressBar(context, reEncryptProgress),
-              if (reEncryptProgress.error != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(
-                    reEncryptProgress.error!,
-                    style: const TextStyle(
-                      fontFamily: 'ProductSans',
-                      color: Colors.red,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
               FilledButton.icon(
-                onPressed: _isReEncrypting
-                    ? null
-                    : () => _confirmReEncrypt(context, settings),
+                onPressed: () => _confirmReEncrypt(context, settings),
                 icon: const Icon(Icons.sync),
                 label: const Text(
-                  'Re-Encrypt All Files',
+                  'Re-Encrypt Files',
                   style: TextStyle(fontFamily: 'ProductSans'),
                 ),
                 style: FilledButton.styleFrom(
@@ -233,35 +215,6 @@ class _EncryptionSettingsScreenState
             ? Icon(Icons.check_circle, color: context.accentColor)
             : null,
         onTap: () => _selectIterations(settings, iterations),
-      ),
-    );
-  }
-
-  Widget _buildProgressBar(BuildContext context, ReEncryptProgress progress) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          LinearProgressIndicator(
-            value: progress.total > 0
-                ? progress.current / progress.total
-                : null,
-            backgroundColor: context.dividerColor,
-            color: context.accentColor,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            progress.total > 0
-                ? 'Re-encrypting ${progress.current}/${progress.total} files...'
-                : 'Re-encrypting...',
-            style: TextStyle(
-              fontFamily: 'ProductSans',
-              fontSize: 12,
-              color: context.textTertiary,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -388,65 +341,14 @@ class _EncryptionSettingsScreenState
     BuildContext context,
     VaultSettings settings,
   ) async {
-    final warningAcknowledged = await showReEncryptWarningDialog(
-      context: context,
-    );
-    if (warningAcknowledged != true || !mounted) return;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: context.surfaceColor,
-        title: Text(
-          'Re-Encrypt Vault',
-          style: TextStyle(
-            fontFamily: 'ProductSans',
-            color: context.textPrimary,
-          ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ReEncryptFilePickerScreen(
+          targetAlgorithm: settings.encryptionAlgorithm,
         ),
-        content: Text(
-          'This will re-encrypt all encrypted files using ${settings.encryptionAlgorithm.displayName}. This cannot be undone and may take a while. Make sure your device has sufficient battery.',
-          style: TextStyle(
-            fontFamily: 'ProductSans',
-            color: context.textSecondary,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(
-              'Cancel',
-              style: TextStyle(color: context.textSecondary),
-            ),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
-            ),
-            child: const Text('Re-Encrypt'),
-          ),
-        ],
       ),
     );
-
-    if (confirmed == true && mounted) {
-      setState(() => _isReEncrypting = true);
-      await ref.read(reEncryptProvider.notifier).reEncryptVault(
-            settings.encryptionAlgorithm,
-          );
-      if (mounted) {
-        setState(() => _isReEncrypting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Re-encryption complete',
-              style: TextStyle(fontFamily: 'ProductSans'),
-            ),
-          ),
-        );
-      }
-    }
   }
 
   Future<void> _saveVaultSettings(VaultSettings settings) async {
