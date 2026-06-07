@@ -524,11 +524,12 @@ class ReEncryptNotifier extends Notifier<ReEncryptProgress> {
 
   VaultService get _vaultService => ref.read(vaultServiceProvider);
 
-  Future<int> reEncryptVault(EncryptionAlgorithm targetAlgorithm) async {
+  Future<int> reEncryptVault(EncryptionAlgorithm targetAlgorithm, {Set<String>? fileFilter}) async {
     state = const ReEncryptProgress(isInProgress: true, current: 0, total: 0);
     try {
       final result = await _vaultService.reEncryptVault(
         targetAlgorithm,
+        fileFilter: fileFilter,
         onProgress: (current, total) {
           state = ReEncryptProgress(
             isInProgress: true,
