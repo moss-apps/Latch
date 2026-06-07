@@ -1184,8 +1184,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                   Expanded(
                     child: SliderTheme(
                       data: SliderTheme.of(context).copyWith(
-                        thumbColor: AppColors.accent,
-                        activeTrackColor: AppColors.accent,
+                        thumbColor: context.accentColor,
+                        activeTrackColor: context.accentColor,
                         inactiveTrackColor: Colors.white24,
                         thumbShape: const RoundSliderThumbShape(
                             enabledThumbRadius: 6.0),
