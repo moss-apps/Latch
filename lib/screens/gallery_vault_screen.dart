@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
+import '../models/encryption_algorithm.dart';
 import '../models/vaulted_file.dart';
 import '../models/album.dart';
 import '../providers/vault_providers.dart';
@@ -17,6 +19,7 @@ import '../themes/app_colors.dart';
 import '../utils/toast_utils.dart';
 import '../utils/responsive_utils.dart';
 import '../widgets/office_conversion_confirm_dialog.dart';
+import '../widgets/per_file_encryption_sheet.dart';
 import 'albums_screen.dart';
 import 'favorites_screen.dart';
 import 'tags_screen.dart';
@@ -3004,7 +3007,6 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
   Future<void> _importImagesFromGallery() async {
     Navigator.pop(context);
 
-    // Open custom media picker for images
     final selectedAssets = await Navigator.push<List<AssetEntity>?>(
       context,
       MaterialPageRoute(
@@ -3020,6 +3022,38 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
       return;
     }
 
+    final settings = await ref.read(vaultSettingsProvider.future);
+    final encryptionEnabled = settings.encryptionEnabled;
+    final defaultAlgorithm = settings.encryptionAlgorithm;
+
+    final perFileSettings = <PerFileEncryptionSettings>[];
+    for (final asset in selectedAssets) {
+      final file = await asset.file;
+      final fileSize = file != null ? await file.length() : 0;
+      perFileSettings.add(PerFileEncryptionSettings(
+        fileName: asset.title ?? 'Unknown',
+        filePath: file?.path ?? '',
+        fileSize: fileSize,
+        encrypt: encryptionEnabled,
+        algorithm: defaultAlgorithm,
+      ));
+    }
+
+    if (!mounted) return;
+    final confirmedSettings = await PerFileEncryptionSheet.show(
+      context,
+      files: perFileSettings,
+      encryptionEnabled: encryptionEnabled,
+      defaultAlgorithm: defaultAlgorithm,
+    );
+
+    if (confirmedSettings == null) return;
+
+    final perFileEncryption = <String, ({bool encrypt, EncryptionAlgorithm algorithm})>{};
+    for (final s in confirmedSettings) {
+      perFileEncryption[s.filePath] = (encrypt: s.encrypt, algorithm: s.algorithm);
+    }
+
     final progressState = ValueNotifier<OperationProgressState>(
       OperationProgressState(
         totalFiles: selectedAssets.length,
@@ -3032,7 +3066,6 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
       ),
     );
 
-    // Show progress sheet
     if (!mounted) return;
     showModalBottomSheet(
       context: context,
@@ -3058,7 +3091,8 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
 
     final result = await _importService.importFromAssets(
       assets: selectedAssets,
-      deleteOriginals: true, // Hide from gallery
+      deleteOriginals: true,
+      perFileEncryption: perFileEncryption,
       onProgress: (current, total, {int? currentSize, int? totalSize}) {
         progressState.value = progressState.value.copyWith(
           totalFiles: total,
@@ -3096,13 +3130,12 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
       ToastUtils.showError(result.error ?? 'Import failed');
     }
 
-    Navigator.pop(context); // Close progress sheet
+    Navigator.pop(context);
   }
 
   Future<void> _importVideosFromGallery() async {
     Navigator.pop(context);
 
-    // Open custom media picker for videos
     final selectedAssets = await Navigator.push<List<AssetEntity>?>(
       context,
       MaterialPageRoute(
@@ -3116,6 +3149,38 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
     if (selectedAssets == null || selectedAssets.isEmpty) {
       ToastUtils.showInfo('No videos selected');
       return;
+    }
+
+    final settings = await ref.read(vaultSettingsProvider.future);
+    final encryptionEnabled = settings.encryptionEnabled;
+    final defaultAlgorithm = settings.encryptionAlgorithm;
+
+    final perFileSettings = <PerFileEncryptionSettings>[];
+    for (final asset in selectedAssets) {
+      final file = await asset.file;
+      final fileSize = file != null ? await file.length() : 0;
+      perFileSettings.add(PerFileEncryptionSettings(
+        fileName: asset.title ?? 'Unknown',
+        filePath: file?.path ?? '',
+        fileSize: fileSize,
+        encrypt: encryptionEnabled,
+        algorithm: defaultAlgorithm,
+      ));
+    }
+
+    if (!mounted) return;
+    final confirmedSettings = await PerFileEncryptionSheet.show(
+      context,
+      files: perFileSettings,
+      encryptionEnabled: encryptionEnabled,
+      defaultAlgorithm: defaultAlgorithm,
+    );
+
+    if (confirmedSettings == null) return;
+
+    final perFileEncryption = <String, ({bool encrypt, EncryptionAlgorithm algorithm})>{};
+    for (final s in confirmedSettings) {
+      perFileEncryption[s.filePath] = (encrypt: s.encrypt, algorithm: s.algorithm);
     }
 
     final progressState = ValueNotifier<OperationProgressState>(
@@ -3155,7 +3220,8 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
 
     final result = await _importService.importFromAssets(
       assets: selectedAssets,
-      deleteOriginals: true, // Hide from gallery
+      deleteOriginals: true,
+      perFileEncryption: perFileEncryption,
       onProgress: (current, total, {int? currentSize, int? totalSize}) {
         progressState.value = progressState.value.copyWith(
           totalFiles: total,
@@ -3376,7 +3442,6 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
   Future<void> _importDocuments() async {
     Navigator.pop(context);
 
-    // Open custom document picker
     final selectedDocuments = await Navigator.push<List<DocumentFile>?>(
       context,
       MaterialPageRoute(
@@ -3391,18 +3456,49 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
       return;
     }
 
+    final settings = await ref.read(vaultSettingsProvider.future);
+    final encryptionEnabled = settings.encryptionEnabled;
+    final defaultAlgorithm = settings.encryptionAlgorithm;
+
+    final perFileSettings = <PerFileEncryptionSettings>[];
+    for (final doc in selectedDocuments) {
+      final file = File(doc.path);
+      final fileSize = await file.exists() ? await file.length() : 0;
+      perFileSettings.add(PerFileEncryptionSettings(
+        fileName: doc.name,
+        filePath: doc.path,
+        fileSize: fileSize,
+        encrypt: encryptionEnabled,
+        algorithm: defaultAlgorithm,
+      ));
+    }
+
+    if (!mounted) return;
+    final confirmedSettings = await PerFileEncryptionSheet.show(
+      context,
+      files: perFileSettings,
+      encryptionEnabled: encryptionEnabled,
+      defaultAlgorithm: defaultAlgorithm,
+    );
+
+    if (confirmedSettings == null) return;
+
+    final perFileEncryption = <String, ({bool encrypt, EncryptionAlgorithm algorithm})>{};
+    for (final s in confirmedSettings) {
+      perFileEncryption[s.filePath] = (encrypt: s.encrypt, algorithm: s.algorithm);
+    }
+
     setState(() {
       _isImporting = true;
       _importProgress = 0;
       _importTotal = selectedDocuments.length;
     });
 
-    // Use the new conversion-aware import method
     final result = await _importService.importFromDocumentFilesWithConversion(
       filePaths: selectedDocuments.map((d) => d.path).toList(),
-      deleteOriginals: true, // Hide from file manager
+      deleteOriginals: true,
+      perFileEncryption: perFileEncryption,
       onConversionConfirmation: (officeFiles) async {
-        // Show conversion confirmation dialog
         if (!mounted) return false;
         final confirmed = await showDialog<bool>(
           context: context,
@@ -3422,7 +3518,6 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
         });
       },
       onStatusUpdate: (message) {
-        // Could be used to show a status message
         debugPrint('[Import] $message');
       },
     );
@@ -3468,6 +3563,38 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
       return;
     }
 
+    final settings = await ref.read(vaultSettingsProvider.future);
+    final encryptionEnabled = settings.encryptionEnabled;
+    final defaultAlgorithm = settings.encryptionAlgorithm;
+
+    final perFileSettings = <PerFileEncryptionSettings>[];
+    for (final song in selectedSongs) {
+      final file = File(song.path);
+      final fileSize = await file.exists() ? await file.length() : 0;
+      perFileSettings.add(PerFileEncryptionSettings(
+        fileName: song.name,
+        filePath: song.path,
+        fileSize: fileSize,
+        encrypt: encryptionEnabled,
+        algorithm: defaultAlgorithm,
+      ));
+    }
+
+    if (!mounted) return;
+    final confirmedSettings = await PerFileEncryptionSheet.show(
+      context,
+      files: perFileSettings,
+      encryptionEnabled: encryptionEnabled,
+      defaultAlgorithm: defaultAlgorithm,
+    );
+
+    if (confirmedSettings == null) return;
+
+    final perFileEncryption = <String, ({bool encrypt, EncryptionAlgorithm algorithm})>{};
+    for (final s in confirmedSettings) {
+      perFileEncryption[s.filePath] = (encrypt: s.encrypt, algorithm: s.algorithm);
+    }
+
     setState(() {
       _isImporting = true;
       _importProgress = 0;
@@ -3477,6 +3604,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
     final result = await _importService.importFromDocumentFiles(
       filePaths: selectedSongs.map((song) => song.path).toList(),
       deleteOriginals: true,
+      perFileEncryption: perFileEncryption,
       onProgress: (current, total) {
         setState(() {
           _importProgress = current;
@@ -3502,14 +3630,65 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
 
   Future<void> _importAnyFiles() async {
     Navigator.pop(context);
+
+    final result = await FilePicker.pickFiles(
+      type: FileType.any,
+      allowMultiple: true,
+    );
+
+    if (result == null || result.files.isEmpty) {
+      ToastUtils.showInfo('No files selected');
+      return;
+    }
+
+    final settings = await ref.read(vaultSettingsProvider.future);
+    final encryptionEnabled = settings.encryptionEnabled;
+    final defaultAlgorithm = settings.encryptionAlgorithm;
+
+    final perFileSettings = <PerFileEncryptionSettings>[];
+    final validPaths = <String>[];
+    for (final file in result.files) {
+      if (file.path == null) continue;
+      validPaths.add(file.path!);
+      perFileSettings.add(PerFileEncryptionSettings(
+        fileName: file.name,
+        filePath: file.path!,
+        fileSize: file.size,
+        encrypt: encryptionEnabled,
+        algorithm: defaultAlgorithm,
+      ));
+    }
+
+    if (perFileSettings.isEmpty) {
+      ToastUtils.showInfo('No valid files selected');
+      return;
+    }
+
+    if (!mounted) return;
+    final confirmedSettings = await PerFileEncryptionSheet.show(
+      context,
+      files: perFileSettings,
+      encryptionEnabled: encryptionEnabled,
+      defaultAlgorithm: defaultAlgorithm,
+    );
+
+    if (confirmedSettings == null) return;
+
+    final perFileEncryption = <String, ({bool encrypt, EncryptionAlgorithm algorithm})>{};
+    for (final s in confirmedSettings) {
+      perFileEncryption[s.filePath] = (encrypt: s.encrypt, algorithm: s.algorithm);
+    }
+
     setState(() {
       _isImporting = true;
       _importProgress = 0;
-      _importTotal = 0;
+      _importTotal = perFileSettings.length;
     });
 
-    final result = await _importService.importAnyFiles(
-      deleteOriginals: true, // Hide originals
+    final importResult = await _importService.importFromDocumentFiles(
+      filePaths: validPaths,
+      deleteOriginals: true,
+      perFileEncryption: perFileEncryption,
       onProgress: (current, total) {
         setState(() {
           _importProgress = current;
@@ -3520,16 +3699,16 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
 
     setState(() => _isImporting = false);
 
-    if (result.success && result.importedCount > 0) {
-      final msg = result.deletedOriginals
-          ? 'Imported and hidden ${result.importedCount} file(s)'
-          : 'Imported ${result.importedCount} file(s)';
+    if (importResult.success && importResult.importedCount > 0) {
+      final msg = importResult.deletedOriginals
+          ? 'Imported and hidden ${importResult.importedCount} file(s)'
+          : 'Imported ${importResult.importedCount} file(s)';
       ToastUtils.showSuccess(msg);
       ref.read(vaultNotifierProvider.notifier).loadFiles();
-    } else if (!result.success) {
-      ToastUtils.showError(result.error ?? 'Import failed');
+    } else if (!importResult.success) {
+      ToastUtils.showError(importResult.error ?? 'Import failed');
     } else {
-      ToastUtils.showInfo('No files selected');
+      ToastUtils.showInfo('No files imported');
     }
   }
 
