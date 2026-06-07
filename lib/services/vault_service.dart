@@ -483,6 +483,8 @@ class VaultService {
     bool isDecoy = false,
     List<String>? tags,
     List<String>? albumIds,
+    EncryptionAlgorithm? encryptionAlgorithm,
+    int? kdfIterations,
   }) async {
     final prepared = await _prepareVaultAddition(
       sourcePath: sourcePath,
@@ -493,6 +495,8 @@ class VaultService {
       isDecoy: isDecoy,
       tags: tags,
       albumIds: albumIds,
+      encryptionAlgorithm: encryptionAlgorithm,
+      kdfIterations: kdfIterations,
     );
 
     if (prepared == null) {
@@ -521,7 +525,6 @@ class VaultService {
     final results = <VaultedFile>[];
 
     int completed = 0;
-    final shouldEncrypt = encrypt || _cachedSettings?.encryptionEnabled == true;
 
     for (int start = 0;
         start < files.length;
@@ -541,15 +544,17 @@ class VaultService {
       final preparedChunk = await Future.wait(
         chunk.map((entry) async {
           final fileSize = await _getFileSizeIfExists(entry.file.sourcePath);
+          final fileEncrypt = entry.file.encrypt ?? encrypt;
+          final fileShouldEncrypt = fileEncrypt || _cachedSettings?.encryptionEnabled == true;
 
           onFileProgress?.call(FileProgressInfo(
             current: entry.index + 1,
             total: files.length,
             fileName: entry.file.originalName,
             fileSize: fileSize,
-            status: shouldEncrypt ? 'Encrypting 0%...' : 'Processing...',
-            isEncrypting: shouldEncrypt,
-            totalBytes: shouldEncrypt ? fileSize : 0,
+            status: fileShouldEncrypt ? 'Encrypting 0%...' : 'Processing...',
+            isEncrypting: fileShouldEncrypt,
+            totalBytes: fileShouldEncrypt ? fileSize : 0,
           ));
 
           final prepared = await _prepareVaultAddition(
@@ -557,9 +562,11 @@ class VaultService {
             originalName: entry.file.originalName,
             type: entry.file.type,
             mimeType: entry.file.mimeType,
-            encrypt: encrypt,
+            encrypt: fileEncrypt,
             isDecoy: isDecoy,
-            onEncryptionProgress: shouldEncrypt
+            encryptionAlgorithm: entry.file.encryptionAlgorithm,
+            kdfIterations: entry.file.kdfIterations,
+            onEncryptionProgress: fileShouldEncrypt
                 ? (processed, total) {
                     final pct = total > 0
                         ? (processed / total * 100).toStringAsFixed(0)
@@ -623,6 +630,8 @@ class VaultService {
     Function(int processed, int total)? onEncryptionProgress,
     List<String>? tags,
     List<String>? albumIds,
+    EncryptionAlgorithm? encryptionAlgorithm,
+    int? kdfIterations,
   }) async {
     String? sourcePathToUse;
     String? vaultPath;
@@ -669,23 +678,44 @@ class VaultService {
           encrypt || _cachedSettings?.encryptionEnabled == true;
       String? encryptionIv;
       int fileSize;
+      EncryptionAlgorithm? usedAlgorithm;
+      String? usedSalt;
+      int? usedKdfIterations;
+
+      Uint8List? derivedKey;
+      if (shouldEncrypt) {
+        final algorithm = encryptionAlgorithm ??
+            _cachedSettings?.encryptionAlgorithm ??
+            EncryptionAlgorithm.aes256Ctr;
+        final iterations = kdfIterations ??
+            _cachedSettings?.kdfIterations ??
+            100000;
+        final salt = _encryptionService.generateFileSalt();
+        final masterKey = await _encryptionService.getMasterKey(isDecoy: isDecoy);
+        derivedKey = _encryptionService.deriveFileKey(masterKey, salt, iterations);
+        usedAlgorithm = algorithm;
+        usedSalt = base64Encode(salt);
+        usedKdfIterations = iterations;
+      }
 
       if (compressedImageBytes != null) {
         fileSize = compressedImageBytes.length;
 
         if (shouldEncrypt) {
           onEncryptionProgress?.call(0, fileSize);
-          final useGcm = _cachedSettings?.encryptionAlgorithm == EncryptionAlgorithm.aes256Gcm;
+          final useGcm = usedAlgorithm == EncryptionAlgorithm.aes256Gcm;
           final encResult = useGcm
               ? await _encryptionService.encryptBytesStreamedGcm(
                   compressedImageBytes,
                   vaultPath,
                   isDecoy: isDecoy,
+                  derivedKey: derivedKey,
                 )
               : await _encryptionService.encryptBytesStreamed(
                   compressedImageBytes,
                   vaultPath,
                   isDecoy: isDecoy,
+                  derivedKey: derivedKey,
                   onProgress: (processed, total) {
                     onEncryptionProgress?.call(processed, total);
                   },
@@ -714,7 +744,7 @@ class VaultService {
 
         if (shouldEncrypt) {
           onEncryptionProgress?.call(0, fileSize);
-          final useGcm = _cachedSettings?.encryptionAlgorithm == EncryptionAlgorithm.aes256Gcm;
+          final useGcm = usedAlgorithm == EncryptionAlgorithm.aes256Gcm;
           final useIsolateEncryption =
               fileSize >= _largeFileIsolateThresholdBytes;
           final encResult = useIsolateEncryption
@@ -723,6 +753,7 @@ class VaultService {
                   vaultPath,
                   isDecoy: isDecoy,
                   useGcm: useGcm,
+                  derivedKey: derivedKey,
                   onProgress: (processed, total) {
                     onEncryptionProgress?.call(processed, total);
                   },
@@ -732,6 +763,7 @@ class VaultService {
                       sourcePathToUse,
                       vaultPath,
                       isDecoy: isDecoy,
+                      derivedKey: derivedKey,
                       onProgress: (processed, total) {
                         onEncryptionProgress?.call(processed, total);
                       },
@@ -740,6 +772,7 @@ class VaultService {
                       sourcePathToUse,
                       vaultPath,
                       isDecoy: isDecoy,
+                      derivedKey: derivedKey,
                       onProgress: (processed, total) {
                         onEncryptionProgress?.call(processed, total);
                       },
@@ -784,6 +817,9 @@ class VaultService {
           isFavorite: normalizedAlbumIds.contains('favorites'),
           isEncrypted: shouldEncrypt,
           encryptionIv: encryptionIv,
+          encryptionAlgorithm: usedAlgorithm,
+          keyDerivationSalt: usedSalt,
+          kdfIterations: usedKdfIterations,
           isDecoy: isDecoy,
           tags: normalizedTags,
           albumIds: normalizedAlbumIds,
@@ -847,11 +883,42 @@ class VaultService {
       return;
     }
 
+    final originalFile = File(vaultedFile.originalPath!);
+    bool deleted = false;
+
     try {
-      await File(vaultedFile.originalPath!).delete();
+      if (await originalFile.exists()) {
+        await originalFile.delete();
+        deleted = true;
+      } else {
+        deleted = true; // already gone, nothing to do
+      }
     } catch (e) {
       debugPrint('Could not delete original file: $e');
     }
+
+    // Verify the original was actually removed from storage
+    if (!deleted) {
+      try {
+        if (await originalFile.exists()) {
+          debugPrint(
+              'Original file still exists, attempting secure delete: ${vaultedFile.originalPath}');
+          if (_cachedSettings?.secureDelete == true) {
+            await _encryptionService.secureDelete(vaultedFile.originalPath!);
+          } else {
+            await originalFile.delete();
+          }
+        }
+      } catch (_) {}
+    }
+
+    // Final check — the file must be gone for the hide to be effective
+    try {
+      if (await originalFile.exists()) {
+        debugPrint(
+            'WARNING: Could not delete original file from device storage: ${vaultedFile.originalPath}');
+      }
+    } catch (_) {}
   }
 
   /// Update a file's metadata
@@ -1066,6 +1133,13 @@ class VaultService {
     }
   }
 
+  Future<Uint8List?> _deriveKeyForFile(VaultedFile file, {bool isDecoy = false}) async {
+    if (file.keyDerivationSalt == null || file.kdfIterations == null) return null;
+    final masterKey = await _encryptionService.getMasterKey(isDecoy: isDecoy || file.isDecoy);
+    final salt = base64Decode(file.keyDerivationSalt!);
+    return _encryptionService.deriveFileKey(masterKey, salt, file.kdfIterations!);
+  }
+
   /// Get the actual file from vault (decrypts if needed)
   Future<File?> getVaultedFile(
     String fileId, {
@@ -1086,6 +1160,7 @@ class VaultService {
 
       final format = _encryptionService.detectFileFormat(vaultedFile.vaultPath);
       final isLegacyCbc = (format == 0 || format == 3);
+      final derivedKey = await _deriveKeyForFile(vaultedFile, isDecoy: isDecoy);
 
       FileDecryptionResult result;
       if (isLegacyCbc) {
@@ -1094,6 +1169,7 @@ class VaultService {
           tempPath,
           vaultedFile.encryptionIv!,
           isDecoy: isDecoy,
+          derivedKey: derivedKey,
           onProgress: onProgress == null
               ? null
               : (current, total) {
@@ -1109,6 +1185,7 @@ class VaultService {
           tempPath,
           vaultedFile.encryptionIv!,
           isDecoy: isDecoy,
+          derivedKey: derivedKey,
           onProgress: onProgress,
         );
       }
@@ -1131,12 +1208,12 @@ class VaultService {
     if (vaultedFile == null) return null;
 
     if (vaultedFile.isEncrypted && vaultedFile.encryptionIv != null) {
-      // Use decryptStreamedFileToMemory which auto-detects format
-      // (legacy CBC vs new CTR streamed encryption)
+      final derivedKey = await _deriveKeyForFile(vaultedFile, isDecoy: isDecoy);
       final result = await _encryptionService.decryptStreamedFileToMemory(
         vaultedFile.vaultPath,
         vaultedFile.encryptionIv!,
         isDecoy: isDecoy,
+        derivedKey: derivedKey,
       );
 
       if (result.success && result.data != null) {
@@ -2080,6 +2157,7 @@ class VaultService {
       if (vaultedFile.isEncrypted && vaultedFile.encryptionIv != null) {
         final format = _encryptionService.detectFileFormat(vaultedFile.vaultPath);
         final isLegacyCbc = (format == 0 || format == 3);
+        final derivedKey = await _deriveKeyForFile(vaultedFile, isDecoy: isDecoy);
 
         FileDecryptionResult result;
         if (isLegacyCbc) {
@@ -2087,6 +2165,7 @@ class VaultService {
             vaultedFile.vaultPath,
             destinationPath,
             vaultedFile.encryptionIv!,
+            derivedKey: derivedKey,
             onProgress: onProgress == null
                 ? null
                 : (current, total) {
@@ -2102,6 +2181,7 @@ class VaultService {
             destinationPath,
             vaultedFile.encryptionIv!,
             isDecoy: isDecoy,
+            derivedKey: derivedKey,
             onProgress: onProgress == null
                 ? null
                 : (bytesProcessed, totalBytes) {
@@ -2134,12 +2214,17 @@ class VaultService {
     EncryptionAlgorithm targetAlgorithm, {
     bool isDecoy = false,
     Function(int current, int total)? onProgress,
+    Set<String>? fileFilter,
   }) async {
     try {
       final files = isDecoy
           ? (await getAllFiles(isDecoy: true))
           : (await getAllFiles(isDecoy: false));
       var encryptedFiles = files.where((f) => f.isEncrypted).toList();
+
+      if (fileFilter != null && fileFilter.isNotEmpty) {
+        encryptedFiles = encryptedFiles.where((f) => fileFilter.contains(f.id)).toList();
+      }
 
       if (encryptedFiles.isEmpty) return 0;
 
@@ -2194,11 +2279,19 @@ class VaultService {
           }),
         );
 
+        final oldDerivedKey = await _deriveKeyForFile(file, isDecoy: isDecoy);
+        final newSalt = _encryptionService.generateFileSalt();
+        final newIterations = _cachedSettings?.kdfIterations ?? 100000;
+        final masterKey = await _encryptionService.getMasterKey(isDecoy: isDecoy || file.isDecoy);
+        final newDerivedKey = _encryptionService.deriveFileKey(masterKey, newSalt, newIterations);
+
         final newIv = await _encryptionService.reEncryptFile(
           file.vaultPath,
           file.encryptionIv ?? '',
           targetAlgorithm: targetAlgorithm,
           isDecoy: isDecoy,
+          oldDerivedKey: oldDerivedKey,
+          newDerivedKey: newDerivedKey,
         );
 
         journalIvs[file.vaultPath] = newIv;
@@ -2211,7 +2304,12 @@ class VaultService {
 
         final fileIndex = files.indexWhere((f) => f.id == file.id);
         if (fileIndex >= 0) {
-          files[fileIndex] = file.copyWith(encryptionIv: newIv);
+          files[fileIndex] = file.copyWith(
+            encryptionIv: newIv,
+            encryptionAlgorithm: targetAlgorithm,
+            keyDerivationSalt: base64Encode(newSalt),
+            kdfIterations: newIterations,
+          );
           reEncryptedCount++;
         }
       }
@@ -2298,12 +2396,18 @@ class FileToVault {
   final String originalName;
   final VaultedFileType type;
   final String mimeType;
+  final bool? encrypt;
+  final EncryptionAlgorithm? encryptionAlgorithm;
+  final int? kdfIterations;
 
   const FileToVault({
     required this.sourcePath,
     required this.originalName,
     required this.type,
     required this.mimeType,
+    this.encrypt,
+    this.encryptionAlgorithm,
+    this.kdfIterations,
   });
 }
 
