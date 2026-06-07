@@ -328,9 +328,22 @@ class _PerFileEncryptionSheetState extends State<PerFileEncryptionSheet> {
                       ),
                     ),
                     ChoiceChip(
-                      label: const Text(
-                        'CTR',
-                        style: TextStyle(fontFamily: 'ProductSans', fontSize: 11),
+                      showCheckmark: false,
+                      label: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (file.algorithm == EncryptionAlgorithm.aes256Ctr)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 4),
+                              child: Icon(Icons.check, size: 14,
+                                  color: context.accentColor),
+                            ),
+                          const Text(
+                            'CTR',
+                            style: TextStyle(
+                                fontFamily: 'ProductSans', fontSize: 11),
+                          ),
+                        ],
                       ),
                       selected: file.algorithm == EncryptionAlgorithm.aes256Ctr,
                       onSelected: (selected) {
@@ -349,9 +362,22 @@ class _PerFileEncryptionSheetState extends State<PerFileEncryptionSheet> {
                     ),
                     const SizedBox(width: 4),
                     ChoiceChip(
-                      label: const Text(
-                        'GCM',
-                        style: TextStyle(fontFamily: 'ProductSans', fontSize: 11),
+                      showCheckmark: false,
+                      label: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (file.algorithm == EncryptionAlgorithm.aes256Gcm)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 4),
+                              child: Icon(Icons.check, size: 14,
+                                  color: context.accentColor),
+                            ),
+                          const Text(
+                            'GCM',
+                            style: TextStyle(
+                                fontFamily: 'ProductSans', fontSize: 11),
+                          ),
+                        ],
                       ),
                       selected: file.algorithm == EncryptionAlgorithm.aes256Gcm,
                       onSelected: (selected) {
