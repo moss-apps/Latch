@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:mime/mime.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:photo_manager/photo_manager.dart';
+import '../models/encryption_algorithm.dart';
 import '../models/vaulted_file.dart';
 import '../models/vault_folder.dart';
 import 'auto_kill_service.dart';
@@ -132,6 +133,7 @@ class FileImportService {
     Function(int current, int total, {int currentSize, int totalSize})?
         onProgress,
     Function(FileProgressInfo)? onFileProgress,
+    Map<String, ({bool encrypt, EncryptionAlgorithm algorithm})>? perFileEncryption,
   }) async {
     if (assets.isEmpty) {
       return ImportResult(
@@ -188,11 +190,14 @@ class FileImportService {
             mimeType = lookupMimeType(filePath) ?? 'application/octet-stream';
           }
 
+          final perFileConfig = perFileEncryption?[filePath];
           filesToVault.add(FileToVault(
             sourcePath: filePath,
             originalName: fileName,
             type: type,
             mimeType: mimeType,
+            encrypt: perFileConfig?.encrypt,
+            encryptionAlgorithm: perFileConfig?.algorithm,
           ));
           validAssets.add(asset);
 
@@ -890,6 +895,7 @@ class FileImportService {
     required List<String> filePaths,
     bool deleteOriginals = true,
     Function(int current, int total)? onProgress,
+    Map<String, ({bool encrypt, EncryptionAlgorithm algorithm})>? perFileEncryption,
   }) async {
     if (filePaths.isEmpty) {
       return ImportResult(
@@ -919,11 +925,14 @@ class FileImportService {
           final mimeType = lookupMimeType(path) ?? 'application/octet-stream';
           final type = getFileTypeFromMime(mimeType);
 
+          final perFileConfig = perFileEncryption?[path];
           filesToVault.add(FileToVault(
             sourcePath: path,
             originalName: fileName,
             type: type,
             mimeType: mimeType,
+            encrypt: perFileConfig?.encrypt,
+            encryptionAlgorithm: perFileConfig?.algorithm,
           ));
 
           pathsToDelete.add(path);
@@ -994,6 +1003,7 @@ class FileImportService {
     bool deleteOriginals = true,
     Function(int current, int total)? onProgress,
     Function(String message)? onStatusUpdate,
+    Map<String, ({bool encrypt, EncryptionAlgorithm algorithm})>? perFileEncryption,
   }) async {
     if (filePaths.isEmpty) {
       return OfficeImportResult(
@@ -1066,11 +1076,14 @@ class FileImportService {
           final fileName = path.split('/').last;
           final mimeType = lookupMimeType(path) ?? 'application/octet-stream';
 
+          final perFileConfig = perFileEncryption?[path];
           filesToVault.add(FileToVault(
             sourcePath: path,
             originalName: fileName,
             type: VaultedFileType.document,
             mimeType: mimeType,
+            encrypt: perFileConfig?.encrypt,
+            encryptionAlgorithm: perFileConfig?.algorithm,
           ));
 
           pathsToDelete.add(path);
@@ -1097,11 +1110,14 @@ class FileImportService {
 
             final mimeType =
                 lookupMimeType(officeFile.path) ?? 'application/octet-stream';
+            final perFileConfig = perFileEncryption?[officeFile.path];
             filesToVault.add(FileToVault(
               sourcePath: officeFile.path,
               originalName: officeFile.fileName,
               type: VaultedFileType.document,
               mimeType: mimeType,
+              encrypt: perFileConfig?.encrypt,
+              encryptionAlgorithm: perFileConfig?.algorithm,
             ));
 
             pathsToDelete.add(officeFile.path);
@@ -1139,11 +1155,14 @@ class FileImportService {
             final tempPdfPath = '${tempDir.path}/$pdfFileName';
             await File(tempPdfPath).writeAsBytes(result.pdfData!);
 
+            final perFileConfig = perFileEncryption?[officeFile.path];
             filesToVault.add(FileToVault(
               sourcePath: tempPdfPath,
               originalName: pdfFileName,
               type: VaultedFileType.document,
               mimeType: 'application/pdf',
+              encrypt: perFileConfig?.encrypt,
+              encryptionAlgorithm: perFileConfig?.algorithm,
             ));
 
             pathsToDelete.add(officeFile.path);
@@ -1159,11 +1178,14 @@ class FileImportService {
             // Fallback to original file
             final mimeType =
                 lookupMimeType(officeFile.path) ?? 'application/octet-stream';
+            final perFileConfig = perFileEncryption?[officeFile.path];
             filesToVault.add(FileToVault(
               sourcePath: officeFile.path,
               originalName: officeFile.fileName,
               type: VaultedFileType.document,
               mimeType: mimeType,
+              encrypt: perFileConfig?.encrypt,
+              encryptionAlgorithm: perFileConfig?.algorithm,
             ));
 
             pathsToDelete.add(officeFile.path);
@@ -1270,6 +1292,7 @@ class FileImportService {
   Future<ImportResult> importAnyFiles({
     bool deleteOriginals = true,
     Function(int current, int total)? onProgress,
+    Map<String, ({bool encrypt, EncryptionAlgorithm algorithm})>? perFileEncryption,
   }) async {
     try {
       // Pick any files
@@ -1300,11 +1323,14 @@ class FileImportService {
         final extension = file.extension ?? '';
         final type = getFileTypeFromExtension(extension);
 
+        final perFileConfig = perFileEncryption?[file.path!];
         filesToVault.add(FileToVault(
           sourcePath: file.path!,
           originalName: file.name,
           type: type,
           mimeType: mimeType,
+          encrypt: perFileConfig?.encrypt,
+          encryptionAlgorithm: perFileConfig?.algorithm,
         ));
 
         // Categorize for deletion
