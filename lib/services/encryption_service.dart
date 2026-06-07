@@ -75,6 +75,10 @@ class EncryptionService {
     return _cachedMasterKey!;
   }
 
+  Future<Uint8List> getMasterKey({bool isDecoy = false}) async {
+    return isDecoy ? await _ensureDecoyKey() : await _ensureMasterKey();
+  }
+
   /// Get or create decoy key (for decoy mode)
   Future<Uint8List> _ensureDecoyKey() async {
     if (_cachedDecoyKey != null) return _cachedDecoyKey!;
@@ -109,6 +113,18 @@ class EncryptionService {
     return _generateRandomBytes(_ivSize);
   }
 
+  /// Generate a random 32-byte salt for per-file key derivation
+  Uint8List generateFileSalt() {
+    return _generateRandomBytes(32);
+  }
+
+  /// Derive a per-file encryption key from the master key + salt using PBKDF2
+  Uint8List deriveFileKey(Uint8List masterKey, Uint8List salt, int iterations) {
+    final pbkdf2 = PBKDF2KeyDerivator(HMac(SHA256Digest(), 64))
+      ..init(Pbkdf2Parameters(salt, iterations, _keySize));
+    return pbkdf2.process(masterKey);
+  }
+
   /// Derive key from password using PBKDF2
   Uint8List deriveKeyFromPassword(String password, {Uint8List? salt, int iterations = 100000}) {
     salt ??= _generateRandomBytes(16);
@@ -136,6 +152,11 @@ class EncryptionService {
     );
 
     return cipher;
+  }
+
+  Future<Uint8List> _resolveKey({bool isDecoy = false, Uint8List? derivedKey}) async {
+    if (derivedKey != null) return derivedKey;
+    return isDecoy ? await _ensureDecoyKey() : await _ensureMasterKey();
   }
 
   GCMBlockCipher _getGcmCipher(
@@ -237,6 +258,7 @@ class EncryptionService {
     String sourcePath,
     String destinationPath, {
     bool isDecoy = false,
+    Uint8List? derivedKey,
     Function(int bytesProcessed, int totalBytes)? onProgress,
   }) async {
     try {
@@ -248,7 +270,7 @@ class EncryptionService {
         );
       }
 
-      final key = isDecoy ? await _ensureDecoyKey() : await _ensureMasterKey();
+      final key = await _resolveKey(isDecoy: isDecoy, derivedKey: derivedKey);
       final iv = generateIV();
       final totalBytes = await sourceFile.length();
 
@@ -311,10 +333,11 @@ class EncryptionService {
     Uint8List data,
     String destinationPath, {
     bool isDecoy = false,
+    Uint8List? derivedKey,
     Function(int bytesProcessed, int totalBytes)? onProgress,
   }) async {
     try {
-      final key = isDecoy ? await _ensureDecoyKey() : await _ensureMasterKey();
+      final key = await _resolveKey(isDecoy: isDecoy, derivedKey: derivedKey);
       final iv = generateIV();
       final totalBytes = data.length;
 
@@ -367,9 +390,10 @@ class EncryptionService {
     Uint8List data,
     String destinationPath, {
     bool isDecoy = false,
+    Uint8List? derivedKey,
   }) async {
     try {
-      final key = isDecoy ? await _ensureDecoyKey() : await _ensureMasterKey();
+      final key = await _resolveKey(isDecoy: isDecoy, derivedKey: derivedKey);
       final iv = generateIV();
 
       final gcm = GCMBlockCipher(AESEngine())
@@ -420,6 +444,7 @@ class EncryptionService {
     String destinationPath,
     String ivBase64, {
     bool isDecoy = false,
+    Uint8List? derivedKey,
     Function(int current, int total)? onProgress,
   }) async {
     try {
@@ -449,6 +474,7 @@ class EncryptionService {
           encryptedPath,
           ivBase64,
           isDecoy: isDecoy,
+          derivedKey: derivedKey,
         );
         onProgress?.call(2, 3);
 
@@ -483,6 +509,7 @@ class EncryptionService {
           destinationPath,
           ivBase64,
           isDecoy: isDecoy,
+          derivedKey: derivedKey,
         );
 
         onProgress?.call(3, 3);
@@ -513,6 +540,7 @@ class EncryptionService {
           encryptedData,
           ivBase64,
           isDecoy: isDecoy,
+          customKey: derivedKey,
         );
         onProgress?.call(2, 3);
 
@@ -549,6 +577,7 @@ class EncryptionService {
     String destinationPath,
     String ivBase64, {
     bool isDecoy = false,
+    Uint8List? derivedKey,
     Function(int bytesProcessed, int totalBytes)? onProgress,
   }) async {
     try {
@@ -560,7 +589,7 @@ class EncryptionService {
         );
       }
 
-      final key = isDecoy ? await _ensureDecoyKey() : await _ensureMasterKey();
+      final key = await _resolveKey(isDecoy: isDecoy, derivedKey: derivedKey);
       final iv = base64Decode(ivBase64);
       final encryptedSize = await encryptedFile.length();
 
@@ -713,6 +742,7 @@ class EncryptionService {
     String encryptedPath,
     String ivBase64, {
     bool isDecoy = false,
+    Uint8List? derivedKey,
   }) async {
     try {
       final encryptedFile = File(encryptedPath);
@@ -741,6 +771,7 @@ class EncryptionService {
           encryptedPath,
           ivBase64,
           isDecoy: isDecoy,
+          derivedKey: derivedKey,
         );
       } else if (header.length >= 4 &&
           header[0] == 0x4C &&
@@ -749,8 +780,7 @@ class EncryptionService {
           header[3] == 0x53) {
         // CTR-encrypted streamed file - use streaming decryption
         debugPrint('[Encryption] Detected CTR streamed format');
-        final key =
-            isDecoy ? await _ensureDecoyKey() : await _ensureMasterKey();
+        final key = await _resolveKey(isDecoy: isDecoy, derivedKey: derivedKey);
         final iv = base64Decode(ivBase64);
 
         final ctr = CTRStreamCipher(AESEngine())
@@ -795,6 +825,7 @@ class EncryptionService {
           Uint8List.fromList(encryptedData),
           ivBase64,
           isDecoy: isDecoy,
+          customKey: derivedKey,
         );
       } else {
         // Legacy CBC file without header - decrypt entire file
@@ -818,6 +849,7 @@ class EncryptionService {
           encryptedData,
           ivBase64,
           isDecoy: isDecoy,
+          customKey: derivedKey,
         );
       }
     } catch (e) {
@@ -835,12 +867,14 @@ class EncryptionService {
     String encryptedPath,
     String ivBase64, {
     bool isDecoy = false,
+    Uint8List? derivedKey,
   }) async {
     // Delegate to the format-detecting function
     return decryptStreamedFileToMemory(
       encryptedPath,
       ivBase64,
       isDecoy: isDecoy,
+      derivedKey: derivedKey,
     );
   }
 
@@ -963,6 +997,7 @@ class EncryptionService {
     String sourcePath,
     String destinationPath, {
     bool isDecoy = false,
+    Uint8List? derivedKey,
     Function(int bytesProcessed, int totalBytes)? onProgress,
   }) async {
     try {
@@ -974,7 +1009,7 @@ class EncryptionService {
         );
       }
 
-      final key = isDecoy ? await _ensureDecoyKey() : await _ensureMasterKey();
+      final key = await _resolveKey(isDecoy: isDecoy, derivedKey: derivedKey);
       final iv = generateIV();
       final totalBytes = await sourceFile.length();
 
@@ -1041,6 +1076,7 @@ class EncryptionService {
     String encryptedPath,
     String ivBase64, {
     bool isDecoy = false,
+    Uint8List? derivedKey,
   }) async {
     try {
       final encryptedFile = File(encryptedPath);
@@ -1051,7 +1087,7 @@ class EncryptionService {
         );
       }
 
-      final key = isDecoy ? await _ensureDecoyKey() : await _ensureMasterKey();
+      final key = await _resolveKey(isDecoy: isDecoy, derivedKey: derivedKey);
       final iv = base64Decode(ivBase64);
 
       final raf = await encryptedFile.open();
@@ -1115,6 +1151,7 @@ class EncryptionService {
     String destinationPath, {
     bool isDecoy = false,
     bool useGcm = true,
+    Uint8List? derivedKey,
     Function(int bytesProcessed, int totalBytes)? onProgress,
   }) async {
     try {
@@ -1126,7 +1163,7 @@ class EncryptionService {
         );
       }
 
-      final key = isDecoy ? await _ensureDecoyKey() : await _ensureMasterKey();
+      final key = await _resolveKey(isDecoy: isDecoy, derivedKey: derivedKey);
 
       final job = _pool!.encryptFile(
         sourcePath: sourcePath,
@@ -1167,6 +1204,7 @@ class EncryptionService {
     String destinationPath,
     String ivBase64, {
     bool isDecoy = false,
+    Uint8List? derivedKey,
     Function(int bytesProcessed, int totalBytes)? onProgress,
   }) async {
     try {
@@ -1178,7 +1216,7 @@ class EncryptionService {
         );
       }
 
-      final key = isDecoy ? await _ensureDecoyKey() : await _ensureMasterKey();
+      final key = await _resolveKey(isDecoy: isDecoy, derivedKey: derivedKey);
 
       final job = _pool!.decryptFile(
         encryptedPath: encryptedPath,
@@ -1297,11 +1335,13 @@ class EncryptionService {
     String oldIvBase64, {
     required EncryptionAlgorithm targetAlgorithm,
     bool isDecoy = false,
+    Uint8List? oldDerivedKey,
+    Uint8List? newDerivedKey,
   }) async {
     final format = detectFileFormat(filePath);
     final isLegacyCbc = (format == 0 || format == 3);
 
-    final key = isDecoy ? await _ensureDecoyKey() : await _ensureMasterKey();
+    final key = await _resolveKey(isDecoy: isDecoy, derivedKey: oldDerivedKey);
     final tempDir = await Directory.systemTemp.createTemp('lkr_reencrypt_');
     final tempDecPath = '${tempDir.path}/decrypted';
 
@@ -1309,7 +1349,7 @@ class EncryptionService {
       try { await File('$filePath.tmp').delete(); } catch (_) {}
 
       if (isLegacyCbc) {
-        final decrypted = await decryptFileToMemory(filePath, oldIvBase64, isDecoy: isDecoy);
+        final decrypted = await decryptFileToMemory(filePath, oldIvBase64, isDecoy: isDecoy, derivedKey: oldDerivedKey);
         if (!decrypted.success || decrypted.data == null) {
           throw Exception('Failed to decrypt CBC file for re-encryption: ${decrypted.error}');
         }
@@ -1327,11 +1367,12 @@ class EncryptionService {
         }
       }
 
+      final newKey = await _resolveKey(isDecoy: isDecoy, derivedKey: newDerivedKey);
       final useGcm = targetAlgorithm == EncryptionAlgorithm.aes256Gcm;
       final encJob = _pool!.encryptFile(
         sourcePath: tempDecPath,
         destinationPath: filePath,
-        key: key,
+        key: newKey,
         useGcm: useGcm,
       );
       final encResult = await encJob.future;
