@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'encryption_algorithm.dart';
+
 /// Enum representing the type of file stored in the vault
 enum VaultedFileType {
   image,
@@ -72,6 +74,9 @@ class VaultedFile {
   final bool isFavorite;
   final bool isEncrypted;
   final String? encryptionIv; // Initialization vector for AES encryption
+  final EncryptionAlgorithm? encryptionAlgorithm;
+  final String? keyDerivationSalt;
+  final int? kdfIterations;
   final bool isDecoy; // Flag for decoy mode files
   final DateTime? lastViewed;
   final int viewCount;
@@ -96,6 +101,9 @@ class VaultedFile {
     this.isFavorite = false,
     this.isEncrypted = false,
     this.encryptionIv,
+    this.encryptionAlgorithm,
+    this.keyDerivationSalt,
+    this.kdfIterations,
     this.isDecoy = false,
     this.lastViewed,
     this.viewCount = 0,
@@ -122,6 +130,9 @@ class VaultedFile {
     bool? isFavorite,
     bool? isEncrypted,
     String? encryptionIv,
+    EncryptionAlgorithm? encryptionAlgorithm,
+    String? keyDerivationSalt,
+    int? kdfIterations,
     bool? isDecoy,
     DateTime? lastViewed,
     int? viewCount,
@@ -146,6 +157,9 @@ class VaultedFile {
       isFavorite: isFavorite ?? this.isFavorite,
       isEncrypted: isEncrypted ?? this.isEncrypted,
       encryptionIv: encryptionIv ?? this.encryptionIv,
+      encryptionAlgorithm: encryptionAlgorithm ?? this.encryptionAlgorithm,
+      keyDerivationSalt: keyDerivationSalt ?? this.keyDerivationSalt,
+      kdfIterations: kdfIterations ?? this.kdfIterations,
       isDecoy: isDecoy ?? this.isDecoy,
       lastViewed: lastViewed ?? this.lastViewed,
       viewCount: viewCount ?? this.viewCount,
@@ -262,6 +276,9 @@ class VaultedFile {
       'isFavorite': isFavorite,
       'isEncrypted': isEncrypted,
       'encryptionIv': encryptionIv,
+      'encryptionAlgorithm': encryptionAlgorithm?.name,
+      'keyDerivationSalt': keyDerivationSalt,
+      'kdfIterations': kdfIterations,
       'isDecoy': isDecoy,
       'lastViewed': lastViewed?.toIso8601String(),
       'viewCount': viewCount,
@@ -294,6 +311,14 @@ class VaultedFile {
       isFavorite: json['isFavorite'] as bool? ?? false,
       isEncrypted: json['isEncrypted'] as bool? ?? false,
       encryptionIv: json['encryptionIv'] as String?,
+      encryptionAlgorithm: json['encryptionAlgorithm'] != null
+          ? EncryptionAlgorithm.values.firstWhere(
+              (e) => e.name == json['encryptionAlgorithm'],
+              orElse: () => EncryptionAlgorithm.aes256Ctr,
+            )
+          : null,
+      keyDerivationSalt: json['keyDerivationSalt'] as String?,
+      kdfIterations: json['kdfIterations'] as int?,
       isDecoy: json['isDecoy'] as bool? ?? false,
       lastViewed: json['lastViewed'] != null
           ? DateTime.parse(json['lastViewed'] as String)
