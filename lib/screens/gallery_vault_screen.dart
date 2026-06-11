@@ -3793,20 +3793,23 @@ class _ImportOptionsSheet extends StatelessWidget {
         color: context.backgroundColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
+      height: MediaQuery.of(context).size.height * 0.57,
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            margin: const EdgeInsets.only(top: 12),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: context.borderColor,
-              borderRadius: BorderRadius.circular(2),
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: context.borderColor,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -3828,119 +3831,129 @@ class _ImportOptionsSheet extends StatelessWidget {
                     fontFamily: 'ProductSans',
                   ),
                 ),
-                const SizedBox(height: 24),
-                _buildSectionHeader(context, 'From Gallery'),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _ImportOptionTile(
-                        icon: Icons.photo_library_outlined,
-                        label: 'Images',
-                        color: context.accentColor,
-                        onTap: onImportImages,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _ImportOptionTile(
-                        icon: Icons.video_library_outlined,
-                        label: 'Videos',
-                        color: Colors.red,
-                        onTap: onImportVideos,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _ImportOptionTile(
-                        icon: Icons.perm_media_outlined,
-                        label: 'All Media',
-                        color: Colors.purple,
-                        onTap: onImportMedia,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                _buildSectionHeader(context, 'From Camera'),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _ImportOptionTile(
-                        icon: Icons.camera_alt_outlined,
-                        label: 'Take Photo',
-                        color: Colors.teal,
-                        onTap: onCapturePhoto,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _ImportOptionTile(
-                        icon: Icons.videocam_outlined,
-                        label: 'Record Video',
-                        color: Colors.orange,
-                        onTap: onRecordVideo,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(child: SizedBox()),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                _buildSectionHeader(context, 'From File Manager'),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _ImportOptionTile(
-                        icon: Icons.music_note_outlined,
-                        label: 'Songs',
-                        color: Colors.purple,
-                        onTap: onImportSongs,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _ImportOptionTile(
-                        icon: Icons.description_outlined,
-                        label: 'Documents',
-                        color: Colors.green,
-                        onTap: onImportDocuments,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _ImportOptionTile(
-                        icon: Icons.folder_zip_outlined,
-                        label: 'Any Files',
-                        color: Colors.blueGrey,
-                        onTap: onImportAnyFiles,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                _buildSectionHeader(context, 'From Device'),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _ImportOptionTile(
-                        icon: Icons.drive_folder_upload_outlined,
-                        label: 'Import Folder',
-                        color: Colors.indigo,
-                        onTap: onImportFolder,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(child: SizedBox()),
-                    const SizedBox(width: 12),
-                    const Expanded(child: SizedBox()),
-                  ],
-                ),
-                const SizedBox(height: 24),
               ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionHeader(context, 'From Gallery'),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _ImportOptionTile(
+                          icon: Icons.photo_library_outlined,
+                          label: 'Images',
+                          color: context.accentColor,
+                          onTap: onImportImages,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _ImportOptionTile(
+                          icon: Icons.video_library_outlined,
+                          label: 'Videos',
+                          color: Colors.red,
+                          onTap: onImportVideos,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _ImportOptionTile(
+                          icon: Icons.perm_media_outlined,
+                          label: 'All Media',
+                          color: Colors.purple,
+                          onTap: onImportMedia,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  _buildSectionHeader(context, 'From Camera'),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _ImportOptionTile(
+                          icon: Icons.camera_alt_outlined,
+                          label: 'Take Photo',
+                          color: Colors.teal,
+                          onTap: onCapturePhoto,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _ImportOptionTile(
+                          icon: Icons.videocam_outlined,
+                          label: 'Record Video',
+                          color: Colors.orange,
+                          onTap: onRecordVideo,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(child: SizedBox()),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  _buildSectionHeader(context, 'From File Manager'),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _ImportOptionTile(
+                          icon: Icons.music_note_outlined,
+                          label: 'Songs',
+                          color: Colors.purple,
+                          onTap: onImportSongs,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _ImportOptionTile(
+                          icon: Icons.description_outlined,
+                          label: 'Documents',
+                          color: Colors.green,
+                          onTap: onImportDocuments,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _ImportOptionTile(
+                          icon: Icons.folder_zip_outlined,
+                          label: 'Any Files',
+                          color: Colors.blueGrey,
+                          onTap: onImportAnyFiles,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  _buildSectionHeader(context, 'From Device'),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _ImportOptionTile(
+                          icon: Icons.drive_folder_upload_outlined,
+                          label: 'Import Folder',
+                          color: Colors.indigo,
+                          onTap: onImportFolder,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(child: SizedBox()),
+                      const SizedBox(width: 12),
+                      const Expanded(child: SizedBox()),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
             ),
           ),
           SizedBox(height: MediaQuery.of(context).padding.bottom),
