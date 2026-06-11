@@ -132,6 +132,7 @@ class PerformanceSettingsScreen extends ConsumerWidget {
     final metrics = optimizer.getMetrics();
 
     return Card(
+      margin: EdgeInsets.zero,
       elevation: 0,
       color: context.surfaceColor,
       shape: RoundedRectangleBorder(
@@ -221,6 +222,7 @@ class PerformanceSettingsScreen extends ConsumerWidget {
     ];
 
     return Card(
+      margin: EdgeInsets.zero,
       elevation: 0,
       color: context.surfaceColor,
       shape: RoundedRectangleBorder(
