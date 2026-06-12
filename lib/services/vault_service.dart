@@ -2388,6 +2388,76 @@ class VaultService {
       debugPrint('Error cleaning temp: $e');
     }
   }
+
+  Future<void> registerNoteEntry({
+    required String noteId,
+    required String title,
+    required String encryptedContentPath,
+    String fileExtension = 'txt',
+    bool isEncrypted = false,
+    EncryptionAlgorithm encryptionAlgorithm = EncryptionAlgorithm.aes256Gcm,
+    int kdfIterations = 0,
+    String? folderId,
+    bool isDecoy = false,
+  }) async {
+    final files = isDecoy
+        ? (_cachedDecoyFiles ??= await _loadFileIndex(isDecoy: true))
+        : (_cachedFiles ??= await _loadFileIndex());
+
+    final existingIndex =
+        files.indexWhere((f) => f.metadata?['noteId'] == noteId);
+
+    final mimeType = switch (fileExtension) {
+      'md' => 'text/markdown',
+      'html' => 'text/html',
+      _ => 'text/plain',
+    };
+
+    final entry = VaultedFile(
+      id: existingIndex != -1 ? files[existingIndex].id : noteId,
+      originalName: '$title.$fileExtension',
+      vaultPath: encryptedContentPath,
+      type: VaultedFileType.document,
+      mimeType: mimeType,
+      fileSize: 0,
+      dateAdded: existingIndex != -1
+          ? files[existingIndex].dateAdded
+          : DateTime.now(),
+      dateModified: DateTime.now(),
+      tags: ['note'],
+      isEncrypted: isEncrypted,
+      encryptionAlgorithm: encryptionAlgorithm,
+      kdfIterations: kdfIterations,
+      folderId: folderId,
+      metadata: {'noteId': noteId},
+    );
+
+    if (existingIndex != -1) {
+      files[existingIndex] = entry;
+    } else {
+      files.insert(0, entry);
+    }
+
+    if (isDecoy) {
+      await _saveFileIndex(isDecoy: true);
+    } else {
+      await _saveFileIndex();
+    }
+  }
+
+  Future<void> removeNoteEntry(String noteId, {bool isDecoy = false}) async {
+    final files = isDecoy
+        ? (_cachedDecoyFiles ??= await _loadFileIndex(isDecoy: true))
+        : (_cachedFiles ??= await _loadFileIndex());
+
+    files.removeWhere((f) => f.metadata?['noteId'] == noteId);
+
+    if (isDecoy) {
+      await _saveFileIndex(isDecoy: true);
+    } else {
+      await _saveFileIndex();
+    }
+  }
 }
 
 /// Helper class for batch file import
