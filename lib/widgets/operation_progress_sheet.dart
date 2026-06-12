@@ -103,6 +103,29 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
               const SizedBox(height: 24),
               if (widget.isComplete) ...[
                 _buildCompleteState(),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.accent,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Done',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'ProductSans',
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
               ] else ...[
                 _buildProgressSection(progress, sizeProgress),
                 const SizedBox(height: 20),
@@ -341,31 +364,6 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
   }
 
   Widget _buildActionButton() {
-    if (widget.isComplete) {
-      return SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-          onPressed: () => Navigator.pop(context),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.accent,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          child: const Text(
-            'Done',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              fontFamily: 'ProductSans',
-              color: Colors.white,
-            ),
-          ),
-        ),
-      );
-    }
-
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton(
