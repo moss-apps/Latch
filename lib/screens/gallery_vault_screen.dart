@@ -35,6 +35,8 @@ import 'package:photo_manager/photo_manager.dart' hide AlbumType;
 import 'camera_screen.dart';
 import 'audio_recorder_screen.dart';
 import 'vault_settings_screen.dart';
+import 'note_editor_screen.dart';
+import '../providers/note_providers.dart';
 import '../widgets/operation_progress_sheet.dart';
 import '../widgets/media_hold_action_sheet.dart';
 import '../widgets/media_multi_select_action_sheet.dart';
@@ -983,8 +985,13 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
         color = Colors.purple;
         break;
       case VaultedFileType.document:
-        icon = _getDocumentIcon(file.extension);
-        color = _getDocumentColor(file.extension);
+        if (file.metadata?['noteId'] != null) {
+          icon = Icons.sticky_note_2;
+          color = Colors.amber;
+        } else {
+          icon = _getDocumentIcon(file.extension);
+          color = _getDocumentColor(file.extension);
+        }
         break;
       case VaultedFileType.other:
         icon = Icons.insert_drive_file;
@@ -1143,16 +1150,21 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
   }
 
   void _openFile(VaultedFile file) {
-    // Get the current list of files for navigation in viewer
+    if (file.metadata?['noteId'] != null) {
+      final noteId = file.metadata?['noteId'] as String?;
+      if (noteId != null) {
+        _openNoteFromVault(noteId);
+      }
+      return;
+    }
+
     final filesAsync = ref.read(vaultNotifierProvider);
     final allFiles = filesAsync.value ?? [];
 
-    // Filter files based on type for viewer navigation
     List<VaultedFile> viewerFiles;
     int initialIndex;
 
     if (file.isImage || file.isVideo) {
-      // For media files, include both images and videos
       viewerFiles = allFiles.where((f) => f.isImage || f.isVideo).toList();
       initialIndex = viewerFiles.indexWhere((f) => f.id == file.id);
       if (initialIndex == -1) initialIndex = 0;
@@ -1175,7 +1187,6 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
         ),
       );
     } else if (file.isDocument) {
-      // For documents, open document viewer
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -1183,9 +1194,23 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
         ),
       );
     } else {
-      // For other files, show export options
       _showFileOptionsSheet(file);
     }
+  }
+
+  void _openNoteFromVault(String noteId) {
+    final notesAsync = ref.read(notesNotifierProvider);
+    notesAsync.whenData((notes) {
+      final note = notes.where((n) => n.id == noteId).firstOrNull;
+      if (note != null && mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => NoteEditorScreen(note: note),
+          ),
+        );
+      }
+    });
   }
 
   /// Show options for files that don't have a preview
