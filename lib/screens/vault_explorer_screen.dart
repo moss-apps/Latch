@@ -17,6 +17,7 @@ import '../widgets/explorer_file_grid.dart';
 import '../widgets/explorer_toolbar.dart';
 import '../widgets/operation_progress_sheet.dart';
 import '../widgets/media_multi_select_action_sheet.dart';
+import 'note_list_screen.dart';
 
 class VaultExplorerScreen extends ConsumerStatefulWidget {
   const VaultExplorerScreen({super.key});
@@ -98,6 +99,18 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
           color: context.textPrimary,
         ),
       ),
+      actions: [
+        IconButton(
+          icon: Icon(Icons.note_outlined, color: context.textSecondary),
+          tooltip: 'Notes',
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const NoteListScreen()),
+            );
+          },
+        ),
+      ],
     );
   }
 
