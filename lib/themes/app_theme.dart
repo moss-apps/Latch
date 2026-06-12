@@ -178,7 +178,7 @@ class AppTheme {
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return primaryColor;
+            return Colors.white;
           }
           return AppColors.darkTextTertiary;
         }),

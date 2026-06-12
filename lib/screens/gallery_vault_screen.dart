@@ -33,7 +33,10 @@ import 'media_picker_screen.dart';
 import 'document_picker_screen.dart';
 import 'package:photo_manager/photo_manager.dart' hide AlbumType;
 import 'camera_screen.dart';
+import 'audio_recorder_screen.dart';
 import 'vault_settings_screen.dart';
+import 'note_editor_screen.dart';
+import '../providers/note_providers.dart';
 import '../widgets/operation_progress_sheet.dart';
 import '../widgets/media_hold_action_sheet.dart';
 import '../widgets/media_multi_select_action_sheet.dart';
@@ -982,8 +985,13 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
         color = Colors.purple;
         break;
       case VaultedFileType.document:
-        icon = _getDocumentIcon(file.extension);
-        color = _getDocumentColor(file.extension);
+        if (file.metadata?['noteId'] != null) {
+          icon = Icons.sticky_note_2;
+          color = Colors.amber;
+        } else {
+          icon = _getDocumentIcon(file.extension);
+          color = _getDocumentColor(file.extension);
+        }
         break;
       case VaultedFileType.other:
         icon = Icons.insert_drive_file;
@@ -1142,16 +1150,21 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
   }
 
   void _openFile(VaultedFile file) {
-    // Get the current list of files for navigation in viewer
+    if (file.metadata?['noteId'] != null) {
+      final noteId = file.metadata?['noteId'] as String?;
+      if (noteId != null) {
+        _openNoteFromVault(noteId);
+      }
+      return;
+    }
+
     final filesAsync = ref.read(vaultNotifierProvider);
     final allFiles = filesAsync.value ?? [];
 
-    // Filter files based on type for viewer navigation
     List<VaultedFile> viewerFiles;
     int initialIndex;
 
     if (file.isImage || file.isVideo) {
-      // For media files, include both images and videos
       viewerFiles = allFiles.where((f) => f.isImage || f.isVideo).toList();
       initialIndex = viewerFiles.indexWhere((f) => f.id == file.id);
       if (initialIndex == -1) initialIndex = 0;
@@ -1174,7 +1187,6 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
         ),
       );
     } else if (file.isDocument) {
-      // For documents, open document viewer
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -1182,9 +1194,23 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
         ),
       );
     } else {
-      // For other files, show export options
       _showFileOptionsSheet(file);
     }
+  }
+
+  void _openNoteFromVault(String noteId) {
+    final notesAsync = ref.read(notesNotifierProvider);
+    notesAsync.whenData((notes) {
+      final note = notes.where((n) => n.id == noteId).firstOrNull;
+      if (note != null && mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => NoteEditorScreen(note: note),
+          ),
+        );
+      }
+    });
   }
 
   /// Show options for files that don't have a preview
@@ -2112,6 +2138,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
         onImportMedia: _importMediaFromGallery,
         onCapturePhoto: _capturePhoto,
         onRecordVideo: _recordVideo,
+        onRecordAudio: _recordAudio,
         onImportSongs: _importSongs,
         onImportDocuments: _importDocuments,
         onImportAnyFiles: _importAnyFiles,
@@ -3439,6 +3466,35 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
     }
   }
 
+  Future<void> _recordAudio() async {
+    Navigator.pop(context);
+
+    final String? audioPath = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const AudioRecorderScreen(),
+      ),
+    );
+
+    if (audioPath == null) return;
+
+    setState(() => _isImporting = true);
+
+    final result = await _importService.importFile(
+      filePath: audioPath,
+      deleteOriginal: true,
+    );
+
+    setState(() => _isImporting = false);
+
+    if (result.success && result.importedCount > 0) {
+      ToastUtils.showSuccess('Audio recorded and hidden');
+      ref.read(vaultNotifierProvider.notifier).loadFiles();
+    } else if (!result.success) {
+      ToastUtils.showError(result.error ?? 'Recording failed');
+    }
+  }
+
   Future<void> _importDocuments() async {
     Navigator.pop(context);
 
@@ -3769,6 +3825,7 @@ class _ImportOptionsSheet extends StatelessWidget {
   final VoidCallback onImportMedia;
   final VoidCallback onCapturePhoto;
   final VoidCallback onRecordVideo;
+  final VoidCallback onRecordAudio;
   final VoidCallback onImportSongs;
   final VoidCallback onImportDocuments;
   final VoidCallback onImportAnyFiles;
@@ -3780,6 +3837,7 @@ class _ImportOptionsSheet extends StatelessWidget {
     required this.onImportMedia,
     required this.onCapturePhoto,
     required this.onRecordVideo,
+    required this.onRecordAudio,
     required this.onImportSongs,
     required this.onImportDocuments,
     required this.onImportAnyFiles,
@@ -3793,20 +3851,23 @@ class _ImportOptionsSheet extends StatelessWidget {
         color: context.backgroundColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
+      height: MediaQuery.of(context).size.height * 0.57,
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            margin: const EdgeInsets.only(top: 12),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: context.borderColor,
-              borderRadius: BorderRadius.circular(2),
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: context.borderColor,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -3828,119 +3889,136 @@ class _ImportOptionsSheet extends StatelessWidget {
                     fontFamily: 'ProductSans',
                   ),
                 ),
-                const SizedBox(height: 24),
-                _buildSectionHeader(context, 'From Gallery'),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _ImportOptionTile(
-                        icon: Icons.photo_library_outlined,
-                        label: 'Images',
-                        color: context.accentColor,
-                        onTap: onImportImages,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _ImportOptionTile(
-                        icon: Icons.video_library_outlined,
-                        label: 'Videos',
-                        color: Colors.red,
-                        onTap: onImportVideos,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _ImportOptionTile(
-                        icon: Icons.perm_media_outlined,
-                        label: 'All Media',
-                        color: Colors.purple,
-                        onTap: onImportMedia,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                _buildSectionHeader(context, 'From Camera'),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _ImportOptionTile(
-                        icon: Icons.camera_alt_outlined,
-                        label: 'Take Photo',
-                        color: Colors.teal,
-                        onTap: onCapturePhoto,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _ImportOptionTile(
-                        icon: Icons.videocam_outlined,
-                        label: 'Record Video',
-                        color: Colors.orange,
-                        onTap: onRecordVideo,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(child: SizedBox()),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                _buildSectionHeader(context, 'From File Manager'),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _ImportOptionTile(
-                        icon: Icons.music_note_outlined,
-                        label: 'Songs',
-                        color: Colors.purple,
-                        onTap: onImportSongs,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _ImportOptionTile(
-                        icon: Icons.description_outlined,
-                        label: 'Documents',
-                        color: Colors.green,
-                        onTap: onImportDocuments,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _ImportOptionTile(
-                        icon: Icons.folder_zip_outlined,
-                        label: 'Any Files',
-                        color: Colors.blueGrey,
-                        onTap: onImportAnyFiles,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                _buildSectionHeader(context, 'From Device'),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _ImportOptionTile(
-                        icon: Icons.drive_folder_upload_outlined,
-                        label: 'Import Folder',
-                        color: Colors.indigo,
-                        onTap: onImportFolder,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(child: SizedBox()),
-                    const SizedBox(width: 12),
-                    const Expanded(child: SizedBox()),
-                  ],
-                ),
-                const SizedBox(height: 24),
               ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionHeader(context, 'From Gallery'),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _ImportOptionTile(
+                          icon: Icons.photo_library_outlined,
+                          label: 'Images',
+                          color: context.accentColor,
+                          onTap: onImportImages,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _ImportOptionTile(
+                          icon: Icons.video_library_outlined,
+                          label: 'Videos',
+                          color: Colors.red,
+                          onTap: onImportVideos,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _ImportOptionTile(
+                          icon: Icons.perm_media_outlined,
+                          label: 'All Media',
+                          color: Colors.purple,
+                          onTap: onImportMedia,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  _buildSectionHeader(context, 'From Camera'),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _ImportOptionTile(
+                          icon: Icons.camera_alt_outlined,
+                          label: 'Take Photo',
+                          color: Colors.teal,
+                          onTap: onCapturePhoto,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _ImportOptionTile(
+                          icon: Icons.videocam_outlined,
+                          label: 'Record Video',
+                          color: Colors.orange,
+                          onTap: onRecordVideo,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _ImportOptionTile(
+                          icon: Icons.mic_outlined,
+                          label: 'Record Audio',
+                          color: Colors.deepPurple,
+                          onTap: onRecordAudio,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  _buildSectionHeader(context, 'From File Manager'),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _ImportOptionTile(
+                          icon: Icons.music_note_outlined,
+                          label: 'Songs',
+                          color: Colors.purple,
+                          onTap: onImportSongs,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _ImportOptionTile(
+                          icon: Icons.description_outlined,
+                          label: 'Documents',
+                          color: Colors.green,
+                          onTap: onImportDocuments,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _ImportOptionTile(
+                          icon: Icons.folder_zip_outlined,
+                          label: 'Any Files',
+                          color: Colors.blueGrey,
+                          onTap: onImportAnyFiles,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  _buildSectionHeader(context, 'From Device'),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _ImportOptionTile(
+                          icon: Icons.drive_folder_upload_outlined,
+                          label: 'Import Folder',
+                          color: Colors.indigo,
+                          onTap: onImportFolder,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(child: SizedBox()),
+                      const SizedBox(width: 12),
+                      const Expanded(child: SizedBox()),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
             ),
           ),
           SizedBox(height: MediaQuery.of(context).padding.bottom),

@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.MediaRecorder
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
@@ -16,6 +17,7 @@ import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterFragmentActivity
 
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 
@@ -27,6 +29,8 @@ class MainActivity: FlutterFragmentActivity() {
     private val SCREENSHOT_PROTECTION_CHANNEL = "com.mossapps.locker/screenshot_protection"
     private val FLICK_CHANNEL = "com.mossapps.locker/flick"
     private val FLICK_PACKAGE = "com.mossapps.flick"
+    private val RECORDER_CHANNEL = "com.mossapps.locker/audio_recorder"
+    private val AMPLITUDE_CHANNEL = "com.mossapps.locker/audio_amplitude"
     private val autoKillPreferences by lazy {
         getSharedPreferences(AUTO_KILL_PREFS, MODE_PRIVATE)
     }
@@ -38,6 +42,22 @@ class MainActivity: FlutterFragmentActivity() {
     }
     private var isAutoKillEnabled = true
     private var autoKillDelayMillis = 0L
+    private var mediaRecorder: MediaRecorder? = null
+    private var currentRecordingPath: String? = null
+    private var isRecording = false
+    private var amplitudeSink: EventChannel.EventSink? = null
+    private val amplitudeHandler = Handler(Looper.getMainLooper())
+    private val amplitudeRunnable = object : Runnable {
+        override fun run() {
+            if (isRecording && mediaRecorder != null) {
+                try {
+                    val amp = mediaRecorder!!.maxAmplitude.toDouble() / 32768.0
+                    amplitudeSink?.success(amp)
+                } catch (_: Exception) {}
+                amplitudeHandler.postDelayed(this, 100)
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -120,6 +140,136 @@ class MainActivity: FlutterFragmentActivity() {
                 else -> result.notImplemented()
             }
         }
+
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, AMPLITUDE_CHANNEL).setStreamHandler(
+            object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    amplitudeSink = events
+                }
+                override fun onCancel(arguments: Any?) {
+                    amplitudeSink = null
+                    amplitudeHandler.removeCallbacks(amplitudeRunnable)
+                }
+            }
+        )
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, RECORDER_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "startRecording" -> {
+                    val path = call.argument<String>("path")
+                    val format = call.argument<String>("format") ?: "aac"
+                    if (path.isNullOrBlank()) {
+                        result.error("INVALID_ARGUMENT", "File path is required", null)
+                    } else {
+                        startRecording(path, format, result)
+                    }
+                }
+                "stopRecording" -> stopRecording(result)
+                "pauseRecording" -> pauseRecording(result)
+                "resumeRecording" -> resumeRecording(result)
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    private fun startRecording(path: String, format: String, result: MethodChannel.Result) {
+        try {
+            stopAndReleaseRecorder()
+
+            val file = File(path)
+            file.parentFile?.mkdirs()
+
+            val recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                MediaRecorder(applicationContext)
+            } else {
+                @Suppress("DEPRECATION")
+                MediaRecorder()
+            }
+
+            recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
+            if (format == "wav") {
+                recorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP)
+                recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB)
+            } else {
+                recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+            }
+            recorder.setAudioSamplingRate(44100)
+            recorder.setAudioChannels(1)
+            recorder.setAudioEncodingBitRate(128000)
+            recorder.setOutputFile(path)
+            recorder.prepare()
+            recorder.start()
+
+            mediaRecorder = recorder
+            currentRecordingPath = path
+            isRecording = true
+
+            amplitudeHandler.removeCallbacks(amplitudeRunnable)
+            amplitudeHandler.postDelayed(amplitudeRunnable, 100)
+
+            result.success(path)
+        } catch (e: Exception) {
+            stopAndReleaseRecorder()
+            result.error("RECORD_ERROR", "Failed to start recording: ${e.message}", null)
+        }
+    }
+
+    private fun stopRecording(result: MethodChannel.Result) {
+        try {
+            val path = currentRecordingPath
+            amplitudeHandler.removeCallbacks(amplitudeRunnable)
+            isRecording = false
+
+            if (mediaRecorder != null) {
+                mediaRecorder!!.stop()
+                mediaRecorder!!.release()
+                mediaRecorder = null
+            }
+            currentRecordingPath = null
+            result.success(path)
+        } catch (e: Exception) {
+            stopAndReleaseRecorder()
+            result.error("RECORD_ERROR", "Failed to stop recording: ${e.message}", null)
+        }
+    }
+
+    private fun pauseRecording(result: MethodChannel.Result) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && mediaRecorder != null) {
+                mediaRecorder!!.pause()
+                amplitudeHandler.removeCallbacks(amplitudeRunnable)
+                result.success(null)
+            } else {
+                result.error("NOT_SUPPORTED", "Pause not supported on this Android version", null)
+            }
+        } catch (e: Exception) {
+            result.error("RECORD_ERROR", "Failed to pause: ${e.message}", null)
+        }
+    }
+
+    private fun resumeRecording(result: MethodChannel.Result) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && mediaRecorder != null) {
+                mediaRecorder!!.resume()
+                amplitudeHandler.removeCallbacks(amplitudeRunnable)
+                amplitudeHandler.postDelayed(amplitudeRunnable, 100)
+                result.success(null)
+            } else {
+                result.error("NOT_SUPPORTED", "Resume not supported on this Android version", null)
+            }
+        } catch (e: Exception) {
+            result.error("RECORD_ERROR", "Failed to resume: ${e.message}", null)
+        }
+    }
+
+    private fun stopAndReleaseRecorder() {
+        isRecording = false
+        amplitudeHandler.removeCallbacks(amplitudeRunnable)
+        try { mediaRecorder?.stop() } catch (_: Exception) {}
+        try { mediaRecorder?.release() } catch (_: Exception) {}
+        mediaRecorder = null
+        currentRecordingPath = null
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -316,6 +466,7 @@ class MainActivity: FlutterFragmentActivity() {
 
     override fun onDestroy() {
         cancelAutoKill()
+        stopAndReleaseRecorder()
         super.onDestroy()
     }
 }

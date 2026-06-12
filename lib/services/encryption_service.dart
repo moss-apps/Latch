@@ -125,6 +125,17 @@ class EncryptionService {
     return pbkdf2.process(masterKey);
   }
 
+  Future<Uint8List> deriveFileKeyAsync(
+      Uint8List masterKey, Uint8List salt, int iterations) async {
+    return compute(_pbkdf2Isolate, _Pbkdf2Params(masterKey, salt, iterations));
+  }
+
+  static Uint8List _pbkdf2Isolate(_Pbkdf2Params params) {
+    final pbkdf2 = PBKDF2KeyDerivator(HMac(SHA256Digest(), 64))
+      ..init(Pbkdf2Parameters(params.salt, params.iterations, 32));
+    return pbkdf2.process(params.masterKey);
+  }
+
   /// Derive key from password using PBKDF2
   Uint8List deriveKeyFromPassword(String password, {Uint8List? salt, int iterations = 100000}) {
     salt ??= _generateRandomBytes(16);
@@ -1755,4 +1766,11 @@ class _ChunkedStreamTransformer
 
     return controller.stream;
   }
+}
+
+class _Pbkdf2Params {
+  final Uint8List masterKey;
+  final Uint8List salt;
+  final int iterations;
+  const _Pbkdf2Params(this.masterKey, this.salt, this.iterations);
 }
