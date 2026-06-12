@@ -33,6 +33,7 @@ import 'media_picker_screen.dart';
 import 'document_picker_screen.dart';
 import 'package:photo_manager/photo_manager.dart' hide AlbumType;
 import 'camera_screen.dart';
+import 'audio_recorder_screen.dart';
 import 'vault_settings_screen.dart';
 import '../widgets/operation_progress_sheet.dart';
 import '../widgets/media_hold_action_sheet.dart';
@@ -2112,6 +2113,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
         onImportMedia: _importMediaFromGallery,
         onCapturePhoto: _capturePhoto,
         onRecordVideo: _recordVideo,
+        onRecordAudio: _recordAudio,
         onImportSongs: _importSongs,
         onImportDocuments: _importDocuments,
         onImportAnyFiles: _importAnyFiles,
@@ -3439,6 +3441,35 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
     }
   }
 
+  Future<void> _recordAudio() async {
+    Navigator.pop(context);
+
+    final String? audioPath = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const AudioRecorderScreen(),
+      ),
+    );
+
+    if (audioPath == null) return;
+
+    setState(() => _isImporting = true);
+
+    final result = await _importService.importFile(
+      filePath: audioPath,
+      deleteOriginal: true,
+    );
+
+    setState(() => _isImporting = false);
+
+    if (result.success && result.importedCount > 0) {
+      ToastUtils.showSuccess('Audio recorded and hidden');
+      ref.read(vaultNotifierProvider.notifier).loadFiles();
+    } else if (!result.success) {
+      ToastUtils.showError(result.error ?? 'Recording failed');
+    }
+  }
+
   Future<void> _importDocuments() async {
     Navigator.pop(context);
 
@@ -3769,6 +3800,7 @@ class _ImportOptionsSheet extends StatelessWidget {
   final VoidCallback onImportMedia;
   final VoidCallback onCapturePhoto;
   final VoidCallback onRecordVideo;
+  final VoidCallback onRecordAudio;
   final VoidCallback onImportSongs;
   final VoidCallback onImportDocuments;
   final VoidCallback onImportAnyFiles;
@@ -3780,6 +3812,7 @@ class _ImportOptionsSheet extends StatelessWidget {
     required this.onImportMedia,
     required this.onCapturePhoto,
     required this.onRecordVideo,
+    required this.onRecordAudio,
     required this.onImportSongs,
     required this.onImportDocuments,
     required this.onImportAnyFiles,
@@ -3896,7 +3929,14 @@ class _ImportOptionsSheet extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      const Expanded(child: SizedBox()),
+                      Expanded(
+                        child: _ImportOptionTile(
+                          icon: Icons.mic_outlined,
+                          label: 'Record Audio',
+                          color: Colors.deepPurple,
+                          onTap: onRecordAudio,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 24),
