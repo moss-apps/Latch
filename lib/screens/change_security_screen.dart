@@ -79,7 +79,6 @@ class _ChangeSecurityScreenState extends State<ChangeSecurityScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBodyBehindAppBar: true,
       backgroundColor: context.backgroundColor,
       appBar: AppBar(
         leading: IconButton(
@@ -94,14 +93,11 @@ class _ChangeSecurityScreenState extends State<ChangeSecurityScreen> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        backgroundColor: context.isDarkMode
-            ? Colors.white.withValues(alpha: 0.04)
-            : Colors.white.withValues(alpha: 0.15),
+        backgroundColor: Colors.transparent,
         elevation: 0,
       ),
       body: Stack(
         children: [
-          _buildBackground(),
           _isLoading
               ? Center(
                   child: CircularProgressIndicator(
@@ -226,28 +222,6 @@ class _ChangeSecurityScreenState extends State<ChangeSecurityScreen> {
           ),
         ];
     }
-  }
-
-  Widget _buildBackground() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: context.isDarkMode
-              ? [
-                  const Color(0xFF0F0F12),
-                  const Color(0xFF1A1A2E),
-                  const Color(0xFF16213E),
-                ]
-              : [
-                  const Color(0xFFE8EEF5),
-                  const Color(0xFFF5F7FA),
-                  const Color(0xFFE4E9F2),
-                ],
-        ),
-      ),
-    );
   }
 
   Widget _buildHeader() {
@@ -682,7 +656,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     ];
 
     return Scaffold(
-      extendBodyBehindAppBar: true,
       backgroundColor: context.backgroundColor,
       appBar: AppBar(
         leading: IconButton(
@@ -708,14 +681,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        backgroundColor: context.isDarkMode
-            ? Colors.white.withValues(alpha: 0.04)
-            : Colors.white.withValues(alpha: 0.15),
+        backgroundColor: Colors.transparent,
         elevation: 0,
       ),
       body: Stack(
         children: [
-          _buildBackground(),
           _isLoading
               ? Center(
                   child: CircularProgressIndicator(
@@ -728,6 +698,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        const Spacer(),
                         _buildIcon(),
                         const SizedBox(height: 32),
                         Text(
@@ -765,28 +736,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   ),
                 ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildBackground() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: context.isDarkMode
-              ? [
-                  const Color(0xFF0F0F12),
-                  const Color(0xFF1A1A2E),
-                  const Color(0xFF16213E),
-                ]
-              : [
-                  const Color(0xFFE8EEF5),
-                  const Color(0xFFF5F7FA),
-                  const Color(0xFFE4E9F2),
-                ],
-        ),
       ),
     );
   }
@@ -1317,7 +1266,6 @@ class _ChangePINScreenState extends State<ChangePINScreen> {
     ];
 
     return Scaffold(
-      extendBodyBehindAppBar: true,
       backgroundColor: context.backgroundColor,
       appBar: AppBar(
         leading: IconButton(
@@ -1343,14 +1291,11 @@ class _ChangePINScreenState extends State<ChangePINScreen> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        backgroundColor: context.isDarkMode
-            ? Colors.white.withValues(alpha: 0.04)
-            : Colors.white.withValues(alpha: 0.15),
+        backgroundColor: Colors.transparent,
         elevation: 0,
       ),
       body: Stack(
         children: [
-          _buildBackground(),
           _isLoading
               ? Center(
                   child: CircularProgressIndicator(
@@ -1363,6 +1308,7 @@ class _ChangePINScreenState extends State<ChangePINScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        const Spacer(),
                         _buildIcon(),
                         const SizedBox(height: 32),
                         Text(
@@ -1406,28 +1352,6 @@ class _ChangePINScreenState extends State<ChangePINScreen> {
                   ),
                 ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildBackground() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: context.isDarkMode
-              ? [
-                  const Color(0xFF0F0F12),
-                  const Color(0xFF1A1A2E),
-                  const Color(0xFF16213E),
-                ]
-              : [
-                  const Color(0xFFE8EEF5),
-                  const Color(0xFFF5F7FA),
-                  const Color(0xFFE4E9F2),
-                ],
-        ),
       ),
     );
   }
@@ -1865,7 +1789,6 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBodyBehindAppBar: true,
       backgroundColor: context.backgroundColor,
       appBar: AppBar(
         leading: IconButton(
@@ -1880,14 +1803,11 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        backgroundColor: context.isDarkMode
-            ? Colors.white.withValues(alpha: 0.04)
-            : Colors.white.withValues(alpha: 0.15),
+        backgroundColor: Colors.transparent,
         elevation: 0,
       ),
       body: Stack(
         children: [
-          _buildBackground(),
           _isLoading
               ? Center(
                   child: CircularProgressIndicator(
@@ -1934,28 +1854,6 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                   ),
                 ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildBackground() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: context.isDarkMode
-              ? [
-                  const Color(0xFF0F0F12),
-                  const Color(0xFF1A1A2E),
-                  const Color(0xFF16213E),
-                ]
-              : [
-                  const Color(0xFFE8EEF5),
-                  const Color(0xFFF5F7FA),
-                  const Color(0xFFE4E9F2),
-                ],
-        ),
       ),
     );
   }

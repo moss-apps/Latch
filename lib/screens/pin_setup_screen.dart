@@ -72,7 +72,6 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBodyBehindAppBar: true,
       backgroundColor: context.backgroundColor,
       appBar: AppBar(
         leading: IconButton(
@@ -99,14 +98,11 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        backgroundColor: context.isDarkMode
-            ? Colors.white.withValues(alpha: 0.04)
-            : Colors.white.withValues(alpha: 0.15),
+        backgroundColor: Colors.transparent,
         elevation: 0,
       ),
       body: Stack(
         children: [
-          _buildBackground(),
           _isLoading
               ? Center(
                   child: CircularProgressIndicator(
@@ -134,28 +130,6 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
                   ),
                 ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildBackground() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: context.isDarkMode
-              ? [
-                  const Color(0xFF0F0F12),
-                  const Color(0xFF1A1A2E),
-                  const Color(0xFF16213E),
-                ]
-              : [
-                  const Color(0xFFE8EEF5),
-                  const Color(0xFFF5F7FA),
-                  const Color(0xFFE4E9F2),
-                ],
-        ),
       ),
     );
   }

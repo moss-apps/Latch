@@ -257,15 +257,10 @@ class _UnlockScreenState extends State<UnlockScreen> {
     if (_isLoading || _authMethod == null) {
       return Scaffold(
         backgroundColor: context.backgroundColor,
-        body: Stack(
-          children: [
-            _buildBackground(),
-            Center(
-              child: CircularProgressIndicator(
-                color: context.accentColor,
-              ),
-            ),
-          ],
+        body: Center(
+          child: CircularProgressIndicator(
+            color: context.accentColor,
+          ),
         ),
       );
     }
@@ -274,7 +269,6 @@ class _UnlockScreenState extends State<UnlockScreen> {
       backgroundColor: context.backgroundColor,
       body: Stack(
         children: [
-          _buildBackground(),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(24.0),
@@ -325,28 +319,6 @@ class _UnlockScreenState extends State<UnlockScreen> {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBackground() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: context.isDarkMode
-              ? [
-                  const Color(0xFF0F0F12),
-                  const Color(0xFF1A1A2E),
-                  const Color(0xFF16213E),
-                ]
-              : [
-                  const Color(0xFFE8EEF5),
-                  const Color(0xFFF5F7FA),
-                  const Color(0xFFE4E9F2),
-                ],
         ),
       ),
     );
