@@ -8,9 +8,7 @@ import '../models/vault_folder.dart';
 import '../models/vaulted_file.dart';
 import '../providers/vault_providers.dart';
 import '../providers/explorer_providers.dart';
-import '../screens/media_viewer_screen.dart';
-import '../screens/document_viewer_screen.dart';
-import '../screens/song_player_screen.dart';
+import '../services/file_open_service.dart';
 import '../services/auto_kill_service.dart';
 import '../themes/app_colors.dart';
 import '../utils/responsive_utils.dart';
@@ -47,7 +45,8 @@ class ExplorerFileGrid extends ConsumerWidget {
             error: (error, _) => Center(
               child: Text(
                 'Error loading folders',
-                style: TextStyle(fontFamily: 'ProductSans', color: context.textSecondary),
+                style: TextStyle(
+                    fontFamily: 'ProductSans', color: context.textSecondary),
               ),
             ),
             data: (folders) {
@@ -56,13 +55,17 @@ class ExplorerFileGrid extends ConsumerWidget {
                 error: (error, _) => Center(
                   child: Text(
                     'Error loading files',
-                    style: TextStyle(fontFamily: 'ProductSans', color: context.textSecondary),
+                    style: TextStyle(
+                        fontFamily: 'ProductSans',
+                        color: context.textSecondary),
                   ),
                 ),
                 data: (files) {
                   // In Sidebar Mode, we only show files in the grid
-                  final showFoldersInGrid = viewMode == ExplorerViewMode.navigation;
-                  final displayFolders = showFoldersInGrid ? folders : <VaultFolder>[];
+                  final showFoldersInGrid =
+                      viewMode == ExplorerViewMode.navigation;
+                  final displayFolders =
+                      showFoldersInGrid ? folders : <VaultFolder>[];
 
                   if (displayFolders.isEmpty && files.isEmpty) {
                     return _buildEmptyState(context);
@@ -136,11 +139,24 @@ class ExplorerFileGrid extends ConsumerWidget {
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: [
-          _buildFilterChip(ref, label: 'All', value: null, isActive: activeFilter == null),
-          _buildFilterChip(ref, label: 'Images', value: VaultedFileType.image, isActive: activeFilter == VaultedFileType.image),
-          _buildFilterChip(ref, label: 'Videos', value: VaultedFileType.video, isActive: activeFilter == VaultedFileType.video),
-          _buildFilterChip(ref, label: 'Songs', value: VaultedFileType.song, isActive: activeFilter == VaultedFileType.song),
-          _buildFilterChip(ref, label: 'Documents', value: VaultedFileType.document, isActive: activeFilter == VaultedFileType.document),
+          _buildFilterChip(ref,
+              label: 'All', value: null, isActive: activeFilter == null),
+          _buildFilterChip(ref,
+              label: 'Images',
+              value: VaultedFileType.image,
+              isActive: activeFilter == VaultedFileType.image),
+          _buildFilterChip(ref,
+              label: 'Videos',
+              value: VaultedFileType.video,
+              isActive: activeFilter == VaultedFileType.video),
+          _buildFilterChip(ref,
+              label: 'Songs',
+              value: VaultedFileType.song,
+              isActive: activeFilter == VaultedFileType.song),
+          _buildFilterChip(ref,
+              label: 'Documents',
+              value: VaultedFileType.document,
+              isActive: activeFilter == VaultedFileType.document),
         ],
       ),
     );
@@ -177,7 +193,9 @@ class ExplorerFileGrid extends ConsumerWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(
-            color: isActive ? context.accentColor : context.borderColor.withValues(alpha: 0.5),
+            color: isActive
+                ? context.accentColor
+                : context.borderColor.withValues(alpha: 0.5),
             width: 1,
           ),
         ),
@@ -195,7 +213,8 @@ class ExplorerFileGrid extends ConsumerWidget {
         // Double tap or tap to navigate inside
         ref.read(explorerCurrentFolderIdProvider.notifier).state = folder.id;
       },
-      onLongPress: onFolderLongPress != null ? () => onFolderLongPress!(folder) : null,
+      onLongPress:
+          onFolderLongPress != null ? () => onFolderLongPress!(folder) : null,
       child: Container(
         decoration: BoxDecoration(
           color: context.backgroundSecondary,
@@ -213,7 +232,8 @@ class ExplorerFileGrid extends ConsumerWidget {
                 width: double.infinity,
                 decoration: BoxDecoration(
                   color: context.accentColor.withValues(alpha: 0.05),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(12)),
                 ),
                 child: Center(
                   child: Icon(
@@ -299,7 +319,9 @@ class ExplorerFileGrid extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(12),
                 border: isSelected
                     ? Border.all(color: context.accentColor, width: 3)
-                    : Border.all(color: context.borderColor.withValues(alpha: 0.5), width: 1),
+                    : Border.all(
+                        color: context.borderColor.withValues(alpha: 0.5),
+                        width: 1),
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(isSelected ? 9 : 11),
@@ -307,98 +329,99 @@ class ExplorerFileGrid extends ConsumerWidget {
               ),
             ),
 
-          // Favorite badge
-          if (file.isFavorite)
-            Positioned(
-              top: 6,
-              left: 6,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.favorite,
-                  size: 10,
-                  color: Colors.red,
-                ),
-              ),
-            ),
-
-          // Filename overlay for all file types
-          Positioned(
-            bottom: 6,
-            left: 6,
-            right: 6,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-              decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (file.isVideo) ...[
-                    const Icon(Icons.play_arrow, size: 10, color: Colors.white),
-                    const SizedBox(width: 1),
-                  ],
-                  Expanded(
-                    child: Text(
-                      file.originalName,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 8,
-                        fontFamily: 'ProductSans',
-                        fontWeight: FontWeight.w500,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                    ),
+            // Favorite badge
+            if (file.isFavorite)
+              Positioned(
+                top: 6,
+                left: 6,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    shape: BoxShape.circle,
                   ),
-                  if (file.isVideo) ...[
-                    const SizedBox(width: 2),
-                    Text(
-                      file.formattedSize,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 8,
-                        fontFamily: 'ProductSans',
-                      ),
-                    ),
-                  ],
-                ],
+                  child: const Icon(
+                    Icons.favorite,
+                    size: 10,
+                    color: Colors.red,
+                  ),
+                ),
               ),
-            ),
-          ),
 
-          // Checkbox overlaid in Selection Mode
-          if (isSelectionMode)
+            // Filename overlay for all file types
             Positioned(
-              top: 6,
+              bottom: 6,
+              left: 6,
               right: 6,
               child: Container(
-                width: 20,
-                height: 24,
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isSelected ? context.accentColor : Colors.white70,
-                  border: Border.all(
-                    color: isSelected ? context.accentColor : Colors.black45,
-                    width: 2,
-                  ),
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(4),
                 ),
-                child: isSelected
-                    ? const Icon(Icons.check, size: 14, color: Colors.white)
-                    : null,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (file.isVideo) ...[
+                      const Icon(Icons.play_arrow,
+                          size: 10, color: Colors.white),
+                      const SizedBox(width: 1),
+                    ],
+                    Expanded(
+                      child: Text(
+                        file.originalName,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 8,
+                          fontFamily: 'ProductSans',
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    if (file.isVideo) ...[
+                      const SizedBox(width: 2),
+                      Text(
+                        file.formattedSize,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 8,
+                          fontFamily: 'ProductSans',
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
-        ],
+
+            // Checkbox overlaid in Selection Mode
+            if (isSelectionMode)
+              Positioned(
+                top: 6,
+                right: 6,
+                child: Container(
+                  width: 20,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isSelected ? context.accentColor : Colors.white70,
+                    border: Border.all(
+                      color: isSelected ? context.accentColor : Colors.black45,
+                      width: 2,
+                    ),
+                  ),
+                  child: isSelected
+                      ? const Icon(Icons.check, size: 14, color: Colors.white)
+                      : null,
+                ),
+              ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
   }
 
   Widget _buildFileThumbnail(VaultedFile file, BuildContext context) {
@@ -465,38 +488,13 @@ class ExplorerFileGrid extends ConsumerWidget {
     VaultedFile file,
     List<VaultedFile> currentFiles,
   ) {
-    if (file.isImage || file.isVideo) {
-      // Filter the current view for all images & videos for slideshow swiping context
-      final viewerFiles = currentFiles.where((f) => f.isImage || f.isVideo).toList();
-      final startIndex = viewerFiles.indexWhere((f) => f.id == file.id);
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => MediaViewerScreen(
-            initialFile: file,
-            files: viewerFiles.isNotEmpty ? viewerFiles : [file],
-            initialIndex: startIndex >= 0 ? startIndex : 0,
-          ),
-        ),
-      );
-    } else if (file.isSong) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => SongPlayerScreen(file: file),
-        ),
-      );
-    } else if (file.isDocument) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => DocumentViewerScreen(file: file),
-        ),
-      );
-    } else {
-      _showFileOptionsSheet(context, ref, file);
-    }
+    FileOpenService.open(
+      context,
+      ref,
+      file,
+      currentFiles: currentFiles,
+      onUnsupported: () => _showFileOptionsSheet(context, ref, file),
+    );
   }
 
   void _showFileOptionsSheet(
@@ -775,7 +773,8 @@ class ExplorerFileGrid extends ConsumerWidget {
     );
 
     if (confirmed == true) {
-      final success = await ref.read(vaultNotifierProvider.notifier).deleteFiles([file.id]);
+      final success =
+          await ref.read(vaultNotifierProvider.notifier).deleteFiles([file.id]);
       if (success) {
         ToastUtils.showSuccess('File deleted');
       } else {
@@ -923,15 +922,12 @@ class ExplorerFileGrid extends ConsumerWidget {
             const SizedBox(height: 12),
             _buildInfoRow(ctx, 'Size', file.formattedSize),
             const SizedBox(height: 12),
-            _buildInfoRow(
-                ctx, 'Added', formatDate(file.dateAdded)),
+            _buildInfoRow(ctx, 'Added', formatDate(file.dateAdded)),
             const SizedBox(height: 12),
-            _buildInfoRow(ctx, 'Encrypted',
-                file.isEncrypted ? 'Yes' : 'No'),
+            _buildInfoRow(ctx, 'Encrypted', file.isEncrypted ? 'Yes' : 'No'),
             if (file.lastViewed != null) ...[
               const SizedBox(height: 12),
-              _buildInfoRow(
-                  ctx, 'Last Viewed', formatDate(file.lastViewed!)),
+              _buildInfoRow(ctx, 'Last Viewed', formatDate(file.lastViewed!)),
             ],
           ],
         ),
