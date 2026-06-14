@@ -1,8 +1,8 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../themes/app_colors.dart';
 import '../services/auth_service.dart';
+import '../widgets/adaptive_logo.dart';
 import 'gallery_vault_screen.dart';
 
 class PasswordSetupScreen extends StatefulWidget {
@@ -15,7 +15,8 @@ class PasswordSetupScreen extends StatefulWidget {
 class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
   final AuthService _authService = AuthService();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
   bool _isConfirmation = false;
   String? _errorMessage;
   bool _isLoading = false;
@@ -80,6 +81,7 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       backgroundColor: context.backgroundColor,
       appBar: AppBar(
         leading: IconButton(
@@ -106,7 +108,9 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        backgroundColor: Colors.transparent,
+        backgroundColor: context.isDarkMode
+            ? Colors.white.withValues(alpha: 0.04)
+            : Colors.white.withValues(alpha: 0.15),
         elevation: 0,
       ),
       body: Stack(
@@ -192,12 +196,9 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
         borderRadius: BorderRadius.circular(16),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: SvgPicture.asset(
-              'assets/locker_logo_nobg.svg',
-              fit: BoxFit.contain,
-            ),
+          child: const Padding(
+            padding: EdgeInsets.all(24),
+            child: AdaptiveLogo(size: 72),
           ),
         ),
       ),
@@ -238,8 +239,11 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
             ),
           ),
           child: TextField(
-            controller: _isConfirmation ? _confirmPasswordController : _passwordController,
-            obscureText: _isConfirmation ? _obscureConfirmPassword : _obscurePassword,
+            controller: _isConfirmation
+                ? _confirmPasswordController
+                : _passwordController,
+            obscureText:
+                _isConfirmation ? _obscureConfirmPassword : _obscurePassword,
             style: TextStyle(
               fontFamily: 'ProductSans',
               fontSize: 16,
@@ -251,7 +255,9 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
                 fontFamily: 'ProductSans',
                 color: context.textSecondary,
               ),
-              hintText: _isConfirmation ? 'Re-enter your password' : 'Enter your password',
+              hintText: _isConfirmation
+                  ? 'Re-enter your password'
+                  : 'Enter your password',
               hintStyle: TextStyle(
                 fontFamily: 'ProductSans',
                 color: context.textTertiary,
