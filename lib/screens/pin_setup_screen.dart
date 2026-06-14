@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../themes/app_colors.dart';
+import '../widgets/adaptive_logo.dart';
 import '../widgets/pin_input_widget.dart';
 import '../services/auth_service.dart';
 import 'gallery_vault_screen.dart';
@@ -72,6 +72,7 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       backgroundColor: context.backgroundColor,
       appBar: AppBar(
         leading: IconButton(
@@ -98,7 +99,9 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        backgroundColor: Colors.transparent,
+        backgroundColor: context.isDarkMode
+            ? Colors.white.withValues(alpha: 0.04)
+            : Colors.white.withValues(alpha: 0.15),
         elevation: 0,
       ),
       body: Stack(
@@ -184,12 +187,9 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
         borderRadius: BorderRadius.circular(16),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: SvgPicture.asset(
-              'assets/locker_logo_nobg.svg',
-              fit: BoxFit.contain,
-            ),
+          child: const Padding(
+            padding: EdgeInsets.all(24),
+            child: AdaptiveLogo(size: 72),
           ),
         ),
       ),
