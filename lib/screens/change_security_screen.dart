@@ -1,10 +1,10 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../themes/app_colors.dart';
 import '../services/auth_service.dart';
 import '../utils/toast_utils.dart';
+import '../widgets/adaptive_logo.dart';
 import 'gallery_vault_screen.dart';
 
 /// Security option type for the change security screen
@@ -86,7 +86,7 @@ class _ChangeSecurityScreenState extends State<ChangeSecurityScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'Change Security',
+          'Security',
           style: TextStyle(
             fontFamily: 'ProductSans',
             color: context.textPrimary,
@@ -98,7 +98,6 @@ class _ChangeSecurityScreenState extends State<ChangeSecurityScreen> {
       ),
       body: Stack(
         children: [
-          _buildBackground(),
           _isLoading
               ? Center(
                   child: CircularProgressIndicator(
@@ -106,75 +105,38 @@ class _ChangeSecurityScreenState extends State<ChangeSecurityScreen> {
                   ),
                 )
               : SafeArea(
-                  child: Padding(
+                  child: SingleChildScrollView(
                     padding: const EdgeInsets.all(24.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const SizedBox(height: 16),
-                        _buildCurrentMethodBadge(),
+                        _buildHeader(),
                         const SizedBox(height: 32),
-                        if (_currentAuthMethod == 'password') ...[
-                          _buildOptionCard(
-                            icon: Icons.lock_outline,
-                            title: 'Change Password',
-                            subtitle: 'Update your current password',
-                            onTap: _navigateToChangePassword,
-                          ),
-                          const SizedBox(height: 16),
-                          _buildOptionCard(
-                            icon: Icons.pin_outlined,
-                            title: 'Switch to PIN',
-                            subtitle: 'Change from password to 6-digit PIN',
-                            onTap: _navigateToChangePIN,
-                          ),
-                        ] else if (_currentAuthMethod == 'pin') ...[
-                          _buildOptionCard(
-                            icon: Icons.pin_outlined,
-                            title: 'Change PIN',
-                            subtitle: 'Update your current PIN',
-                            onTap: _navigateToChangePIN,
-                          ),
-                          const SizedBox(height: 16),
-                          _buildOptionCard(
-                            icon: Icons.lock_outline,
-                            title: 'Switch to Password',
-                            subtitle:
-                                'Change from PIN to alphanumeric password',
-                            onTap: _navigateToChangePassword,
-                          ),
-                        ] else if (_currentAuthMethod == 'biometric') ...[
-                          _buildOptionCard(
-                            icon: Icons.fingerprint,
-                            title: 'Change Biometric',
-                            subtitle: 'Update your biometric settings',
-                            onTap: _navigateToSetupBiometric,
-                          ),
-                          const SizedBox(height: 16),
-                          _buildOptionCard(
-                            icon: Icons.lock_outline,
-                            title: 'Switch to Password',
-                            subtitle: 'Use alphanumeric password instead',
-                            onTap: _navigateToChangePassword,
-                          ),
-                          const SizedBox(height: 16),
-                          _buildOptionCard(
-                            icon: Icons.pin_outlined,
-                            title: 'Switch to PIN',
-                            subtitle: 'Use 6-digit PIN instead',
-                            onTap: _navigateToChangePIN,
-                          ),
-                        ],
-                        const SizedBox(height: 16),
+                        _buildCurrentMethodCard(),
+                        const SizedBox(height: 28),
+                        _buildSectionTitle('Authentication options'),
+                        const SizedBox(height: 12),
+                        ..._buildAuthOptions(),
+                        const SizedBox(height: 24),
                         FutureBuilder<bool>(
                           future: _authService.isBiometricAvailable(),
                           builder: (context, snapshot) {
-                            if (snapshot.data == true) {
-                              return _buildOptionCard(
-                                icon: Icons.fingerprint,
-                                title: 'Enable Biometric',
-                                subtitle: 'Use fingerprint or face to unlock',
-                                onTap: _navigateToSetupBiometric,
+                            if (snapshot.data == true &&
+                                _currentAuthMethod != 'biometric') {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _buildSectionTitle('Biometric'),
+                                  const SizedBox(height: 12),
+                                  _buildOptionCard(
+                                    icon: Icons.fingerprint,
+                                    title: 'Enable Biometric',
+                                    subtitle:
+                                        'Use fingerprint or face to unlock',
+                                    onTap: _navigateToSetupBiometric,
+                                    accentColor: AppColors.darkSuccess,
+                                  ),
+                                ],
                               );
                             }
                             return const SizedBox.shrink();
@@ -189,57 +151,228 @@ class _ChangeSecurityScreenState extends State<ChangeSecurityScreen> {
     );
   }
 
-  Widget _buildBackground() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: context.isDarkMode
-              ? [
-                  const Color(0xFF0F0F12),
-                  const Color(0xFF1A1A2E),
-                  const Color(0xFF16213E),
-                ]
-              : [
-                  const Color(0xFFE8EEF5),
-                  const Color(0xFFF5F7FA),
-                  const Color(0xFFE4E9F2),
-                ],
+  List<Widget> _buildAuthOptions() {
+    switch (_currentAuthMethod) {
+      case 'password':
+        return [
+          _buildOptionCard(
+            icon: Icons.lock_outline,
+            title: 'Change Password',
+            subtitle: 'Update your current password',
+            onTap: _navigateToChangePassword,
+            isPrimary: true,
+          ),
+          const SizedBox(height: 12),
+          _buildOptionCard(
+            icon: Icons.pin_outlined,
+            title: 'Switch to PIN',
+            subtitle: 'Change from password to 6-digit PIN',
+            onTap: _navigateToChangePIN,
+          ),
+        ];
+      case 'pin':
+        return [
+          _buildOptionCard(
+            icon: Icons.pin_outlined,
+            title: 'Change PIN',
+            subtitle: 'Update your current 6-digit PIN',
+            onTap: _navigateToChangePIN,
+            isPrimary: true,
+          ),
+          const SizedBox(height: 12),
+          _buildOptionCard(
+            icon: Icons.lock_outline,
+            title: 'Switch to Password',
+            subtitle: 'Change from PIN to alphanumeric password',
+            onTap: _navigateToChangePassword,
+          ),
+        ];
+      case 'biometric':
+        return [
+          _buildOptionCard(
+            icon: Icons.fingerprint,
+            title: 'Change Biometric',
+            subtitle: 'Update your biometric settings',
+            onTap: _navigateToSetupBiometric,
+            isPrimary: true,
+          ),
+          const SizedBox(height: 12),
+          _buildOptionCard(
+            icon: Icons.lock_outline,
+            title: 'Switch to Password',
+            subtitle: 'Use alphanumeric password instead',
+            onTap: _navigateToChangePassword,
+          ),
+          const SizedBox(height: 12),
+          _buildOptionCard(
+            icon: Icons.pin_outlined,
+            title: 'Switch to PIN',
+            subtitle: 'Use 6-digit PIN instead',
+            onTap: _navigateToChangePIN,
+          ),
+        ];
+      default:
+        return [
+          _buildOptionCard(
+            icon: Icons.lock_outline,
+            title: 'Set Password',
+            subtitle: 'Create an alphanumeric password',
+            onTap: _navigateToChangePassword,
+            isPrimary: true,
+          ),
+        ];
+    }
+  }
+
+  Widget _buildHeader() {
+    return Column(
+      children: [
+        Container(
+          width: 80,
+          height: 80,
+          decoration: BoxDecoration(
+            color: context.accentColor.withValues(alpha: 0.12),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.shield_outlined,
+            size: 40,
+            color: context.accentColor,
+          ),
         ),
+        const SizedBox(height: 20),
+        Text(
+          'Secure your vault',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w700,
+            fontFamily: 'ProductSans',
+            color: context.textPrimary,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Choose how you want to unlock and protect your files',
+          style: TextStyle(
+            fontSize: 15,
+            fontFamily: 'ProductSans',
+            color: context.textSecondary,
+            height: 1.4,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        fontFamily: 'ProductSans',
+        color: context.textTertiary,
+        letterSpacing: 0.5,
       ),
     );
   }
 
-  Widget _buildCurrentMethodBadge() {
-    return Center(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            decoration: BoxDecoration(
+  Widget _buildCurrentMethodCard() {
+    final (icon, label) = switch (_currentAuthMethod) {
+      'password' => (Icons.lock_outline, 'Password'),
+      'pin' => (Icons.pin_outlined, 'PIN'),
+      'biometric' => (Icons.fingerprint, 'Biometric'),
+      _ => (Icons.security, 'None'),
+    };
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: context.isDarkMode
+                ? Colors.white.withValues(alpha: 0.06)
+                : Colors.white.withValues(alpha: 0.25),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
               color: context.isDarkMode
-                  ? Colors.white.withValues(alpha: 0.08)
-                  : Colors.white.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: context.isDarkMode
-                    ? Colors.white.withValues(alpha: 0.15)
-                    : Colors.white.withValues(alpha: 0.2),
-                width: 1,
-              ),
+                  ? Colors.white.withValues(alpha: 0.12)
+                  : Colors.white.withValues(alpha: 0.35),
+              width: 1,
             ),
-            child: Text(
-              'Current: ${_currentAuthMethod!.toUpperCase()}',
-              style: TextStyle(
-                fontSize: 14,
-                color: context.textSecondary,
-                fontFamily: 'ProductSans',
-                fontWeight: FontWeight.w600,
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: context.accentColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: context.accentColor, size: 26),
               ),
-            ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Current method',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontFamily: 'ProductSans',
+                        color: context.textTertiary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'ProductSans',
+                        color: context.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.darkSuccess.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: AppColors.darkSuccess,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Active',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'ProductSans',
+                        color: AppColors.darkSuccess,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -251,70 +384,75 @@ class _ChangeSecurityScreenState extends State<ChangeSecurityScreen> {
     required String title,
     required String subtitle,
     required VoidCallback onTap,
+    bool isPrimary = false,
+    Color? accentColor,
   }) {
-    return ClipRRect(
+    final color = accentColor ?? context.accentColor;
+
+    return Material(
+      color: Colors.transparent,
       borderRadius: BorderRadius.circular(14),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: context.isDarkMode
-                  ? Colors.white.withValues(alpha: 0.05)
-                  : Colors.white.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: context.isDarkMode
-                    ? Colors.white.withValues(alpha: 0.1)
-                    : Colors.white.withValues(alpha: 0.2),
-                width: 1,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: context.isDarkMode
+                ? Colors.white.withValues(alpha: 0.05)
+                : Colors.white.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isPrimary
+                  ? color.withValues(alpha: 0.35)
+                  : context.isDarkMode
+                      ? Colors.white.withValues(alpha: 0.1)
+                      : Colors.white.withValues(alpha: 0.2),
+              width: isPrimary ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(11),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 24),
               ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: context.accentColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(icon, color: context.accentColor, size: 24),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          fontFamily: 'ProductSans',
-                          color: context.textPrimary,
-                        ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'ProductSans',
+                        color: context.textPrimary,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontFamily: 'ProductSans',
-                          color: context.textSecondary,
-                        ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontFamily: 'ProductSans',
+                        color: context.textSecondary,
+                        height: 1.3,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                Icon(
-                  Icons.chevron_right,
-                  color: context.textTertiary,
-                ),
-              ],
-            ),
+              ),
+              Icon(
+                Icons.chevron_right,
+                color: context.textTertiary,
+              ),
+            ],
           ),
         ),
       ),
@@ -474,13 +612,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         ? ['Verify Biometric', 'New Password', 'Confirm Password']
         : widget.currentAuthMethod == 'pin'
             ? ['Verify Current PIN', 'New Password', 'Confirm Password']
-        : ['Verify Current Password', 'New Password', 'Confirm Password'];
+            : ['Verify Current Password', 'New Password', 'Confirm Password'];
     final subtitles = [
       widget.currentAuthMethod == 'biometric'
           ? 'Use your fingerprint or face to verify'
           : widget.currentAuthMethod == 'pin'
               ? 'Enter your current 6-digit PIN to verify'
-          : 'Enter your current password to verify',
+              : 'Enter your current password to verify',
       'Create a new secure password',
       'Enter your new password again to confirm',
     ];
@@ -548,7 +686,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       ),
       body: Stack(
         children: [
-          _buildBackground(),
           _isLoading
               ? Center(
                   child: CircularProgressIndicator(
@@ -603,28 +740,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     );
   }
 
-  Widget _buildBackground() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: context.isDarkMode
-              ? [
-                  const Color(0xFF0F0F12),
-                  const Color(0xFF1A1A2E),
-                  const Color(0xFF16213E),
-                ]
-              : [
-                  const Color(0xFFE8EEF5),
-                  const Color(0xFFF5F7FA),
-                  const Color(0xFFE4E9F2),
-                ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildIcon() {
     return Center(
       child: Container(
@@ -648,10 +763,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
             child: Padding(
               padding: const EdgeInsets.all(20),
-              child: SvgPicture.asset(
-                'assets/locker_logo_nobg.svg',
-                fit: BoxFit.contain,
-              ),
+              child: const AdaptiveLogo(size: 60),
             ),
           ),
         ),
@@ -798,7 +910,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             ),
           ),
           child: GestureDetector(
-            onTap: () => FocusScope.of(context).requestFocus(_currentPinFocusNode),
+            onTap: () =>
+                FocusScope.of(context).requestFocus(_currentPinFocusNode),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -822,7 +935,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: List.generate(6, (index) {
-                    final isFilled = index < _currentCredentialController.text.length;
+                    final isFilled =
+                        index < _currentCredentialController.text.length;
                     return Container(
                       width: 44,
                       height: 52,
@@ -1025,7 +1139,8 @@ class _ChangePINScreenState extends State<ChangePINScreen> {
       }
       final isCurrentCredentialValid = widget.currentAuthMethod == 'pin'
           ? await _authService.verifyPIN(_currentCredentialController.text)
-          : await _authService.verifyPassword(_currentCredentialController.text);
+          : await _authService
+              .verifyPassword(_currentCredentialController.text);
       if (!isCurrentCredentialValid) {
         setState(() {
           _errorMessage = widget.currentAuthMethod == 'pin'
@@ -1136,7 +1251,9 @@ class _ChangePINScreenState extends State<ChangePINScreen> {
       _confirmPINController,
     ];
     final labels = [
-      widget.currentAuthMethod == 'password' ? 'Current Password' : 'Current PIN',
+      widget.currentAuthMethod == 'password'
+          ? 'Current Password'
+          : 'Current PIN',
       'New PIN',
       'Confirm PIN',
     ];
@@ -1179,7 +1296,6 @@ class _ChangePINScreenState extends State<ChangePINScreen> {
       ),
       body: Stack(
         children: [
-          _buildBackground(),
           _isLoading
               ? Center(
                   child: CircularProgressIndicator(
@@ -1240,28 +1356,6 @@ class _ChangePINScreenState extends State<ChangePINScreen> {
     );
   }
 
-  Widget _buildBackground() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: context.isDarkMode
-              ? [
-                  const Color(0xFF0F0F12),
-                  const Color(0xFF1A1A2E),
-                  const Color(0xFF16213E),
-                ]
-              : [
-                  const Color(0xFFE8EEF5),
-                  const Color(0xFFF5F7FA),
-                  const Color(0xFFE4E9F2),
-                ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildIcon() {
     return Center(
       child: Container(
@@ -1285,10 +1379,7 @@ class _ChangePINScreenState extends State<ChangePINScreen> {
             filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
             child: Padding(
               padding: const EdgeInsets.all(20),
-              child: SvgPicture.asset(
-                'assets/locker_logo_nobg.svg',
-                fit: BoxFit.contain,
-              ),
+              child: const AdaptiveLogo(size: 60),
             ),
           ),
         ),
@@ -1717,7 +1808,6 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
       ),
       body: Stack(
         children: [
-          _buildBackground(),
           _isLoading
               ? Center(
                   child: CircularProgressIndicator(
@@ -1768,28 +1858,6 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
     );
   }
 
-  Widget _buildBackground() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: context.isDarkMode
-              ? [
-                  const Color(0xFF0F0F12),
-                  const Color(0xFF1A1A2E),
-                  const Color(0xFF16213E),
-                ]
-              : [
-                  const Color(0xFFE8EEF5),
-                  const Color(0xFFF5F7FA),
-                  const Color(0xFFE4E9F2),
-                ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildIcon() {
     return Center(
       child: Container(
@@ -1813,10 +1881,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
             filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
             child: Padding(
               padding: const EdgeInsets.all(32),
-              child: SvgPicture.asset(
-                'assets/locker_logo_nobg.svg',
-                fit: BoxFit.contain,
-              ),
+              child: const AdaptiveLogo(size: 76),
             ),
           ),
         ),

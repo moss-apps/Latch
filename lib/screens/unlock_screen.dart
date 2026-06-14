@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../themes/app_colors.dart';
 import '../services/auth_service.dart';
 import '../services/decoy_service.dart';
+import '../widgets/adaptive_logo.dart';
 import '../widgets/pin_input_widget.dart';
 import 'gallery_vault_screen.dart';
 
@@ -257,15 +257,10 @@ class _UnlockScreenState extends State<UnlockScreen> {
     if (_isLoading || _authMethod == null) {
       return Scaffold(
         backgroundColor: context.backgroundColor,
-        body: Stack(
-          children: [
-            _buildBackground(),
-            Center(
-              child: CircularProgressIndicator(
-                color: context.accentColor,
-              ),
-            ),
-          ],
+        body: Center(
+          child: CircularProgressIndicator(
+            color: context.accentColor,
+          ),
         ),
       );
     }
@@ -274,7 +269,6 @@ class _UnlockScreenState extends State<UnlockScreen> {
       backgroundColor: context.backgroundColor,
       body: Stack(
         children: [
-          _buildBackground(),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(24.0),
@@ -330,28 +324,6 @@ class _UnlockScreenState extends State<UnlockScreen> {
     );
   }
 
-  Widget _buildBackground() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: context.isDarkMode
-              ? [
-                  const Color(0xFF0F0F12),
-                  const Color(0xFF1A1A2E),
-                  const Color(0xFF16213E),
-                ]
-              : [
-                  const Color(0xFFE8EEF5),
-                  const Color(0xFFF5F7FA),
-                  const Color(0xFFE4E9F2),
-                ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildLogo() {
     return Center(
       child: Container(
@@ -380,16 +352,9 @@ class _UnlockScreenState extends State<UnlockScreen> {
           borderRadius: BorderRadius.circular(16),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: SvgPicture.asset(
-                'assets/locker_logo_nobg.svg',
-                fit: BoxFit.contain,
-                colorFilter: ColorFilter.mode(
-                  context.isDarkMode ? const Color(0xFFF5F5F5) : Colors.black,
-                  BlendMode.srcIn,
-                ),
-              ),
+            child: const Padding(
+              padding: EdgeInsets.all(32),
+              child: AdaptiveLogo(size: 76),
             ),
           ),
         ),

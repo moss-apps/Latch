@@ -17,9 +17,14 @@ import '../widgets/conversion_warning_dialog.dart';
 class DocumentViewerScreen extends ConsumerStatefulWidget {
   final VaultedFile file;
 
+  /// A decrypted file prepared by the caller. When supplied, decryption is not
+  /// performed on the main thread.
+  final File? decryptedFile;
+
   const DocumentViewerScreen({
     super.key,
     required this.file,
+    this.decryptedFile,
   });
 
   @override
@@ -32,6 +37,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
   bool _isConverting = false;
   String? _error;
   Uint8List? _decryptedData;
+  Uint8List? _plainFileData;
   Uint8List? _convertedPdfData;
   String? _textContent;
   PdfViewerController? _pdfController;
@@ -60,6 +66,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
   void dispose() {
     // Clear decrypted data from memory
     _decryptedData = null;
+    _plainFileData = null;
     _convertedPdfData = null;
     // Clean up temp decrypted files to prevent disk leaks
     _cleanupTempFiles();
@@ -110,12 +117,19 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
     });
 
     try {
-      // Get file data (decrypt if needed)
+      // Get file data. Prefer the decrypted file prepared by the caller, and
+      // otherwise read/convert in an isolate where possible.
       Uint8List? fileData;
-      if (widget.file.isEncrypted && widget.file.encryptionIv != null) {
-        fileData = await ref
-            .read(vaultServiceProvider)
-            .getDecryptedFileData(widget.file.id);
+      if (widget.decryptedFile != null) {
+        fileData = await widget.decryptedFile!.readAsBytes();
+      } else if (widget.file.isEncrypted && widget.file.encryptionIv != null) {
+        final decryptedFile =
+            await ref.read(vaultServiceProvider).getVaultedFile(widget.file.id);
+        fileData = decryptedFile != null
+            ? await decryptedFile.readAsBytes()
+            : await ref
+                .read(vaultServiceProvider)
+                .getDecryptedFileData(widget.file.id);
       } else {
         fileData = await File(widget.file.vaultPath).readAsBytes();
       }
@@ -175,11 +189,22 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
     });
 
     try {
-      if (widget.file.isEncrypted && widget.file.encryptionIv != null) {
-        // Decrypt the file
-        final data = await ref
-            .read(vaultServiceProvider)
-            .getDecryptedFileData(widget.file.id);
+      if (widget.decryptedFile != null) {
+        final data = await widget.decryptedFile!.readAsBytes();
+        if (widget.file.isEncrypted && widget.file.encryptionIv != null) {
+          _decryptedData = data;
+        } else {
+          _plainFileData = data;
+        }
+      } else if (widget.file.isEncrypted && widget.file.encryptionIv != null) {
+        // Decrypt the file outside the main thread when possible.
+        final decryptedFile =
+            await ref.read(vaultServiceProvider).getVaultedFile(widget.file.id);
+        final data = decryptedFile != null
+            ? await decryptedFile.readAsBytes()
+            : await ref
+                .read(vaultServiceProvider)
+                .getDecryptedFileData(widget.file.id);
         if (data == null) {
           setState(() {
             _error = 'Failed to decrypt document';
@@ -188,6 +213,9 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
           return;
         }
         _decryptedData = data;
+      } else if (_isPdf || _isTextFile) {
+        // Pre-load PDF/text bytes so the viewer does not block the UI thread.
+        _plainFileData = await File(widget.file.vaultPath).readAsBytes();
       }
 
       // Load text content for text files
@@ -223,8 +251,9 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
 
   Future<void> _loadTextContent() async {
     try {
-      if (_decryptedData != null) {
-        _textContent = String.fromCharCodes(_decryptedData!);
+      final bytes = _decryptedData ?? _plainFileData;
+      if (bytes != null) {
+        _textContent = String.fromCharCodes(bytes);
       } else {
         final file = File(widget.file.vaultPath);
         _textContent = await file.readAsString();
@@ -321,8 +350,8 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
         ),
       );
 
-      final vaultService = ref.read(vaultServiceProvider);
-      final decryptedFile = await vaultService.getVaultedFile(widget.file.id);
+      final decryptedFile = widget.decryptedFile ??
+          await ref.read(vaultServiceProvider).getVaultedFile(widget.file.id);
 
       if (mounted) Navigator.pop(context);
 
@@ -614,8 +643,18 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
   }
 
   Widget _buildPdfViewer() {
-    final pdfData =
-        _decryptedData ?? File(widget.file.vaultPath).readAsBytesSync();
+    final pdfData = _decryptedData ?? _plainFileData;
+    if (pdfData == null) {
+      return Center(
+        child: Text(
+          'No PDF data available',
+          style: TextStyle(
+            fontFamily: 'ProductSans',
+            color: context.textSecondary,
+          ),
+        ),
+      );
+    }
 
     return PdfViewer.data(
       pdfData,

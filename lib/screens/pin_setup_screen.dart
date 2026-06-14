@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../themes/app_colors.dart';
+import '../widgets/adaptive_logo.dart';
 import '../widgets/pin_input_widget.dart';
 import '../services/auth_service.dart';
 import 'gallery_vault_screen.dart';
@@ -103,7 +103,6 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
       ),
       body: Stack(
         children: [
-          _buildBackground(),
           _isLoading
               ? Center(
                   child: CircularProgressIndicator(
@@ -135,28 +134,6 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
     );
   }
 
-  Widget _buildBackground() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: context.isDarkMode
-              ? [
-                  const Color(0xFF0F0F12),
-                  const Color(0xFF1A1A2E),
-                  const Color(0xFF16213E),
-                ]
-              : [
-                  const Color(0xFFE8EEF5),
-                  const Color(0xFFF5F7FA),
-                  const Color(0xFFE4E9F2),
-                ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildIcon() {
     return Container(
       width: 120,
@@ -184,12 +161,9 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
         borderRadius: BorderRadius.circular(16),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: SvgPicture.asset(
-              'assets/locker_logo_nobg.svg',
-              fit: BoxFit.contain,
-            ),
+          child: const Padding(
+            padding: EdgeInsets.all(24),
+            child: AdaptiveLogo(size: 72),
           ),
         ),
       ),

@@ -22,11 +22,16 @@ class MediaViewerScreen extends ConsumerStatefulWidget {
   final List<VaultedFile> files;
   final int initialIndex;
 
+  /// A decrypted file already prepared by the caller. Used for the initial
+  /// file so decryption does not happen on the main thread.
+  final File? initialDecryptedFile;
+
   const MediaViewerScreen({
     super.key,
     required this.initialFile,
     required this.files,
     required this.initialIndex,
+    this.initialDecryptedFile,
   });
 
   @override
@@ -107,14 +112,22 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
       return;
     }
 
-    // Pre-load decrypted data for encrypted images only
-    if (file.isEncrypted && file.isImage && !_decryptedCache.containsKey(file.id)) {
-      final data =
-          await ref.read(vaultServiceProvider).getDecryptedFileData(file.id);
-      if (mounted) {
-        setState(() {
-          _decryptedCache[file.id] = data;
-        });
+    // Pre-load decrypted data for encrypted images only. Decrypt to a temp
+    // file in the crypto isolate pool (when possible) and then read the bytes.
+    if (file.isEncrypted &&
+        file.isImage &&
+        !_decryptedCache.containsKey(file.id)) {
+      final decryptedFile = file.id == widget.initialFile.id
+          ? widget.initialDecryptedFile
+          : await ref.read(vaultServiceProvider).getVaultedFile(file.id);
+
+      if (decryptedFile != null && await decryptedFile.exists()) {
+        final data = await decryptedFile.readAsBytes();
+        if (mounted) {
+          setState(() {
+            _decryptedCache[file.id] = data;
+          });
+        }
       }
     }
   }
@@ -128,6 +141,30 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
     if (!file.isVideo) return;
 
     try {
+      // If the caller already prepared a decrypted file, use it directly.
+      final preDecryptedFile =
+          file.id == widget.initialFile.id ? widget.initialDecryptedFile : null;
+
+      if (preDecryptedFile != null && await preDecryptedFile.exists()) {
+        if (mounted && !cancel.isCompleted) {
+          setState(() {
+            _videoPhase = _VideoLoadPhase.initializing;
+            _decryptProgress = null;
+          });
+        }
+
+        final controller = VideoPlayerController.file(preDecryptedFile);
+        await controller.initialize();
+
+        if (cancel.isCompleted) {
+          controller.dispose();
+          return;
+        }
+
+        await _setupController(controller);
+        return;
+      }
+
       // Phase 1: decrypt
       if (file.isEncrypted && file.encryptionIv != null) {
         if (mounted && !cancel.isCompleted) {
@@ -410,7 +447,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   }
 
   void _toggleVideoPlayback() {
-    if (_videoController == null || _videoPhase != _VideoLoadPhase.ready) return;
+    if (_videoController == null || _videoPhase != _VideoLoadPhase.ready) {
+      return;
+    }
 
     setState(() {
       if (_isVideoPlaying) {
@@ -423,12 +462,16 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   }
 
   void _seekVideo(Duration position) {
-    if (_videoController == null || _videoPhase != _VideoLoadPhase.ready) return;
+    if (_videoController == null || _videoPhase != _VideoLoadPhase.ready) {
+      return;
+    }
     _videoController!.seekTo(position);
   }
 
   void _skipForward() {
-    if (_videoController == null || _videoPhase != _VideoLoadPhase.ready) return;
+    if (_videoController == null || _videoPhase != _VideoLoadPhase.ready) {
+      return;
+    }
     final newPos =
         _videoController!.value.position + const Duration(seconds: 10);
     final duration = _videoController!.value.duration;
@@ -436,7 +479,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   }
 
   void _skipBackward() {
-    if (_videoController == null || _videoPhase != _VideoLoadPhase.ready) return;
+    if (_videoController == null || _videoPhase != _VideoLoadPhase.ready) {
+      return;
+    }
     final newPos =
         _videoController!.value.position - const Duration(seconds: 10);
     _seekVideo(newPos < Duration.zero ? Duration.zero : newPos);
@@ -938,7 +983,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (_videoPhase == _VideoLoadPhase.decrypting && _decryptProgress != null) ...[
+            if (_videoPhase == _VideoLoadPhase.decrypting &&
+                _decryptProgress != null) ...[
               SizedBox(
                 width: 200,
                 child: ClipRRect(

@@ -25,9 +25,7 @@ import 'favorites_screen.dart';
 import 'tags_screen.dart';
 import 'folders_screen.dart';
 import 'vault_explorer_screen.dart';
-import 'media_viewer_screen.dart';
-import 'document_viewer_screen.dart';
-import 'song_player_screen.dart';
+import '../services/file_open_service.dart';
 import '../widgets/permission_warning_banner.dart';
 import 'media_picker_screen.dart';
 import 'document_picker_screen.dart';
@@ -1150,52 +1148,15 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
   }
 
   void _openFile(VaultedFile file) {
-    if (file.metadata?['noteId'] != null) {
-      final noteId = file.metadata?['noteId'] as String?;
-      if (noteId != null) {
-        _openNoteFromVault(noteId);
-      }
-      return;
-    }
-
     final filesAsync = ref.read(vaultNotifierProvider);
-    final allFiles = filesAsync.value ?? [];
-
-    List<VaultedFile> viewerFiles;
-    int initialIndex;
-
-    if (file.isImage || file.isVideo) {
-      viewerFiles = allFiles.where((f) => f.isImage || f.isVideo).toList();
-      initialIndex = viewerFiles.indexWhere((f) => f.id == file.id);
-      if (initialIndex == -1) initialIndex = 0;
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => MediaViewerScreen(
-            initialFile: file,
-            files: viewerFiles,
-            initialIndex: initialIndex,
-          ),
-        ),
-      );
-    } else if (file.isSong) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => SongPlayerScreen(file: file),
-        ),
-      );
-    } else if (file.isDocument) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => DocumentViewerScreen(file: file),
-        ),
-      );
-    } else {
-      _showFileOptionsSheet(file);
-    }
+    FileOpenService.open(
+      context,
+      ref,
+      file,
+      currentFiles: filesAsync.value ?? [],
+      onUnsupported: () => _showFileOptionsSheet(file),
+      onOpenNote: (noteId) => _openNoteFromVault(noteId),
+    );
   }
 
   void _openNoteFromVault(String noteId) {
@@ -3076,9 +3037,11 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
 
     if (confirmedSettings == null) return;
 
-    final perFileEncryption = <String, ({bool encrypt, EncryptionAlgorithm algorithm})>{};
+    final perFileEncryption =
+        <String, ({bool encrypt, EncryptionAlgorithm algorithm})>{};
     for (final s in confirmedSettings) {
-      perFileEncryption[s.filePath] = (encrypt: s.encrypt, algorithm: s.algorithm);
+      perFileEncryption[s.filePath] =
+          (encrypt: s.encrypt, algorithm: s.algorithm);
     }
 
     final progressState = ValueNotifier<OperationProgressState>(
@@ -3205,9 +3168,11 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
 
     if (confirmedSettings == null) return;
 
-    final perFileEncryption = <String, ({bool encrypt, EncryptionAlgorithm algorithm})>{};
+    final perFileEncryption =
+        <String, ({bool encrypt, EncryptionAlgorithm algorithm})>{};
     for (final s in confirmedSettings) {
-      perFileEncryption[s.filePath] = (encrypt: s.encrypt, algorithm: s.algorithm);
+      perFileEncryption[s.filePath] =
+          (encrypt: s.encrypt, algorithm: s.algorithm);
     }
 
     final progressState = ValueNotifier<OperationProgressState>(
@@ -3539,9 +3504,11 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
 
     if (confirmedSettings == null) return;
 
-    final perFileEncryption = <String, ({bool encrypt, EncryptionAlgorithm algorithm})>{};
+    final perFileEncryption =
+        <String, ({bool encrypt, EncryptionAlgorithm algorithm})>{};
     for (final s in confirmedSettings) {
-      perFileEncryption[s.filePath] = (encrypt: s.encrypt, algorithm: s.algorithm);
+      perFileEncryption[s.filePath] =
+          (encrypt: s.encrypt, algorithm: s.algorithm);
     }
 
     setState(() {
@@ -3646,9 +3613,11 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
 
     if (confirmedSettings == null) return;
 
-    final perFileEncryption = <String, ({bool encrypt, EncryptionAlgorithm algorithm})>{};
+    final perFileEncryption =
+        <String, ({bool encrypt, EncryptionAlgorithm algorithm})>{};
     for (final s in confirmedSettings) {
-      perFileEncryption[s.filePath] = (encrypt: s.encrypt, algorithm: s.algorithm);
+      perFileEncryption[s.filePath] =
+          (encrypt: s.encrypt, algorithm: s.algorithm);
     }
 
     setState(() {
@@ -3730,9 +3699,11 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
 
     if (confirmedSettings == null) return;
 
-    final perFileEncryption = <String, ({bool encrypt, EncryptionAlgorithm algorithm})>{};
+    final perFileEncryption =
+        <String, ({bool encrypt, EncryptionAlgorithm algorithm})>{};
     for (final s in confirmedSettings) {
-      perFileEncryption[s.filePath] = (encrypt: s.encrypt, algorithm: s.algorithm);
+      perFileEncryption[s.filePath] =
+          (encrypt: s.encrypt, algorithm: s.algorithm);
     }
 
     setState(() {

@@ -10,9 +10,7 @@ import '../services/auto_kill_service.dart';
 import '../themes/app_colors.dart';
 import '../utils/toast_utils.dart';
 import '../utils/responsive_utils.dart';
-import 'media_viewer_screen.dart';
-import 'document_viewer_screen.dart';
-import 'song_player_screen.dart';
+import '../services/file_open_service.dart';
 
 /// Predefined tag colors
 final List<Color> tagColors = [
@@ -84,8 +82,8 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
       final files = _selectedTag != null
           ? (ref.read(filesByTagProvider(_selectedTag!)).value ?? [])
           : <VaultedFile>[];
-      final allSelected = files.isNotEmpty &&
-          files.every((f) => _selectedFiles.contains(f.id));
+      final allSelected =
+          files.isNotEmpty && files.every((f) => _selectedFiles.contains(f.id));
 
       return AppBar(
         backgroundColor: context.accentColor,
@@ -627,39 +625,13 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
 
   void _openFile(VaultedFile file) {
     final filesAsync = ref.read(filesByTagProvider(_selectedTag!));
-    final files = filesAsync.value ?? [];
-
-    if (file.isImage || file.isVideo) {
-      final viewerFiles = files.where((f) => f.isImage || f.isVideo).toList();
-      final initialIndex = viewerFiles.indexWhere((f) => f.id == file.id);
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => MediaViewerScreen(
-            initialFile: file,
-            files: viewerFiles,
-            initialIndex: initialIndex >= 0 ? initialIndex : 0,
-          ),
-        ),
-      );
-    } else if (file.isSong) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => SongPlayerScreen(file: file),
-        ),
-      );
-    } else if (file.isDocument) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => DocumentViewerScreen(file: file),
-        ),
-      );
-    } else {
-      _showFileOptionsSheet(file);
-    }
+    FileOpenService.open(
+      context,
+      ref,
+      file,
+      currentFiles: filesAsync.value ?? [],
+      onUnsupported: () => _showFileOptionsSheet(file),
+    );
   }
 
   void _showFileOptionsSheet(VaultedFile file) {

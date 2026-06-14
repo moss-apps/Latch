@@ -12,9 +12,7 @@ import '../services/vault_service.dart';
 import '../themes/app_colors.dart';
 import '../utils/toast_utils.dart';
 import '../utils/responsive_utils.dart';
-import 'media_viewer_screen.dart';
-import 'document_viewer_screen.dart';
-import 'song_player_screen.dart';
+import '../services/file_open_service.dart';
 
 class FolderDetailScreen extends ConsumerStatefulWidget {
   final String folderId;
@@ -43,7 +41,8 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
         error: (error, _) => Center(
           child: Text(
             'Error loading folder',
-            style: TextStyle(fontFamily: 'ProductSans', color: context.textSecondary),
+            style: TextStyle(
+                fontFamily: 'ProductSans', color: context.textSecondary),
           ),
         ),
         data: (folder) {
@@ -51,7 +50,8 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
             return Center(
               child: Text(
                 'Folder not found',
-                style: TextStyle(fontFamily: 'ProductSans', color: context.textSecondary),
+                style: TextStyle(
+                    fontFamily: 'ProductSans', color: context.textSecondary),
               ),
             );
           }
@@ -78,8 +78,10 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
 
   PreferredSizeWidget _buildAppBar(AsyncValue<VaultFolder?> folderAsync) {
     if (_isSelectionMode) {
-      final files = ref.read(filesInFolderProvider(widget.folderId)).value ?? [];
-      final allSelected = files.isNotEmpty && files.every((f) => _selectedFiles.contains(f.id));
+      final files =
+          ref.read(filesInFolderProvider(widget.folderId)).value ?? [];
+      final allSelected =
+          files.isNotEmpty && files.every((f) => _selectedFiles.contains(f.id));
 
       return AppBar(
         backgroundColor: context.accentColor,
@@ -89,7 +91,8 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
         ),
         title: Text(
           '${_selectedFiles.length} selected',
-          style: const TextStyle(fontFamily: 'ProductSans', color: Colors.white),
+          style:
+              const TextStyle(fontFamily: 'ProductSans', color: Colors.white),
         ),
         actions: [
           if (files.isNotEmpty)
@@ -97,7 +100,8 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
               onPressed: _toggleSelectAll,
               child: Text(
                 allSelected ? 'Deselect All' : 'Select All',
-                style: const TextStyle(color: Colors.white, fontFamily: 'ProductSans'),
+                style: const TextStyle(
+                    color: Colors.white, fontFamily: 'ProductSans'),
               ),
             ),
           IconButton(
@@ -205,7 +209,8 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
       error: (error, _) => Center(
         child: Text(
           'Error loading files',
-          style: TextStyle(fontFamily: 'ProductSans', color: context.textSecondary),
+          style: TextStyle(
+              fontFamily: 'ProductSans', color: context.textSecondary),
         ),
       ),
       data: (files) {
@@ -214,7 +219,8 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
           error: (error, _) => Center(
             child: Text(
               'Error loading subfolders',
-              style: TextStyle(fontFamily: 'ProductSans', color: context.textSecondary),
+              style: TextStyle(
+                  fontFamily: 'ProductSans', color: context.textSecondary),
             ),
           ),
           data: (subfolders) {
@@ -311,7 +317,8 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
           children: [
             Expanded(
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(16)),
                 child: Container(
                   color: context.accentColor.withValues(alpha: 0.1),
                   child: Center(
@@ -370,7 +377,8 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
       parts.add('${folder.fileCount} file${folder.fileCount == 1 ? '' : 's'}');
     }
     if (folder.subfolderCount > 0) {
-      parts.add('${folder.subfolderCount} folder${folder.subfolderCount == 1 ? '' : 's'}');
+      parts.add(
+          '${folder.subfolderCount} folder${folder.subfolderCount == 1 ? '' : 's'}');
     }
     if (parts.isEmpty) return 'Empty';
     return parts.join(', ');
@@ -437,7 +445,8 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                   shape: BoxShape.circle,
                   color: isSelected ? context.accentColor : Colors.white,
                   border: Border.all(
-                    color: isSelected ? context.accentColor : context.borderColor,
+                    color:
+                        isSelected ? context.accentColor : context.borderColor,
                     width: 2,
                   ),
                 ),
@@ -635,7 +644,8 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: context.accentColor,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(24),
                   ),
@@ -649,7 +659,8 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: context.accentColor,
                   side: BorderSide(color: context.accentColor),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(24),
                   ),
@@ -672,39 +683,14 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
   }
 
   void _openFile(VaultedFile file) {
-    if (file.isImage || file.isVideo) {
-      final filesAsync = ref.read(filesInFolderProvider(widget.folderId));
-      final files = filesAsync.value ?? [];
-      final viewerFiles =
-          files.where((f) => f.isImage || f.isVideo).toList();
-      final startIndex = viewerFiles.indexWhere((f) => f.id == file.id);
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => MediaViewerScreen(
-            initialFile: file,
-            files: viewerFiles.isNotEmpty ? viewerFiles : [file],
-            initialIndex: startIndex >= 0 ? startIndex : 0,
-          ),
-        ),
-      );
-    } else if (file.isSong) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => SongPlayerScreen(file: file),
-        ),
-      );
-    } else if (file.isDocument) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => DocumentViewerScreen(file: file),
-        ),
-      );
-    } else {
-      _showOtherFileOptions(file);
-    }
+    final filesAsync = ref.read(filesInFolderProvider(widget.folderId));
+    FileOpenService.open(
+      context,
+      ref,
+      file,
+      currentFiles: filesAsync.value ?? [],
+      onUnsupported: () => _showOtherFileOptions(file),
+    );
   }
 
   void _showOtherFileOptions(VaultedFile file) {
@@ -755,7 +741,8 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                       },
                     ),
                     ListTile(
-                      leading: Icon(Icons.open_in_new, color: context.accentColor),
+                      leading:
+                          Icon(Icons.open_in_new, color: context.accentColor),
                       title: const Text('Open with...'),
                       onTap: () {
                         Navigator.pop(context);
@@ -847,21 +834,28 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         title: Text(
           'Remove from Folder',
-          style: TextStyle(fontFamily: 'ProductSans', color: context.textPrimary),
+          style:
+              TextStyle(fontFamily: 'ProductSans', color: context.textPrimary),
         ),
         content: Text(
           'Remove ${_selectedFiles.length} file${_selectedFiles.length == 1 ? '' : 's'} from this folder? The files will not be deleted from the vault.',
-          style: TextStyle(fontFamily: 'ProductSans', color: context.textSecondary),
+          style: TextStyle(
+              fontFamily: 'ProductSans', color: context.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel', style: TextStyle(fontFamily: 'ProductSans', color: context.textSecondary)),
+            child: Text('Cancel',
+                style: TextStyle(
+                    fontFamily: 'ProductSans', color: context.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
-            child: const Text('Remove', style: TextStyle(fontFamily: 'ProductSans')),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error,
+                foregroundColor: Colors.white),
+            child: const Text('Remove',
+                style: TextStyle(fontFamily: 'ProductSans')),
           ),
         ],
       ),
@@ -891,21 +885,28 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         title: Text(
           'Delete Files',
-          style: TextStyle(fontFamily: 'ProductSans', color: context.textPrimary),
+          style:
+              TextStyle(fontFamily: 'ProductSans', color: context.textPrimary),
         ),
         content: Text(
           'Permanently delete ${_selectedFiles.length} file${_selectedFiles.length == 1 ? '' : 's'}? This cannot be undone.',
-          style: TextStyle(fontFamily: 'ProductSans', color: context.textSecondary),
+          style: TextStyle(
+              fontFamily: 'ProductSans', color: context.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel', style: TextStyle(fontFamily: 'ProductSans', color: context.textSecondary)),
+            child: Text('Cancel',
+                style: TextStyle(
+                    fontFamily: 'ProductSans', color: context.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
-            child: const Text('Delete', style: TextStyle(fontFamily: 'ProductSans')),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error,
+                foregroundColor: Colors.white),
+            child: const Text('Delete',
+                style: TextStyle(fontFamily: 'ProductSans')),
           ),
         ],
       ),
@@ -913,7 +914,9 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
 
     if (confirmed != true) return;
 
-    await ref.read(vaultNotifierProvider.notifier).deleteFiles(_selectedFiles.toList());
+    await ref
+        .read(vaultNotifierProvider.notifier)
+        .deleteFiles(_selectedFiles.toList());
 
     _exitSelectionMode();
     ref.invalidate(filesInFolderProvider(widget.folderId));
@@ -963,11 +966,15 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                           contentPadding: EdgeInsets.zero,
                           title: Text(
                             option.displayName,
-                            style: TextStyle(fontFamily: 'ProductSans', color: context.textPrimary),
+                            style: TextStyle(
+                                fontFamily: 'ProductSans',
+                                color: context.textPrimary),
                           ),
                           onTap: () {
-                            ref.read(sortOptionProvider.notifier).state = option;
-                            ref.invalidate(filesInFolderProvider(widget.folderId));
+                            ref.read(sortOptionProvider.notifier).state =
+                                option;
+                            ref.invalidate(
+                                filesInFolderProvider(widget.folderId));
                             Navigator.pop(context);
                           },
                         )),
@@ -990,13 +997,15 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         title: Text(
           'Create Subfolder',
-          style: TextStyle(fontFamily: 'ProductSans', color: context.textPrimary),
+          style:
+              TextStyle(fontFamily: 'ProductSans', color: context.textPrimary),
         ),
         content: TextField(
           controller: nameController,
           decoration: InputDecoration(
             labelText: 'Folder Name',
-            labelStyle: TextStyle(fontFamily: 'ProductSans', color: context.textSecondary),
+            labelStyle: TextStyle(
+                fontFamily: 'ProductSans', color: context.textSecondary),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -1008,7 +1017,9 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: TextStyle(fontFamily: 'ProductSans', color: context.textSecondary)),
+            child: Text('Cancel',
+                style: TextStyle(
+                    fontFamily: 'ProductSans', color: context.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -1018,10 +1029,11 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                 return;
               }
 
-              final folder = await ref.read(foldersNotifierProvider.notifier).createFolder(
-                    name: name,
-                    parentId: widget.folderId,
-                  );
+              final folder =
+                  await ref.read(foldersNotifierProvider.notifier).createFolder(
+                        name: name,
+                        parentId: widget.folderId,
+                      );
 
               if (!context.mounted) return;
               Navigator.pop(context);
@@ -1033,8 +1045,11 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                 ToastUtils.showError('Failed to create subfolder');
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: context.accentColor, foregroundColor: Colors.white),
-            child: const Text('Create', style: TextStyle(fontFamily: 'ProductSans')),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: context.accentColor,
+                foregroundColor: Colors.white),
+            child: const Text('Create',
+                style: TextStyle(fontFamily: 'ProductSans')),
           ),
         ],
       ),
@@ -1083,8 +1098,12 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                     ),
                     const SizedBox(height: 20),
                     ListTile(
-                      leading: Icon(Icons.edit_outlined, color: context.textPrimary),
-                      title: Text('Rename', style: TextStyle(fontFamily: 'ProductSans', color: context.textPrimary)),
+                      leading:
+                          Icon(Icons.edit_outlined, color: context.textPrimary),
+                      title: Text('Rename',
+                          style: TextStyle(
+                              fontFamily: 'ProductSans',
+                              color: context.textPrimary)),
                       contentPadding: EdgeInsets.zero,
                       onTap: () {
                         Navigator.pop(context);
@@ -1092,8 +1111,12 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                       },
                     ),
                     ListTile(
-                      leading: Icon(Icons.delete_outline, color: AppColors.error),
-                      title: Text('Delete', style: TextStyle(fontFamily: 'ProductSans', color: AppColors.error)),
+                      leading:
+                          Icon(Icons.delete_outline, color: AppColors.error),
+                      title: Text('Delete',
+                          style: TextStyle(
+                              fontFamily: 'ProductSans',
+                              color: AppColors.error)),
                       contentPadding: EdgeInsets.zero,
                       onTap: () {
                         Navigator.pop(context);
@@ -1118,12 +1141,15 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        title: Text('Rename Subfolder', style: TextStyle(fontFamily: 'ProductSans', color: context.textPrimary)),
+        title: Text('Rename Subfolder',
+            style: TextStyle(
+                fontFamily: 'ProductSans', color: context.textPrimary)),
         content: TextField(
           controller: nameController,
           decoration: InputDecoration(
             labelText: 'Folder Name',
-            labelStyle: TextStyle(fontFamily: 'ProductSans', color: context.textSecondary),
+            labelStyle: TextStyle(
+                fontFamily: 'ProductSans', color: context.textSecondary),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -1135,7 +1161,9 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: TextStyle(fontFamily: 'ProductSans', color: context.textSecondary)),
+            child: Text('Cancel',
+                style: TextStyle(
+                    fontFamily: 'ProductSans', color: context.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -1145,9 +1173,10 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                 return;
               }
 
-              final updated = await ref.read(foldersNotifierProvider.notifier).updateFolder(
-                    subfolder.copyWith(name: name),
-                  );
+              final updated =
+                  await ref.read(foldersNotifierProvider.notifier).updateFolder(
+                        subfolder.copyWith(name: name),
+                      );
 
               if (!context.mounted) return;
               Navigator.pop(context);
@@ -1158,8 +1187,11 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                 ToastUtils.showError('Failed to rename subfolder');
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: context.accentColor, foregroundColor: Colors.white),
-            child: const Text('Rename', style: TextStyle(fontFamily: 'ProductSans')),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: context.accentColor,
+                foregroundColor: Colors.white),
+            child: const Text('Rename',
+                style: TextStyle(fontFamily: 'ProductSans')),
           ),
         ],
       ),
@@ -1171,19 +1203,26 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        title: Text('Delete Subfolder', style: TextStyle(fontFamily: 'ProductSans', color: context.textPrimary)),
+        title: Text('Delete Subfolder',
+            style: TextStyle(
+                fontFamily: 'ProductSans', color: context.textPrimary)),
         content: Text(
           'Are you sure you want to delete "${subfolder.name}"? Files in this subfolder will not be deleted from the vault.',
-          style: TextStyle(fontFamily: 'ProductSans', color: context.textSecondary),
+          style: TextStyle(
+              fontFamily: 'ProductSans', color: context.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: TextStyle(fontFamily: 'ProductSans', color: context.textSecondary)),
+            child: Text('Cancel',
+                style: TextStyle(
+                    fontFamily: 'ProductSans', color: context.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () async {
-              final deleted = await ref.read(foldersNotifierProvider.notifier).deleteFolder(subfolder.id);
+              final deleted = await ref
+                  .read(foldersNotifierProvider.notifier)
+                  .deleteFolder(subfolder.id);
 
               if (!context.mounted) return;
               Navigator.pop(context);
@@ -1195,8 +1234,11 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                 ToastUtils.showError('Failed to delete subfolder');
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
-            child: const Text('Delete', style: TextStyle(fontFamily: 'ProductSans')),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error,
+                foregroundColor: Colors.white),
+            child: const Text('Delete',
+                style: TextStyle(fontFamily: 'ProductSans')),
           ),
         ],
       ),
@@ -1208,8 +1250,10 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
     final folderFilesAsync = ref.read(filesInFolderProvider(widget.folderId));
 
     final allFiles = allFilesAsync.value ?? [];
-    final folderFileIds = (folderFilesAsync.value ?? []).map((f) => f.id).toSet();
-    final availableFiles = allFiles.where((f) => !folderFileIds.contains(f.id)).toList();
+    final folderFileIds =
+        (folderFilesAsync.value ?? []).map((f) => f.id).toSet();
+    final availableFiles =
+        allFiles.where((f) => !folderFileIds.contains(f.id)).toList();
 
     showModalBottomSheet(
       context: context,
@@ -1285,8 +1329,12 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                     ),
                     const SizedBox(height: 20),
                     ListTile(
-                      leading: Icon(Icons.add_photo_alternate, color: context.accentColor),
-                      title: Text('Add Files from Vault', style: TextStyle(fontFamily: 'ProductSans', color: context.textPrimary)),
+                      leading: Icon(Icons.add_photo_alternate,
+                          color: context.accentColor),
+                      title: Text('Add Files from Vault',
+                          style: TextStyle(
+                              fontFamily: 'ProductSans',
+                              color: context.textPrimary)),
                       contentPadding: EdgeInsets.zero,
                       onTap: () {
                         Navigator.pop(context);
@@ -1294,8 +1342,12 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                       },
                     ),
                     ListTile(
-                      leading: Icon(Icons.create_new_folder_outlined, color: context.accentColor),
-                      title: Text('Create Subfolder', style: TextStyle(fontFamily: 'ProductSans', color: context.textPrimary)),
+                      leading: Icon(Icons.create_new_folder_outlined,
+                          color: context.accentColor),
+                      title: Text('Create Subfolder',
+                          style: TextStyle(
+                              fontFamily: 'ProductSans',
+                              color: context.textPrimary)),
                       contentPadding: EdgeInsets.zero,
                       onTap: () {
                         Navigator.pop(context);
@@ -1303,8 +1355,12 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                       },
                     ),
                     ListTile(
-                      leading: Icon(Icons.drive_folder_upload_outlined, color: context.accentColor),
-                      title: Text('Import from Device', style: TextStyle(fontFamily: 'ProductSans', color: context.textPrimary)),
+                      leading: Icon(Icons.drive_folder_upload_outlined,
+                          color: context.accentColor),
+                      title: Text('Import from Device',
+                          style: TextStyle(
+                              fontFamily: 'ProductSans',
+                              color: context.textPrimary)),
                       contentPadding: EdgeInsets.zero,
                       onTap: () {
                         Navigator.pop(context);
@@ -1334,10 +1390,12 @@ class _AddFilesToFolderSheet extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<_AddFilesToFolderSheet> createState() => _AddFilesToFolderSheetState();
+  ConsumerState<_AddFilesToFolderSheet> createState() =>
+      _AddFilesToFolderSheetState();
 }
 
-class _AddFilesToFolderSheetState extends ConsumerState<_AddFilesToFolderSheet> {
+class _AddFilesToFolderSheetState
+    extends ConsumerState<_AddFilesToFolderSheet> {
   final Set<String> _selectedFileIds = {};
   bool _isAdding = false;
 
@@ -1389,7 +1447,8 @@ class _AddFilesToFolderSheetState extends ConsumerState<_AddFilesToFolderSheet> 
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
                           )
                         : Text(
                             'Add (${_selectedFileIds.length})',
@@ -1405,11 +1464,14 @@ class _AddFilesToFolderSheetState extends ConsumerState<_AddFilesToFolderSheet> 
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.inbox, size: 64, color: context.textTertiary),
+                        Icon(Icons.inbox,
+                            size: 64, color: context.textTertiary),
                         const SizedBox(height: 16),
                         Text(
                           'No files available',
-                          style: TextStyle(fontFamily: 'ProductSans', color: context.textSecondary),
+                          style: TextStyle(
+                              fontFamily: 'ProductSans',
+                              color: context.textSecondary),
                         ),
                         const SizedBox(height: 8),
                         Text(
@@ -1456,11 +1518,13 @@ class _AddFilesToFolderSheetState extends ConsumerState<_AddFilesToFolderSheet> 
                                 color: context.backgroundSecondary,
                                 borderRadius: BorderRadius.circular(8),
                                 border: isSelected
-                                    ? Border.all(color: context.accentColor, width: 3)
+                                    ? Border.all(
+                                        color: context.accentColor, width: 3)
                                     : null,
                               ),
                               child: ClipRRect(
-                                borderRadius: BorderRadius.circular(isSelected ? 5 : 8),
+                                borderRadius:
+                                    BorderRadius.circular(isSelected ? 5 : 8),
                                 child: _buildFileThumbnail(file),
                               ),
                             ),
@@ -1474,9 +1538,11 @@ class _AddFilesToFolderSheetState extends ConsumerState<_AddFilesToFolderSheet> 
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     color: context.accentColor,
-                                    border: Border.all(color: Colors.white, width: 2),
+                                    border: Border.all(
+                                        color: Colors.white, width: 2),
                                   ),
-                                  child: const Icon(Icons.check, size: 16, color: Colors.white),
+                                  child: const Icon(Icons.check,
+                                      size: 16, color: Colors.white),
                                 ),
                               ),
                           ],
@@ -1568,7 +1634,9 @@ class _AddFilesToFolderSheetState extends ConsumerState<_AddFilesToFolderSheet> 
     setState(() => _isAdding = true);
 
     for (final fileId in _selectedFileIds) {
-      await ref.read(foldersNotifierProvider.notifier).addFileToFolder(fileId, widget.folderId);
+      await ref
+          .read(foldersNotifierProvider.notifier)
+          .addFileToFolder(fileId, widget.folderId);
     }
 
     widget.onFilesAdded();
@@ -1584,7 +1652,8 @@ class _FolderImportPickerScreen extends StatefulWidget {
   const _FolderImportPickerScreen();
 
   @override
-  State<_FolderImportPickerScreen> createState() => _FolderImportPickerScreenState();
+  State<_FolderImportPickerScreen> createState() =>
+      _FolderImportPickerScreenState();
 }
 
 class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
@@ -1658,7 +1727,11 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
           .where((d) => !d.path.split('/').last.startsWith('.'))
           .where((d) => d.path.split('/').last != 'Android')
           .toList()
-        ..sort((a, b) => a.path.split('/').last.toLowerCase().compareTo(b.path.split('/').last.toLowerCase()));
+        ..sort((a, b) => a.path
+            .split('/')
+            .last
+            .toLowerCase()
+            .compareTo(b.path.split('/').last.toLowerCase()));
 
       setState(() {
         if (_currentPath != null) {
@@ -1670,7 +1743,7 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
       });
     } catch (e) {
       setState(() {
-_isLoading = false;
+        _isLoading = false;
         _error = e.toString();
       });
     }
@@ -1706,7 +1779,8 @@ _isLoading = false;
             : null,
         title: const Text(
           'Select Folder to Import',
-          style: TextStyle(fontFamily: 'ProductSans', fontWeight: FontWeight.w600),
+          style:
+              TextStyle(fontFamily: 'ProductSans', fontWeight: FontWeight.w600),
         ),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         foregroundColor: context.textPrimary,
@@ -1719,11 +1793,14 @@ _isLoading = false;
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.error_outline, size: 64, color: AppColors.error),
+                      Icon(Icons.error_outline,
+                          size: 64, color: AppColors.error),
                       const SizedBox(height: 16),
                       Text(
                         _error!,
-                        style: TextStyle(fontFamily: 'ProductSans', color: context.textSecondary),
+                        style: TextStyle(
+                            fontFamily: 'ProductSans',
+                            color: context.textSecondary),
                         textAlign: TextAlign.center,
                       ),
                     ],
@@ -1733,7 +1810,8 @@ _isLoading = false;
                   children: [
                     if (_pathStack.isNotEmpty)
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
                         child: InkWell(
                           onTap: _goBack,
                           borderRadius: BorderRadius.circular(8),
@@ -1741,9 +1819,11 @@ _isLoading = false;
                             padding: const EdgeInsets.all(8),
                             child: Row(
                               children: [
-                                const Icon(Icons.arrow_back, size: 14, color: AppColors.accent),
+                                const Icon(Icons.arrow_back,
+                                    size: 14, color: AppColors.accent),
                                 const SizedBox(width: 8),
-                                Icon(Icons.folder, size: 16, color: context.accentColor),
+                                Icon(Icons.folder,
+                                    size: 16, color: context.accentColor),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
@@ -1768,11 +1848,14 @@ _isLoading = false;
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.folder_off_outlined, size: 48, color: context.textTertiary),
+                                  Icon(Icons.folder_off_outlined,
+                                      size: 48, color: context.textTertiary),
                                   const SizedBox(height: 16),
                                   Text(
                                     'No subfolders',
-                                    style: TextStyle(fontFamily: 'ProductSans', color: context.textSecondary),
+                                    style: TextStyle(
+                                        fontFamily: 'ProductSans',
+                                        color: context.textSecondary),
                                   ),
                                 ],
                               ),
@@ -1784,9 +1867,14 @@ _isLoading = false;
                                 final dir = _subdirs[index];
                                 final name = dir.path.split('/').last;
                                 return ListTile(
-                                  leading: Icon(Icons.folder, color: context.accentColor),
-                                  title: Text(name, style: TextStyle(fontFamily: 'ProductSans', color: context.textPrimary)),
-                                  trailing: Icon(Icons.chevron_right, color: context.textTertiary),
+                                  leading: Icon(Icons.folder,
+                                      color: context.accentColor),
+                                  title: Text(name,
+                                      style: TextStyle(
+                                          fontFamily: 'ProductSans',
+                                          color: context.textPrimary)),
+                                  trailing: Icon(Icons.chevron_right,
+                                      color: context.textTertiary),
                                   onTap: () => _navigateInto(dir.path),
                                 );
                               },
@@ -1803,13 +1891,15 @@ _isLoading = false;
                   icon: const Icon(Icons.check),
                   label: const Text(
                     'Import This Folder',
-                    style: TextStyle(fontFamily: 'ProductSans', fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                        fontFamily: 'ProductSans', fontWeight: FontWeight.w600),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: context.accentColor,
                     foregroundColor: Colors.white,
                     minimumSize: const Size(double.infinity, 48),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
               ),
@@ -1829,7 +1919,8 @@ class _ImportProgressDialog extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<_ImportProgressDialog> createState() => _ImportProgressDialogState();
+  ConsumerState<_ImportProgressDialog> createState() =>
+      _ImportProgressDialogState();
 }
 
 class _ImportProgressDialogState extends ConsumerState<_ImportProgressDialog> {
@@ -1883,7 +1974,9 @@ class _ImportProgressDialogState extends ConsumerState<_ImportProgressDialog> {
     return AlertDialog(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       title: Text(
-        _isImporting ? 'Importing Folder' : (_error != null ? 'Import Failed' : 'Import Complete'),
+        _isImporting
+            ? 'Importing Folder'
+            : (_error != null ? 'Import Failed' : 'Import Complete'),
         style: TextStyle(fontFamily: 'ProductSans', color: context.textPrimary),
       ),
       content: Column(
@@ -1901,7 +1994,10 @@ class _ImportProgressDialogState extends ConsumerState<_ImportProgressDialog> {
           ],
           Text(
             _status,
-            style: TextStyle(fontFamily: 'ProductSans', color: context.textSecondary, fontSize: 14),
+            style: TextStyle(
+                fontFamily: 'ProductSans',
+                color: context.textSecondary,
+                fontSize: 14),
             textAlign: TextAlign.center,
           ),
         ],
@@ -1912,7 +2008,8 @@ class _ImportProgressDialogState extends ConsumerState<_ImportProgressDialog> {
             onPressed: () => Navigator.pop(context),
             child: Text(
               _error != null ? 'OK' : 'Done',
-              style: TextStyle(fontFamily: 'ProductSans', color: context.accentColor),
+              style: TextStyle(
+                  fontFamily: 'ProductSans', color: context.accentColor),
             ),
           ),
       ],
