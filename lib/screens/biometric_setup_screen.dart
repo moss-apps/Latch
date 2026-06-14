@@ -1,8 +1,8 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../themes/app_colors.dart';
 import '../services/auth_service.dart';
+import '../widgets/adaptive_logo.dart';
 import 'gallery_vault_screen.dart';
 
 class BiometricSetupScreen extends StatefulWidget {
@@ -80,6 +80,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       backgroundColor: context.backgroundColor,
       appBar: AppBar(
         leading: IconButton(
@@ -93,7 +94,9 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
             color: context.textPrimary,
           ),
         ),
-        backgroundColor: Colors.transparent,
+        backgroundColor: context.isDarkMode
+            ? Colors.white.withValues(alpha: 0.04)
+            : Colors.white.withValues(alpha: 0.15),
         elevation: 0,
       ),
       body: Stack(
@@ -173,12 +176,9 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
         borderRadius: BorderRadius.circular(16),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: SvgPicture.asset(
-              'assets/locker_logo_nobg.svg',
-              fit: BoxFit.contain,
-            ),
+          child: const Padding(
+            padding: EdgeInsets.all(32),
+            child: AdaptiveLogo(size: 76),
           ),
         ),
       ),
