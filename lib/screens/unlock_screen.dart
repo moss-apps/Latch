@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../themes/app_colors.dart';
 import '../services/auth_service.dart';
 import '../services/decoy_service.dart';
+import '../widgets/adaptive_logo.dart';
 import '../widgets/pin_input_widget.dart';
 import 'gallery_vault_screen.dart';
 
@@ -380,16 +380,9 @@ class _UnlockScreenState extends State<UnlockScreen> {
           borderRadius: BorderRadius.circular(16),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: SvgPicture.asset(
-                'assets/locker_logo_nobg.svg',
-                fit: BoxFit.contain,
-                colorFilter: ColorFilter.mode(
-                  context.isDarkMode ? const Color(0xFFF5F5F5) : Colors.black,
-                  BlendMode.srcIn,
-                ),
-              ),
+            child: const Padding(
+              padding: EdgeInsets.all(32),
+              child: AdaptiveLogo(size: 76),
             ),
           ),
         ),
