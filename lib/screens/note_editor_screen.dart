@@ -21,12 +21,14 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   bool _isMarkdown = false;
   bool _showPreview = false;
   bool _isSaving = false;
+  bool _isLoading = false;
   String? _folderId;
 
   @override
   void initState() {
     super.initState();
     if (widget.note != null) {
+      _isLoading = true;
       _titleController.text = widget.note!.title;
       _isMarkdown = widget.note!.isMarkdown;
       _folderId = widget.note!.folderId;
@@ -37,16 +39,17 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   Future<void> _loadContent() async {
     if (widget.note == null) return;
     try {
-      final content = await ref
-          .read(noteServiceProvider)
-          .decryptNoteContent(widget.note!);
+      final content =
+          await ref.read(noteServiceProvider).decryptNoteContent(widget.note!);
       if (mounted) {
         setState(() {
           _contentController.text = content;
+          _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
+        setState(() => _isLoading = false);
         ToastUtils.showError('Failed to load note content');
       }
     }
@@ -118,147 +121,164 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           ),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: TextField(
-              controller: _titleController,
-              style: TextStyle(
-                fontFamily: 'ProductSans',
-                fontSize: 22,
-                fontWeight: FontWeight.w600,
-                color: context.textPrimary,
-              ),
-              decoration: InputDecoration(
-                hintText: 'Title',
-                hintStyle: TextStyle(
-                  fontFamily: 'ProductSans',
-                  fontSize: 22,
-                  fontWeight: FontWeight.w600,
-                  color: context.textTertiary,
+          Column(
+            children: [
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: TextField(
+                  controller: _titleController,
+                  style: TextStyle(
+                    fontFamily: 'ProductSans',
+                    fontSize: 22,
+                    fontWeight: FontWeight.w600,
+                    color: context.textPrimary,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Title',
+                    hintStyle: TextStyle(
+                      fontFamily: 'ProductSans',
+                      fontSize: 22,
+                      fontWeight: FontWeight.w600,
+                      color: context.textTertiary,
+                    ),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                  ),
                 ),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
               ),
-            ),
-          ),
-          if (_folderId != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Icon(Icons.folder, size: 14, color: context.accentColor),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      ref.read(noteFoldersNotifierProvider).when(
-                            data: (folders) {
-                              final folder = folders.firstWhere(
-                                (f) => f.id == _folderId,
-                                orElse: () => NoteFolder(
-                                  id: '',
-                                  name: 'Unknown',
-                                  createdAt: DateTime.now(),
-                                  updatedAt: DateTime.now(),
-                                ),
-                              );
-                              return folder.name;
-                            },
-                            loading: () => '...',
-                            error: (_, __) => 'Error',
+              if (_folderId != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Icon(Icons.folder, size: 14, color: context.accentColor),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          ref.read(noteFoldersNotifierProvider).when(
+                                data: (folders) {
+                                  final folder = folders.firstWhere(
+                                    (f) => f.id == _folderId,
+                                    orElse: () => NoteFolder(
+                                      id: '',
+                                      name: 'Unknown',
+                                      createdAt: DateTime.now(),
+                                      updatedAt: DateTime.now(),
+                                    ),
+                                  );
+                                  return folder.name;
+                                },
+                                loading: () => '...',
+                                error: (_, __) => 'Error',
+                              ),
+                          style: TextStyle(
+                            fontFamily: 'ProductSans',
+                            fontSize: 12,
+                            color: context.textTertiary,
                           ),
-                      style: TextStyle(
-                        fontFamily: 'ProductSans',
-                        fontSize: 12,
-                        color: context.textTertiary,
+                        ),
                       ),
-                    ),
+                      GestureDetector(
+                        onTap: () => setState(() => _folderId = null),
+                        child: Icon(Icons.close,
+                            size: 14, color: context.textTertiary),
+                      ),
+                    ],
                   ),
-                  GestureDetector(
-                    onTap: () => setState(() => _folderId = null),
-                    child: Icon(Icons.close, size: 14, color: context.textTertiary),
-                  ),
-                ],
-              ),
-            ),
-          Divider(color: context.dividerColor),
-          Expanded(
-            child: _showPreview && _isMarkdown
-                ? Markdown(
-                    data: _contentController.text,
-                    styleSheet: MarkdownStyleSheet(
-                      p: TextStyle(
-                        fontFamily: 'ProductSans',
-                        fontSize: 15,
-                        color: context.textPrimary,
-                      ),
-                      h1: TextStyle(
-                        fontFamily: 'ProductSans',
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: context.textPrimary,
-                      ),
-                      h2: TextStyle(
-                        fontFamily: 'ProductSans',
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: context.textPrimary,
-                      ),
-                      h3: TextStyle(
-                        fontFamily: 'ProductSans',
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: context.textPrimary,
-                      ),
-                      code: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 13,
-                        color: context.accentColor,
-                        backgroundColor: context.surfaceColor,
-                      ),
-                      codeblockDecoration: BoxDecoration(
-                        color: context.surfaceColor,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      blockquoteDecoration: BoxDecoration(
-                        border: Border(
-                          left: BorderSide(
+                ),
+              Divider(color: context.dividerColor),
+              Expanded(
+                child: _showPreview && _isMarkdown
+                    ? Markdown(
+                        data: _contentController.text,
+                        styleSheet: MarkdownStyleSheet(
+                          p: TextStyle(
+                            fontFamily: 'ProductSans',
+                            fontSize: 15,
+                            color: context.textPrimary,
+                          ),
+                          h1: TextStyle(
+                            fontFamily: 'ProductSans',
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: context.textPrimary,
+                          ),
+                          h2: TextStyle(
+                            fontFamily: 'ProductSans',
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: context.textPrimary,
+                          ),
+                          h3: TextStyle(
+                            fontFamily: 'ProductSans',
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: context.textPrimary,
+                          ),
+                          code: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 13,
                             color: context.accentColor,
-                            width: 3,
+                            backgroundColor: context.surfaceColor,
+                          ),
+                          codeblockDecoration: BoxDecoration(
+                            color: context.surfaceColor,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          blockquoteDecoration: BoxDecoration(
+                            border: Border(
+                              left: BorderSide(
+                                color: context.accentColor,
+                                width: 3,
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
+                    : Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: TextField(
+                          controller: _contentController,
+                          maxLines: null,
+                          expands: true,
+                          textAlignVertical: TextAlignVertical.top,
+                          style: TextStyle(
+                            fontFamily: 'ProductSans',
+                            fontSize: 15,
+                            color: context.textPrimary,
+                            height: 1.5,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'Start writing...',
+                            hintStyle: TextStyle(
+                              fontFamily: 'ProductSans',
+                              fontSize: 15,
+                              color: context.textTertiary,
+                            ),
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
                           ),
                         ),
                       ),
-                    ),
-                  )
-                : Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: TextField(
-                      controller: _contentController,
-                      maxLines: null,
-                      expands: true,
-                      textAlignVertical: TextAlignVertical.top,
-                      style: TextStyle(
-                        fontFamily: 'ProductSans',
-                        fontSize: 15,
-                        color: context.textPrimary,
-                        height: 1.5,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Start writing...',
-                        hintStyle: TextStyle(
-                          fontFamily: 'ProductSans',
-                          fontSize: 15,
-                          color: context.textTertiary,
-                        ),
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                      ),
-                    ),
-                  ),
+              ),
+            ],
           ),
+          if (_isLoading)
+            Positioned.fill(
+              child: Container(
+                color: context.backgroundColor.withValues(alpha: 0.7),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation(context.accentColor),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -343,7 +363,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                 ),
               ),
               ListTile(
-                leading: Icon(Icons.folder_off_outlined, color: context.textSecondary),
+                leading: Icon(Icons.folder_off_outlined,
+                    color: context.textSecondary),
                 title: Text(
                   'No Folder',
                   style: TextStyle(

@@ -17,9 +17,14 @@ import '../utils/toast_utils.dart';
 class SongPlayerScreen extends ConsumerStatefulWidget {
   final VaultedFile file;
 
+  /// A decrypted file prepared by the caller. When supplied, decryption is not
+  /// performed on the main thread.
+  final File? decryptedFile;
+
   const SongPlayerScreen({
     super.key,
     required this.file,
+    this.decryptedFile,
   });
 
   @override
@@ -91,9 +96,10 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
 
     try {
       final vaultService = ref.read(vaultServiceProvider);
-      final file = widget.file.isEncrypted && widget.file.encryptionIv != null
-          ? await vaultService.getVaultedFile(widget.file.id)
-          : File(widget.file.vaultPath);
+      final file = widget.decryptedFile ??
+          (widget.file.isEncrypted && widget.file.encryptionIv != null
+              ? await vaultService.getVaultedFile(widget.file.id)
+              : File(widget.file.vaultPath));
 
       if (file == null || !await file.exists()) {
         setState(() {
@@ -137,7 +143,9 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
   }
 
   void _toggleFavorite() async {
-    await ref.read(vaultNotifierProvider.notifier).toggleFavorite(widget.file.id);
+    await ref
+        .read(vaultNotifierProvider.notifier)
+        .toggleFavorite(widget.file.id);
     ToastUtils.showSuccess(
       widget.file.isFavorite ? 'Removed from favorites' : 'Added to favorites',
     );
@@ -183,7 +191,8 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
         return;
       }
 
-      final destinationPath = '${downloadsDir.path}/${widget.file.originalName}';
+      final destinationPath =
+          '${downloadsDir.path}/${widget.file.originalName}';
       final exportedFile = await ref
           .read(vaultServiceProvider)
           .exportFile(widget.file.id, destinationPath);
@@ -191,7 +200,8 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
       if (mounted) Navigator.pop(context);
 
       if (exportedFile != null) {
-        ToastUtils.showSuccess('Exported to Downloads/${widget.file.originalName}');
+        ToastUtils.showSuccess(
+            'Exported to Downloads/${widget.file.originalName}');
       } else {
         ToastUtils.showError('Failed to export file');
       }
@@ -225,15 +235,14 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
         ),
       );
 
-      final decryptedFile = await ref
-          .read(vaultServiceProvider)
-          .getVaultedFile(widget.file.id);
+      final decryptedFile = _playbackFile ??
+          await ref.read(vaultServiceProvider).getVaultedFile(widget.file.id);
 
       if (mounted) Navigator.pop(context);
 
       if (decryptedFile != null && await decryptedFile.exists()) {
-        final result =
-            await AutoKillService.runSafe(() => OpenFilex.open(decryptedFile.path));
+        final result = await AutoKillService.runSafe(
+            () => OpenFilex.open(decryptedFile.path));
         if (result.type != ResultType.done) {
           ToastUtils.showError('No app found to open this file type');
         }
@@ -315,7 +324,8 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
               }
             },
             itemBuilder: (context) => const [
-              PopupMenuItem(value: 'export', child: Text('Export to Downloads')),
+              PopupMenuItem(
+                  value: 'export', child: Text('Export to Downloads')),
               PopupMenuItem(value: 'external', child: Text('Open with...')),
             ],
           ),
@@ -388,7 +398,9 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
                 final sliderMax = duration.inMilliseconds.toDouble();
                 final sliderValue = sliderMax == 0
                     ? 0.0
-                    : position.inMilliseconds.clamp(0, duration.inMilliseconds).toDouble();
+                    : position.inMilliseconds
+                        .clamp(0, duration.inMilliseconds)
+                        .toDouble();
 
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -437,7 +449,8 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
                       activeColor: context.accentColor,
                       onChanged: sliderMax == 0
                           ? null
-                          : (value) => _seek(Duration(milliseconds: value.round())),
+                          : (value) =>
+                              _seek(Duration(milliseconds: value.round())),
                     ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -467,7 +480,8 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
                       children: [
                         IconButton(
                           onPressed: position > const Duration(seconds: 10)
-                              ? () => _seek(position - const Duration(seconds: 10))
+                              ? () =>
+                                  _seek(position - const Duration(seconds: 10))
                               : () => _seek(Duration.zero),
                           icon: Icon(
                             Icons.replay_10,
@@ -484,7 +498,8 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
                             color: context.accentColor,
                           ),
                           child: IconButton(
-                            onPressed: processingState == ProcessingState.loading ||
+                            onPressed: processingState ==
+                                        ProcessingState.loading ||
                                     processingState == ProcessingState.buffering
                                 ? null
                                 : _togglePlayback,
@@ -498,7 +513,8 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
                         const SizedBox(width: 24),
                         IconButton(
                           onPressed: duration > const Duration(seconds: 10)
-                              ? () => _seek(position + const Duration(seconds: 10))
+                              ? () =>
+                                  _seek(position + const Duration(seconds: 10))
                               : null,
                           icon: Icon(
                             Icons.forward_10,
@@ -509,7 +525,9 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
                       ],
                     ),
                     const SizedBox(height: 24),
-                    if (!_isCheckingFlick && _isFlickAvailable && _playbackFile != null)
+                    if (!_isCheckingFlick &&
+                        _isFlickAvailable &&
+                        _playbackFile != null)
                       FilledButton.icon(
                         onPressed: _playWithFlick,
                         icon: const Icon(Icons.music_note),
@@ -520,7 +538,9 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
                       ),
-                    if (!_isCheckingFlick && _isFlickAvailable && _playbackFile != null)
+                    if (!_isCheckingFlick &&
+                        _isFlickAvailable &&
+                        _playbackFile != null)
                       const SizedBox(height: 12),
                     if (_playbackFile != null)
                       OutlinedButton.icon(
