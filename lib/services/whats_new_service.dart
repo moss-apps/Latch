@@ -55,6 +55,70 @@ class WhatsNewService {
   /// The key MUST match `PackageInfo.version` exactly (the `+buildNumber`
   /// suffix is ignored).
   static const Map<String, List<WhatsNewSection>> _builtIn = {
+    '0.14.4-beta.4': [
+      WhatsNewSection(
+        title: 'Notes',
+        items: [
+          WhatsNewItem(
+            icon: Icons.note_outlined,
+            title: 'Encrypted notes',
+            description:
+                'Create, edit, and organise secure notes inside the vault with folders, search, and multi-select.',
+          ),
+          WhatsNewItem(
+            icon: Icons.folder_outlined,
+            title: 'Note folders',
+            description:
+                'Hierarchical folder organisation with full CRUD operations for your notes.',
+          ),
+        ],
+      ),
+      WhatsNewSection(
+        title: 'Audio Recording',
+        items: [
+          WhatsNewItem(
+            icon: Icons.mic_outlined,
+            title: 'Voice recording',
+            description:
+                'Record audio directly into the vault with real-time amplitude visualisation and preview.',
+          ),
+        ],
+      ),
+      WhatsNewSection(
+        title: 'UI & Design',
+        items: [
+          WhatsNewItem(
+            icon: Icons.palette_outlined,
+            title: 'Adaptive logo',
+            description:
+                'Logo automatically switches between light and dark variants to match your theme.',
+          ),
+          WhatsNewItem(
+            icon: Icons.build_outlined,
+            title: 'Resizable sidebar',
+            description:
+                'Drag to resize the vault explorer sidebar to your preferred width.',
+          ),
+        ],
+      ),
+      WhatsNewSection(
+        title: 'Under the Hood',
+        items: [
+          WhatsNewItem(
+            icon: Icons.new_releases_outlined,
+            title: 'Centralised file service',
+            description:
+                'All vault file opening now routed through a single service for better reliability.',
+          ),
+          WhatsNewItem(
+            icon: Icons.auto_awesome_outlined,
+            title: 'Always up-to-date',
+            description:
+                'What\'s New and Changelog now fetch live from GitHub — no APK update needed for release notes.',
+          ),
+        ],
+      ),
+    ],
     '0.14.2-beta.3': [
       WhatsNewSection(
         title: 'Encryption & Crypto',
@@ -153,6 +217,10 @@ class WhatsNewService {
         return Icons.new_releases_outlined;
       case 'build_outlined':
         return Icons.build_outlined;
+      case 'note_outlined':
+        return Icons.note_outlined;
+      case 'mic_outlined':
+        return Icons.mic_outlined;
       case 'info_outlined':
         return Icons.info_outlined;
       default:

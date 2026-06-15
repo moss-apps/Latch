@@ -2,6 +2,45 @@
 
 All notable changes to Latch are documented in this file.
 
+## 0.14.4-beta.4
+
+### Notes System
+- **Encrypted note management** — create, edit, and organize secure notes inside the vault
+- **Note editor screen** with rich text editing
+- **Note folders** with CRUD operations for hierarchical organization
+- **Note list screen** with search, folder browsing, and multi-select
+- **NoteCard widget** with selection support and formatted date display
+- **Riverpod providers** for reactive note state management
+- **Async PBKDF2 key derivation** using isolates for note encryption
+- Notes integration in gallery vault and vault explorer navigation
+
+### Audio Recording
+- **Audio recorder screen** with real-time amplitude visualization
+- Recording preview and save-to-vault functionality
+- Integrated into the gallery vault screen
+
+### UI & Design
+- **Adaptive logo widget** — automatically switches between light and dark variants
+- SVG logo replaced with `AdaptiveLogo` across all screens
+- **Resizable sidebar** in vault explorer
+- Checkmark icons on selected encryption algorithm chips
+- Dynamic accent color for slider thumb and track
+- Redesigned password setup and change security screens
+- Removed gradient backgrounds from security screens
+
+### Architecture
+- **Centralized `FileOpenService`** — all vault file opening routed through a single service
+- Refactored file grid to use the new service
+
+### Platform Cleanup
+- Removed Windows, Linux, macOS, iOS, and web platform stubs — app is now explicitly Android-only
+
+### Fixes
+- Fixed import options sheet layout and scrolling
+- Removed extra card margin in performance settings screen
+
+---
+
 ## 0.14.3-beta.4
 
 ### Always Up-to-Date Content
