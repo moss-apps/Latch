@@ -1,4 +1,61 @@
 {
+  "0.14.4-beta.4": [
+    {
+      "title": "Notes",
+      "items": [
+        {
+          "icon": "note_outlined",
+          "title": "Encrypted notes",
+          "description": "Create, edit, and organise secure notes inside the vault with folders, search, and multi-select."
+        },
+        {
+          "icon": "folder_outlined",
+          "title": "Note folders",
+          "description": "Hierarchical folder organisation with full CRUD operations for your notes."
+        }
+      ]
+    },
+    {
+      "title": "Audio Recording",
+      "items": [
+        {
+          "icon": "mic_outlined",
+          "title": "Voice recording",
+          "description": "Record audio directly into the vault with real-time amplitude visualisation and preview."
+        }
+      ]
+    },
+    {
+      "title": "UI & Design",
+      "items": [
+        {
+          "icon": "palette_outlined",
+          "title": "Adaptive logo",
+          "description": "Logo automatically switches between light and dark variants to match your theme."
+        },
+        {
+          "icon": "build_outlined",
+          "title": "Resizable sidebar",
+          "description": "Drag to resize the vault explorer sidebar to your preferred width."
+        }
+      ]
+    },
+    {
+      "title": "Under the Hood",
+      "items": [
+        {
+          "icon": "new_releases_outlined",
+          "title": "Centralised file service",
+          "description": "All vault file opening now routed through a single service for better reliability."
+        },
+        {
+          "icon": "auto_awesome_outlined",
+          "title": "Always up-to-date",
+          "description": "What's New and Changelog now fetch live from GitHub — no APK update needed for release notes."
+        }
+      ]
+    }
+  ],
   "0.14.2-beta.3": [
     {
       "title": "Encryption & Crypto",
