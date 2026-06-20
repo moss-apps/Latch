@@ -36,7 +36,9 @@ final explorerFileTypeFilterProvider = StateProvider<VaultedFileType?>((ref) {
 
 /// Provider for unfiled files (files that do not belong to any folder)
 final unfiledFilesProvider = FutureProvider<List<VaultedFile>>((ref) async {
-  final allFiles = await ref.watch(allFilesProvider.future);
+  final vaultService = ref.watch(vaultServiceProvider);
+  final isDecoy = ref.watch(isDecoyModeProvider);
+  final allFiles = await vaultService.getAllFiles(isDecoy: isDecoy);
   return allFiles.where((file) => file.folderId == null).toList();
 });
 

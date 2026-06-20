@@ -55,7 +55,7 @@ class _ReEncryptFilePickerScreenState
 
   @override
   Widget build(BuildContext context) {
-    final filesAsync = ref.watch(allFilesProvider);
+    final filesAsync = ref.watch(vaultNotifierProvider);
     final reEncryptProgress = ref.watch(reEncryptProvider);
 
     return Scaffold(
@@ -334,7 +334,7 @@ class _ReEncryptFilePickerScreenState
   }
 
   Future<void> _startReEncrypt() async {
-    final encryptedFiles = _encryptedFiles(ref.read(allFilesProvider));
+    final encryptedFiles = _encryptedFiles(ref.read(vaultNotifierProvider));
     final largeFiles = encryptedFiles
         .where((f) => _selectedIds.contains(f.id) && f.fileSize > _largeFileThresholdBytes)
         .toList();
@@ -435,7 +435,7 @@ class _ReEncryptFilePickerScreenState
           ),
         ),
       );
-      ref.invalidate(allFilesProvider);
+      ref.invalidate(vaultNotifierProvider);
     }
   }
 }

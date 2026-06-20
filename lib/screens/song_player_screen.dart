@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:open_filex/open_filex.dart';
-import 'package:path_provider/path_provider.dart';
+import '../utils/path_utils.dart';
 
 import '../models/vaulted_file.dart';
 import '../services/flick_integration_service.dart';
@@ -175,15 +175,7 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
         ),
       );
 
-      Directory? downloadsDir;
-      if (Platform.isAndroid) {
-        downloadsDir = Directory('/storage/emulated/0/Download');
-        if (!await downloadsDir.exists()) {
-          downloadsDir = await getExternalStorageDirectory();
-        }
-      } else {
-        downloadsDir = await getDownloadsDirectory();
-      }
+      final downloadsDir = await PathUtils.getDownloadsDirectory();
 
       if (downloadsDir == null) {
         if (mounted) Navigator.pop(context);

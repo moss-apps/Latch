@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:pointycastle/export.dart';
 import '../models/encryption_algorithm.dart';
 import '../utils/argon2_isolate.dart';
@@ -30,7 +31,7 @@ class EncryptionService {
   // migrateOnAlgorithmChange ensures existing data is automatically migrated
   static const _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(),
-    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.unlocked_this_device),
   );
 
   static const String _masterKeyKey = 'vault_master_key';
@@ -463,7 +464,7 @@ class EncryptionService {
       debugPrint('Decryption error: $e');
       return DecryptionResult(
         success: false,
-        error: 'Decryption failed: $e',
+        error: 'Decryption failed.',
       );
     }
   }
@@ -539,7 +540,7 @@ class EncryptionService {
       debugPrint('File streaming encryption error: $e');
       return FileEncryptionResult(
         success: false,
-        error: 'File streaming encryption failed: $e',
+        error: 'File streaming encryption failed.',
       );
     }
   }
@@ -597,7 +598,7 @@ class EncryptionService {
       debugPrint('Bytes streaming encryption error: $e');
       return FileEncryptionResult(
         success: false,
-        error: 'Bytes streaming encryption failed: $e',
+        error: 'Bytes streaming encryption failed.',
       );
     }
   }
@@ -649,7 +650,7 @@ class EncryptionService {
       debugPrint('Bytes GCM streaming encryption error: $e');
       return FileEncryptionResult(
         success: false,
-        error: 'Bytes GCM streaming encryption failed: $e',
+        error: 'Bytes GCM streaming encryption failed.',
       );
     }
   }
@@ -782,7 +783,7 @@ class EncryptionService {
       debugPrint('File decryption error: $e');
       return FileDecryptionResult(
         success: false,
-        error: 'File decryption failed: $e',
+        error: 'File decryption failed.',
       );
     }
   }
@@ -948,7 +949,7 @@ class EncryptionService {
       debugPrint('File streaming decryption error: $e');
       return FileDecryptionResult(
         success: false,
-        error: 'File streaming decryption failed: $e',
+        error: 'File streaming decryption failed.',
       );
     }
   }
@@ -1073,7 +1074,7 @@ class EncryptionService {
       debugPrint('Streamed file decryption to memory error: $e');
       return DecryptionResult(
         success: false,
-        error: 'File decryption failed: $e',
+        error: 'File decryption failed.',
       );
     }
   }
@@ -1118,7 +1119,7 @@ class EncryptionService {
       debugPrint('GCM Decryption error: $e');
       return DecryptionResult(
         success: false,
-        error: 'GCM Decryption failed: $e',
+        error: 'GCM Decryption failed.',
       );
     }
   }
@@ -1203,7 +1204,7 @@ class EncryptionService {
       debugPrint('GCM File decryption error: $e');
       return FileDecryptionResult(
         success: false,
-        error: 'GCM File decryption failed: $e',
+        error: 'GCM File decryption failed.',
       );
     }
   }
@@ -1282,7 +1283,7 @@ class EncryptionService {
       debugPrint('GCM v2 streaming encryption error: $e');
       return FileEncryptionResult(
         success: false,
-        error: 'GCM streaming encryption failed: $e',
+        error: 'GCM streaming encryption failed.',
       );
     }
   }
@@ -1357,7 +1358,7 @@ class EncryptionService {
       debugPrint('GCM streamed decryption error: $e');
       return DecryptionResult(
         success: false,
-        error: 'GCM decryption failed: $e',
+        error: 'GCM decryption failed.',
       );
     }
   }
@@ -1410,7 +1411,7 @@ class EncryptionService {
       debugPrint('Isolate pool encryption error: $e');
       return FileEncryptionResult(
         success: false,
-        error: 'Isolate encryption failed: $e',
+        error: 'Isolate encryption failed.',
       );
     }
   }
@@ -1462,7 +1463,7 @@ class EncryptionService {
       debugPrint('Isolate pool decryption error: $e');
       return FileDecryptionResult(
         success: false,
-        error: 'Isolate decryption failed: $e',
+        error: 'Isolate decryption failed.',
       );
     }
   }
@@ -1547,6 +1548,16 @@ class EncryptionService {
     }
   }
 
+  /// App-private temp dir for plaintext intermediates (never system temp).
+  /// ponytail: keeps decrypted rotation/re-encryption scratch off the shared
+  /// system temp; callers still secureDelete the plaintext file on cleanup.
+  Future<Directory> _createAppPrivateTemp(String prefix) async {
+    final docs = await getApplicationDocumentsDirectory();
+    final root = Directory('${docs.path}/.locker_temp');
+    await root.create(recursive: true);
+    return root.createTemp(prefix);
+  }
+
   Future<String> reEncryptFile(
     String filePath,
     String oldIvBase64, {
@@ -1559,7 +1570,7 @@ class EncryptionService {
     final isLegacyCbc = (format == 0 || format == 3);
 
     final key = await _resolveKey(isDecoy: isDecoy, derivedKey: oldDerivedKey);
-    final tempDir = await Directory.systemTemp.createTemp('lkr_reencrypt_');
+    final tempDir = await _createAppPrivateTemp('lkr_reencrypt_');
     final tempDecPath = '${tempDir.path}/decrypted';
 
     try {
@@ -1601,6 +1612,7 @@ class EncryptionService {
 
       return encResult.ivBase64!;
     } finally {
+      try { await secureDelete(tempDecPath); } catch (_) {}
       try { await tempDir.delete(recursive: true); } catch (_) {}
     }
   }
@@ -1649,7 +1661,7 @@ class EncryptionService {
       final doneSet = (journal['done'] as List).cast<String>().toSet();
       final ivs = (journal['ivs'] as Map<String, dynamic>).cast<String, String>();
 
-      final tempDir = await Directory.systemTemp.createTemp('lkr_rot_recovery_');
+      final tempDir = await _createAppPrivateTemp('lkr_rot_recovery_');
       try {
         for (final path in files) {
           if (doneSet.contains(path)) continue;
@@ -1693,7 +1705,7 @@ class EncryptionService {
           );
           await encJob.future;
 
-          try { await File(tempDecPath).delete(); } catch (_) {}
+          try { await secureDelete(tempDecPath); } catch (_) {}
         }
       } finally {
         try { await tempDir.delete(recursive: true); } catch (_) {}
@@ -1743,7 +1755,7 @@ class EncryptionService {
       };
       await _storage.write(key: _rotationJournalKey, value: jsonEncode(journal));
 
-      final tempDir = await Directory.systemTemp.createTemp('lkr_rotate_');
+      final tempDir = await _createAppPrivateTemp('lkr_rotate_');
       try {
         for (int i = 0; i < encryptedFilePaths.length; i++) {
           onProgress?.call(i + 1, encryptedFilePaths.length);
@@ -1782,7 +1794,7 @@ class EncryptionService {
             } catch (e) {
               return KeyRotationResult(
                 success: false,
-                error: 'Failed to decrypt file at index $i: $e',
+                error: 'Failed to decrypt file at index $i.',
                 processedCount: i,
               );
             }
@@ -1798,7 +1810,7 @@ class EncryptionService {
           final encResult = await encJob.future;
           newIvs.add(encResult.ivBase64!);
 
-          try { await File(tempDecPath).delete(); } catch (_) {}
+          try { await secureDelete(tempDecPath); } catch (_) {}
 
           journal['done'] = encryptedFilePaths.sublist(0, i + 1);
           await _storage.write(key: _rotationJournalKey, value: jsonEncode(journal));
@@ -1819,7 +1831,7 @@ class EncryptionService {
       debugPrint('Key rotation error: $e');
       return KeyRotationResult(
         success: false,
-        error: 'Key rotation failed: $e',
+        error: 'Key rotation failed.',
       );
     }
   }

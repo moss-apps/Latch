@@ -16,9 +16,8 @@ import 'screens/auth_method_selection_screen.dart';
 import 'screens/unlock_screen.dart';
 import 'autofill_app.dart';
 import 'utils/frame_rate_optimizer.dart';
+import 'utils/navigator_key.dart';
 import 'utils/performance_config.dart';
-
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

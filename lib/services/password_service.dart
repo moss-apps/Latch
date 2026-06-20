@@ -174,7 +174,7 @@ class PasswordService {
           );
 
     if (!result.success || result.data == null) {
-      throw Exception('Failed to decrypt: ${result.error}');
+      throw Exception('Failed to decrypt password entry');
     }
 
     return PasswordContent.fromJsonString(utf8.decode(result.data!));

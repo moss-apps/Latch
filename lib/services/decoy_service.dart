@@ -4,6 +4,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../utils/pbkdf2_isolate.dart';
+import '../utils/secure_compare.dart';
 import '../models/vaulted_file.dart';
 import 'encryption_service.dart';
 import 'vault_service.dart';
@@ -16,7 +17,7 @@ class DecoyService {
 
   static const _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(),
-    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.unlocked_this_device),
   );
 
   static const String _decoyEnabledKey = 'decoy_mode_enabled';
@@ -282,7 +283,11 @@ class DecoyService {
 
       if (storedSalt == null) {
         final legacyHash = _hashCredentialLegacy(credential);
-        if (legacyHash == storedHash) {
+        // Pad the legacy path with dummy KDF work so verify time does not
+        // reveal that this is a legacy (plain SHA-256) account.
+        await computePbkdf2Hash(
+            credential, _generateSalt(), iterations: _defaultKdfIterations);
+        if (constantTimeEquals(legacyHash, storedHash)) {
           final salt = _generateSalt();
           final iterations = await _getCurrentKdfIterations();
           final newHash = await computePbkdf2Hash(credential, salt, iterations: iterations);
@@ -301,7 +306,7 @@ class DecoyService {
 
       final salt = base64Decode(storedSalt);
       final computedHash = await computePbkdf2Hash(credential, salt, iterations: storedIterations);
-      if (computedHash != storedHash) return false;
+      if (!constantTimeEquals(computedHash, storedHash)) return false;
 
       final currentIterations = await _getCurrentKdfIterations();
       if (currentIterations != storedIterations) {

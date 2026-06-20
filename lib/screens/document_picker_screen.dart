@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
+import '../utils/path_utils.dart';
 import 'package:mime/mime.dart';
 import '../models/vaulted_file.dart';
 import '../themes/app_colors.dart';
@@ -239,11 +240,7 @@ class _DocumentPickerScreenState extends State<DocumentPickerScreen> {
         }
 
         // Also check common locations
-        final commonPaths = [
-          '/storage/emulated/0/Download',
-          '/storage/emulated/0/Documents',
-          '/storage/emulated/0/DCIM',
-        ];
+        final commonPaths = PathUtils.androidSourceRoots;
 
         for (final path in commonPaths) {
           final dir = Directory(path);

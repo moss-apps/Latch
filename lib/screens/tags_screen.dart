@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:locker/models/album.dart';
 import 'package:open_filex/open_filex.dart';
-import 'package:path_provider/path_provider.dart';
+import '../utils/path_utils.dart';
 import '../models/vaulted_file.dart';
 import '../providers/vault_providers.dart';
 import '../services/auto_kill_service.dart';
@@ -517,31 +517,8 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
   }
 
   Widget _buildPlaceholder(VaultedFile file) {
-    IconData icon;
-    Color color;
-
-    switch (file.type) {
-      case VaultedFileType.image:
-        icon = Icons.image;
-        color = context.accentColor;
-        break;
-      case VaultedFileType.video:
-        icon = Icons.videocam;
-        color = Colors.red;
-        break;
-      case VaultedFileType.song:
-        icon = Icons.music_note;
-        color = Colors.purple;
-        break;
-      case VaultedFileType.document:
-        icon = Icons.description;
-        color = Colors.orange;
-        break;
-      case VaultedFileType.other:
-        icon = Icons.insert_drive_file;
-        color = Colors.grey;
-        break;
-    }
+    final color = FileTypeColors.colorForType(file.type, accent: context.accentColor);
+    final icon = FileTypeColors.iconForType(file.type);
 
     return Container(
       color: color.withValues(alpha: 0.1),
@@ -786,15 +763,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
         ),
       );
 
-      Directory? downloadsDir;
-      if (Platform.isAndroid) {
-        downloadsDir = Directory('/storage/emulated/0/Download');
-        if (!await downloadsDir.exists()) {
-          downloadsDir = await getExternalStorageDirectory();
-        }
-      } else {
-        downloadsDir = await getDownloadsDirectory();
-      }
+      final downloadsDir = await PathUtils.getDownloadsDirectory();
 
       if (downloadsDir == null) {
         if (mounted) Navigator.pop(context);

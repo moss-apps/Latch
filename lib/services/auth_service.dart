@@ -8,6 +8,7 @@ import 'package:local_auth/local_auth.dart';
 import 'package:local_auth_android/local_auth_android.dart';
 import 'package:local_auth_darwin/local_auth_darwin.dart';
 import '../utils/pbkdf2_isolate.dart';
+import '../utils/secure_compare.dart';
 import 'auto_kill_service.dart';
 import 'decoy_service.dart';
 import 'encryption_service.dart';
@@ -17,7 +18,7 @@ import 'vault_service.dart';
 class AuthService {
   static const _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(),
-    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.unlocked_this_device),
   );
 
   static const String _passwordHashKey = 'user_password_hash';
@@ -59,7 +60,7 @@ class AuthService {
   /// Create and store the user's password
   Future<bool> createPassword(String password) async {
     try {
-      if (password.isEmpty) return false;
+      if (password.length < minPasswordLength) return false;
 
       await _createHashedCredential(password, _passwordSaltKey, _passwordHashKey, _passwordIterationsKey);
       await _storage.write(key: _firstTimeKey, value: 'false');
@@ -380,7 +381,7 @@ class AuthService {
   Future<bool> changePassword(
       String currentPassword, String newPassword) async {
     try {
-      if (currentPassword.isEmpty || newPassword.isEmpty) return false;
+      if (currentPassword.isEmpty || newPassword.length < minPasswordLength) return false;
 
       final isVerified = await verifyPassword(currentPassword);
       if (!isVerified) return false;
@@ -425,7 +426,7 @@ class AuthService {
   Future<bool> switchFromPINToPassword(
       String currentPIN, String newPassword) async {
     try {
-      if (currentPIN.isEmpty || newPassword.isEmpty) return false;
+      if (currentPIN.isEmpty || newPassword.length < minPasswordLength) return false;
 
       final isVerified = await verifyPIN(currentPIN);
       if (!isVerified) return false;
@@ -571,6 +572,23 @@ class AuthService {
   static const int _defaultKdfIterations = 600000;
   static const int _saltSize = 32;
 
+  /// Minimum password length enforced at every entry point (setup, change).
+  static const int minPasswordLength = 8;
+
+  /// Classify a password's strength. Length is a hard floor; composition only
+  /// informs the warning level (NIST 800-63B: length over forced composition).
+  static PasswordStrength validatePasswordStrength(String password) {
+    if (password.length < minPasswordLength) return PasswordStrength.tooShort;
+    var classes = 0;
+    if (RegExp(r'[a-z]').hasMatch(password)) classes++;
+    if (RegExp(r'[A-Z]').hasMatch(password)) classes++;
+    if (RegExp(r'[0-9]').hasMatch(password)) classes++;
+    if (RegExp(r'[^a-zA-Z0-9]').hasMatch(password)) classes++;
+    // A long passphrase is fine even with one class; only flag short+mono.
+    if (password.length < 12 && classes < 2) return PasswordStrength.weak;
+    return PasswordStrength.acceptable;
+  }
+
   Future<int> _getCurrentKdfIterations() async {
     final settings = await _vaultService.getSettings();
     return settings.kdfIterations;
@@ -611,7 +629,11 @@ class AuthService {
 
       if (storedSalt == null) {
         final legacyHash = _hashCredentialLegacy(credential);
-        if (legacyHash == storedHash) {
+        // Pad the legacy path with dummy KDF work so verify time does not
+        // reveal that this is a legacy (plain SHA-256) account.
+        await computePbkdf2Hash(
+            credential, _generateSalt(), iterations: _defaultKdfIterations);
+        if (constantTimeEquals(legacyHash, storedHash)) {
           final salt = _generateSalt();
           final iterations = await _getCurrentKdfIterations();
           final newHash = await computePbkdf2Hash(credential, salt, iterations: iterations);
@@ -630,7 +652,7 @@ class AuthService {
 
       final salt = base64Decode(storedSalt);
       final computedHash = await computePbkdf2Hash(credential, salt, iterations: storedIterations);
-      if (computedHash != storedHash) return false;
+      if (!constantTimeEquals(computedHash, storedHash)) return false;
 
       final currentIterations = await _getCurrentKdfIterations();
       if (currentIterations != storedIterations) {
@@ -749,6 +771,26 @@ enum BiometricAuthenticationStatus {
   canceled,
   lockedOut,
   unavailable,
+}
+
+/// Strength classification for a candidate password.
+enum PasswordStrength {
+  tooShort,
+  weak,
+  acceptable;
+
+  bool get isBlocking => this == tooShort;
+
+  String get label {
+    switch (this) {
+      case PasswordStrength.tooShort:
+        return 'Use at least $AuthService.minPasswordLength characters';
+      case PasswordStrength.weak:
+        return 'Weak — add length or a mix of letters, numbers, symbols';
+      case PasswordStrength.acceptable:
+        return 'Acceptable';
+    }
+  }
 }
 
 class BiometricAuthenticationResult {

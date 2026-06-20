@@ -525,9 +525,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         _errorMessage = null;
       });
     } else if (_step == 1) {
-      if (_newPasswordController.text.isEmpty) {
+      if (_newPasswordController.text.length <
+          AuthService.minPasswordLength) {
         setState(() {
-          _errorMessage = 'Please enter a new password';
+          _errorMessage =
+              'Use at least ${AuthService.minPasswordLength} characters';
         });
         return;
       }

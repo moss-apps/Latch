@@ -537,30 +537,8 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
   }
 
   Widget _buildFilePlaceholder(VaultedFile file) {
-    IconData icon;
-    Color color;
-    switch (file.type) {
-      case VaultedFileType.image:
-        icon = Icons.image;
-        color = context.accentColor;
-        break;
-      case VaultedFileType.video:
-        icon = Icons.videocam;
-        color = Colors.red;
-        break;
-      case VaultedFileType.song:
-        icon = Icons.music_note;
-        color = Colors.purple;
-        break;
-      case VaultedFileType.document:
-        icon = Icons.description;
-        color = Colors.green;
-        break;
-      case VaultedFileType.other:
-        icon = Icons.insert_drive_file;
-        color = Colors.grey;
-        break;
-    }
+    final color = FileTypeColors.colorForType(file.type, accent: context.accentColor);
+    final icon = FileTypeColors.iconForType(file.type);
     return Container(
       color: color.withValues(alpha: 0.1),
       child: Column(

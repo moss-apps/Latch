@@ -63,7 +63,7 @@ class VaultService {
 
   static const _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(),
-    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.unlocked_this_device),
   );
 
   static const String _vaultIndexKey = 'vault_file_index';
