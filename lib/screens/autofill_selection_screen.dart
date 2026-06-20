@@ -5,6 +5,8 @@ import 'package:local_auth_android/local_auth_android.dart';
 import 'package:local_auth_darwin/local_auth_darwin.dart';
 
 import '../models/password_entry.dart';
+import '../services/auth_service.dart';
+import '../services/encryption_service.dart';
 import '../services/password_service.dart';
 import '../themes/app_colors.dart';
 
@@ -48,6 +50,16 @@ class _AutofillSelectionScreenState extends State<AutofillSelectionScreen> {
     });
 
     try {
+      final authService = AuthService();
+      final isBiometricEnabled = await authService.isBiometricEnabled();
+      if (!isBiometricEnabled) {
+        setState(() {
+          _biometricsUnavailable = true;
+          _isAuthenticating = false;
+        });
+        return;
+      }
+
       final canCheck = await _localAuth.canCheckBiometrics;
       if (!canCheck) {
         setState(() {
@@ -72,6 +84,15 @@ class _AutofillSelectionScreenState extends State<AutofillSelectionScreen> {
       );
 
       if (didAuth) {
+        try {
+          await EncryptionService.instance.unlockMasterKeyWithBiometric();
+        } catch (e) {
+          setState(() {
+            _error = 'Unable to unlock vault';
+            _isAuthenticating = false;
+          });
+          return;
+        }
         await _loadEntries();
       } else {
         setState(() {
