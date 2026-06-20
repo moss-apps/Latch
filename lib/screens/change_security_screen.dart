@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../themes/app_colors.dart';
 import '../services/auth_service.dart';
+import '../services/encryption_service.dart';
 import '../utils/toast_utils.dart';
 import '../widgets/adaptive_logo.dart';
 import 'gallery_vault_screen.dart';
@@ -565,6 +566,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         // Update auth method to password
         if (success) {
           await _authService.setAuthMethod('password');
+          await EncryptionService.instance.reWrapKey(_newPasswordController.text);
+          await EncryptionService.instance.removeBiometricKwk();
         }
       } else {
         success = await _authService.switchFromPINToPassword(
@@ -1188,6 +1191,8 @@ class _ChangePINScreenState extends State<ChangePINScreen> {
         // Update auth method to PIN
         if (success) {
           await _authService.setAuthMethod('pin');
+          await EncryptionService.instance.reWrapKey(_newPINController.text);
+          await EncryptionService.instance.removeBiometricKwk();
         }
       } else {
         success = await _authService.switchFromPasswordToPIN(
