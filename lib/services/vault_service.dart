@@ -2583,8 +2583,8 @@ class VaultSettings {
 
   const VaultSettings({
     this.encryptionEnabled = false,
-    this.encryptionAlgorithm = EncryptionAlgorithm.aes256Ctr,
-    this.kdfIterations = 100000,
+    this.encryptionAlgorithm = EncryptionAlgorithm.aes256Gcm,
+    this.kdfIterations = 600000,
     this.secureDelete = true,
     this.screenshotProtectionEnabled = false,
     this.autoKillDelaySeconds = 0,
@@ -2680,10 +2680,10 @@ class VaultSettings {
     return VaultSettings(
       encryptionEnabled: json['encryptionEnabled'] as bool? ?? false,
       encryptionAlgorithm: EncryptionAlgorithm.values.firstWhere(
-        (a) => a.name == (json['encryptionAlgorithm'] as String? ?? 'aes256Ctr'),
-        orElse: () => EncryptionAlgorithm.aes256Ctr,
+        (a) => a.name == (json['encryptionAlgorithm'] as String? ?? 'aes256Gcm'),
+        orElse: () => EncryptionAlgorithm.aes256Gcm,
       ),
-      kdfIterations: json['kdfIterations'] as int? ?? 100000,
+      kdfIterations: json['kdfIterations'] as int? ?? 600000,
       secureDelete: json['secureDelete'] as bool? ?? true,
       screenshotProtectionEnabled:
           json['screenshotProtectionEnabled'] as bool? ?? false,
