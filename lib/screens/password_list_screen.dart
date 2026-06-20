@@ -266,13 +266,12 @@ class _PasswordListScreenState extends ConsumerState<PasswordListScreen> {
               ],
             ),
           ),
-          GestureDetector(
-            onTap: _dismissAutofillInfo,
-            child: Padding(
-              padding: const EdgeInsets.only(left: 8),
-              child:
-                  Icon(Icons.close, size: 16, color: context.textTertiary),
-            ),
+          IconButton(
+            icon: Icon(Icons.close, size: 16, color: context.textTertiary),
+            onPressed: _dismissAutofillInfo,
+            tooltip: 'Dismiss',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
           ),
         ],
       ),
