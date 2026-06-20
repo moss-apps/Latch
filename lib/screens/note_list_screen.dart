@@ -704,7 +704,10 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
           },
         );
       },
-    );
+    ).whenComplete(() {
+      titleController.dispose();
+      contentController.dispose();
+    });
   }
 
   Future<void> _showDeleteConfirmation() async {
