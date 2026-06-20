@@ -21,7 +21,7 @@ String _computePbkdf2(_Pbkdf2Args args) {
 Future<String> computePbkdf2Hash(
   String credential,
   Uint8List salt, {
-  int iterations = 100000,
+  int iterations = 600000,
   int keyLength = 32,
 }) {
   return compute(
