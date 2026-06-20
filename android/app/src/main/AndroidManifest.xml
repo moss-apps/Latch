@@ -78,6 +78,27 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
+        <service
+            android:name=".AutofillService"
+            android:label="Latch"
+            android:exported="true"
+            android:permission="android.permission.BIND_AUTOFILL_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.autofill.AutofillService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.autofill"
+                android:resource="@xml/autofill_service" />
+        </service>
+
+        <activity
+            android:name=".AutofillSelectionActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@style/NormalTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:windowSoftInputMode="adjustResize" />
+
     </application>
 
     <!-- Required to query activities that can process text, see:
