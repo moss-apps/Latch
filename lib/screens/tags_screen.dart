@@ -491,20 +491,12 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
   Widget _buildFileThumbnail(VaultedFile file) {
     if (file.isImage) {
       final imageFile = File(file.vaultPath);
-      return FutureBuilder<bool>(
-        future: imageFile.exists(),
-        builder: (context, snapshot) {
-          if (snapshot.data != true) {
-            return _buildPlaceholder(file);
-          }
-          return Image.file(
-            imageFile,
-            fit: BoxFit.cover,
-            cacheWidth: 300,
-            filterQuality: FilterQuality.low,
-            errorBuilder: (_, __, ___) => _buildPlaceholder(file),
-          );
-        },
+      return Image.file(
+        imageFile,
+        fit: BoxFit.cover,
+        cacheWidth: 300,
+        filterQuality: FilterQuality.low,
+        errorBuilder: (_, __, ___) => _buildPlaceholder(file),
       );
     }
 
@@ -998,7 +990,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
           ],
         ),
       ),
-    );
+    ).whenComplete(nameController.dispose);
   }
 
   void _showTagOptions(TagInfo tag) {
