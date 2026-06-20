@@ -35,7 +35,9 @@ import 'camera_screen.dart';
 import 'audio_recorder_screen.dart';
 import 'vault_settings_screen.dart';
 import 'note_editor_screen.dart';
+import 'password_editor_screen.dart';
 import '../providers/note_providers.dart';
+import '../providers/password_providers.dart';
 import '../widgets/operation_progress_sheet.dart';
 import '../widgets/media_hold_action_sheet.dart';
 import '../widgets/media_multi_select_action_sheet.dart';
@@ -1148,6 +1150,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
       currentFiles: filesAsync.value ?? [],
       onUnsupported: () => _showFileOptionsSheet(file),
       onOpenNote: (noteId) => _openNoteFromVault(noteId),
+      onOpenPassword: (passwordId) => _openPasswordFromVault(passwordId),
     );
   }
 
@@ -1160,6 +1163,21 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
           context,
           MaterialPageRoute(
             builder: (_) => NoteEditorScreen(note: note),
+          ),
+        );
+      }
+    });
+  }
+
+  void _openPasswordFromVault(String passwordId) {
+    final passwordsAsync = ref.read(passwordsNotifierProvider);
+    passwordsAsync.whenData((passwords) {
+      final entry = passwords.where((p) => p.id == passwordId).firstOrNull;
+      if (entry != null && mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PasswordEditorScreen(entry: entry),
           ),
         );
       }
