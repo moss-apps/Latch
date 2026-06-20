@@ -230,22 +230,14 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen> {
             final file = snapshot.data!;
             if (file.isImage) {
               final imageFile = File(file.vaultPath);
-              return FutureBuilder<bool>(
-                future: imageFile.exists(),
-                builder: (context, existsSnapshot) {
-                  if (existsSnapshot.data != true) {
-                    return _buildPlaceholderCover();
-                  }
-                  return Image.file(
-                    imageFile,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: double.infinity,
-                    cacheWidth: 400,
-                    filterQuality: FilterQuality.low,
-                    errorBuilder: (_, __, ___) => _buildPlaceholderCover(),
-                  );
-                },
+              return Image.file(
+                imageFile,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
+                cacheWidth: 400,
+                filterQuality: FilterQuality.low,
+                errorBuilder: (_, __, ___) => _buildPlaceholderCover(),
               );
             }
           }
@@ -627,7 +619,10 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen> {
           ),
         ],
       ),
-    );
+    ).whenComplete(() {
+      nameController.dispose();
+      descController.dispose();
+    });
   }
 
   void _showCreateSubfolderDialog(VaultFolder parentFolder) {
@@ -708,7 +703,7 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen> {
           ),
         ],
       ),
-    );
+    ).whenComplete(nameController.dispose);
   }
 
   void _showDeleteFolderDialog(VaultFolder folder) {
