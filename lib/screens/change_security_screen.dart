@@ -348,19 +348,7 @@ class _ChangeSecurityScreenState extends State<ChangeSecurityScreen> {
                   color: AppColors.darkSuccess.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: AppColors.darkSuccess,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
+                child: Text(
                       'Active',
                       style: TextStyle(
                         fontSize: 12,
@@ -369,8 +357,6 @@ class _ChangeSecurityScreenState extends State<ChangeSecurityScreen> {
                         color: AppColors.darkSuccess,
                       ),
                     ),
-                  ],
-                ),
               ),
             ],
           ),
