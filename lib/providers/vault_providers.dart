@@ -71,13 +71,6 @@ final fileTypeFilterProvider = StateProvider<VaultedFileType?>((ref) {
 
 // ========== ASYNC PROVIDERS ==========
 
-/// Provider for all vaulted files
-final allFilesProvider = FutureProvider<List<VaultedFile>>((ref) async {
-  final vaultService = ref.watch(vaultServiceProvider);
-  final isDecoy = ref.watch(isDecoyModeProvider);
-  return await vaultService.getAllFiles(isDecoy: isDecoy);
-});
-
 /// Provider for sorted and filtered files
 final filteredFilesProvider = FutureProvider<List<VaultedFile>>((ref) async {
   final vaultService = ref.watch(vaultServiceProvider);
@@ -546,7 +539,7 @@ class ReEncryptNotifier extends Notifier<ReEncryptProgress> {
       }
 
       ref.invalidate(vaultSettingsProvider);
-      ref.invalidate(allFilesProvider);
+      ref.invalidate(vaultNotifierProvider);
       return result;
     } catch (e) {
       state = ReEncryptProgress(error: e.toString());

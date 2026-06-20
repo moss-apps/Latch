@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
+import '../utils/path_utils.dart';
 import '../models/encryption_algorithm.dart';
 import '../models/vaulted_file.dart';
 import '../models/album.dart';
@@ -34,7 +35,9 @@ import 'camera_screen.dart';
 import 'audio_recorder_screen.dart';
 import 'vault_settings_screen.dart';
 import 'note_editor_screen.dart';
+import 'password_editor_screen.dart';
 import '../providers/note_providers.dart';
+import '../providers/password_providers.dart';
 import '../widgets/operation_progress_sheet.dart';
 import '../widgets/media_hold_action_sheet.dart';
 import '../widgets/media_multi_select_action_sheet.dart';
@@ -160,6 +163,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
         backgroundColor: context.accentColor,
         leading: IconButton(
           icon: const Icon(Icons.close, color: Colors.white),
+          tooltip: 'Exit selection',
           onPressed: _exitSelectionMode,
         ),
         title: Text(
@@ -206,6 +210,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
             _isSearching ? Icons.close : Icons.search,
             color: context.textPrimary,
           ),
+          tooltip: _isSearching ? 'Close search' : 'Search',
           onPressed: () {
             setState(() {
               _isSearching = !_isSearching;
@@ -218,9 +223,11 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
         ),
         IconButton(
           icon: Icon(Icons.sort, color: context.textPrimary),
+          tooltip: 'Sort',
           onPressed: _showSortOptions,
         ),
         PopupMenuButton<String>(
+          tooltip: 'More options',
           icon: Icon(Icons.more_vert, color: context.textPrimary),
           onSelected: (value) {
             switch (value) {
@@ -909,34 +916,21 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
     if (file.isImage) {
       final imageFile = File(file.vaultPath);
 
-      // Use FutureBuilder to check file existence first
-      return FutureBuilder<bool>(
-        future: imageFile.exists(),
-        builder: (context, snapshot) {
-          if (snapshot.data != true) {
-            return _buildPlaceholder(file);
+      return Image.file(
+        imageFile,
+        fit: BoxFit.cover,
+        cacheWidth: 300,
+        filterQuality: FilterQuality.low,
+        gaplessPlayback: true,
+        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+          if (wasSynchronouslyLoaded || frame != null) {
+            return child;
           }
-
-          // Use Image.file with defensive error handling
-          return Image.file(
-            imageFile,
-            fit: BoxFit.cover,
-            cacheWidth: 300, // Limit resolution for performance
-            filterQuality: FilterQuality.low,
-            gaplessPlayback: true,
-            frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-              if (wasSynchronouslyLoaded || frame != null) {
-                return child;
-              }
-              // Show placeholder while loading
-              return const _ImageLoadingPlaceholder();
-            },
-            errorBuilder: (context, error, stackTrace) {
-              // Log error for debugging but show placeholder gracefully
-              debugPrint('Error loading image: ${file.originalName} - $error');
-              return _buildPlaceholder(file);
-            },
-          );
+          return const _ImageLoadingPlaceholder();
+        },
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint('Error loading image: ${file.originalName} - $error');
+          return _buildPlaceholder(file);
         },
       );
     }
@@ -1156,6 +1150,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
       currentFiles: filesAsync.value ?? [],
       onUnsupported: () => _showFileOptionsSheet(file),
       onOpenNote: (noteId) => _openNoteFromVault(noteId),
+      onOpenPassword: (passwordId) => _openPasswordFromVault(passwordId),
     );
   }
 
@@ -1168,6 +1163,21 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
           context,
           MaterialPageRoute(
             builder: (_) => NoteEditorScreen(note: note),
+          ),
+        );
+      }
+    });
+  }
+
+  void _openPasswordFromVault(String passwordId) {
+    final passwordsAsync = ref.read(passwordsNotifierProvider);
+    passwordsAsync.whenData((passwords) {
+      final entry = passwords.where((p) => p.id == passwordId).firstOrNull;
+      if (entry != null && mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PasswordEditorScreen(entry: entry),
           ),
         );
       }
@@ -1402,15 +1412,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
       );
 
       // Get the Downloads directory
-      Directory? downloadsDir;
-      if (Platform.isAndroid) {
-        downloadsDir = Directory('/storage/emulated/0/Download');
-        if (!await downloadsDir.exists()) {
-          downloadsDir = await getExternalStorageDirectory();
-        }
-      } else {
-        downloadsDir = await getDownloadsDirectory();
-      }
+      final downloadsDir = await PathUtils.getDownloadsDirectory();
 
       if (downloadsDir == null) {
         if (mounted) Navigator.pop(context);
@@ -2366,6 +2368,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
                                 color: AppColors.lightTextSecondary),
                             suffixIcon: IconButton(
                               icon: Icon(Icons.add, color: context.accentColor),
+                              tooltip: 'Add tag',
                               onPressed: () async {
                                 final tag = tagController.text.trim();
                                 if (tag.isEmpty) return;
@@ -2530,7 +2533,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
           );
         },
       ),
-    );
+    ).whenComplete(tagController.dispose);
   }
 
   Future<void> _toggleFavoriteSelected(Set<String> selectedFiles) async {
@@ -2988,7 +2991,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
           ),
         ],
       ),
-    );
+    ).whenComplete(pinController.dispose);
   }
 
   // Import methods
@@ -3391,7 +3394,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
       deleteOriginal: true,
     );
 
-    setState(() => _isImporting = false);
+    if (mounted) setState(() => _isImporting = false);
 
     if (result.success && result.importedCount > 0) {
       ToastUtils.showSuccess('Photo captured and hidden');
@@ -3421,7 +3424,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
       deleteOriginal: true,
     );
 
-    setState(() => _isImporting = false);
+    if (mounted) setState(() => _isImporting = false);
 
     if (result.success && result.importedCount > 0) {
       ToastUtils.showSuccess('Video recorded and hidden');
@@ -3450,7 +3453,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
       deleteOriginal: true,
     );
 
-    setState(() => _isImporting = false);
+    if (mounted) setState(() => _isImporting = false);
 
     if (result.success && result.importedCount > 0) {
       ToastUtils.showSuccess('Audio recorded and hidden');
@@ -3535,6 +3538,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
         return confirmed ?? false;
       },
       onProgress: (current, total) {
+        if (!mounted) return;
         setState(() {
           _importProgress = current;
           _importTotal = total;
@@ -3545,7 +3549,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
       },
     );
 
-    setState(() => _isImporting = false);
+    if (mounted) setState(() => _isImporting = false);
 
     if (result.success && result.importedCount > 0) {
       final msgBuilder =
@@ -3631,6 +3635,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
       deleteOriginals: true,
       perFileEncryption: perFileEncryption,
       onProgress: (current, total) {
+        if (!mounted) return;
         setState(() {
           _importProgress = current;
           _importTotal = total;
@@ -3638,7 +3643,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
       },
     );
 
-    setState(() => _isImporting = false);
+    if (mounted) setState(() => _isImporting = false);
 
     if (result.success && result.importedCount > 0) {
       final msg = result.deletedOriginals
@@ -3717,6 +3722,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
       deleteOriginals: true,
       perFileEncryption: perFileEncryption,
       onProgress: (current, total) {
+        if (!mounted) return;
         setState(() {
           _importProgress = current;
           _importTotal = total;
@@ -3724,7 +3730,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
       },
     );
 
-    setState(() => _isImporting = false);
+    if (mounted) setState(() => _isImporting = false);
 
     if (importResult.success && importResult.importedCount > 0) {
       final msg = importResult.deletedOriginals
@@ -3763,6 +3769,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
         recursive: true,
         deleteOriginals: false,
         onProgress: (current, total) {
+          if (!mounted) return;
           setState(() {
             _importProgress = current;
             _importTotal = total;
@@ -3770,7 +3777,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
         },
       );
 
-      setState(() => _isImporting = false);
+      if (mounted) setState(() => _isImporting = false);
 
       if (result.success && result.filesImported > 0) {
         ToastUtils.showSuccess(result.message ??
@@ -3783,7 +3790,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
         ToastUtils.showInfo('No files found in folder');
       }
     } catch (e) {
-      setState(() => _isImporting = false);
+      if (mounted) setState(() => _isImporting = false);
       ToastUtils.showError('Failed to import folder: $e');
     }
   }
@@ -4198,6 +4205,7 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
         leading: _pathStack.isNotEmpty
             ? IconButton(
                 icon: const Icon(Icons.arrow_back),
+                tooltip: 'Back',
                 onPressed: _goBack,
                 color: context.textPrimary,
               )

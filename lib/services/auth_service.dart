@@ -8,15 +8,17 @@ import 'package:local_auth/local_auth.dart';
 import 'package:local_auth_android/local_auth_android.dart';
 import 'package:local_auth_darwin/local_auth_darwin.dart';
 import '../utils/pbkdf2_isolate.dart';
+import '../utils/secure_compare.dart';
 import 'auto_kill_service.dart';
 import 'decoy_service.dart';
+import 'encryption_service.dart';
 import 'vault_service.dart';
 
 /// Authentication service that handles password and biometric authentication
 class AuthService {
   static const _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(),
-    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.unlocked_this_device),
   );
 
   static const String _passwordHashKey = 'user_password_hash';
@@ -58,11 +60,12 @@ class AuthService {
   /// Create and store the user's password
   Future<bool> createPassword(String password) async {
     try {
-      if (password.isEmpty) return false;
+      if (password.length < minPasswordLength) return false;
 
       await _createHashedCredential(password, _passwordSaltKey, _passwordHashKey, _passwordIterationsKey);
       await _storage.write(key: _firstTimeKey, value: 'false');
       await _storage.write(key: _authMethodKey, value: 'password');
+      EncryptionService.instance.setPendingCredential(password);
 
       return true;
     } catch (e) {
@@ -80,6 +83,7 @@ class AuthService {
       await _createHashedCredential(pin, _pinSaltKey, _pinHashKey, _pinIterationsKey);
       await _storage.write(key: _firstTimeKey, value: 'false');
       await _storage.write(key: _authMethodKey, value: 'pin');
+      EncryptionService.instance.setPendingCredential(pin);
 
       return true;
     } catch (e) {
@@ -89,12 +93,18 @@ class AuthService {
 
   /// Verify the provided PIN against stored hash
   Future<bool> verifyPIN(String pin) async {
-    if (await _verifyCredential(pin, _pinHashKey, _pinSaltKey, _pinIterationsKey)) return true;
+    if (await _verifyCredential(pin, _pinHashKey, _pinSaltKey, _pinIterationsKey)) {
+      EncryptionService.instance.setPendingCredential(pin);
+      return true;
+    }
     return _verifyCredential(pin, _backupPinHashKey, _backupPinSaltKey, _backupPinIterationsKey);
   }
 
   Future<bool> verifyPassword(String password) async {
-    if (await _verifyCredential(password, _passwordHashKey, _passwordSaltKey, _passwordIterationsKey)) return true;
+    if (await _verifyCredential(password, _passwordHashKey, _passwordSaltKey, _passwordIterationsKey)) {
+      EncryptionService.instance.setPendingCredential(password);
+      return true;
+    }
     return _verifyCredential(password, _backupPasswordHashKey, _backupPasswordSaltKey, _backupPasswordIterationsKey);
   }
 
@@ -311,6 +321,7 @@ class AuthService {
 
         await _storage.write(key: _firstTimeKey, value: 'false');
         await _storage.write(key: _authMethodKey, value: 'biometric');
+        await EncryptionService.instance.setupBiometricKwk();
         debugPrint('[AuthService] Biometric setup complete');
         return true;
       }
@@ -370,7 +381,7 @@ class AuthService {
   Future<bool> changePassword(
       String currentPassword, String newPassword) async {
     try {
-      if (currentPassword.isEmpty || newPassword.isEmpty) return false;
+      if (currentPassword.isEmpty || newPassword.length < minPasswordLength) return false;
 
       final isVerified = await verifyPassword(currentPassword);
       if (!isVerified) return false;
@@ -378,6 +389,9 @@ class AuthService {
       await _createHashedCredential(newPassword, _passwordSaltKey, _passwordHashKey, _passwordIterationsKey);
       await _storage.write(key: _authMethodKey, value: 'password');
       await _storage.write(key: _biometricsEnabledKey, value: 'false');
+      await _clearBackupCredentials();
+      await EncryptionService.instance.reWrapKey(newPassword);
+      await EncryptionService.instance.removeBiometricKwk();
 
       return true;
     } catch (e) {
@@ -398,6 +412,9 @@ class AuthService {
       await _createHashedCredential(newPIN, _pinSaltKey, _pinHashKey, _pinIterationsKey);
       await _storage.write(key: _authMethodKey, value: 'pin');
       await _storage.write(key: _biometricsEnabledKey, value: 'false');
+      await _clearBackupCredentials();
+      await EncryptionService.instance.reWrapKey(newPIN);
+      await EncryptionService.instance.removeBiometricKwk();
 
       return true;
     } catch (e) {
@@ -409,7 +426,7 @@ class AuthService {
   Future<bool> switchFromPINToPassword(
       String currentPIN, String newPassword) async {
     try {
-      if (currentPIN.isEmpty || newPassword.isEmpty) return false;
+      if (currentPIN.isEmpty || newPassword.length < minPasswordLength) return false;
 
       final isVerified = await verifyPIN(currentPIN);
       if (!isVerified) return false;
@@ -417,6 +434,9 @@ class AuthService {
       await _createHashedCredential(newPassword, _passwordSaltKey, _passwordHashKey, _passwordIterationsKey);
       await _storage.write(key: _authMethodKey, value: 'password');
       await _storage.write(key: _biometricsEnabledKey, value: 'false');
+      await _clearBackupCredentials();
+      await EncryptionService.instance.reWrapKey(newPassword);
+      await EncryptionService.instance.removeBiometricKwk();
 
       return true;
     } catch (e) {
@@ -438,6 +458,9 @@ class AuthService {
       await _createHashedCredential(newPIN, _pinSaltKey, _pinHashKey, _pinIterationsKey);
       await _storage.write(key: _authMethodKey, value: 'pin');
       await _storage.write(key: _biometricsEnabledKey, value: 'false');
+      await _clearBackupCredentials();
+      await EncryptionService.instance.reWrapKey(newPIN);
+      await EncryptionService.instance.removeBiometricKwk();
 
       return true;
     } catch (e) {
@@ -452,23 +475,26 @@ class AuthService {
       await _storage.delete(key: _pinHashKey);
       await _storage.delete(key: _passwordSaltKey);
       await _storage.delete(key: _pinSaltKey);
-      await _storage.delete(key: _backupPasswordHashKey);
-      await _storage.delete(key: _backupPinHashKey);
-      await _storage.delete(key: _backupPasswordSaltKey);
-      await _storage.delete(key: _backupPinSaltKey);
-      await _storage.delete(key: _passwordIterationsKey);
-      await _storage.delete(key: _pinIterationsKey);
-      await _storage.delete(key: _backupPasswordIterationsKey);
-      await _storage.delete(key: _backupPinIterationsKey);
+      await _clearBackupCredentials();
       await _storage.delete(key: _hashVersionKey);
       await _storage.delete(key: _firstTimeKey);
       await _storage.delete(key: _biometricsEnabledKey);
       await _storage.delete(key: _authMethodKey);
       await resetUnlockAttempts();
+      await EncryptionService.instance.removeBiometricKwk();
       return true;
     } catch (e) {
       return false;
     }
+  }
+
+  Future<void> _clearBackupCredentials() async {
+    await _storage.delete(key: _backupPasswordHashKey);
+    await _storage.delete(key: _backupPinHashKey);
+    await _storage.delete(key: _backupPasswordSaltKey);
+    await _storage.delete(key: _backupPinSaltKey);
+    await _storage.delete(key: _backupPasswordIterationsKey);
+    await _storage.delete(key: _backupPinIterationsKey);
   }
 
   /// Get the current unlock protection state.
@@ -543,8 +569,25 @@ class AuthService {
     );
   }
 
-  static const int _defaultKdfIterations = 100000;
+  static const int _defaultKdfIterations = 600000;
   static const int _saltSize = 32;
+
+  /// Minimum password length enforced at every entry point (setup, change).
+  static const int minPasswordLength = 8;
+
+  /// Classify a password's strength. Length is a hard floor; composition only
+  /// informs the warning level (NIST 800-63B: length over forced composition).
+  static PasswordStrength validatePasswordStrength(String password) {
+    if (password.length < minPasswordLength) return PasswordStrength.tooShort;
+    var classes = 0;
+    if (RegExp(r'[a-z]').hasMatch(password)) classes++;
+    if (RegExp(r'[A-Z]').hasMatch(password)) classes++;
+    if (RegExp(r'[0-9]').hasMatch(password)) classes++;
+    if (RegExp(r'[^a-zA-Z0-9]').hasMatch(password)) classes++;
+    // A long passphrase is fine even with one class; only flag short+mono.
+    if (password.length < 12 && classes < 2) return PasswordStrength.weak;
+    return PasswordStrength.acceptable;
+  }
 
   Future<int> _getCurrentKdfIterations() async {
     final settings = await _vaultService.getSettings();
@@ -576,6 +619,9 @@ class AuthService {
 
   Future<bool> _verifyCredential(String credential, String hashKey, String saltKey, String iterationsKey) async {
     try {
+      final state = await getUnlockSecurityState();
+      if (state.isLockedOut) return false;
+
       final storedHash = await _storage.read(key: hashKey);
       final storedSalt = await _storage.read(key: saltKey);
 
@@ -583,7 +629,11 @@ class AuthService {
 
       if (storedSalt == null) {
         final legacyHash = _hashCredentialLegacy(credential);
-        if (legacyHash == storedHash) {
+        // Pad the legacy path with dummy KDF work so verify time does not
+        // reveal that this is a legacy (plain SHA-256) account.
+        await computePbkdf2Hash(
+            credential, _generateSalt(), iterations: _defaultKdfIterations);
+        if (constantTimeEquals(legacyHash, storedHash)) {
           final salt = _generateSalt();
           final iterations = await _getCurrentKdfIterations();
           final newHash = await computePbkdf2Hash(credential, salt, iterations: iterations);
@@ -602,7 +652,7 @@ class AuthService {
 
       final salt = base64Decode(storedSalt);
       final computedHash = await computePbkdf2Hash(credential, salt, iterations: storedIterations);
-      if (computedHash != storedHash) return false;
+      if (!constantTimeEquals(computedHash, storedHash)) return false;
 
       final currentIterations = await _getCurrentKdfIterations();
       if (currentIterations != storedIterations) {
@@ -721,6 +771,26 @@ enum BiometricAuthenticationStatus {
   canceled,
   lockedOut,
   unavailable,
+}
+
+/// Strength classification for a candidate password.
+enum PasswordStrength {
+  tooShort,
+  weak,
+  acceptable;
+
+  bool get isBlocking => this == tooShort;
+
+  String get label {
+    switch (this) {
+      case PasswordStrength.tooShort:
+        return 'Use at least $AuthService.minPasswordLength characters';
+      case PasswordStrength.weak:
+        return 'Weak — add length or a mix of letters, numbers, symbols';
+      case PasswordStrength.acceptable:
+        return 'Acceptable';
+    }
+  }
 }
 
 class BiometricAuthenticationResult {

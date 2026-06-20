@@ -1,8 +1,7 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
+import '../utils/path_utils.dart';
 import '../models/album.dart';
 import '../models/vault_folder.dart';
 import '../models/vaulted_file.dart';
@@ -18,6 +17,7 @@ import '../widgets/explorer_toolbar.dart';
 import '../widgets/operation_progress_sheet.dart';
 import '../widgets/media_multi_select_action_sheet.dart';
 import 'note_list_screen.dart';
+import 'password_list_screen.dart';
 
 class VaultExplorerScreen extends ConsumerStatefulWidget {
   const VaultExplorerScreen({super.key});
@@ -107,6 +107,16 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const NoteListScreen()),
+            );
+          },
+        ),
+        IconButton(
+          icon: Icon(Icons.password, color: context.textSecondary),
+          tooltip: 'Passwords',
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const PasswordListScreen()),
             );
           },
         ),
@@ -279,15 +289,7 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
 
   Future<void> _exportFileToDownloads(VaultedFile file) async {
     try {
-      Directory? downloadsDir;
-      if (Platform.isAndroid) {
-        downloadsDir = Directory('/storage/emulated/0/Download');
-        if (!await downloadsDir.exists()) {
-          downloadsDir = await getExternalStorageDirectory();
-        }
-      } else {
-        downloadsDir = await getDownloadsDirectory();
-      }
+      final downloadsDir = await PathUtils.getDownloadsDirectory();
 
       if (downloadsDir == null) {
         ToastUtils.showError('Could not access Downloads folder');

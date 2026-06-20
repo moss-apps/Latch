@@ -3,7 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:open_filex/open_filex.dart';
-import 'package:path_provider/path_provider.dart';
+import '../utils/path_utils.dart';
 import 'package:pdfrx/pdfrx.dart';
 import '../models/vaulted_file.dart';
 import '../providers/vault_providers.dart';
@@ -293,15 +293,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
         ),
       );
 
-      Directory? downloadsDir;
-      if (Platform.isAndroid) {
-        downloadsDir = Directory('/storage/emulated/0/Download');
-        if (!await downloadsDir.exists()) {
-          downloadsDir = await getExternalStorageDirectory();
-        }
-      } else {
-        downloadsDir = await getDownloadsDirectory();
-      }
+      final downloadsDir = await PathUtils.getDownloadsDirectory();
 
       if (downloadsDir == null) {
         if (mounted) Navigator.pop(context);

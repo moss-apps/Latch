@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:open_filex/open_filex.dart';
-import 'package:path_provider/path_provider.dart';
+import '../utils/path_utils.dart';
 
 import '../models/vaulted_file.dart';
 import '../services/flick_integration_service.dart';
@@ -175,15 +175,7 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
         ),
       );
 
-      Directory? downloadsDir;
-      if (Platform.isAndroid) {
-        downloadsDir = Directory('/storage/emulated/0/Download');
-        if (!await downloadsDir.exists()) {
-          downloadsDir = await getExternalStorageDirectory();
-        }
-      } else {
-        downloadsDir = await getDownloadsDirectory();
-      }
+      final downloadsDir = await PathUtils.getDownloadsDirectory();
 
       if (downloadsDir == null) {
         if (mounted) Navigator.pop(context);
@@ -306,12 +298,14 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
         actions: [
           IconButton(
             onPressed: _toggleFavorite,
+            tooltip: 'Favorite',
             icon: Icon(
               widget.file.isFavorite ? Icons.favorite : Icons.favorite_border,
               color: widget.file.isFavorite ? Colors.red : context.textPrimary,
             ),
           ),
           PopupMenuButton<String>(
+            tooltip: 'More options',
             icon: Icon(Icons.more_vert, color: context.textPrimary),
             onSelected: (value) {
               switch (value) {
@@ -483,6 +477,7 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
                               ? () =>
                                   _seek(position - const Duration(seconds: 10))
                               : () => _seek(Duration.zero),
+                          tooltip: 'Back 10 seconds',
                           icon: Icon(
                             Icons.replay_10,
                             color: context.textPrimary,
@@ -503,6 +498,7 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
                                     processingState == ProcessingState.buffering
                                 ? null
                                 : _togglePlayback,
+                            tooltip: isPlaying ? 'Pause' : 'Play',
                             icon: Icon(
                               isPlaying ? Icons.pause : Icons.play_arrow,
                               color: Colors.white,
@@ -516,6 +512,7 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
                               ? () =>
                                   _seek(position + const Duration(seconds: 10))
                               : null,
+                          tooltip: 'Forward 10 seconds',
                           icon: Icon(
                             Icons.forward_10,
                             color: context.textPrimary,

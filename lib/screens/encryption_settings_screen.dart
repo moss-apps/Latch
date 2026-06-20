@@ -16,7 +16,7 @@ class EncryptionSettingsScreen extends ConsumerStatefulWidget {
 
 class _EncryptionSettingsScreenState
     extends ConsumerState<EncryptionSettingsScreen> {
-  static const List<int> _kdfIterationOptions = [100000, 200000, 500000];
+  static const List<int> _kdfIterationOptions = [100000, 300000, 600000, 1000000];
 
   @override
   Widget build(BuildContext context) {

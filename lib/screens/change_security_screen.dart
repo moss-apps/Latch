@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../themes/app_colors.dart';
 import '../services/auth_service.dart';
+import '../services/encryption_service.dart';
 import '../utils/toast_utils.dart';
 import '../widgets/adaptive_logo.dart';
 import 'gallery_vault_screen.dart';
@@ -348,19 +349,7 @@ class _ChangeSecurityScreenState extends State<ChangeSecurityScreen> {
                   color: AppColors.darkSuccess.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: AppColors.darkSuccess,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
+                child: Text(
                       'Active',
                       style: TextStyle(
                         fontSize: 12,
@@ -369,8 +358,6 @@ class _ChangeSecurityScreenState extends State<ChangeSecurityScreen> {
                         color: AppColors.darkSuccess,
                       ),
                     ),
-                  ],
-                ),
               ),
             ],
           ),
@@ -538,9 +525,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         _errorMessage = null;
       });
     } else if (_step == 1) {
-      if (_newPasswordController.text.isEmpty) {
+      if (_newPasswordController.text.length <
+          AuthService.minPasswordLength) {
         setState(() {
-          _errorMessage = 'Please enter a new password';
+          _errorMessage =
+              'Use at least ${AuthService.minPasswordLength} characters';
         });
         return;
       }
@@ -579,6 +568,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         // Update auth method to password
         if (success) {
           await _authService.setAuthMethod('password');
+          await EncryptionService.instance.reWrapKey(_newPasswordController.text);
+          await EncryptionService.instance.removeBiometricKwk();
         }
       } else {
         success = await _authService.switchFromPINToPassword(
@@ -1202,6 +1193,8 @@ class _ChangePINScreenState extends State<ChangePINScreen> {
         // Update auth method to PIN
         if (success) {
           await _authService.setAuthMethod('pin');
+          await EncryptionService.instance.reWrapKey(_newPINController.text);
+          await EncryptionService.instance.removeBiometricKwk();
         }
       } else {
         success = await _authService.switchFromPasswordToPIN(

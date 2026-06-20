@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/vaulted_file.dart';
 
 /// App Color Palette
 /// Contains all color definitions used throughout the Latch app
@@ -376,4 +377,52 @@ extension AppColorsExtension on BuildContext {
 
   /// Glass highlight color
   Color get glassHighlight => AppColors.glassHighlight;
+}
+
+/// Single source of truth for per-file-type colors/icons and status colors.
+/// Resolves the document green/orange divergence (now consistently orange).
+class FileTypeColors {
+  FileTypeColors._();
+
+  static const Color imageAccentFallback = Color(0xFF1976D2);
+  static const Color video = Colors.red;
+  static const Color song = Colors.purple;
+  static const Color document = Colors.orange;
+  static const Color other = Colors.grey;
+
+  /// Favorite/amber used for the star indicator across screens.
+  static const Color favorite = Colors.amber;
+
+  /// Color for a vaulted file type. Pass the theme accent for images, which
+  /// follow the dynamic accent color rather than a fixed value.
+  static Color colorForType(VaultedFileType type, {Color? accent}) {
+    switch (type) {
+      case VaultedFileType.image:
+        return accent ?? imageAccentFallback;
+      case VaultedFileType.video:
+        return video;
+      case VaultedFileType.song:
+        return song;
+      case VaultedFileType.document:
+        return document;
+      case VaultedFileType.other:
+        return other;
+    }
+  }
+
+  /// Icon for a vaulted file type.
+  static IconData iconForType(VaultedFileType type) {
+    switch (type) {
+      case VaultedFileType.image:
+        return Icons.image;
+      case VaultedFileType.video:
+        return Icons.videocam;
+      case VaultedFileType.song:
+        return Icons.music_note;
+      case VaultedFileType.document:
+        return Icons.description;
+      case VaultedFileType.other:
+        return Icons.insert_drive_file;
+    }
+  }
 }

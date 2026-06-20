@@ -182,10 +182,14 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                           ),
                         ),
                       ),
-                      GestureDetector(
-                        onTap: () => setState(() => _folderId = null),
-                        child: Icon(Icons.close,
+                      IconButton(
+                        icon: Icon(Icons.close,
                             size: 14, color: context.textTertiary),
+                        onPressed: () => setState(() => _folderId = null),
+                        tooltip: 'Clear folder',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                            minWidth: 36, minHeight: 36),
                       ),
                     ],
                   ),
@@ -372,7 +376,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                     color: context.textPrimary,
                   ),
                 ),
-                onTap: () => Navigator.pop(context, null),
+                onTap: () => Navigator.pop(context, ''),
               ),
               ...folders.map((folder) => ListTile(
                     leading: Icon(Icons.folder, color: context.accentColor),
@@ -392,10 +396,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       },
     );
 
-    if (selected != null || selected == null) {
-      setState(() {
-        _folderId = selected;
-      });
+    if (selected != null) {
+      setState(() => _folderId = selected.isEmpty ? null : selected);
     }
   }
 }

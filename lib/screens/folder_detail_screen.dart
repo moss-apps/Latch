@@ -525,50 +525,20 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
   Widget _buildFileThumbnail(VaultedFile file) {
     if (file.isImage) {
       final imageFile = File(file.vaultPath);
-      return FutureBuilder<bool>(
-        future: imageFile.exists(),
-        builder: (context, snapshot) {
-          if (snapshot.data != true) {
-            return _buildFilePlaceholder(file);
-          }
-          return Image.file(
-            imageFile,
-            fit: BoxFit.cover,
-            cacheWidth: 200,
-            filterQuality: FilterQuality.low,
-            errorBuilder: (_, __, ___) => _buildFilePlaceholder(file),
-          );
-        },
+      return Image.file(
+        imageFile,
+        fit: BoxFit.cover,
+        cacheWidth: 200,
+        filterQuality: FilterQuality.low,
+        errorBuilder: (_, __, ___) => _buildFilePlaceholder(file),
       );
     }
     return _buildFilePlaceholder(file);
   }
 
   Widget _buildFilePlaceholder(VaultedFile file) {
-    IconData icon;
-    Color color;
-    switch (file.type) {
-      case VaultedFileType.image:
-        icon = Icons.image;
-        color = context.accentColor;
-        break;
-      case VaultedFileType.video:
-        icon = Icons.videocam;
-        color = Colors.red;
-        break;
-      case VaultedFileType.song:
-        icon = Icons.music_note;
-        color = Colors.purple;
-        break;
-      case VaultedFileType.document:
-        icon = Icons.description;
-        color = Colors.green;
-        break;
-      case VaultedFileType.other:
-        icon = Icons.insert_drive_file;
-        color = Colors.grey;
-        break;
-    }
+    final color = FileTypeColors.colorForType(file.type, accent: context.accentColor);
+    final icon = FileTypeColors.iconForType(file.type);
     return Container(
       color: color.withValues(alpha: 0.1),
       child: Column(
@@ -1053,7 +1023,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
           ),
         ],
       ),
-    );
+    ).whenComplete(nameController.dispose);
   }
 
   void _showSubfolderOptions(VaultFolder subfolder) {
@@ -1195,7 +1165,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
           ),
         ],
       ),
-    );
+    ).whenComplete(nameController.dispose);
   }
 
   void _showDeleteSubfolderDialog(VaultFolder subfolder) {

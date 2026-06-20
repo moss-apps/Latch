@@ -33,9 +33,10 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
   Future<void> _handleContinue() async {
     final password = _passwordController.text;
 
-    if (password.isEmpty) {
+    final strength = AuthService.validatePasswordStrength(password);
+    if (strength.isBlocking) {
       setState(() {
-        _errorMessage = 'Please enter a password';
+        _errorMessage = strength.label;
       });
       return;
     }

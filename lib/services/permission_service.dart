@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'auto_kill_service.dart';
@@ -315,13 +316,11 @@ class PermissionService {
     if (!Platform.isAndroid) return 0;
 
     try {
-      // Use ProcessInfo or default to a safe version
-      // In a real app, you'd use device_info_plus
-      // For now, we'll default to 33 (Android 13) which is common
-      return 33;
+      final deviceInfo = await DeviceInfoPlugin().androidInfo;
+      return deviceInfo.version.sdkInt;
     } catch (e) {
       debugPrint('Error getting Android SDK version: $e');
-      return 33; // Default to Android 13
+      return 0;
     }
   }
 }

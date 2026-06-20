@@ -63,7 +63,7 @@ class VaultService {
 
   static const _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(),
-    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.unlocked_this_device),
   );
 
   static const String _vaultIndexKey = 'vault_file_index';
@@ -2458,6 +2458,69 @@ class VaultService {
       await _saveFileIndex();
     }
   }
+
+  Future<void> registerPasswordEntry({
+    required String passwordId,
+    required String title,
+    required String encryptedContentPath,
+    List<String> tags = const [],
+    bool isEncrypted = false,
+    EncryptionAlgorithm encryptionAlgorithm = EncryptionAlgorithm.aes256Gcm,
+    int kdfIterations = 0,
+    bool isDecoy = false,
+  }) async {
+    final files = isDecoy
+        ? (_cachedDecoyFiles ??= await _loadFileIndex(isDecoy: true))
+        : (_cachedFiles ??= await _loadFileIndex());
+
+    final existingIndex =
+        files.indexWhere((f) => f.metadata?['passwordId'] == passwordId);
+
+    final entry = VaultedFile(
+      id: existingIndex != -1 ? files[existingIndex].id : passwordId,
+      originalName: '$title.pwd',
+      vaultPath: encryptedContentPath,
+      type: VaultedFileType.document,
+      mimeType: 'application/octet-stream',
+      fileSize: 0,
+      dateAdded: existingIndex != -1
+          ? files[existingIndex].dateAdded
+          : DateTime.now(),
+      dateModified: DateTime.now(),
+      tags: ['password', ...tags],
+      isEncrypted: isEncrypted,
+      encryptionAlgorithm: encryptionAlgorithm,
+      kdfIterations: kdfIterations,
+      metadata: {'passwordId': passwordId},
+    );
+
+    if (existingIndex != -1) {
+      files[existingIndex] = entry;
+    } else {
+      files.insert(0, entry);
+    }
+
+    if (isDecoy) {
+      await _saveFileIndex(isDecoy: true);
+    } else {
+      await _saveFileIndex();
+    }
+  }
+
+  Future<void> removePasswordEntry(String passwordId,
+      {bool isDecoy = false}) async {
+    final files = isDecoy
+        ? (_cachedDecoyFiles ??= await _loadFileIndex(isDecoy: true))
+        : (_cachedFiles ??= await _loadFileIndex());
+
+    files.removeWhere((f) => f.metadata?['passwordId'] == passwordId);
+
+    if (isDecoy) {
+      await _saveFileIndex(isDecoy: true);
+    } else {
+      await _saveFileIndex();
+    }
+  }
 }
 
 /// Helper class for batch file import
@@ -2520,8 +2583,8 @@ class VaultSettings {
 
   const VaultSettings({
     this.encryptionEnabled = false,
-    this.encryptionAlgorithm = EncryptionAlgorithm.aes256Ctr,
-    this.kdfIterations = 100000,
+    this.encryptionAlgorithm = EncryptionAlgorithm.aes256Gcm,
+    this.kdfIterations = 600000,
     this.secureDelete = true,
     this.screenshotProtectionEnabled = false,
     this.autoKillDelaySeconds = 0,
@@ -2617,10 +2680,10 @@ class VaultSettings {
     return VaultSettings(
       encryptionEnabled: json['encryptionEnabled'] as bool? ?? false,
       encryptionAlgorithm: EncryptionAlgorithm.values.firstWhere(
-        (a) => a.name == (json['encryptionAlgorithm'] as String? ?? 'aes256Ctr'),
-        orElse: () => EncryptionAlgorithm.aes256Ctr,
+        (a) => a.name == (json['encryptionAlgorithm'] as String? ?? 'aes256Gcm'),
+        orElse: () => EncryptionAlgorithm.aes256Gcm,
       ),
-      kdfIterations: json['kdfIterations'] as int? ?? 100000,
+      kdfIterations: json['kdfIterations'] as int? ?? 600000,
       secureDelete: json['secureDelete'] as bool? ?? true,
       screenshotProtectionEnabled:
           json['screenshotProtectionEnabled'] as bool? ?? false,

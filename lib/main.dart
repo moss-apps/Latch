@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,10 +14,10 @@ import 'providers/vault_providers.dart';
 import 'services/auth_service.dart';
 import 'screens/auth_method_selection_screen.dart';
 import 'screens/unlock_screen.dart';
+import 'autofill_app.dart';
 import 'utils/frame_rate_optimizer.dart';
+import 'utils/navigator_key.dart';
 import 'utils/performance_config.dart';
-
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -72,6 +74,7 @@ class _AppInitializerState extends ConsumerState<AppInitializer> {
   final AuthService _authService = AuthService();
   bool _isLoading = true;
   bool _isFirstTime = true;
+  StreamSubscription<AppUpdateInfo?>? _updateSub;
 
   @override
   void initState() {
@@ -79,12 +82,18 @@ class _AppInitializerState extends ConsumerState<AppInitializer> {
     _checkAuthStatus();
 
     final updateService = ref.read(updateServiceProvider);
-    updateService.onUpdateCheck.listen((info) {
+    _updateSub = updateService.onUpdateCheck.listen((info) {
       if (info != null &&
           info.updateAvailability == UpdateAvailability.updateAvailable) {
         _showUpdateDialog();
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _updateSub?.cancel();
+    super.dispose();
   }
 
   void _showUpdateDialog() {
@@ -150,3 +159,6 @@ class _AppInitializerState extends ConsumerState<AppInitializer> {
     }
   }
 }
+
+@pragma('vm:entry-point')
+void autofillMain() => runApp(AutofillApp());

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:open_filex/open_filex.dart';
-import 'package:path_provider/path_provider.dart';
+import '../utils/path_utils.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
 import 'package:video_player/video_player.dart';
@@ -704,15 +704,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
         ),
       );
 
-      Directory? downloadsDir;
-      if (Platform.isAndroid) {
-        downloadsDir = Directory('/storage/emulated/0/Download');
-        if (!await downloadsDir.exists()) {
-          downloadsDir = await getExternalStorageDirectory();
-        }
-      } else {
-        downloadsDir = await getDownloadsDirectory();
-      }
+      final downloadsDir = await PathUtils.getDownloadsDirectory();
 
       if (downloadsDir == null) {
         if (mounted) Navigator.pop(context);
@@ -840,13 +832,17 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: () => setState(() => _isSlideshow = false),
-                          child: const Icon(
+                        IconButton(
+                          icon: const Icon(
                             Icons.close,
                             color: Colors.white,
                             size: 18,
                           ),
+                          onPressed: () => setState(() => _isSlideshow = false),
+                          tooltip: 'Close slideshow',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                              minWidth: 36, minHeight: 36),
                         ),
                       ],
                     ),
@@ -899,20 +895,12 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
             minScale: PhotoViewComputedScale.contained,
             maxScale: PhotoViewComputedScale.covered * 3,
             heroAttributes: PhotoViewHeroAttributes(tag: file.id),
-            child: FutureBuilder<bool>(
-              future: File(file.vaultPath).exists(),
-              builder: (context, snapshot) {
-                if (snapshot.data != true) {
-                  return _buildImageErrorPlaceholder(file);
-                }
-                return Image.file(
-                  File(file.vaultPath),
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    debugPrint('Error decoding image file: $error');
-                    return _buildImageErrorPlaceholder(file);
-                  },
-                );
+            child: Image.file(
+              File(file.vaultPath),
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                debugPrint('Error decoding image file: $error');
+                return _buildImageErrorPlaceholder(file);
               },
             ),
           ),
@@ -1039,6 +1027,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                     IconButton(
                       icon: const Icon(Icons.replay_10, size: 36),
                       color: Colors.white,
+                      tooltip: 'Back 10 seconds',
                       onPressed: _skipBackward,
                     ),
                     IconButton(
@@ -1047,11 +1036,13 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                         size: 48,
                         color: Colors.white,
                       ),
+                      tooltip: _isVideoPlaying ? 'Pause' : 'Play',
                       onPressed: _toggleVideoPlayback,
                     ),
                     IconButton(
                       icon: const Icon(Icons.forward_10, size: 36),
                       color: Colors.white,
+                      tooltip: 'Forward 10 seconds',
                       onPressed: _skipForward,
                     ),
                   ],
@@ -1127,6 +1118,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
           children: [
             IconButton(
               icon: const Icon(Icons.arrow_back, color: Colors.white),
+              tooltip: 'Back',
               onPressed: () => Navigator.pop(context),
             ),
             Expanded(
@@ -1160,6 +1152,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                 file.isFavorite ? Icons.favorite : Icons.favorite_border,
                 color: file.isFavorite ? Colors.red : Colors.white,
               ),
+              tooltip: 'Favorite',
               onPressed: _toggleFavorite,
             ),
             if (file.isVideo)
@@ -1168,10 +1161,12 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                   _isLooping ? Icons.repeat_one : Icons.repeat,
                   color: _isLooping ? AppColors.accent : Colors.white,
                 ),
+                tooltip: 'Loop',
                 onPressed: _toggleLooping,
               ),
             IconButton(
               icon: const Icon(Icons.info_outline, color: Colors.white),
+              tooltip: 'File info',
               onPressed: _showFileInfo,
             ),
           ],
@@ -1265,39 +1260,42 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  IconButton(
-                    icon: Icon(
-                      _isMuted ? Icons.volume_off : Icons.volume_up,
-                      color: Colors.white,
-                    ),
-                    onPressed: () {
+                   IconButton(
+                     icon: Icon(
+                       _isMuted ? Icons.volume_off : Icons.volume_up,
+                       color: Colors.white,
+                     ),
+                     tooltip: _isMuted ? 'Unmute' : 'Mute',
+                     onPressed: () {
                       setState(() {
                         _isMuted = !_isMuted;
                         _videoController?.setVolume(_isMuted ? 0.0 : 1.0);
                       });
                     },
                   ),
-                  IconButton(
-                    icon: Icon(
-                      _isVideoPlaying
-                          ? Icons.pause_circle_filled
-                          : Icons.play_circle_filled,
-                      color: Colors.white,
-                      size: 48,
-                    ),
-                    onPressed: _toggleVideoPlayback,
-                  ),
-                  IconButton(
-                    icon: Text(
-                      '${_playbackSpeed}x',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        fontFamily: 'ProductSans',
-                      ),
-                    ),
-                    onPressed: () {
+                   IconButton(
+                     icon: Icon(
+                       _isVideoPlaying
+                           ? Icons.pause_circle_filled
+                           : Icons.play_circle_filled,
+                       color: Colors.white,
+                       size: 48,
+                     ),
+                     tooltip: _isVideoPlaying ? 'Pause' : 'Play',
+                     onPressed: _toggleVideoPlayback,
+                   ),
+                   IconButton(
+                     icon: Text(
+                       '${_playbackSpeed}x',
+                       style: const TextStyle(
+                         color: Colors.white,
+                         fontWeight: FontWeight.bold,
+                         fontSize: 14,
+                         fontFamily: 'ProductSans',
+                       ),
+                     ),
+                     tooltip: 'Playback speed',
+                     onPressed: () {
                       setState(() {
                         if (_playbackSpeed == 1.0) {
                           _playbackSpeed = 1.5;
@@ -1354,6 +1352,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                   // Previous
                   IconButton(
                     icon: const Icon(Icons.skip_previous, color: Colors.white),
+                    tooltip: 'Previous',
                     onPressed: _currentIndex > 0
                         ? () => _pageController.previousPage(
                               duration: const Duration(milliseconds: 300),
@@ -1368,21 +1367,25 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                         _isSlideshow ? Icons.stop : Icons.slideshow,
                         color: Colors.white,
                       ),
+                      tooltip: 'Slideshow',
                       onPressed: _showSlideshowSettings,
                     ),
                   // Share/Export
                   IconButton(
                     icon: const Icon(Icons.share, color: Colors.white),
+                    tooltip: 'Share',
                     onPressed: () => _showExportOptions(file),
                   ),
                   // Delete
                   IconButton(
                     icon: const Icon(Icons.delete_outline, color: Colors.white),
+                    tooltip: 'Delete',
                     onPressed: () => _confirmDelete(file),
                   ),
                   // Next
                   IconButton(
                     icon: const Icon(Icons.skip_next, color: Colors.white),
+                    tooltip: 'Next',
                     onPressed: _currentIndex < widget.files.length - 1
                         ? () => _pageController.nextPage(
                               duration: const Duration(milliseconds: 300),

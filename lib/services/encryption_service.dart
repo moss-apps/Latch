@@ -5,8 +5,10 @@ import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:pointycastle/export.dart';
 import '../models/encryption_algorithm.dart';
+import '../utils/argon2_isolate.dart';
 import 'crypto_isolate_pool.dart';
 
 const int _streamChunkSize = 1024 * 1024;
@@ -29,21 +31,42 @@ class EncryptionService {
   // migrateOnAlgorithmChange ensures existing data is automatically migrated
   static const _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(),
-    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.unlocked_this_device),
   );
 
   static const String _masterKeyKey = 'vault_master_key';
   static const String _decoyKeyKey = 'vault_decoy_key';
+
+  // H1: Key wrapping storage keys (real vault)
+  static const String _keyVersionKey = 'vault_key_version';
+  static const String _wrappedKeyKey = 'vault_master_key_wrapped';
+  static const String _kwkSaltKey = 'vault_kwk_salt';
+  static const String _kwkIvKey = 'vault_kwk_iv';
+  static const String _biometricKwkKey = 'vault_biometric_kwk';
+  static const String _biometricWrappedKeyKey = 'vault_master_key_wrapped_biometric';
+  static const String _biometricIvKey = 'vault_biometric_iv';
+
+  // H1: Key wrapping storage keys (decoy vault)
+  static const String _decoyKeyVersionKey = 'vault_decoy_key_version';
+  static const String _decoyWrappedKeyKey = 'vault_decoy_key_wrapped';
+  static const String _decoyKwkSaltKey = 'vault_decoy_kwk_salt';
+  static const String _decoyKwkIvKey = 'vault_decoy_kwk_iv';
+
   static const int _keySize = 32; // 256 bits
   static const int _ivSize = 16; // 128 bits
 
   Uint8List? _cachedMasterKey;
   Uint8List? _cachedDecoyKey;
+  String? _pendingCredential;
+  String? _pendingDecoyCredential;
 
   CryptoIsolatePool? _pool;
 
   Future<void> initialize() async {
-    await _ensureMasterKey();
+    final version = await _storage.read(key: _keyVersionKey);
+    if (version == null) {
+      await _ensureMasterKey();
+    }
     _pool = CryptoIsolatePool();
     await _pool!.initialize();
     await _checkKeyRotationRecovery();
@@ -54,9 +77,208 @@ class EncryptionService {
     _pool = null;
   }
 
+  /// Set pending credential for key unlocking (called by AuthService after verify/create)
+  void setPendingCredential(String credential, {bool isDecoy = false}) {
+    if (isDecoy) {
+      _pendingDecoyCredential = credential;
+    } else {
+      _pendingCredential = credential;
+    }
+  }
+
+  /// Unlock master key using user credential (PIN/password).
+  /// Handles first-time key creation, legacy migration, and normal unwrap.
+  Future<Uint8List> unlockMasterKey(String credential, {bool isDecoy = false}) async {
+    final cached = isDecoy ? _cachedDecoyKey : _cachedMasterKey;
+    if (cached != null) return cached;
+
+    final versionKey = isDecoy ? _decoyKeyVersionKey : _keyVersionKey;
+    final rawKeyKey = isDecoy ? _decoyKeyKey : _masterKeyKey;
+    final wrappedKeyKey = isDecoy ? _decoyWrappedKeyKey : _wrappedKeyKey;
+    final saltKey = isDecoy ? _decoyKwkSaltKey : _kwkSaltKey;
+    final ivKey = isDecoy ? _decoyKwkIvKey : _kwkIvKey;
+
+    final version = await _storage.read(key: versionKey);
+
+    if (version == '1') {
+      final wrappedKeyB64 = await _storage.read(key: wrappedKeyKey);
+      final saltB64 = await _storage.read(key: saltKey);
+      final ivB64 = await _storage.read(key: ivKey);
+
+      if (wrappedKeyB64 == null || saltB64 == null || ivB64 == null) {
+        throw StateError('Wrapped key data incomplete');
+      }
+
+      final kwk = await computeArgon2idHash(credential, base64Decode(saltB64));
+      final masterKey = _unwrapKey(base64Decode(wrappedKeyB64), kwk, base64Decode(ivB64));
+
+      if (isDecoy) {
+        _cachedDecoyKey = masterKey;
+      } else {
+        _cachedMasterKey = masterKey;
+      }
+      return masterKey;
+    }
+
+    // Legacy: read raw key, wrap with credential, delete raw (transparent migration)
+    final rawKeyB64 = await _storage.read(key: rawKeyKey);
+    if (rawKeyB64 != null) {
+      final masterKey = base64Decode(rawKeyB64);
+      await _wrapAndStoreKey(masterKey, credential, isDecoy: isDecoy);
+      await _storage.delete(key: rawKeyKey);
+      await _storage.write(key: versionKey, value: '1');
+
+      if (isDecoy) {
+        _cachedDecoyKey = masterKey;
+      } else {
+        _cachedMasterKey = masterKey;
+      }
+      debugPrint('[Encryption] Migrated ${isDecoy ? 'decoy' : 'master'} key to wrapped form');
+      return masterKey;
+    }
+
+    // First-time: generate new key, wrap, store
+    final masterKey = _generateRandomBytes(_keySize);
+    await _wrapAndStoreKey(masterKey, credential, isDecoy: isDecoy);
+    await _storage.write(key: versionKey, value: '1');
+
+    if (isDecoy) {
+      _cachedDecoyKey = masterKey;
+    } else {
+      _cachedMasterKey = masterKey;
+    }
+    return masterKey;
+  }
+
+  /// Unlock master key using biometric KWK (stored in secure storage).
+  Future<Uint8List> unlockMasterKeyWithBiometric({bool isDecoy = false}) async {
+    if (isDecoy) throw StateError('Decoy biometric unlock not supported');
+    if (_cachedMasterKey != null) return _cachedMasterKey!;
+
+    final version = await _storage.read(key: _keyVersionKey);
+
+    if (version == '1') {
+      final biometricKwkB64 = await _storage.read(key: _biometricKwkKey);
+      final wrappedKeyB64 = await _storage.read(key: _biometricWrappedKeyKey);
+      final ivB64 = await _storage.read(key: _biometricIvKey);
+
+      if (biometricKwkB64 == null || wrappedKeyB64 == null || ivB64 == null) {
+        throw StateError('Biometric key data incomplete');
+      }
+
+      final masterKey = _unwrapKey(
+        base64Decode(wrappedKeyB64),
+        base64Decode(biometricKwkB64),
+        base64Decode(ivB64),
+      );
+      _cachedMasterKey = masterKey;
+      return masterKey;
+    }
+
+    // Legacy: read raw key, create biometric wrapping, migrate
+    final rawKeyB64 = await _storage.read(key: _masterKeyKey);
+    if (rawKeyB64 != null) {
+      final masterKey = base64Decode(rawKeyB64);
+      await _setupBiometricKwkForKey(masterKey);
+      await _storage.delete(key: _masterKeyKey);
+      await _storage.write(key: _keyVersionKey, value: '1');
+      _cachedMasterKey = masterKey;
+      debugPrint('[Encryption] Migrated master key to wrapped form (biometric)');
+      return masterKey;
+    }
+
+    throw StateError('No master key found for biometric unlock');
+  }
+
+  /// Re-wrap the master key with a new credential (called on password/PIN change).
+  Future<void> reWrapKey(String newCredential, {bool isDecoy = false}) async {
+    final masterKey = isDecoy ? _cachedDecoyKey : _cachedMasterKey;
+    if (masterKey == null) throw StateError('Master key not unlocked');
+
+    await _wrapAndStoreKey(masterKey, newCredential, isDecoy: isDecoy);
+  }
+
+  /// Set up biometric KWK for the current master key (called when enabling biometric).
+  Future<void> setupBiometricKwk() async {
+    if (_cachedMasterKey == null) {
+      final version = await _storage.read(key: _keyVersionKey);
+      if (version == null) {
+        _cachedMasterKey = _generateRandomBytes(_keySize);
+        await _storage.write(key: _masterKeyKey, value: base64Encode(_cachedMasterKey!));
+      } else {
+        throw StateError('Master key not unlocked. Call unlockMasterKey first.');
+      }
+    }
+
+    await _setupBiometricKwkForKey(_cachedMasterKey!);
+
+    final version = await _storage.read(key: _keyVersionKey);
+    if (version == null) {
+      await _storage.write(key: _keyVersionKey, value: '1');
+      await _storage.delete(key: _masterKeyKey);
+    }
+  }
+
+  /// Remove biometric KWK (called when disabling biometric).
+  Future<void> removeBiometricKwk() async {
+    await _storage.delete(key: _biometricKwkKey);
+    await _storage.delete(key: _biometricWrappedKeyKey);
+    await _storage.delete(key: _biometricIvKey);
+  }
+
+  /// Check if biometric KWK is set up.
+  Future<bool> hasBiometricKwk() async {
+    final kwk = await _storage.read(key: _biometricKwkKey);
+    return kwk != null;
+  }
+
+  Future<void> _wrapAndStoreKey(
+    Uint8List masterKey,
+    String credential, {
+    required bool isDecoy,
+  }) async {
+    final salt = _generateRandomBytes(32);
+    final iv = generateIV();
+    final kwk = await computeArgon2idHash(credential, salt);
+    final wrappedKey = _wrapKey(masterKey, kwk, iv);
+
+    final wrappedKeyKey = isDecoy ? _decoyWrappedKeyKey : _wrappedKeyKey;
+    final saltKey = isDecoy ? _decoyKwkSaltKey : _kwkSaltKey;
+    final ivKey = isDecoy ? _decoyKwkIvKey : _kwkIvKey;
+
+    await _storage.write(key: wrappedKeyKey, value: base64Encode(wrappedKey));
+    await _storage.write(key: saltKey, value: base64Encode(salt));
+    await _storage.write(key: ivKey, value: base64Encode(iv));
+  }
+
+  Future<void> _setupBiometricKwkForKey(Uint8List masterKey) async {
+    final biometricKwk = _generateRandomBytes(_keySize);
+    final iv = generateIV();
+    final wrappedKey = _wrapKey(masterKey, biometricKwk, iv);
+
+    await _storage.write(key: _biometricKwkKey, value: base64Encode(biometricKwk));
+    await _storage.write(key: _biometricWrappedKeyKey, value: base64Encode(wrappedKey));
+    await _storage.write(key: _biometricIvKey, value: base64Encode(iv));
+  }
+
+  Uint8List _wrapKey(Uint8List masterKey, Uint8List kwk, Uint8List iv) {
+    final cipher = _getGcmCipher(kwk, iv, true);
+    return cipher.process(masterKey);
+  }
+
+  Uint8List _unwrapKey(Uint8List wrappedKey, Uint8List kwk, Uint8List iv) {
+    final cipher = _getGcmCipher(kwk, iv, false);
+    return cipher.process(wrappedKey);
+  }
+
   /// Ensure master key exists, create if not
   Future<Uint8List> _ensureMasterKey() async {
     if (_cachedMasterKey != null) return _cachedMasterKey!;
+
+    final version = await _storage.read(key: _keyVersionKey);
+    if (version == '1') {
+      throw StateError('Master key is wrapped. Call unlockMasterKey first.');
+    }
 
     try {
       final storedKey = await _storage.read(key: _masterKeyKey);
@@ -68,10 +290,15 @@ class EncryptionService {
       debugPrint('Error reading master key: $e');
     }
 
-    // Generate new master key
     _cachedMasterKey = _generateRandomBytes(_keySize);
-    await _storage.write(
-        key: _masterKeyKey, value: base64Encode(_cachedMasterKey!));
+    if (_pendingCredential != null) {
+      await _wrapAndStoreKey(_cachedMasterKey!, _pendingCredential!, isDecoy: false);
+      await _storage.write(key: _keyVersionKey, value: '1');
+      _pendingCredential = null;
+    } else {
+      await _storage.write(
+          key: _masterKeyKey, value: base64Encode(_cachedMasterKey!));
+    }
     return _cachedMasterKey!;
   }
 
@@ -83,6 +310,11 @@ class EncryptionService {
   Future<Uint8List> _ensureDecoyKey() async {
     if (_cachedDecoyKey != null) return _cachedDecoyKey!;
 
+    final version = await _storage.read(key: _decoyKeyVersionKey);
+    if (version == '1') {
+      throw StateError('Decoy key is wrapped. Call unlockMasterKey(isDecoy: true) first.');
+    }
+
     try {
       final storedKey = await _storage.read(key: _decoyKeyKey);
       if (storedKey != null) {
@@ -93,10 +325,15 @@ class EncryptionService {
       debugPrint('Error reading decoy key: $e');
     }
 
-    // Generate new decoy key
     _cachedDecoyKey = _generateRandomBytes(_keySize);
-    await _storage.write(
-        key: _decoyKeyKey, value: base64Encode(_cachedDecoyKey!));
+    if (_pendingDecoyCredential != null) {
+      await _wrapAndStoreKey(_cachedDecoyKey!, _pendingDecoyCredential!, isDecoy: true);
+      await _storage.write(key: _decoyKeyVersionKey, value: '1');
+      _pendingDecoyCredential = null;
+    } else {
+      await _storage.write(
+          key: _decoyKeyKey, value: base64Encode(_cachedDecoyKey!));
+    }
     return _cachedDecoyKey!;
   }
 
@@ -210,11 +447,10 @@ class EncryptionService {
 
       // Validate input data length for CBC mode
       if (encryptedData.length % 16 != 0) {
-        debugPrint(
-            'Decryption error: Invalid data length ${encryptedData.length} (not multiple of 16)');
-        // Try CTR mode as fallback - maybe file was incorrectly detected
-        debugPrint('[Encryption] Attempting CTR fallback...');
-        return await _tryCtrFallback(encryptedData, ivBase64, isDecoy);
+        return DecryptionResult(
+          success: false,
+          error: 'Invalid data length ${encryptedData.length} (not multiple of 16). File may be corrupted.',
+        );
       }
 
       final cipher = _getCipher(key, iv, false);
@@ -228,36 +464,7 @@ class EncryptionService {
       debugPrint('Decryption error: $e');
       return DecryptionResult(
         success: false,
-        error: 'Decryption failed: $e',
-      );
-    }
-  }
-
-  /// CTR fallback when CBC fails
-  Future<DecryptionResult> _tryCtrFallback(
-    Uint8List encryptedData,
-    String ivBase64,
-    bool isDecoy,
-  ) async {
-    try {
-      final key = isDecoy ? await _ensureDecoyKey() : await _ensureMasterKey();
-      final iv = base64Decode(ivBase64);
-
-      final ctr = CTRStreamCipher(AESEngine())
-        ..init(false, ParametersWithIV<KeyParameter>(KeyParameter(key), iv));
-
-      final decrypted = ctr.process(encryptedData);
-
-      debugPrint('[Encryption] CTR fallback succeeded!');
-      return DecryptionResult(
-        success: true,
-        data: decrypted,
-      );
-    } catch (e) {
-      debugPrint('[Encryption] CTR fallback failed: $e');
-      return DecryptionResult(
-        success: false,
-        error: 'Decryption failed: $e',
+        error: 'Decryption failed.',
       );
     }
   }
@@ -333,7 +540,7 @@ class EncryptionService {
       debugPrint('File streaming encryption error: $e');
       return FileEncryptionResult(
         success: false,
-        error: 'File streaming encryption failed: $e',
+        error: 'File streaming encryption failed.',
       );
     }
   }
@@ -391,7 +598,7 @@ class EncryptionService {
       debugPrint('Bytes streaming encryption error: $e');
       return FileEncryptionResult(
         success: false,
-        error: 'Bytes streaming encryption failed: $e',
+        error: 'Bytes streaming encryption failed.',
       );
     }
   }
@@ -443,7 +650,7 @@ class EncryptionService {
       debugPrint('Bytes GCM streaming encryption error: $e');
       return FileEncryptionResult(
         success: false,
-        error: 'Bytes GCM streaming encryption failed: $e',
+        error: 'Bytes GCM streaming encryption failed.',
       );
     }
   }
@@ -576,7 +783,7 @@ class EncryptionService {
       debugPrint('File decryption error: $e');
       return FileDecryptionResult(
         success: false,
-        error: 'File decryption failed: $e',
+        error: 'File decryption failed.',
       );
     }
   }
@@ -742,7 +949,7 @@ class EncryptionService {
       debugPrint('File streaming decryption error: $e');
       return FileDecryptionResult(
         success: false,
-        error: 'File streaming decryption failed: $e',
+        error: 'File streaming decryption failed.',
       );
     }
   }
@@ -867,7 +1074,7 @@ class EncryptionService {
       debugPrint('Streamed file decryption to memory error: $e');
       return DecryptionResult(
         success: false,
-        error: 'File decryption failed: $e',
+        error: 'File decryption failed.',
       );
     }
   }
@@ -912,7 +1119,7 @@ class EncryptionService {
       debugPrint('GCM Decryption error: $e');
       return DecryptionResult(
         success: false,
-        error: 'GCM Decryption failed: $e',
+        error: 'GCM Decryption failed.',
       );
     }
   }
@@ -997,7 +1204,7 @@ class EncryptionService {
       debugPrint('GCM File decryption error: $e');
       return FileDecryptionResult(
         success: false,
-        error: 'GCM File decryption failed: $e',
+        error: 'GCM File decryption failed.',
       );
     }
   }
@@ -1076,7 +1283,7 @@ class EncryptionService {
       debugPrint('GCM v2 streaming encryption error: $e');
       return FileEncryptionResult(
         success: false,
-        error: 'GCM streaming encryption failed: $e',
+        error: 'GCM streaming encryption failed.',
       );
     }
   }
@@ -1151,7 +1358,7 @@ class EncryptionService {
       debugPrint('GCM streamed decryption error: $e');
       return DecryptionResult(
         success: false,
-        error: 'GCM decryption failed: $e',
+        error: 'GCM decryption failed.',
       );
     }
   }
@@ -1204,7 +1411,7 @@ class EncryptionService {
       debugPrint('Isolate pool encryption error: $e');
       return FileEncryptionResult(
         success: false,
-        error: 'Isolate encryption failed: $e',
+        error: 'Isolate encryption failed.',
       );
     }
   }
@@ -1256,7 +1463,7 @@ class EncryptionService {
       debugPrint('Isolate pool decryption error: $e');
       return FileDecryptionResult(
         success: false,
-        error: 'Isolate decryption failed: $e',
+        error: 'Isolate decryption failed.',
       );
     }
   }
@@ -1341,6 +1548,16 @@ class EncryptionService {
     }
   }
 
+  /// App-private temp dir for plaintext intermediates (never system temp).
+  /// ponytail: keeps decrypted rotation/re-encryption scratch off the shared
+  /// system temp; callers still secureDelete the plaintext file on cleanup.
+  Future<Directory> _createAppPrivateTemp(String prefix) async {
+    final docs = await getApplicationDocumentsDirectory();
+    final root = Directory('${docs.path}/.locker_temp');
+    await root.create(recursive: true);
+    return root.createTemp(prefix);
+  }
+
   Future<String> reEncryptFile(
     String filePath,
     String oldIvBase64, {
@@ -1353,7 +1570,7 @@ class EncryptionService {
     final isLegacyCbc = (format == 0 || format == 3);
 
     final key = await _resolveKey(isDecoy: isDecoy, derivedKey: oldDerivedKey);
-    final tempDir = await Directory.systemTemp.createTemp('lkr_reencrypt_');
+    final tempDir = await _createAppPrivateTemp('lkr_reencrypt_');
     final tempDecPath = '${tempDir.path}/decrypted';
 
     try {
@@ -1395,6 +1612,7 @@ class EncryptionService {
 
       return encResult.ivBase64!;
     } finally {
+      try { await secureDelete(tempDecPath); } catch (_) {}
       try { await tempDir.delete(recursive: true); } catch (_) {}
     }
   }
@@ -1443,7 +1661,7 @@ class EncryptionService {
       final doneSet = (journal['done'] as List).cast<String>().toSet();
       final ivs = (journal['ivs'] as Map<String, dynamic>).cast<String, String>();
 
-      final tempDir = await Directory.systemTemp.createTemp('lkr_rot_recovery_');
+      final tempDir = await _createAppPrivateTemp('lkr_rot_recovery_');
       try {
         for (final path in files) {
           if (doneSet.contains(path)) continue;
@@ -1487,7 +1705,7 @@ class EncryptionService {
           );
           await encJob.future;
 
-          try { await File(tempDecPath).delete(); } catch (_) {}
+          try { await secureDelete(tempDecPath); } catch (_) {}
         }
       } finally {
         try { await tempDir.delete(recursive: true); } catch (_) {}
@@ -1537,7 +1755,7 @@ class EncryptionService {
       };
       await _storage.write(key: _rotationJournalKey, value: jsonEncode(journal));
 
-      final tempDir = await Directory.systemTemp.createTemp('lkr_rotate_');
+      final tempDir = await _createAppPrivateTemp('lkr_rotate_');
       try {
         for (int i = 0; i < encryptedFilePaths.length; i++) {
           onProgress?.call(i + 1, encryptedFilePaths.length);
@@ -1576,7 +1794,7 @@ class EncryptionService {
             } catch (e) {
               return KeyRotationResult(
                 success: false,
-                error: 'Failed to decrypt file at index $i: $e',
+                error: 'Failed to decrypt file at index $i.',
                 processedCount: i,
               );
             }
@@ -1592,7 +1810,7 @@ class EncryptionService {
           final encResult = await encJob.future;
           newIvs.add(encResult.ivBase64!);
 
-          try { await File(tempDecPath).delete(); } catch (_) {}
+          try { await secureDelete(tempDecPath); } catch (_) {}
 
           journal['done'] = encryptedFilePaths.sublist(0, i + 1);
           await _storage.write(key: _rotationJournalKey, value: jsonEncode(journal));
@@ -1613,7 +1831,7 @@ class EncryptionService {
       debugPrint('Key rotation error: $e');
       return KeyRotationResult(
         success: false,
-        error: 'Key rotation failed: $e',
+        error: 'Key rotation failed.',
       );
     }
   }
@@ -1621,6 +1839,11 @@ class EncryptionService {
   /// Check if encryption is enabled
   Future<bool> hasEncryptionKey() async {
     try {
+      final version = await _storage.read(key: _keyVersionKey);
+      if (version == '1') {
+        final wrappedKey = await _storage.read(key: _wrappedKeyKey);
+        return wrappedKey != null;
+      }
       final key = await _storage.read(key: _masterKeyKey);
       return key != null;
     } catch (e) {
@@ -1631,10 +1854,26 @@ class EncryptionService {
   Future<void> resetKeys() async {
     _cachedMasterKey = null;
     _cachedDecoyKey = null;
+    _pendingCredential = null;
+    _pendingDecoyCredential = null;
+
     await _storage.delete(key: _masterKeyKey);
     await _storage.delete(key: _decoyKeyKey);
     await _storage.delete(key: _oldMasterKeyKey);
     await _storage.delete(key: _rotationJournalKey);
+
+    await _storage.delete(key: _keyVersionKey);
+    await _storage.delete(key: _wrappedKeyKey);
+    await _storage.delete(key: _kwkSaltKey);
+    await _storage.delete(key: _kwkIvKey);
+    await _storage.delete(key: _biometricKwkKey);
+    await _storage.delete(key: _biometricWrappedKeyKey);
+    await _storage.delete(key: _biometricIvKey);
+
+    await _storage.delete(key: _decoyKeyVersionKey);
+    await _storage.delete(key: _decoyWrappedKeyKey);
+    await _storage.delete(key: _decoyKwkSaltKey);
+    await _storage.delete(key: _decoyKwkIvKey);
   }
 }
 

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:archive/archive_io.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import '../models/vaulted_file.dart';
@@ -26,9 +27,12 @@ class BackupService {
 
   static final BackupService instance = BackupService._();
   final VaultService _vaultService;
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
   static const String _zipPrefix = 'locker_';
   static const String _zipSuffix = '.zip';
+  static const String _passwordIndexKey = 'locker_passwords_index';
+  static const String _passwordIndexEntry = '_passwords_index.json';
 
   /// Map file type to ZIP subdir name (images/videos/documents).
   String _subdirForType(VaultedFileType type) {
@@ -111,6 +115,17 @@ class BackupService {
           }
           current++;
           onProgress?.call(current, total);
+        }
+
+        final passwordIndex =
+            await _secureStorage.read(key: _passwordIndexKey);
+        if (passwordIndex != null && passwordIndex.isNotEmpty) {
+          final indexFile = File('${workDir.path}/$_passwordIndexEntry');
+          await indexFile.writeAsString(passwordIndex);
+          await encoder.addFile(indexFile, _passwordIndexEntry);
+          try {
+            await indexFile.delete();
+          } catch (_) {}
         }
 
         await encoder.close();

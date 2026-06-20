@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../themes/app_colors.dart';
 import '../services/auth_service.dart';
 import '../services/decoy_service.dart';
+import '../services/encryption_service.dart';
 import '../widgets/adaptive_logo.dart';
 import '../widgets/pin_input_widget.dart';
 import 'gallery_vault_screen.dart';
@@ -124,6 +125,13 @@ class _UnlockScreenState extends State<UnlockScreen> {
     final result = await _decoyService.checkIfDecoyCredential(credential);
     if (!result.isDecoy) return false;
 
+    try {
+      await EncryptionService.instance.unlockMasterKey(credential, isDecoy: true);
+    } catch (e) {
+      debugPrint('Decoy key unlock failed: $e');
+      return false;
+    }
+
     await _openVault(isDecoy: true);
     return true;
   }
@@ -159,7 +167,14 @@ class _UnlockScreenState extends State<UnlockScreen> {
     final isValid = await _authService.verifyPIN(pin);
 
     if (isValid && mounted) {
-      await _openVault(isDecoy: false);
+      try {
+        await EncryptionService.instance.unlockMasterKey(pin);
+        await _openVault(isDecoy: false);
+      } catch (e) {
+        debugPrint('Master key unlock failed: $e');
+        await _handleFailedUnlock('Incorrect PIN.');
+        _pinController.clear();
+      }
     } else if (mounted) {
       await _handleFailedUnlock('Incorrect PIN.');
       _pinController.clear();
@@ -204,7 +219,14 @@ class _UnlockScreenState extends State<UnlockScreen> {
     final isValid = await _authService.verifyPassword(password);
 
     if (isValid && mounted) {
-      await _openVault(isDecoy: false);
+      try {
+        await EncryptionService.instance.unlockMasterKey(password);
+        await _openVault(isDecoy: false);
+      } catch (e) {
+        debugPrint('Master key unlock failed: $e');
+        await _handleFailedUnlock('Incorrect password.');
+        _passwordController.clear();
+      }
     } else if (mounted) {
       await _handleFailedUnlock('Incorrect password.');
       _passwordController.clear();
@@ -231,7 +253,16 @@ class _UnlockScreenState extends State<UnlockScreen> {
     final result = await _authService.performBiometricAuthentication();
 
     if (result.isSuccess && mounted) {
-      await _openVault(isDecoy: false);
+      try {
+        await EncryptionService.instance.unlockMasterKeyWithBiometric();
+        await _openVault(isDecoy: false);
+      } catch (e) {
+        debugPrint('Biometric key unlock failed: $e');
+        setState(() {
+          _errorMessage = 'Unable to unlock vault. Please use your backup credential.';
+          _isAuthenticating = false;
+        });
+      }
     } else if (mounted) {
       if (countFailure && result.shouldCountAsFailedUnlock) {
         await _handleFailedUnlock('Biometric authentication failed.');

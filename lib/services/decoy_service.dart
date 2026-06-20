@@ -4,7 +4,9 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../utils/pbkdf2_isolate.dart';
+import '../utils/secure_compare.dart';
 import '../models/vaulted_file.dart';
+import 'encryption_service.dart';
 import 'vault_service.dart';
 
 /// Service for managing decoy mode functionality
@@ -15,7 +17,7 @@ class DecoyService {
 
   static const _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(),
-    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.unlocked_this_device),
   );
 
   static const String _decoyEnabledKey = 'decoy_mode_enabled';
@@ -115,12 +117,14 @@ class DecoyService {
     }
   }
 
-  /// Set decoy PIN
+  /// Set decoy PIN (6 digits, matching main PIN requirement)
   Future<bool> setDecoyPin(String pin) async {
     try {
-      if (pin.isEmpty || pin.length < 4) return false;
+      if (pin.isEmpty || pin.length != 6) return false;
+      if (!RegExp(r'^[0-9]{6}$').hasMatch(pin)) return false;
 
       await _createHashedCredential(pin, _decoyPinSaltKey, _decoyPinKey, _decoyPinIterationsKey);
+      EncryptionService.instance.setPendingCredential(pin, isDecoy: true);
 
       _cachedSettings = (_cachedSettings ?? const DecoySettings()).copyWith(
         hasPinSet: true,
@@ -140,6 +144,7 @@ class DecoyService {
       if (password.isEmpty) return false;
 
       await _createHashedCredential(password, _decoyPasswordSaltKey, _decoyPasswordKey, _decoyPasswordIterationsKey);
+      EncryptionService.instance.setPendingCredential(password, isDecoy: true);
 
       _cachedSettings = (_cachedSettings ?? const DecoySettings()).copyWith(
         hasPasswordSet: true,
@@ -155,12 +160,16 @@ class DecoyService {
 
   /// Verify decoy PIN
   Future<bool> verifyDecoyPin(String pin) async {
-    return _verifyCredential(pin, _decoyPinKey, _decoyPinSaltKey, _decoyPinIterationsKey);
+    final result = await _verifyCredential(pin, _decoyPinKey, _decoyPinSaltKey, _decoyPinIterationsKey);
+    if (result) EncryptionService.instance.setPendingCredential(pin, isDecoy: true);
+    return result;
   }
 
   /// Verify decoy password
   Future<bool> verifyDecoyPassword(String password) async {
-    return _verifyCredential(password, _decoyPasswordKey, _decoyPasswordSaltKey, _decoyPasswordIterationsKey);
+    final result = await _verifyCredential(password, _decoyPasswordKey, _decoyPasswordSaltKey, _decoyPasswordIterationsKey);
+    if (result) EncryptionService.instance.setPendingCredential(password, isDecoy: true);
+    return result;
   }
 
   /// Check if input is decoy credential
@@ -235,7 +244,7 @@ class DecoyService {
     await _saveSettings();
   }
 
-  static const int _defaultKdfIterations = 100000;
+  static const int _defaultKdfIterations = 600000;
 
   Future<int> _getCurrentKdfIterations() async {
     final settings = await _vaultService.getSettings();
@@ -274,7 +283,11 @@ class DecoyService {
 
       if (storedSalt == null) {
         final legacyHash = _hashCredentialLegacy(credential);
-        if (legacyHash == storedHash) {
+        // Pad the legacy path with dummy KDF work so verify time does not
+        // reveal that this is a legacy (plain SHA-256) account.
+        await computePbkdf2Hash(
+            credential, _generateSalt(), iterations: _defaultKdfIterations);
+        if (constantTimeEquals(legacyHash, storedHash)) {
           final salt = _generateSalt();
           final iterations = await _getCurrentKdfIterations();
           final newHash = await computePbkdf2Hash(credential, salt, iterations: iterations);
@@ -293,7 +306,7 @@ class DecoyService {
 
       final salt = base64Decode(storedSalt);
       final computedHash = await computePbkdf2Hash(credential, salt, iterations: storedIterations);
-      if (computedHash != storedHash) return false;
+      if (!constantTimeEquals(computedHash, storedHash)) return false;
 
       final currentIterations = await _getCurrentKdfIterations();
       if (currentIterations != storedIterations) {
@@ -342,6 +355,11 @@ class DecoyService {
       await _storage.delete(key: _decoyPasswordSaltKey);
       await _storage.delete(key: _decoyPinIterationsKey);
       await _storage.delete(key: _decoyPasswordIterationsKey);
+      await _storage.delete(key: 'vault_decoy_key_version');
+      await _storage.delete(key: 'vault_decoy_key_wrapped');
+      await _storage.delete(key: 'vault_decoy_kwk_salt');
+      await _storage.delete(key: 'vault_decoy_kwk_iv');
+      await _storage.delete(key: 'vault_decoy_key');
       _cachedSettings = (_cachedSettings ?? const DecoySettings()).copyWith(
         hasPinSet: false,
         hasPasswordSet: false,

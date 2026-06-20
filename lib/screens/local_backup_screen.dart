@@ -1,7 +1,7 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
+import '../utils/path_utils.dart';
 import '../models/vaulted_file.dart';
 import '../services/backup_service.dart';
 import '../themes/app_colors.dart';
@@ -35,13 +35,7 @@ class _LocalBackupScreenState extends ConsumerState<LocalBackupScreen> {
         SaveLocation(
           name: 'Downloads',
           resolvePath: () async {
-            if (Platform.isAndroid) {
-              final d = Directory('/storage/emulated/0/Download');
-              if (await d.exists()) return d.path;
-              final ext = await getExternalStorageDirectory();
-              return ext?.path;
-            }
-            final d = await getDownloadsDirectory();
+            final d = await PathUtils.getDownloadsDirectory();
             return d?.path;
           },
         ),

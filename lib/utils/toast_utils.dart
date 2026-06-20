@@ -1,68 +1,43 @@
 import 'package:flutter/material.dart';
 import 'package:locker/themes/app_colors.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+import 'navigator_key.dart';
 
 class ToastUtils {
-  static const Color _toastBg = AppColors.primaryBackground;
-  static const Color _lightText = AppColors.primaryText;
-
-  static void showToast(String message) {
-    Fluttertoast.showToast(
-      msg: message,
-      toastLength: Toast.LENGTH_SHORT,
-      gravity: ToastGravity.BOTTOM,
-      timeInSecForIosWeb: 1,
-      backgroundColor: _toastBg,
-      textColor: _lightText,
-      fontSize: 16,
-    );
+  static void _show(
+    String message, {
+    Color? backgroundColor,
+    Duration duration = const Duration(seconds: 2),
+  }) {
+    final context = navigatorKey.currentContext;
+    if (context == null) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) return;
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: backgroundColor,
+          behavior: SnackBarBehavior.floating,
+          duration: duration,
+        ),
+      );
   }
 
-  static void showSuccess(String message) {
-    Fluttertoast.showToast(
-      msg: message,
-      toastLength: Toast.LENGTH_SHORT,
-      gravity: ToastGravity.BOTTOM,
-      timeInSecForIosWeb: 2,
-      backgroundColor: AppColors.success,
-      textColor: Colors.white,
-      fontSize: 16,
-    );
-  }
+  static void showToast(String message) => _show(message);
 
-  static void showError(String message) {
-    Fluttertoast.showToast(
-      msg: message,
-      toastLength: Toast.LENGTH_LONG,
-      gravity: ToastGravity.BOTTOM,
-      timeInSecForIosWeb: 3,
-      backgroundColor: AppColors.error,
-      textColor: Colors.white,
-      fontSize: 16,
-    );
-  }
+  static void showSuccess(String message) =>
+      _show(message, backgroundColor: AppColors.success);
 
-  static void showInfo(String message) {
-    Fluttertoast.showToast(
-      msg: message,
-      toastLength: Toast.LENGTH_SHORT,
-      gravity: ToastGravity.BOTTOM,
-      timeInSecForIosWeb: 2,
-      backgroundColor: AppColors.info,
-      textColor: Colors.white,
-      fontSize: 16,
-    );
-  }
+  static void showError(String message) => _show(
+        message,
+        backgroundColor: AppColors.error,
+        duration: const Duration(seconds: 3),
+      );
 
-  static void showWarning(String message) {
-    Fluttertoast.showToast(
-      msg: message,
-      toastLength: Toast.LENGTH_SHORT,
-      gravity: ToastGravity.BOTTOM,
-      timeInSecForIosWeb: 2,
-      backgroundColor: AppColors.warning,
-      textColor: Colors.white,
-      fontSize: 16,
-    );
-  }
+  static void showInfo(String message) =>
+      _show(message, backgroundColor: AppColors.info);
+
+  static void showWarning(String message) =>
+      _show(message, backgroundColor: AppColors.warning);
 }

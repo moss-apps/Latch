@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mime/mime.dart';
 import 'package:path_provider/path_provider.dart';
+import '../utils/path_utils.dart';
 import 'package:photo_manager/photo_manager.dart';
 import '../models/encryption_algorithm.dart';
 import '../models/vaulted_file.dart';
@@ -1612,13 +1613,7 @@ class FileImportService {
   /// Try to get the original path from a cached/picked file path
   Future<String?> _getOriginalPath(String cachedPath, String fileName) async {
     // Common locations to check
-    final possibleDirs = [
-      '/storage/emulated/0/Download',
-      '/storage/emulated/0/Documents',
-      '/storage/emulated/0/DCIM',
-      '/sdcard/Download',
-      '/sdcard/Documents',
-    ];
+    final possibleDirs = PathUtils.androidSourceRoots;
 
     for (final dir in possibleDirs) {
       final possiblePath = '$dir/$fileName';
