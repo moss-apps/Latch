@@ -203,6 +203,7 @@ class _PasswordEditorScreenState extends ConsumerState<PasswordEditorScreen> {
           IconButton(
             icon: Icon(Icons.check, color: context.accentColor),
             onPressed: _isSaving ? null : _save,
+            tooltip: 'Save',
           ),
         ],
       ),
@@ -216,7 +217,8 @@ class _PasswordEditorScreenState extends ConsumerState<PasswordEditorScreen> {
   }
 
   Widget _buildForm() {
-    return SingleChildScrollView(
+    return AutofillGroup(
+      child: SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -227,11 +229,13 @@ class _PasswordEditorScreenState extends ConsumerState<PasswordEditorScreen> {
             controller: _usernameController,
             label: 'Username',
             icon: Icons.person_outline,
+            autofillHints: const [AutofillHints.username],
             suffix: _usernameController.text.isNotEmpty
                 ? IconButton(
                     icon: Icon(Icons.copy, size: 18, color: context.textTertiary),
                     onPressed: () =>
                         _copyField(_usernameController.text, 'Username'),
+                    tooltip: 'Copy username',
                   )
                 : null,
           ),
@@ -243,6 +247,7 @@ class _PasswordEditorScreenState extends ConsumerState<PasswordEditorScreen> {
             label: 'URL',
             icon: Icons.link,
             keyboardType: TextInputType.url,
+            autofillHints: const [AutofillHints.url],
           ),
           const SizedBox(height: 16),
           _buildField(
@@ -261,6 +266,7 @@ class _PasswordEditorScreenState extends ConsumerState<PasswordEditorScreen> {
           ],
           const SizedBox(height: 32),
         ],
+      ),
       ),
     );
   }
@@ -298,11 +304,13 @@ class _PasswordEditorScreenState extends ConsumerState<PasswordEditorScreen> {
     TextInputType? keyboardType,
     int maxLines = 1,
     Widget? suffix,
+    Iterable<String>? autofillHints,
   }) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
       maxLines: maxLines,
+      autofillHints: autofillHints,
       style: TextStyle(
         fontFamily: 'ProductSans',
         fontSize: 15,
@@ -339,6 +347,8 @@ class _PasswordEditorScreenState extends ConsumerState<PasswordEditorScreen> {
     return TextField(
       controller: _passwordController,
       obscureText: _obscurePassword,
+      keyboardType: TextInputType.visiblePassword,
+      autofillHints: [isEditing ? AutofillHints.password : AutofillHints.newPassword],
       style: TextStyle(
         fontFamily: 'ProductSans',
         fontSize: 15,
