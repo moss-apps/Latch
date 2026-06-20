@@ -525,20 +525,12 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
   Widget _buildFileThumbnail(VaultedFile file) {
     if (file.isImage) {
       final imageFile = File(file.vaultPath);
-      return FutureBuilder<bool>(
-        future: imageFile.exists(),
-        builder: (context, snapshot) {
-          if (snapshot.data != true) {
-            return _buildFilePlaceholder(file);
-          }
-          return Image.file(
-            imageFile,
-            fit: BoxFit.cover,
-            cacheWidth: 200,
-            filterQuality: FilterQuality.low,
-            errorBuilder: (_, __, ___) => _buildFilePlaceholder(file),
-          );
-        },
+      return Image.file(
+        imageFile,
+        fit: BoxFit.cover,
+        cacheWidth: 200,
+        filterQuality: FilterQuality.low,
+        errorBuilder: (_, __, ___) => _buildFilePlaceholder(file),
       );
     }
     return _buildFilePlaceholder(file);
@@ -1053,7 +1045,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
           ),
         ],
       ),
-    );
+    ).whenComplete(nameController.dispose);
   }
 
   void _showSubfolderOptions(VaultFolder subfolder) {
@@ -1195,7 +1187,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
           ),
         ],
       ),
-    );
+    ).whenComplete(nameController.dispose);
   }
 
   void _showDeleteSubfolderDialog(VaultFolder subfolder) {
