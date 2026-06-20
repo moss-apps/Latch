@@ -306,12 +306,14 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
         actions: [
           IconButton(
             onPressed: _toggleFavorite,
+            tooltip: 'Favorite',
             icon: Icon(
               widget.file.isFavorite ? Icons.favorite : Icons.favorite_border,
               color: widget.file.isFavorite ? Colors.red : context.textPrimary,
             ),
           ),
           PopupMenuButton<String>(
+            tooltip: 'More options',
             icon: Icon(Icons.more_vert, color: context.textPrimary),
             onSelected: (value) {
               switch (value) {
@@ -483,6 +485,7 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
                               ? () =>
                                   _seek(position - const Duration(seconds: 10))
                               : () => _seek(Duration.zero),
+                          tooltip: 'Back 10 seconds',
                           icon: Icon(
                             Icons.replay_10,
                             color: context.textPrimary,
@@ -503,6 +506,7 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
                                     processingState == ProcessingState.buffering
                                 ? null
                                 : _togglePlayback,
+                            tooltip: isPlaying ? 'Pause' : 'Play',
                             icon: Icon(
                               isPlaying ? Icons.pause : Icons.play_arrow,
                               color: Colors.white,
@@ -516,6 +520,7 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
                               ? () =>
                                   _seek(position + const Duration(seconds: 10))
                               : null,
+                          tooltip: 'Forward 10 seconds',
                           icon: Icon(
                             Icons.forward_10,
                             color: context.textPrimary,
