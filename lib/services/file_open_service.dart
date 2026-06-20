@@ -26,6 +26,7 @@ class FileOpenService {
   /// used to build the swipeable gallery context for images and videos.
   /// [onUnsupported] is called when the file has no built-in viewer.
   /// [onOpenNote] is called when the vault entry represents a note.
+  /// [onOpenPassword] is called when the vault entry represents a password.
   static Future<void> open(
     BuildContext context,
     WidgetRef ref,
@@ -33,6 +34,7 @@ class FileOpenService {
     required List<VaultedFile> currentFiles,
     VoidCallback? onUnsupported,
     ValueChanged<String>? onOpenNote,
+    ValueChanged<String>? onOpenPassword,
   }) async {
     if (_isOpening) return;
     if (!context.mounted) return;
@@ -91,6 +93,17 @@ class FileOpenService {
         hideOverlay();
         if (onOpenNote != null) {
           onOpenNote(noteId);
+        } else {
+          onUnsupported?.call();
+        }
+        return;
+      }
+
+      final passwordId = file.metadata?['passwordId'] as String?;
+      if (passwordId != null) {
+        hideOverlay();
+        if (onOpenPassword != null) {
+          onOpenPassword(passwordId);
         } else {
           onUnsupported?.call();
         }
