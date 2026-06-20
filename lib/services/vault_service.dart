@@ -2458,6 +2458,69 @@ class VaultService {
       await _saveFileIndex();
     }
   }
+
+  Future<void> registerPasswordEntry({
+    required String passwordId,
+    required String title,
+    required String encryptedContentPath,
+    List<String> tags = const [],
+    bool isEncrypted = false,
+    EncryptionAlgorithm encryptionAlgorithm = EncryptionAlgorithm.aes256Gcm,
+    int kdfIterations = 0,
+    bool isDecoy = false,
+  }) async {
+    final files = isDecoy
+        ? (_cachedDecoyFiles ??= await _loadFileIndex(isDecoy: true))
+        : (_cachedFiles ??= await _loadFileIndex());
+
+    final existingIndex =
+        files.indexWhere((f) => f.metadata?['passwordId'] == passwordId);
+
+    final entry = VaultedFile(
+      id: existingIndex != -1 ? files[existingIndex].id : passwordId,
+      originalName: '$title.pwd',
+      vaultPath: encryptedContentPath,
+      type: VaultedFileType.document,
+      mimeType: 'application/octet-stream',
+      fileSize: 0,
+      dateAdded: existingIndex != -1
+          ? files[existingIndex].dateAdded
+          : DateTime.now(),
+      dateModified: DateTime.now(),
+      tags: ['password', ...tags],
+      isEncrypted: isEncrypted,
+      encryptionAlgorithm: encryptionAlgorithm,
+      kdfIterations: kdfIterations,
+      metadata: {'passwordId': passwordId},
+    );
+
+    if (existingIndex != -1) {
+      files[existingIndex] = entry;
+    } else {
+      files.insert(0, entry);
+    }
+
+    if (isDecoy) {
+      await _saveFileIndex(isDecoy: true);
+    } else {
+      await _saveFileIndex();
+    }
+  }
+
+  Future<void> removePasswordEntry(String passwordId,
+      {bool isDecoy = false}) async {
+    final files = isDecoy
+        ? (_cachedDecoyFiles ??= await _loadFileIndex(isDecoy: true))
+        : (_cachedFiles ??= await _loadFileIndex());
+
+    files.removeWhere((f) => f.metadata?['passwordId'] == passwordId);
+
+    if (isDecoy) {
+      await _saveFileIndex(isDecoy: true);
+    } else {
+      await _saveFileIndex();
+    }
+  }
 }
 
 /// Helper class for batch file import

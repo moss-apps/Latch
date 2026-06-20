@@ -12,6 +12,7 @@ import 'providers/vault_providers.dart';
 import 'services/auth_service.dart';
 import 'screens/auth_method_selection_screen.dart';
 import 'screens/unlock_screen.dart';
+import 'autofill_app.dart';
 import 'utils/frame_rate_optimizer.dart';
 import 'utils/performance_config.dart';
 
@@ -150,3 +151,6 @@ class _AppInitializerState extends ConsumerState<AppInitializer> {
     }
   }
 }
+
+@pragma('vm:entry-point')
+void autofillMain() => runApp(AutofillApp());
