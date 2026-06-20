@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -73,6 +75,7 @@ class _AppInitializerState extends ConsumerState<AppInitializer> {
   final AuthService _authService = AuthService();
   bool _isLoading = true;
   bool _isFirstTime = true;
+  StreamSubscription<AppUpdateInfo?>? _updateSub;
 
   @override
   void initState() {
@@ -80,12 +83,18 @@ class _AppInitializerState extends ConsumerState<AppInitializer> {
     _checkAuthStatus();
 
     final updateService = ref.read(updateServiceProvider);
-    updateService.onUpdateCheck.listen((info) {
+    _updateSub = updateService.onUpdateCheck.listen((info) {
       if (info != null &&
           info.updateAvailability == UpdateAvailability.updateAvailable) {
         _showUpdateDialog();
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _updateSub?.cancel();
+    super.dispose();
   }
 
   void _showUpdateDialog() {
