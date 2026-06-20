@@ -18,6 +18,7 @@ import '../widgets/explorer_toolbar.dart';
 import '../widgets/operation_progress_sheet.dart';
 import '../widgets/media_multi_select_action_sheet.dart';
 import 'note_list_screen.dart';
+import 'password_list_screen.dart';
 
 class VaultExplorerScreen extends ConsumerStatefulWidget {
   const VaultExplorerScreen({super.key});
@@ -107,6 +108,16 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const NoteListScreen()),
+            );
+          },
+        ),
+        IconButton(
+          icon: Icon(Icons.password, color: context.textSecondary),
+          tooltip: 'Passwords',
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const PasswordListScreen()),
             );
           },
         ),
