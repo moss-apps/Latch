@@ -41,6 +41,8 @@ class MediaViewerScreen extends ConsumerStatefulWidget {
 class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   late PageController _pageController;
   late int _currentIndex;
+  // ponytail: local copy so on-delete remove() mutates ours, not the caller's list
+  late final List<VaultedFile> _files;
   bool _showControls = true;
   bool _isSlideshow = false;
   int _slideshowDuration = 3; // seconds
@@ -68,6 +70,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    _files = List.of(widget.files);
     _pageController = PageController(initialPage: _currentIndex);
     _loadCurrentMedia();
 
@@ -103,7 +106,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   }
 
   Future<void> _loadCurrentMedia() async {
-    final file = widget.files[_currentIndex];
+    final file = _files[_currentIndex];
 
     if (file.isVideo) {
       await _initializeVideo(file);
@@ -287,7 +290,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
 
     _loadCurrentMedia();
 
-    final file = widget.files[index];
+    final file = _files[index];
     ref.read(vaultServiceProvider).updateFile(file.markViewed());
   }
 
@@ -298,7 +301,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   }
 
   void _toggleFavorite() async {
-    final file = widget.files[_currentIndex];
+    final file = _files[_currentIndex];
     final wasFavorite = file.isFavorite;
     await ref.read(vaultNotifierProvider.notifier).toggleFavorite(file.id);
     ToastUtils.showSuccess(
@@ -333,9 +336,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
       // Move to next image (skip videos in slideshow)
       int nextIndex = _currentIndex;
       do {
-        nextIndex = (nextIndex + 1) % widget.files.length;
+        nextIndex = (nextIndex + 1) % _files.length;
         if (nextIndex == _currentIndex) break; // Completed full loop
-      } while (widget.files[nextIndex].isVideo);
+      } while (_files[nextIndex].isVideo);
 
       if (nextIndex != _currentIndex) {
         _pageController.animateToPage(
@@ -495,7 +498,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   }
 
   void _showFileInfo() {
-    final file = widget.files[_currentIndex];
+    final file = _files[_currentIndex];
 
     showModalBottomSheet(
       context: context,
@@ -774,7 +777,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentFile = widget.files[_currentIndex];
+    final currentFile = _files[_currentIndex];
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -859,7 +862,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
     return PhotoViewGallery.builder(
       scrollPhysics: const BouncingScrollPhysics(),
       builder: (context, index) {
-        final file = widget.files[index];
+        final file = _files[index];
 
         if (file.isEncrypted) {
           final data = _decryptedCache[file.id];
@@ -906,7 +909,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
           ),
         );
       },
-      itemCount: widget.files.length,
+      itemCount: _files.length,
       loadingBuilder: (context, event) => Center(
         child: CircularProgressIndicator(
           value: event == null
@@ -1137,7 +1140,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    '${_currentIndex + 1} of ${widget.files.length}',
+                    '${_currentIndex + 1} of ${_files.length}',
                     style: TextStyle(
                       color: Colors.white70,
                       fontSize: 12,
@@ -1361,7 +1364,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                         : null,
                   ),
                   // Slideshow (only for images)
-                  if (widget.files.where((f) => f.isImage).length > 1)
+                  if (_files.where((f) => f.isImage).length > 1)
                     IconButton(
                       icon: Icon(
                         _isSlideshow ? Icons.stop : Icons.slideshow,
@@ -1386,7 +1389,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                   IconButton(
                     icon: const Icon(Icons.skip_next, color: Colors.white),
                     tooltip: 'Next',
-                    onPressed: _currentIndex < widget.files.length - 1
+                    onPressed: _currentIndex < _files.length - 1
                         ? () => _pageController.nextPage(
                               duration: const Duration(milliseconds: 300),
                               curve: Curves.easeInOut,
@@ -1440,14 +1443,14 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                   .deleteFiles([file.id]);
               if (success) {
                 ToastUtils.showSuccess('File deleted');
-                if (widget.files.length == 1) {
+                if (_files.length == 1) {
                   if (mounted) Navigator.pop(context);
                 } else {
                   // Remove from list and update
                   setState(() {
-                    widget.files.remove(file);
-                    if (_currentIndex >= widget.files.length) {
-                      _currentIndex = widget.files.length - 1;
+                    _files.remove(file);
+                    if (_currentIndex >= _files.length) {
+                      _currentIndex = _files.length - 1;
                     }
                   });
                 }
