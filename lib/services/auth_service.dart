@@ -468,7 +468,13 @@ class AuthService {
     }
   }
 
-  /// Reset all Authentication data (for testing or reset functionality)
+  /// Reset all authentication data: credential hashes/salts, backup
+  /// credentials, hash version, first-time flag, biometrics toggle, lockout
+  /// counters, and the biometric key-wrapping key.
+  ///
+  /// NOTE: this does NOT delete the wrapped master key or any vault files.
+  /// resetAuth ≠ wipe. For a full wipe, also call
+  /// `EncryptionService.instance.resetKeys()` and `VaultService.clearVault()`.
   Future<bool> resetAuth() async {
     try {
       await _storage.delete(key: _passwordHashKey);
