@@ -19,6 +19,11 @@ class ToastUtils {
           content: Text(message),
           backgroundColor: backgroundColor,
           behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(6),
+          ),
+          elevation: 4,
           duration: duration,
         ),
       );

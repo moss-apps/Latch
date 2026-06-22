@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -29,6 +30,7 @@ class _ChangeSecurityScreenState extends State<ChangeSecurityScreen> {
   final AuthService _authService = AuthService();
   String? _currentAuthMethod;
   bool _isLoading = true;
+  bool _autofillEnabled = false;
 
   @override
   void initState() {
@@ -38,9 +40,11 @@ class _ChangeSecurityScreenState extends State<ChangeSecurityScreen> {
 
   Future<void> _loadAuthMethod() async {
     final method = await _authService.getAuthMethod();
+    final autofillEnabled = await _authService.isUnlockAutofillEnabled();
     if (mounted) {
       setState(() {
         _currentAuthMethod = method;
+        _autofillEnabled = autofillEnabled;
         _isLoading = false;
       });
     }
@@ -143,6 +147,10 @@ class _ChangeSecurityScreenState extends State<ChangeSecurityScreen> {
                             return const SizedBox.shrink();
                           },
                         ),
+                        const SizedBox(height: 24),
+                        _buildSectionTitle('Unlock convenience'),
+                        const SizedBox(height: 12),
+                        _buildAutofillToggleCard(),
                       ],
                     ),
                   ),
@@ -443,6 +451,189 @@ class _ChangeSecurityScreenState extends State<ChangeSecurityScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildAutofillToggleCard() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: context.isDarkMode
+            ? Colors.white.withValues(alpha: 0.05)
+            : Colors.white.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: context.isDarkMode
+              ? Colors.white.withValues(alpha: 0.1)
+              : Colors.white.withValues(alpha: 0.2),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(11),
+            decoration: BoxDecoration(
+              color: AppColors.error.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              Icons.lock_outline,
+              color: AppColors.error,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Autofill Credential',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'ProductSans',
+                    color: context.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Let password managers fill your PIN or password',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontFamily: 'ProductSans',
+                    color: context.textSecondary,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: _autofillEnabled,
+            onChanged: _handleAutofillToggle,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleAutofillToggle(bool value) async {
+    if (!value) {
+      await _authService.setUnlockAutofillEnabled(false);
+      if (mounted) setState(() => _autofillEnabled = false);
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const _AutofillWarningDialog(),
+    );
+
+    if (confirmed == true && mounted) {
+      await _authService.setUnlockAutofillEnabled(true);
+      setState(() => _autofillEnabled = true);
+    }
+  }
+}
+
+class _AutofillWarningDialog extends StatefulWidget {
+  const _AutofillWarningDialog();
+
+  @override
+  State<_AutofillWarningDialog> createState() => _AutofillWarningDialogState();
+}
+
+class _AutofillWarningDialogState extends State<_AutofillWarningDialog> {
+  int _countdown = 10;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_countdown > 0) {
+        setState(() => _countdown--);
+      } else {
+        _timer?.cancel();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      icon: Icon(
+        Icons.warning_amber_rounded,
+        size: 48,
+        color: AppColors.error,
+      ),
+      title: Text(
+        'Enable Autofill?',
+        style: TextStyle(
+          fontFamily: 'ProductSans',
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'This lets password managers (Google, Bitwarden, Samsung Pass) store and fill your vault PIN or password.',
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.4,
+              fontFamily: 'ProductSans',
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Your master credential will be stored outside Latch. If that password manager is ever compromised, your vault is at risk.',
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.4,
+              fontFamily: 'ProductSans',
+              color: AppColors.error,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Biometric unlock is the safer no-type alternative — your key never leaves the hardware Keystore.',
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.4,
+              fontFamily: 'ProductSans',
+              color: context.textSecondary,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text(
+            'Cancel',
+            style: TextStyle(fontFamily: 'ProductSans'),
+          ),
+        ),
+        FilledButton(
+          onPressed: _countdown > 0
+              ? null
+              : () => Navigator.of(context).pop(true),
+          child: Text(
+            _countdown > 0 ? 'Wait ${_countdown}s' : 'Enable',
+            style: TextStyle(fontFamily: 'ProductSans'),
+          ),
+        ),
+      ],
     );
   }
 }

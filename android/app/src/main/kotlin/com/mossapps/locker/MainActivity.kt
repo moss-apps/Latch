@@ -31,6 +31,7 @@ class MainActivity: FlutterFragmentActivity() {
     private val FLICK_PACKAGE = "com.mossapps.flick"
     private val RECORDER_CHANNEL = "com.mossapps.locker/audio_recorder"
     private val AMPLITUDE_CHANNEL = "com.mossapps.locker/audio_amplitude"
+    private val INSTALL_SOURCE_CHANNEL = "com.mossapps.locker/install_source"
     private val autoKillPreferences by lazy {
         getSharedPreferences(AUTO_KILL_PREFS, MODE_PRIVATE)
     }
@@ -170,6 +171,14 @@ class MainActivity: FlutterFragmentActivity() {
                 else -> result.notImplemented()
             }
         }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, INSTALL_SOURCE_CHANNEL).setMethodCallHandler { call, result ->
+            if (call.method == "getInstallerPackageName") {
+                result.success(getInstallerPackageName())
+            } else {
+                result.notImplemented()
+            }
+        }
     }
 
     private fun startRecording(path: String, format: String, result: MethodChannel.Result) {
@@ -288,6 +297,15 @@ class MainActivity: FlutterFragmentActivity() {
             true
         } catch (_: PackageManager.NameNotFoundException) {
             false
+        }
+    }
+
+    private fun getInstallerPackageName(): String? {
+        return try {
+            @Suppress("DEPRECATION")
+            packageManager.getInstallerPackageName(packageName)
+        } catch (_: Exception) {
+            null
         }
     }
 

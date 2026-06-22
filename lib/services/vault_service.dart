@@ -177,9 +177,16 @@ class VaultService {
   }
 
   /// Load file index from secure storage
-  Future<List<VaultedFile>> _loadFileIndex({bool isDecoy = false}) async {
-    if (!isDecoy && _cachedFiles != null) return _cachedFiles!;
-    if (isDecoy && _cachedDecoyFiles != null) return _cachedDecoyFiles!;
+  Future<List<VaultedFile>> _loadFileIndex({
+    bool isDecoy = false,
+    bool forceReload = false,
+  }) async {
+    if (!forceReload && !isDecoy && _cachedFiles != null) {
+      return _cachedFiles!;
+    }
+    if (!forceReload && isDecoy && _cachedDecoyFiles != null) {
+      return _cachedDecoyFiles!;
+    }
 
     try {
       final key = isDecoy ? _decoyIndexKey : _vaultIndexKey;
@@ -260,8 +267,8 @@ class VaultService {
   }
 
   /// Load albums from secure storage
-  Future<List<Album>> _loadAlbums() async {
-    if (_cachedAlbums != null) return _cachedAlbums!;
+  Future<List<Album>> _loadAlbums({bool forceReload = false}) async {
+    if (!forceReload && _cachedAlbums != null) return _cachedAlbums!;
 
     try {
       final albumsJson = await _storage.read(key: _albumsKey);
@@ -320,8 +327,8 @@ class VaultService {
   }
 
   /// Load folders from secure storage
-  Future<List<VaultFolder>> _loadFolders() async {
-    if (_cachedFolders != null) return _cachedFolders!;
+  Future<List<VaultFolder>> _loadFolders({bool forceReload = false}) async {
+    if (!forceReload && _cachedFolders != null) return _cachedFolders!;
 
     try {
       final foldersJson = await _storage.read(key: _foldersKey);
@@ -354,8 +361,8 @@ class VaultService {
   }
 
   /// Load tags from secure storage
-  Future<List<TagInfo>> _loadTags() async {
-    if (_cachedTags != null) return _cachedTags!;
+  Future<List<TagInfo>> _loadTags({bool forceReload = false}) async {
+    if (!forceReload && _cachedTags != null) return _cachedTags!;
 
     try {
       final tagsJson = await _storage.read(key: _tagsKey);
@@ -2363,15 +2370,21 @@ class VaultService {
 
   /// Refresh the cache
   Future<void> refresh() async {
-    _cachedFiles = null;
-    _cachedDecoyFiles = null;
-    _cachedAlbums = null;
-    _cachedFolders = null;
-    _cachedTags = null;
-    await _loadFileIndex();
-    await _loadAlbums();
-    await _loadFolders();
-    await _loadTags();
+    // ponytail: atomic swap — read storage into locals before replacing caches,
+    // so a concurrent mutation never observes a null cache (was the NPE vector
+    // flagged in Tier 4). Full mutation serialization (repositories + a
+    // re-entrant lock) is deferred; a naive lock deadlocks because mutating
+    // methods call each other (addFileToAlbum → updateFile, etc.).
+    final files = await _loadFileIndex(forceReload: true);
+    final decoyFiles = await _loadFileIndex(isDecoy: true, forceReload: true);
+    final albums = await _loadAlbums(forceReload: true);
+    final folders = await _loadFolders(forceReload: true);
+    final tags = await _loadTags(forceReload: true);
+    _cachedFiles = files;
+    _cachedDecoyFiles = decoyFiles;
+    _cachedAlbums = albums;
+    _cachedFolders = folders;
+    _cachedTags = tags;
   }
 
   /// Clean up temp files

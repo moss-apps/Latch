@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
-import 'package:in_app_update/in_app_update.dart';
 import '../models/album.dart';
 import '../models/encryption_algorithm.dart';
 import '../models/vault_folder.dart';
@@ -559,7 +558,7 @@ final updateServiceProvider = Provider<UpdateService>((ref) {
   return UpdateService.instance;
 });
 
-final updateInfoProvider = StateProvider<AppUpdateInfo?>((ref) {
+final updateInfoProvider = StateProvider<PendingUpdate?>((ref) {
   final service = ref.watch(updateServiceProvider);
-  return service.lastUpdateInfo;
+  return service.pendingUpdate;
 });
