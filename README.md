@@ -4,13 +4,19 @@
   <img src="assets/banner_locker.png" alt="Latch Banner" width="100%">
 </p>
 
+<p align="center">
+  <a href="https://play.google.com/store/apps/details?id=com.mossapps.locker">
+    <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Get it on Google Play" height="80">
+  </a>
+</p>
+
 ---
 
 Latch is a secure, private media vault application built with Flutter for Android. It provides a safe space to hide and protect your sensitive photos, videos, and documents from prying eyes, with multiple layers of security including biometric authentication, optional AES-256 encryption, and an auto-kill feature that removes the app from the recent apps list when you leave.
 
 > **Renamed from Locker to Latch.** The repository directory is still `Locker`; the app and all user-facing references are now **Latch**.
 
-> **Closed Beta** — Latch is currently in a closed beta test. To join, email `moss_apps@proton.me`.
+> **Now on Google Play** — [Download Latch](https://play.google.com/store/apps/details?id=com.mossapps.locker).
 
 ## Key Features
 
@@ -206,11 +212,7 @@ Locker/
 
 ### Installation
 
-> **GitHub Releases are deprecated.** Latch is distributed through the **Google Play Store** as a Closed Beta Test.
->
-> To join the Closed Beta, email: `moss_apps@proton.me`
->
-> Old release APKs and tags on GitHub are kept for historical reference only.
+> **Latch is available on the [Google Play Store](https://play.google.com/store/apps/details?id=com.mossapps.locker)** and via [GitHub Releases](https://github.com/moss-apps/Latch/releases).
 
 ### Running
 ```bash
