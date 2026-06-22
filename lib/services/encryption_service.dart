@@ -1,24 +1,24 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pointycastle/export.dart';
+import '../crypto/aes_ctr_cipher.dart';
+import '../crypto/aes_gcm_cipher.dart';
+import '../crypto/header_codec.dart';
+import '../crypto/key_derivation.dart';
+import '../crypto/key_wrap.dart';
 import '../models/encryption_algorithm.dart';
-import '../utils/argon2_isolate.dart';
 import 'crypto_isolate_pool.dart';
 
+// Header/magic constants + chunking now live in lib/crypto/. Crypto primitives
+// (AesGcmCipher, AesCtrCipher, KeyDerivation, KeyWrap, HeaderCodec) are pure;
+// this class is the stateful facade: it owns the secure-storage key I/O, the
+// in-memory key cache, the isolate pool, and the file streaming orchestration.
 const int _streamChunkSize = 1024 * 1024;
-
-const int _magicBytesGcm = 0x4C4B5247;
-const int _magicBytesGcmV2 = 0x4C4B5232;
-const int _magicBytesCtr = 0x4C4B5253;
-const int _magicBytesCbc = 0x4C4B5244;
-const int _gcmTagSize = 16;
-const int _v2HeaderSize = 9;
 
 /// AES-256 Encryption Service for secure file encryption
 /// Uses AES-256-CBC mode with PKCS7 padding
@@ -52,8 +52,7 @@ class EncryptionService {
   static const String _decoyKwkSaltKey = 'vault_decoy_kwk_salt';
   static const String _decoyKwkIvKey = 'vault_decoy_kwk_iv';
 
-  static const int _keySize = 32; // 256 bits
-  static const int _ivSize = 16; // 128 bits
+  static const int _keySize = KeyDerivation.keySize; // 256 bits
 
   Uint8List? _cachedMasterKey;
   Uint8List? _cachedDecoyKey;
@@ -109,8 +108,8 @@ class EncryptionService {
         throw StateError('Wrapped key data incomplete');
       }
 
-      final kwk = await computeArgon2idHash(credential, base64Decode(saltB64));
-      final masterKey = _unwrapKey(base64Decode(wrappedKeyB64), kwk, base64Decode(ivB64));
+      final kwk = await KeyDerivation.argon2id(credential, base64Decode(saltB64));
+      final masterKey = KeyWrap.unwrap(base64Decode(wrappedKeyB64), kwk, base64Decode(ivB64));
 
       if (isDecoy) {
         _cachedDecoyKey = masterKey;
@@ -138,7 +137,7 @@ class EncryptionService {
     }
 
     // First-time: generate new key, wrap, store
-    final masterKey = _generateRandomBytes(_keySize);
+    final masterKey = KeyDerivation.randomBytes(_keySize);
     await _wrapAndStoreKey(masterKey, credential, isDecoy: isDecoy);
     await _storage.write(key: versionKey, value: '1');
 
@@ -166,11 +165,8 @@ class EncryptionService {
         throw StateError('Biometric key data incomplete');
       }
 
-      final masterKey = _unwrapKey(
-        base64Decode(wrappedKeyB64),
-        base64Decode(biometricKwkB64),
-        base64Decode(ivB64),
-      );
+      final masterKey =
+          KeyWrap.unwrap(base64Decode(wrappedKeyB64), base64Decode(biometricKwkB64), base64Decode(ivB64));
       _cachedMasterKey = masterKey;
       return masterKey;
     }
@@ -203,7 +199,7 @@ class EncryptionService {
     if (_cachedMasterKey == null) {
       final version = await _storage.read(key: _keyVersionKey);
       if (version == null) {
-        _cachedMasterKey = _generateRandomBytes(_keySize);
+        _cachedMasterKey = KeyDerivation.randomBytes(_keySize);
         await _storage.write(key: _masterKeyKey, value: base64Encode(_cachedMasterKey!));
       } else {
         throw StateError('Master key not unlocked. Call unlockMasterKey first.');
@@ -237,10 +233,10 @@ class EncryptionService {
     String credential, {
     required bool isDecoy,
   }) async {
-    final salt = _generateRandomBytes(32);
+    final salt = KeyDerivation.randomBytes(32);
     final iv = generateIV();
-    final kwk = await computeArgon2idHash(credential, salt);
-    final wrappedKey = _wrapKey(masterKey, kwk, iv);
+    final kwk = await KeyDerivation.argon2id(credential, salt);
+    final wrappedKey = KeyWrap.wrap(masterKey, kwk, iv);
 
     final wrappedKeyKey = isDecoy ? _decoyWrappedKeyKey : _wrappedKeyKey;
     final saltKey = isDecoy ? _decoyKwkSaltKey : _kwkSaltKey;
@@ -252,23 +248,13 @@ class EncryptionService {
   }
 
   Future<void> _setupBiometricKwkForKey(Uint8List masterKey) async {
-    final biometricKwk = _generateRandomBytes(_keySize);
+    final biometricKwk = KeyDerivation.randomBytes(_keySize);
     final iv = generateIV();
-    final wrappedKey = _wrapKey(masterKey, biometricKwk, iv);
+    final wrappedKey = KeyWrap.wrap(masterKey, biometricKwk, iv);
 
     await _storage.write(key: _biometricKwkKey, value: base64Encode(biometricKwk));
     await _storage.write(key: _biometricWrappedKeyKey, value: base64Encode(wrappedKey));
     await _storage.write(key: _biometricIvKey, value: base64Encode(iv));
-  }
-
-  Uint8List _wrapKey(Uint8List masterKey, Uint8List kwk, Uint8List iv) {
-    final cipher = _getGcmCipher(kwk, iv, true);
-    return cipher.process(masterKey);
-  }
-
-  Uint8List _unwrapKey(Uint8List wrappedKey, Uint8List kwk, Uint8List iv) {
-    final cipher = _getGcmCipher(kwk, iv, false);
-    return cipher.process(wrappedKey);
   }
 
   /// Ensure master key exists, create if not
@@ -290,7 +276,7 @@ class EncryptionService {
       debugPrint('Error reading master key: $e');
     }
 
-    _cachedMasterKey = _generateRandomBytes(_keySize);
+    _cachedMasterKey = KeyDerivation.randomBytes(_keySize);
     if (_pendingCredential != null) {
       await _wrapAndStoreKey(_cachedMasterKey!, _pendingCredential!, isDecoy: false);
       await _storage.write(key: _keyVersionKey, value: '1');
@@ -325,7 +311,7 @@ class EncryptionService {
       debugPrint('Error reading decoy key: $e');
     }
 
-    _cachedDecoyKey = _generateRandomBytes(_keySize);
+    _cachedDecoyKey = KeyDerivation.randomBytes(_keySize);
     if (_pendingDecoyCredential != null) {
       await _wrapAndStoreKey(_cachedDecoyKey!, _pendingDecoyCredential!, isDecoy: true);
       await _storage.write(key: _decoyKeyVersionKey, value: '1');
@@ -337,53 +323,27 @@ class EncryptionService {
     return _cachedDecoyKey!;
   }
 
-  /// Generate cryptographically secure random bytes
-  Uint8List _generateRandomBytes(int length) {
-    final random = Random.secure();
-    return Uint8List.fromList(
-      List<int>.generate(length, (_) => random.nextInt(256)),
-    );
-  }
-
   /// Generate a random IV (Initialization Vector)
-  Uint8List generateIV() {
-    return _generateRandomBytes(_ivSize);
-  }
+  Uint8List generateIV() => KeyDerivation.generateIV();
 
   /// Generate a random 32-byte salt for per-file key derivation
-  Uint8List generateFileSalt() {
-    return _generateRandomBytes(32);
-  }
+  Uint8List generateFileSalt() => KeyDerivation.generateFileSalt();
 
   /// Derive a per-file encryption key from the master key + salt using PBKDF2
-  Uint8List deriveFileKey(Uint8List masterKey, Uint8List salt, int iterations) {
-    final pbkdf2 = PBKDF2KeyDerivator(HMac(SHA256Digest(), 64))
-      ..init(Pbkdf2Parameters(salt, iterations, _keySize));
-    return pbkdf2.process(masterKey);
-  }
+  Uint8List deriveFileKey(Uint8List masterKey, Uint8List salt, int iterations) =>
+      KeyDerivation.deriveFileKey(masterKey, salt, iterations);
 
   Future<Uint8List> deriveFileKeyAsync(
-      Uint8List masterKey, Uint8List salt, int iterations) async {
-    return compute(_pbkdf2Isolate, _Pbkdf2Params(masterKey, salt, iterations));
-  }
-
-  static Uint8List _pbkdf2Isolate(_Pbkdf2Params params) {
-    final pbkdf2 = PBKDF2KeyDerivator(HMac(SHA256Digest(), 64))
-      ..init(Pbkdf2Parameters(params.salt, params.iterations, 32));
-    return pbkdf2.process(params.masterKey);
-  }
+          Uint8List masterKey, Uint8List salt, int iterations) =>
+      KeyDerivation.deriveFileKeyAsync(masterKey, salt, iterations);
 
   /// Derive key from password using PBKDF2
-  Uint8List deriveKeyFromPassword(String password, {Uint8List? salt, int iterations = 100000}) {
-    salt ??= _generateRandomBytes(16);
+  Uint8List deriveKeyFromPassword(String password,
+          {Uint8List? salt, int iterations = 100000}) =>
+      KeyDerivation.deriveKeyFromPassword(password,
+          salt: salt, iterations: iterations);
 
-    final pbkdf2 = PBKDF2KeyDerivator(HMac(SHA256Digest(), 64))
-      ..init(Pbkdf2Parameters(salt, iterations, _keySize));
-
-    return pbkdf2.process(Uint8List.fromList(utf8.encode(password)));
-  }
-
-  /// Get the encryption cipher
+  /// Legacy AES-256-CBC cipher (decrypt-only path for old vault files).
   PaddedBlockCipher _getCipher(
       Uint8List key, Uint8List iv, bool forEncryption) {
     final cipher = PaddedBlockCipherImpl(
@@ -407,28 +367,11 @@ class EncryptionService {
     return isDecoy ? await _ensureDecoyKey() : await _ensureMasterKey();
   }
 
-  GCMBlockCipher _getGcmCipher(
-      Uint8List key, Uint8List iv, bool forEncryption) {
-    final cipher = GCMBlockCipher(AESEngine());
-    final params = AEADParameters(KeyParameter(key), 128, iv, Uint8List(0));
-    cipher.init(forEncryption, params);
-    return cipher;
-  }
-
   Stream<Uint8List> _createChunkedStream(Stream<List<int>> input) {
     return input.transform(_ChunkedStreamTransformer(_streamChunkSize));
   }
 
-  int detectEncryptionFormat(List<int> bytes) {
-    if (bytes.length < 4) return 0;
-    final magic =
-        bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24);
-    if (magic == _magicBytesGcmV2) return 4; // GCM v2 (authenticated)
-    if (magic == _magicBytesGcm) return 1; // GCM v1 (legacy)
-    if (magic == _magicBytesCtr) return 2; // CTR (streamed)
-    if (magic == _magicBytesCbc) return 3; // CBC (legacy)
-    return 0;
-  }
+  int detectEncryptionFormat(List<int> bytes) => HeaderCodec.detectFormat(bytes);
 
   /// Decrypt data using AES-256-CBC
   Future<DecryptionResult> decryptData(
@@ -493,8 +436,7 @@ class EncryptionService {
       final totalBytes = await sourceFile.length();
 
       // Use CTR mode for streaming - it's a stream cipher that doesn't require padding
-      final ctr = CTRStreamCipher(AESEngine())
-        ..init(true, ParametersWithIV<KeyParameter>(KeyParameter(key), iv));
+      final ctr = AesCtrCipher.cipher(key, iv, true);
 
       final destFile = File(destinationPath);
       final sink = destFile.openWrite();
@@ -561,8 +503,7 @@ class EncryptionService {
 
       onProgress?.call(0, totalBytes);
 
-      final ctr = CTRStreamCipher(AESEngine())
-        ..init(true, ParametersWithIV<KeyParameter>(KeyParameter(key), iv));
+      final ctr = AesCtrCipher.cipher(key, iv, true);
 
       final encrypted = ctr.process(data);
 
@@ -619,16 +560,7 @@ class EncryptionService {
 
       final encrypted = gcm.process(data);
 
-      final header = Uint8List(_v2HeaderSize);
-      header[0] = 0x4C;
-      header[1] = 0x4B;
-      header[2] = 0x52;
-      header[3] = 0x32;
-      header[4] = 0x02;
-      header[5] = (data.length & 0xFF);
-      header[6] = ((data.length >> 8) & 0xFF);
-      header[7] = ((data.length >> 16) & 0xFF);
-      header[8] = ((data.length >> 24) & 0xFF);
+      final header = HeaderCodec.encodeV2Header(data.length);
 
       final destFile = File(destinationPath);
       final sink = destFile.openWrite();
@@ -842,7 +774,7 @@ class EncryptionService {
 
       if (isGcmV2) {
         await raf.read(1);
-        headerSize = _v2HeaderSize;
+        headerSize = kV2HeaderSize;
         final sizeBytes = await raf.read(4);
         originalSize = sizeBytes[0] | (sizeBytes[1] << 8) | (sizeBytes[2] << 16) | (sizeBytes[3] << 24);
       } else {
@@ -852,7 +784,7 @@ class EncryptionService {
 
       await raf.close();
 
-      final totalBytes = encryptedSize - headerSize - (isGcmV2 ? _gcmTagSize : 0);
+      final totalBytes = encryptedSize - headerSize - (isGcmV2 ? kGcmTagSize : 0);
       int bytesProcessed = 0;
 
       onProgress?.call(0, totalBytes);
@@ -862,8 +794,7 @@ class EncryptionService {
         final tempCtrFile = File(tempCtrPath);
         final sink = tempCtrFile.openWrite();
 
-        final ctr = CTRStreamCipher(AESEngine())
-          ..init(false, ParametersWithIV<KeyParameter>(KeyParameter(key), iv));
+        final ctr = AesCtrCipher.cipher(key, iv, false);
 
         final inputStream = _createChunkedStream(encryptedFile.openRead(headerSize));
 
@@ -1001,8 +932,7 @@ class EncryptionService {
         final key = await _resolveKey(isDecoy: isDecoy, derivedKey: derivedKey);
         final iv = base64Decode(ivBase64);
 
-        final ctr = CTRStreamCipher(AESEngine())
-          ..init(false, ParametersWithIV<KeyParameter>(KeyParameter(key), iv));
+        final ctr = AesCtrCipher.cipher(key, iv, false);
 
         // Stream decryption without loading entire file
         final inputStream = _createChunkedStream(encryptedFile.openRead(8));
@@ -1108,7 +1038,7 @@ class EncryptionService {
           (isDecoy ? await _ensureDecoyKey() : await _ensureMasterKey());
       final iv = base64Decode(ivBase64);
 
-      final cipher = _getGcmCipher(key, iv, false);
+      final cipher = AesGcmCipher.cipher(key, iv, false);
       final decrypted = cipher.process(encryptedData);
 
       return DecryptionResult(
@@ -1163,7 +1093,7 @@ class EncryptionService {
 
       if (isV2) {
         final rest = await raf.read(5);
-        headerSize = _v2HeaderSize;
+        headerSize = kV2HeaderSize;
         originalSize = rest[1] | (rest[2] << 8) | (rest[3] << 16) | (rest[4] << 24);
       } else {
         final rest = await raf.read(4);
@@ -1237,16 +1167,7 @@ class EncryptionService {
       final destFile = File(destinationPath);
       final sink = destFile.openWrite();
 
-      final header = Uint8List(_v2HeaderSize);
-      header[0] = 0x4C;
-      header[1] = 0x4B;
-      header[2] = 0x52;
-      header[3] = 0x32;
-      header[4] = 0x02;
-      header[5] = (totalBytes & 0xFF);
-      header[6] = ((totalBytes >> 8) & 0xFF);
-      header[7] = ((totalBytes >> 16) & 0xFF);
-      header[8] = ((totalBytes >> 24) & 0xFF);
+      final header = HeaderCodec.encodeV2Header(totalBytes);
       sink.add(header);
 
       int bytesProcessed = 0;
@@ -1315,7 +1236,7 @@ class EncryptionService {
       int dataOffset;
       if (isV2) {
         await raf.read(5);
-        dataOffset = _v2HeaderSize;
+        dataOffset = kV2HeaderSize;
       } else {
         await raf.read(4);
         dataOffset = 8;
@@ -1497,7 +1418,7 @@ class EncryptionService {
         // Generate one chunk of random data to reuse (much faster/lighter than generating unique for whole file)
         // While theoretically less secure than unique random bytes for every byte,
         // it serves the purpose of destorying the original data structure.
-        final randomChunk = _generateRandomBytes(chunkSize);
+        final randomChunk = KeyDerivation.randomBytes(chunkSize);
         final zeroChunk = Uint8List(chunkSize); // Default initialized to 0
 
         // Pass 1: Overwrite with random data
@@ -1619,25 +1540,7 @@ class EncryptionService {
 
   /// Check what encryption format a file uses
   /// Returns: 0=unknown/legacy CBC, 1=GCM, 2=CTR, 3=CBC with header
-  int detectFileFormat(String filePath) {
-    try {
-      final file = File(filePath);
-      final raf = file.openSync();
-      final header = raf.readSync(4);
-      raf.closeSync();
-
-      if (header.length < 4) return 0;
-
-      final magic = header[0] | (header[1] << 8) | (header[2] << 16) | (header[3] << 24);
-      if (magic == _magicBytesGcmV2) return 4;
-      if (magic == _magicBytesGcm) return 1;
-      if (magic == _magicBytesCtr) return 2;
-      if (magic == _magicBytesCbc) return 3;
-      return 0;
-    } catch (e) {
-      return 0;
-    }
-  }
+  int detectFileFormat(String filePath) => HeaderCodec.detectFormatFromFile(filePath);
 
   static const String _rotationJournalKey = 'key_rotation_journal';
   static const String _oldMasterKeyKey = 'vault_master_key_old';
@@ -1736,7 +1639,7 @@ class EncryptionService {
       await _checkKeyRotationRecovery();
 
       final oldKey = await _ensureMasterKey();
-      final newKey = _generateRandomBytes(_keySize);
+      final newKey = KeyDerivation.randomBytes(_keySize);
       final newIvs = <String>[];
 
       final ivMap = <String, String>{};
@@ -2005,11 +1908,4 @@ class _ChunkedStreamTransformer
 
     return controller.stream;
   }
-}
-
-class _Pbkdf2Params {
-  final Uint8List masterKey;
-  final Uint8List salt;
-  final int iterations;
-  const _Pbkdf2Params(this.masterKey, this.salt, this.iterations);
 }
