@@ -36,6 +36,7 @@ class AuthService {
   static const String _hashVersionKey = 'hash_version';
   static const String _firstTimeKey = 'is_first_time';
   static const String _biometricsEnabledKey = 'biometrics_enabled';
+  static const String _unlockAutofillEnabledKey = 'unlock_autofill_enabled';
   static const String _authMethodKey =
       'auth_method'; // 'pin', 'password', 'biometric'
   static const String _failedUnlockAttemptsKey = 'failed_unlock_attempts';
@@ -165,6 +166,25 @@ class AuthService {
     try {
       await _storage.write(
           key: _biometricsEnabledKey, value: enabled.toString());
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> isUnlockAutofillEnabled() async {
+    try {
+      final enabled = await _storage.read(key: _unlockAutofillEnabledKey);
+      return enabled == 'true';
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> setUnlockAutofillEnabled(bool enabled) async {
+    try {
+      await _storage.write(
+          key: _unlockAutofillEnabledKey, value: enabled.toString());
       return true;
     } catch (e) {
       return false;
