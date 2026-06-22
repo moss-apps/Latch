@@ -205,32 +205,23 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       elevation: 0,
       actions: [
-        IconButton(
-          icon: Icon(
-            _isSearching ? Icons.close : Icons.search,
-            color: context.textPrimary,
-          ),
-          tooltip: _isSearching ? 'Close search' : 'Search',
-          onPressed: () {
-            setState(() {
-              _isSearching = !_isSearching;
-              if (!_isSearching) {
-                _searchController.clear();
-                ref.read(searchQueryProvider.notifier).state = '';
-              }
-            });
-          },
-        ),
-        IconButton(
-          icon: Icon(Icons.sort, color: context.textPrimary),
-          tooltip: 'Sort',
-          onPressed: _showSortOptions,
-        ),
         PopupMenuButton<String>(
           tooltip: 'More options',
           icon: Icon(Icons.more_vert, color: context.textPrimary),
           onSelected: (value) {
             switch (value) {
+              case 'search':
+                setState(() {
+                  _isSearching = !_isSearching;
+                  if (!_isSearching) {
+                    _searchController.clear();
+                    ref.read(searchQueryProvider.notifier).state = '';
+                  }
+                });
+                break;
+              case 'sort':
+                _showSortOptions();
+                break;
               case 'albums':
                 Navigator.push(
                   context,
@@ -246,6 +237,26 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
             }
           },
           itemBuilder: (context) => [
+            PopupMenuItem(
+              value: 'search',
+              child: Row(
+                children: [
+                  Icon(_isSearching ? Icons.close : Icons.search, size: 20),
+                  const SizedBox(width: 12),
+                  Text(_isSearching ? 'Close search' : 'Search'),
+                ],
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'sort',
+              child: Row(
+                children: [
+                  Icon(Icons.sort, size: 20),
+                  SizedBox(width: 12),
+                  Text('Sort'),
+                ],
+              ),
+            ),
             const PopupMenuItem(
               value: 'albums',
               child: Row(
