@@ -3268,25 +3268,6 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
     Navigator.pop(context); // Close progress sheet
   }
 
-  Future<void> _importFromDocuments() async {
-    Navigator.pop(context);
-
-    // Open document picker directly
-    final result = await FileImportService.instance.importFromDocumentFiles(
-      filePaths: (<String>[]), // Will be populated by picker
-      deleteOriginals: true,
-    );
-
-    if (!mounted) return;
-
-    if (result.success && result.importedCount > 0) {
-      ToastUtils.showSuccess('Imported ${result.importedCount} document(s)');
-      ref.read(vaultNotifierProvider.notifier).loadFiles();
-    } else if (!result.success) {
-      ToastUtils.showError(result.error ?? 'Import failed');
-    }
-  }
-
   Future<void> _importMediaFromGallery() async {
     Navigator.pop(context);
 
