@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_update/in_app_update.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'services/auto_kill_service.dart';
 import 'services/screenshot_protection_service.dart';
 import 'services/update_service.dart';
@@ -74,7 +75,7 @@ class _AppInitializerState extends ConsumerState<AppInitializer> {
   final AuthService _authService = AuthService();
   bool _isLoading = true;
   bool _isFirstTime = true;
-  StreamSubscription<AppUpdateInfo?>? _updateSub;
+  StreamSubscription<PendingUpdate?>? _updateSub;
 
   @override
   void initState() {
@@ -82,10 +83,9 @@ class _AppInitializerState extends ConsumerState<AppInitializer> {
     _checkAuthStatus();
 
     final updateService = ref.read(updateServiceProvider);
-    _updateSub = updateService.onUpdateCheck.listen((info) {
-      if (info != null &&
-          info.updateAvailability == UpdateAvailability.updateAvailable) {
-        _showUpdateDialog();
+    _updateSub = updateService.onUpdateCheck.listen((update) {
+      if (update != null) {
+        _showUpdateDialog(update);
       }
     });
   }
@@ -96,9 +96,14 @@ class _AppInitializerState extends ConsumerState<AppInitializer> {
     super.dispose();
   }
 
-  void _showUpdateDialog() {
+  void _showUpdateDialog(PendingUpdate update) {
     final context = navigatorKey.currentContext;
     if (context == null) return;
+    final isPlayStore = update.source == InstallSource.playStore;
+    final message = isPlayStore
+        ? 'A new version is available on the Play Store. Update now?'
+        : 'A new version${update.latestVersion != null ? ' (${update.latestVersion})' : ''}'
+            ' is available on GitHub. Open the download page?';
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -106,9 +111,9 @@ class _AppInitializerState extends ConsumerState<AppInitializer> {
             Theme.of(dialogContext).scaffoldBackgroundColor,
         title: const Text('Update Available',
             style: TextStyle(fontFamily: 'ProductSans')),
-        content: const Text(
-          'A new version is available on the Play Store. Update now?',
-          style: TextStyle(fontFamily: 'ProductSans'),
+        content: Text(
+          message,
+          style: const TextStyle(fontFamily: 'ProductSans'),
         ),
         actions: [
           TextButton(
@@ -118,9 +123,17 @@ class _AppInitializerState extends ConsumerState<AppInitializer> {
           FilledButton(
             onPressed: () {
               Navigator.pop(dialogContext);
-              InAppUpdate.performImmediateUpdate();
+              if (isPlayStore) {
+                InAppUpdate.performImmediateUpdate();
+              } else {
+                final url = Uri.parse(
+                  update.releaseUrl ??
+                      'https://github.com/moss-apps/Latch/releases/latest',
+                );
+                launchUrl(url, mode: LaunchMode.externalApplication);
+              }
             },
-            child: const Text('Update'),
+            child: Text(isPlayStore ? 'Update' : 'Open'),
           ),
         ],
       ),
