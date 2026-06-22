@@ -45,6 +45,62 @@ All notable changes to Latch are documented in this file.
 - Sub-48px tap targets replaced with `IconButton`
 - `main.dart` update-check `StreamSubscription` stored + cancelled in `dispose()`
 
+## 0.15.0-beta.1
+
+### Password Vault & Autofill
+- **Password vault** — store, edit, and organize credentials inside the encrypted vault
+- **Password editor** with generator for strong random passwords
+- **Password list** with search, domain filtering, and multi-select
+- **Android Autofill service** — seamlessly fill credentials in other apps and browsers
+- Autofill credential toggle with security warning dialog
+- **Autofill support** on PIN and password unlock inputs
+- **Clipboard auto-clear** after pasting passwords
+- Password index included in vault backups
+
+### Crypto Overhaul
+- **AEAD key-wrapping** for vault master key (AES-256-GCM wrapping)
+- **Argon2id** key derivation alongside PBKDF2
+- `HeaderCodec` for encrypted file format detection
+- Stateless **AES-256-GCM** and **AES-256-CTR** cipher primitives
+- **Key wrapping and biometric unlock** for master keys
+- Encryption key **re-wrapping** after password/PIN change
+- Constant-time string comparison for cryptographic operations
+- **PBKDF2 iterations increased to 600,000** (from 100,000)
+- Default encryption algorithm set to **AES-256-GCM**
+
+### Update System Rework
+- **GitHub-based updates** via `url_launcher` (supports non-Play Store installs)
+- Install source detection — Play Store vs sideload vs GitHub
+- Pre-release version ordering with `pub_semver`
+
+### Testing & Infrastructure
+- **CI workflow** for versionF branch
+- Comprehensive unit tests for AES-256-GCM, CTR, crypto hygiene, password strength
+- PBKDF2 isolate test suite
+- Argon2id KWK derivation and AES-256-GCM key wrapping tests
+
+### UI Polish
+- Tooltips on song player, media viewer, and password editor buttons
+- SnackBar margin, shape, and elevation styling
+- Search and sort actions moved to overflow menu
+- GestureDetector replaced with IconButton for better accessibility
+- `forceReload` parameter on vault cache loaders
+
+### Security Hardening
+- App backup disabled
+- Network security config for cleartext traffic policy
+- ProGuard minification enabled for release builds
+- ProGuard rules for Flutter, crypto, and autofill service
+
+### Cleanup
+- Removed Firebase dependencies from Android Gradle config
+- Removed deprecated compression services and widgets
+- Removed redundant file existence checks across the codebase
+- Removed unused UI components, imports, and platform stubs
+- Replaced `cupertino_icons` and `encrypt` with `device_info_plus`
+
+---
+
 ## 0.14.4-beta.4
 
 ### Notes System
