@@ -55,6 +55,77 @@ class WhatsNewService {
   /// The key MUST match `PackageInfo.version` exactly (the `+buildNumber`
   /// suffix is ignored).
   static const Map<String, List<WhatsNewSection>> _builtIn = {
+    '0.15.0-beta.1': [
+      WhatsNewSection(
+        title: 'Password Vault & Autofill',
+        items: [
+          WhatsNewItem(
+            icon: Icons.lock_outlined,
+            title: 'Password vault',
+            description:
+                'Store, edit, and organise credentials inside the encrypted vault with a built-in strong password generator.',
+          ),
+          WhatsNewItem(
+            icon: Icons.auto_awesome_outlined,
+            title: 'Android Autofill',
+            description:
+                'Seamlessly fill credentials in other apps and browsers — Latch now integrates with the Android Autofill framework.',
+          ),
+          WhatsNewItem(
+            icon: Icons.info_outlined,
+            title: 'Clipboard auto-clear',
+            description:
+                'Copied passwords are automatically cleared from the clipboard after use.',
+          ),
+        ],
+      ),
+      WhatsNewSection(
+        title: 'Crypto Overhaul',
+        items: [
+          WhatsNewItem(
+            icon: Icons.shield_outlined,
+            title: 'Argon2id + key wrapping',
+            description:
+                'AEAD key-wrapping protects the vault master key. Argon2id joins PBKDF2 for memory-hard key derivation.',
+          ),
+          WhatsNewItem(
+            icon: Icons.key_outlined,
+            title: '600,000 PBKDF2 iterations',
+            description:
+                'Default iterations raised 6× — from 100k to 600k — for stronger resistance against brute-force attacks.',
+          ),
+          WhatsNewItem(
+            icon: Icons.new_releases_outlined,
+            title: 'Auto re-wrap on PIN change',
+            description:
+                'The encryption key is automatically re-wrapped when you change your password or PIN.',
+          ),
+        ],
+      ),
+      WhatsNewSection(
+        title: 'Updates & Stability',
+        items: [
+          WhatsNewItem(
+            icon: Icons.system_update_outlined,
+            title: 'GitHub update support',
+            description:
+                'Update checks now detect your install source — Play Store, sideload, or GitHub — and route you accordingly.',
+          ),
+          WhatsNewItem(
+            icon: Icons.bug_report_outlined,
+            title: 'Comprehensive test suite',
+            description:
+                'New unit tests cover every crypto path: AES-256-GCM, CTR, PBKDF2, Argon2id, and key wrapping.',
+          ),
+          WhatsNewItem(
+            icon: Icons.build_outlined,
+            title: 'CI workflow active',
+            description:
+                'Automated builds and tests now run on every push to the versionF branch.',
+          ),
+        ],
+      ),
+    ],
     '0.14.4-beta.4': [
       WhatsNewSection(
         title: 'Notes',
