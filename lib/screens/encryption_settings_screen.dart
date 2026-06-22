@@ -186,9 +186,11 @@ class _EncryptionSettingsScreenState
     int iterations,
   ) {
     final isSelected = settings.kdfIterations == iterations;
-    final label = iterations == 100000
-        ? '${(iterations / 1000).round()}K (Default)'
-        : '${(iterations / 1000).round()}K';
+    final label = iterations >= 1000000
+        ? '${(iterations / 1000000).round()}M'
+        : iterations == 100000
+            ? '${(iterations / 1000).round()}K (Default)'
+            : '${(iterations / 1000).round()}K';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
