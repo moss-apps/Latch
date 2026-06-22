@@ -2,6 +2,49 @@
 
 All notable changes to Latch are documented in this file.
 
+## 0.14.4-beta.5
+
+### Security
+- **Argon2id key wrapping (H1)** — the vault master key is now wrapped by an Argon2id-derived key-wrapping key from the user credential; PIN/password actually protects the vault. Transparent migration on next unlock.
+- **KDF iterations 100k → 600k**; selectable options `[100k, 300k, 600k, 1M]`
+- **AES-256-GCM is the default cipher** for new media; silent CBC→CTR fallback removed
+- **Constant-time credential comparison** (`secure_compare.dart`) in AuthService and DecoyService verify paths; legacy SHA-256 branch padded with dummy PBKDF2 work
+- **Decoy PIN minimum 4 → 6 digits**
+- **Password-strength enforcement** — `minPasswordLength = 8` + `validatePasswordStrength()` centralized in AuthService
+- **Plaintext temp wiped** — re-encryption/rotation intermediates written to app-private temp and `secureDelete`d
+- **iOS Keychain accessibility** set to `unlocked_this_device` (Android-only app, low-impact but correct)
+- Raw `$e` removed from all crypto/UI exception strings; detail kept in `debugPrint`
+
+### Architecture
+- **Crypto module split (3.1)** — `encryption_service.dart` split into pure, tested modules under `lib/crypto/`: `AesGcmCipher`, `AesCtrCipher`, `KeyDerivation`, `HeaderCodec`, `KeyWrap`. `EncryptionService` is now a behavior-preserving facade. +33 round-trip/auth tests.
+- **Vault cache-NPE fix (3.2 partial)** — `refresh()` now swaps caches atomically instead of nulling first, closing the crash vector where an in-flight mutation could NPE on a nulled cache. Full repository split deferred.
+
+### UI & Cleanup
+- **Password vault integration** — open/create password entries from the gallery screen
+- **Search and sort** moved into the overflow menu
+- **Centralized toasts** (`ToastUtils` via global `navigatorKey`); `fluttertoast` dependency dropped
+- **Centralized paths** (`PathUtils.getDownloadsDirectory()` + `androidSourceRoots`)
+- **FileTypeColors** map added to `app_colors.dart`
+- **Dead code purge** — deleted `OptimizedScrollView`, `OptimizedGridView`, `OptimizedThumbnail`, `PerformanceOverlayWidget`, `CompactPermissionWarning`, `showOperationProgressSheet`, `compression_options_dialog`, dead `locker_logo_512.png` asset, dead `_importFromDocuments` method
+- **Vestigial Firebase removed** — `google-services` plugin, `firebase-bom`, and `google-services.json` deleted (no Dart Firebase packages consumed)
+- **`.metadata` cleanup** — removed ios/linux/macos/web/windows platform entries
+
+### Platform & Tooling
+- **CI workflow** (`github/workflows/ci.yml`) — pub get / analyze / test on push
+- **ProGuard rules** for Flutter, crypto, and autofill service
+- **AndroidManifest** — `allowBackup="false"` + `dataExtractionRules` + `networkSecurityConfig`
+- **Release builds** — `minifyEnabled` / `shrinkResources` / `proguardFiles`
+- `permission_service.dart` hardcoded SDK 33 → `device_info_plus`
+- Dropped unused deps `encrypt`, `cupertino_icons`; `fluttertoast` removed
+
+### Fixes
+- `media_viewer_screen.dart` delete-from-viewer no longer mutates the caller's file list (operates on a local copy)
+- `gallery_vault_screen.dart` `mounted` guards on 8 `setState`-after-await sites
+- `note_editor_screen.dart` folder-picker tautology bug fixed
+- `TextEditingController`s now disposed in dialogs/sheets (10 sites)
+- Sub-48px tap targets replaced with `IconButton`
+- `main.dart` update-check `StreamSubscription` stored + cancelled in `dispose()`
+
 ## 0.14.4-beta.4
 
 ### Notes System

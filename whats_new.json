@@ -1,4 +1,56 @@
 {
+  "0.14.4-beta.5": [
+    {
+      "title": "Security Hardening",
+      "items": [
+        {
+          "icon": "lock_outline",
+          "title": "Argon2id key wrapping",
+          "description": "Your PIN or password now derives a key-wrapping key with Argon2id that encrypts the vault master key — the credential actually protects the vault, not just the lock screen."
+        },
+        {
+          "icon": "speed",
+          "title": "Stronger key derivation",
+          "description": "Default PBKDF2 iterations raised to 600,000 and AES-256-GCM is now the default cipher for new media."
+        },
+        {
+          "icon": "verified_user_outlined",
+          "title": "Hardened credential checks",
+          "description": "Constant-time comparison for all credential and decoy verification, 6-digit minimum decoy PIN, and plaintext wiped from temp files after re-encryption."
+        }
+      ]
+    },
+    {
+      "title": "Password Vault",
+      "items": [
+        {
+          "icon": "password_outlined",
+          "title": "Passwords in the gallery",
+          "description": "Open and create password entries directly from the gallery screen's quick actions."
+        }
+      ]
+    },
+    {
+      "title": "Under the Hood",
+      "items": [
+        {
+          "icon": "architecture_outlined",
+          "title": "Crypto modules split",
+          "description": "Encryption internals split into independently tested GCM, CTR, key-derivation, header, and key-wrap modules — 33 new round-trip and auth-failure tests."
+        },
+        {
+          "icon": "cleaning_services_outlined",
+          "title": "Dead code purge",
+          "description": "Removed unused widgets, a dead asset, vestigial Firebase wiring, and stale platform stubs for a leaner build."
+        },
+        {
+          "icon": "science_outlined",
+          "title": "CI + ProGuard",
+          "description": "GitHub Actions CI runs analyze and tests on every push; release builds now ship obfuscated with ProGuard rules for crypto and autofill."
+        }
+      ]
+    }
+  ],
   "0.14.4-beta.4": [
     {
       "title": "Notes",

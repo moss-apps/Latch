@@ -8,6 +8,8 @@
 
 Latch is a secure, private media vault application built with Flutter for Android. It provides a safe space to hide and protect your sensitive photos, videos, and documents from prying eyes, with multiple layers of security including biometric authentication, optional AES-256 encryption, and an auto-kill feature that removes the app from the recent apps list when you leave.
 
+> **Renamed from Locker to Latch.** The repository directory is still `Locker`; the app and all user-facing references are now **Latch**.
+
 > **Closed Beta** — Latch is currently in a closed beta test. To join, email `moss_apps@proton.me`.
 
 ## Key Features
@@ -108,46 +110,78 @@ When you want to play an audio file stored in Latch using Flick's advanced audio
 ## Project Structure
 
 ```
-locker/
+Locker/
 ├── lib/                          # Flutter/Dart source
 │   ├── main.dart                 # Application entry point
+│   ├── autofill_app.dart         # Autofill entry point (separate app mode)
+│   ├── crypto/                   # Pure, testable crypto primitives
+│   │   ├── aes_gcm_cipher.dart   # AES-256-GCM one-shot
+│   │   ├── aes_ctr_cipher.dart   # AES-256-CTR one-shot
+│   │   ├── key_derivation.dart   # PBKDF2 + Argon2id + salt/IV generation
+│   │   ├── header_codec.dart     # Magic bytes + format detection + headers
+│   │   └── key_wrap.dart         # AEAD key wrap/unwrap
 │   ├── models/                   # Data models
-│   │   ├── album.dart            # Album and tag models
 │   │   ├── vaulted_file.dart     # Vaulted file model
 │   │   ├── vault_folder.dart     # Folder model
-│   │   └── encryption_algorithm.dart # Encryption algorithm enum
+│   │   ├── album.dart            # Album and tag models
+│   │   ├── note.dart             # Note model
+│   │   ├── password_entry.dart   # Password entry model
+│   │   ├── encryption_algorithm.dart # Encryption algorithm enum
+│   │   └── accent_color.dart     # Accent color options
 │   ├── providers/                # Riverpod state providers
 │   │   ├── vault_providers.dart  # Vault state management
+│   │   ├── note_providers.dart   # Notes state
+│   │   ├── password_providers.dart # Passwords state
 │   │   ├── theme_provider.dart   # Theme management
 │   │   ├── performance_provider.dart # Performance settings
 │   │   └── explorer_providers.dart # Explorer state management
 │   ├── screens/                  # UI screens
 │   │   ├── unlock_screen.dart    # Authentication unlock screen
 │   │   ├── gallery_vault_screen.dart # Gallery import screen
+│   │   ├── vault_explorer_screen.dart # Vault explorer with folder management
 │   │   ├── media_viewer_screen.dart # Image/video viewer
 │   │   ├── document_viewer_screen.dart # PDF/Office document viewer
 │   │   ├── song_player_screen.dart # Audio player screen
-│   │   ├── vault_explorer_screen.dart # Vault explorer with folder management
+│   │   ├── note_list_screen.dart # Notes list + folders
+│   │   ├── note_editor_screen.dart # Note editor
+│   │   ├── password_list_screen.dart # Password manager
+│   │   ├── password_editor_screen.dart # Password entry editor
+│   │   ├── autofill_selection_screen.dart # Autofill target picker
 │   │   ├── folders_screen.dart   # Folder management screen
 │   │   ├── folder_detail_screen.dart # Folder detail with file management
 │   │   ├── encryption_settings_screen.dart # Encryption algorithm settings
-│   │   └── vault_settings_screen.dart # Vault configuration
+│   │   ├── vault_settings_screen.dart # Vault configuration
+│   │   └── ...                   # Setup, backup, camera, tags, albums, etc.
 │   ├── services/                 # Business logic services
 │   │   ├── auth_service.dart     # Authentication handling
-│   │   ├── encryption_service.dart # AES-256-GCM/CTR encryption/decryption
+│   │   ├── encryption_service.dart # AES-256-GCM/CTR facade (delegates to crypto/)
 │   │   ├── vault_service.dart    # Core vault operations
 │   │   ├── backup_service.dart   # Backup and restore
-│   │   └── flick_integration_service.dart # Flick Player handoff
+│   │   ├── crypto_isolate_pool.dart # Background crypto worker pool
+│   │   ├── note_service.dart     # Encrypted notes
+│   │   ├── password_service.dart # Password manager
+│   │   ├── decoy_service.dart    # Decoy vault
+│   │   ├── file_import_service.dart # Import orchestration
+│   │   ├── file_open_service.dart # Centralized file opening
+│   │   └── ...                   # Compression, permissions, updates, etc.
 │   ├── themes/                   # App theming
-│   │   ├── app_colors.dart       # Accent color definitions
+│   │   ├── app_colors.dart       # Accent colors + FileTypeColors
 │   │   └── app_theme.dart        # Theme configuration
+│   ├── utils/                    # Utilities
+│   │   ├── path_utils.dart       # Centralized paths (downloads, source roots)
+│   │   ├── toast_utils.dart      # SnackBar-based toasts
+│   │   ├── secure_compare.dart   # Constant-time comparison
+│   │   ├── argon2_isolate.dart   # Argon2id via isolate
+│   │   ├── pbkdf2_isolate.dart   # PBKDF2 via isolate
+│   │   └── ...                   # Navigator key, clipboard, responsive, etc.
 │   └── widgets/                  # Reusable widgets
-│       ├── pin_input_widget.dart # PIN entry widget
-│       ├── performance_overlay_widget.dart # FPS overlay
+│       ├── operation_progress_sheet.dart # Vault op progress dialog
+│       ├── adaptive_logo.dart    # Light/dark logo
 │       ├── explorer_file_grid.dart # Explorer grid widget
 │       ├── explorer_toolbar.dart  # Explorer toolbar widget
 │       ├── folder_breadcrumb_widget.dart # Breadcrumb navigation
-│       └── folder_tree_widget.dart # Expandable folder tree
+│       ├── folder_tree_widget.dart # Expandable folder tree
+│       └── ...                   # Note card, action sheets, dialogs, etc.
 ├── android/                      # Android platform code
 │   └── app/src/main/kotlin/com/mossapps/locker/
 │       └── MainActivity.kt       # Auto-kill, performance, content URI handling
@@ -155,7 +189,8 @@ locker/
 │   ├── banner_locker.png         # App banner
 │   └── ...
 ├── docs/                         # Architecture documentation
-│   ├── architecture_media.md     # Media compression/encryption design
+│   ├── architecture_media.md     # Media encryption/compression design
+│   ├── improvement_roadmap.md    # Audit-driven backlog
 │   └── flick_integration.md      # Flick Player integration guide
 └── pubspec.yaml                  # Flutter dependencies
 ```
@@ -165,9 +200,9 @@ locker/
 ### Prerequisites
 - Flutter SDK 3.4.4 or higher
 - Dart SDK (included with Flutter)
-- Android SDK with API level 34
+- Android SDK with API level 36
 - Java Development Kit (JDK) 17
-- Android device with Android 6.0 (API 23) or higher
+- Android device with Android 8.0 (API 26) or higher
 
 ### Installation
 
@@ -192,7 +227,7 @@ flutter run -d <device-id>
 flutter build apk --debug
 
 # Release build
-flutter build apk --release
+flutter build apk --release --obfuscate --split-debug-info=./build/symbols
 ```
 
 #### Building from Source
