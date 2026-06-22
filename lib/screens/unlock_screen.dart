@@ -25,6 +25,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
   bool _isLoading = true;
   bool _isAuthenticating = false;
   bool _obscurePassword = true;
+  bool _autofillEnabled = false;
   String? _backupAuthMethod;
   bool _showingBackupAuth = false;
   final TextEditingController _passwordController = TextEditingController();
@@ -49,6 +50,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
     final method = await _authService.getAuthMethod();
     final unlockState = await _authService.getUnlockSecurityState();
     final backupMethod = await _authService.getBackupAuthMethod();
+    final autofillEnabled = await _authService.isUnlockAutofillEnabled();
 
     if (!mounted) return;
 
@@ -56,6 +58,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
       _authMethod = method;
       _unlockSecurityState = unlockState;
       _backupAuthMethod = backupMethod;
+      _autofillEnabled = autofillEnabled;
       _isLoading = false;
     });
 
@@ -431,16 +434,21 @@ class _UnlockScreenState extends State<UnlockScreen> {
 
   Widget _buildAuthWidget() {
     if (_authMethod == 'biometric' && _showingBackupAuth) {
-      return _buildBackupAuthWidget();
+      return _wrapAutofill(_buildBackupAuthWidget());
     }
     if (_authMethod == 'pin') {
-      return _buildPinAuth();
+      return _wrapAutofill(_buildPinAuth());
     } else if (_authMethod == 'password') {
-      return _buildPasswordAuth();
+      return _wrapAutofill(_buildPasswordAuth());
     } else if (_authMethod == 'biometric') {
       return _buildBiometricAuth();
     }
     return const SizedBox.shrink();
+  }
+
+  Widget _wrapAutofill(Widget child) {
+    if (!_autofillEnabled) return child;
+    return AutofillGroup(child: child);
   }
 
   Widget _buildPinAuth() {
@@ -452,6 +460,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
           errorMessage: _errorMessage,
           controller: _pinController,
           enabled: !_unlockSecurityState.isLockedOut,
+          autofillEnabled: _autofillEnabled,
         ),
         if (_errorMessage != null) ...[
           const SizedBox(height: 16),
@@ -489,6 +498,9 @@ class _UnlockScreenState extends State<UnlockScreen> {
                     !_isLoading &&
                     !_isAuthenticating,
                 obscureText: _obscurePassword,
+                autofillHints: _autofillEnabled
+                    ? const [AutofillHints.password]
+                    : null,
                 style: TextStyle(
                   fontFamily: 'ProductSans',
                   fontSize: 16,
