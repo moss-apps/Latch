@@ -11,6 +11,7 @@ import '../providers/vault_providers.dart';
 import '../services/auth_service.dart';
 import '../services/auto_kill_service.dart';
 import '../services/screenshot_protection_service.dart';
+import '../services/update_service.dart';
 import '../services/vault_service.dart';
 import '../services/whats_new_service.dart';
 import '../themes/app_colors.dart';
@@ -46,7 +47,7 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
   static const List<int> _wipeAttemptOptions = [10, 15, 20, 30];
 
   late Future<PackageInfo> _packageInfoFuture;
-  AppUpdateInfo? _updateInfo;
+  PendingUpdate? _pendingUpdate;
   bool _isScanning = false;
   bool _hasScanned = false;
 
@@ -59,9 +60,9 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
 
   void _syncWithAutoScan() {
     final updateService = ref.read(updateServiceProvider);
-    final info = updateService.lastUpdateInfo;
-    if (info != null) {
-      _updateInfo = info;
+    final update = updateService.pendingUpdate;
+    if (update != null) {
+      _pendingUpdate = update;
       _hasScanned = true;
     }
   }
@@ -71,10 +72,10 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
     setState(() => _isScanning = true);
     try {
       final updateService = ref.read(updateServiceProvider);
-      _updateInfo = await updateService.checkForUpdate();
-      ref.read(updateInfoProvider.notifier).state = _updateInfo;
+      _pendingUpdate = await updateService.checkForUpdate();
+      ref.read(updateInfoProvider.notifier).state = _pendingUpdate;
     } catch (_) {
-      _updateInfo = null;
+      _pendingUpdate = null;
       ref.read(updateInfoProvider.notifier).state = null;
     }
     if (mounted) {
@@ -537,7 +538,9 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                   title: const Text('Scanning...',
                       style: TextStyle(fontFamily: 'ProductSans')),
                   subtitle: Text(
-                    'Checking the Play Store for updates',
+                    _isPlayStoreInstall
+                        ? 'Checking the Play Store for updates'
+                        : 'Checking GitHub for updates',
                     style: TextStyle(
                       fontFamily: 'ProductSans',
                       fontSize: 12,
@@ -546,17 +549,16 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                   ),
                   contentPadding: EdgeInsets.zero,
                 )
-              else if (_hasScanned &&
-                  _updateInfo != null &&
-                  _updateInfo!.updateAvailability ==
-                      UpdateAvailability.updateAvailable)
+              else if (_hasScanned && _pendingUpdate != null)
                 ListTile(
                   leading:
                       Icon(Icons.system_update, color: context.accentColor),
                   title: const Text('Update Available',
                       style: TextStyle(fontFamily: 'ProductSans')),
                   subtitle: Text(
-                    'A new version is available on the Play Store',
+                    _pendingUpdate!.source == InstallSource.playStore
+                        ? 'A new version is available on the Play Store'
+                        : 'A new version${_pendingUpdate!.latestVersion != null ? ' (${_pendingUpdate!.latestVersion})' : ''} is available on GitHub',
                     style: TextStyle(
                       fontFamily: 'ProductSans',
                       fontSize: 12,
@@ -862,15 +864,22 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
   }
 
   void _showUpdateDialog() {
+    final update = _pendingUpdate;
+    if (update == null) return;
+    final isPlayStore = update.source == InstallSource.playStore;
+    final message = isPlayStore
+        ? 'A new version is available on the Play Store. Update now?'
+        : 'A new version${update.latestVersion != null ? ' (${update.latestVersion})' : ''}'
+            ' is available on GitHub. Open the download page?';
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: Theme.of(dialogContext).scaffoldBackgroundColor,
         title: const Text('Update Available',
             style: TextStyle(fontFamily: 'ProductSans')),
-        content: const Text(
-          'A new version is available on the Play Store. Update now?',
-          style: TextStyle(fontFamily: 'ProductSans'),
+        content: Text(
+          message,
+          style: const TextStyle(fontFamily: 'ProductSans'),
         ),
         actions: [
           TextButton(
@@ -880,14 +889,26 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
           FilledButton(
             onPressed: () {
               Navigator.pop(dialogContext);
-              InAppUpdate.performImmediateUpdate();
+              if (isPlayStore) {
+                InAppUpdate.performImmediateUpdate();
+              } else {
+                final url = Uri.parse(
+                  update.releaseUrl ??
+                      'https://github.com/moss-apps/Latch/releases/latest',
+                );
+                launchUrl(url, mode: LaunchMode.externalApplication);
+              }
             },
-            child: const Text('Update'),
+            child: Text(isPlayStore ? 'Update' : 'Open'),
           ),
         ],
       ),
     );
   }
+
+  bool get _isPlayStoreInstall =>
+      ref.read(updateServiceProvider).installSource ==
+      InstallSource.playStore;
 
   Widget _buildSecurityOptionDropdown({
     required BuildContext context,
