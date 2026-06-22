@@ -26,6 +26,7 @@ class PinInputWidget extends StatefulWidget {
   final String? errorMessage;
   final PinInputController? controller;
   final bool enabled;
+  final bool autofillEnabled;
 
   const PinInputWidget({
     super.key,
@@ -34,6 +35,7 @@ class PinInputWidget extends StatefulWidget {
     this.errorMessage,
     this.controller,
     this.enabled = true,
+    this.autofillEnabled = false,
   });
 
   @override
@@ -180,6 +182,9 @@ class _PinInputWidgetState extends State<PinInputWidget> {
                     keyboardType: TextInputType.number,
                     obscureText: true,
                     maxLength: _pinLength,
+                    autofillHints: widget.autofillEnabled
+                        ? const [AutofillHints.password]
+                        : null,
                     inputFormatters: [
                       FilteringTextInputFormatter.digitsOnly,
                       LengthLimitingTextInputFormatter(_pinLength),
