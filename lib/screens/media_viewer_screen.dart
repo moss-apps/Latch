@@ -59,8 +59,12 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   // Cancel token for in-flight video loads
   Completer<void>? _videoLoadCancel;
 
-  // For encrypted files
-  final Map<String, Uint8List?> _decryptedCache = {};
+  // ponytail: cache the decrypted File path per file id. Reading bytes into
+  // Uint8List and using Image.memory forced the whole file through the Dart
+  // heap and triggered main-isolate decode stalls on large images. Letting
+  // Image.file stream from disk keeps the Dart heap small and decoding on
+  // Flutter's background rasterizer.
+  final Map<String, File> _decryptedFileCache = {};
 
   // Debounce timer for video player updates (reduces setState calls)
   Timer? _videoUpdateTimer;
@@ -88,7 +92,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
     _videoController = null;
     _pageController.dispose();
     // Clear decrypted cache to free memory immediately
-    _decryptedCache.clear();
+    _decryptedFileCache.clear();
     // Clean up temp decrypted files in background
     _cleanupTempFiles();
     // Restore system UI
@@ -115,20 +119,19 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
       return;
     }
 
-    // Pre-load decrypted data for encrypted images only. Decrypt to a temp
-    // file in the crypto isolate pool (when possible) and then read the bytes.
+    // Resolve the decrypted File path for encrypted images. We keep the File
+    // (not its bytes) so Image.file can stream the decode off the main isolate.
     if (file.isEncrypted &&
         file.isImage &&
-        !_decryptedCache.containsKey(file.id)) {
+        !_decryptedFileCache.containsKey(file.id)) {
       final decryptedFile = file.id == widget.initialFile.id
           ? widget.initialDecryptedFile
           : await ref.read(vaultServiceProvider).getVaultedFile(file.id);
 
       if (decryptedFile != null && await decryptedFile.exists()) {
-        final data = await decryptedFile.readAsBytes();
         if (mounted) {
           setState(() {
-            _decryptedCache[file.id] = data;
+            _decryptedFileCache[file.id] = decryptedFile;
           });
         }
       }
@@ -865,16 +868,16 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
         final file = _files[index];
 
         if (file.isEncrypted) {
-          final data = _decryptedCache[file.id];
-          if (data != null) {
+          final decryptedFile = _decryptedFileCache[file.id];
+          if (decryptedFile != null) {
             // Use customChild for encrypted images to handle decode errors
             return PhotoViewGalleryPageOptions.customChild(
               child: PhotoView.customChild(
                 minScale: PhotoViewComputedScale.contained,
                 maxScale: PhotoViewComputedScale.covered * 3,
                 heroAttributes: PhotoViewHeroAttributes(tag: file.id),
-                child: Image.memory(
-                  data,
+                child: Image.file(
+                  decryptedFile,
                   fit: BoxFit.contain,
                   errorBuilder: (context, error, stackTrace) {
                     debugPrint('Error decoding encrypted image: $error');

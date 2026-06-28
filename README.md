@@ -196,7 +196,7 @@ Locker/
 │   └── ...
 ├── docs/                         # Architecture documentation
 │   ├── architecture_media.md     # Media encryption/compression design
-│   ├── improvement_roadmap.md    # Audit-driven backlog
+│   ├── unlock_autofill.md        # Unlock credential autofill design
 │   └── flick_integration.md      # Flick Player integration guide
 └── pubspec.yaml                  # Flutter dependencies
 ```
@@ -235,7 +235,7 @@ flutter build apk --release --obfuscate --split-debug-info=./build/symbols
 #### Building from Source
 1. Clone the repository:
    ```bash
-   git clone https://github.com/heimin22/Locker.git
+   git clone https://github.com/moss-apps/Latch.git
    cd Locker
    ```
 2. Install dependencies:
@@ -281,6 +281,7 @@ All sensitive data (PIN, passwords, encryption keys) is stored via `flutter_secu
 ## Documentation
 Additional documentation available:
 - [Architecture Diagram](docs/architecture_media.md) - Detailed system architecture design covering compression, encryption, and file operations
+- [Unlock Autofill](docs/unlock_autofill.md) - How the opt-in unlock credential autofill delegation works and its security model
 - [Flick Integration Guide](docs/flick_integration.md) - Contract and implementation notes for making Flick a first-class Latch playback companion
 
 ## License
@@ -289,7 +290,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 Latch is purely open-source and free. There are no premium features, ads, or paid components.
 
 ## Contributors
-- [@heimin22](https://github.com/heimin22) (Project creator)
+- [@ultraelectronica](https://github.com/ultraelectronica) (Project creator)
 
 ## Contributing
 Contributions are welcome. Please ensure all changes pass linting and testing before submitting pull requests.

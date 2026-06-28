@@ -58,7 +58,6 @@ class VaultService {
   VaultService._();
   static final VaultService instance = VaultService._();
 
-  static const int _largeFileIsolateThresholdBytes = 2 * 1024 * 1024;
   static const int _maxConcurrentBatchAdds = 3;
 
   static const _storage = FlutterSecureStorage(
@@ -699,7 +698,7 @@ class VaultService {
             100000;
         final salt = _encryptionService.generateFileSalt();
         final masterKey = await _encryptionService.getMasterKey(isDecoy: isDecoy);
-        derivedKey = _encryptionService.deriveFileKey(masterKey, salt, iterations);
+        derivedKey = await _encryptionService.deriveFileKeyAsync(masterKey, salt, iterations);
         usedAlgorithm = algorithm;
         usedSalt = base64Encode(salt);
         usedKdfIterations = iterations;
@@ -711,32 +710,39 @@ class VaultService {
         if (shouldEncrypt) {
           onEncryptionProgress?.call(0, fileSize);
           final useGcm = usedAlgorithm == EncryptionAlgorithm.aes256Gcm;
-          final encResult = useGcm
-              ? await _encryptionService.encryptBytesStreamedGcm(
-                  compressedImageBytes,
-                  vaultPath,
-                  isDecoy: isDecoy,
-                  derivedKey: derivedKey,
-                )
-              : await _encryptionService.encryptBytesStreamed(
-                  compressedImageBytes,
-                  vaultPath,
-                  isDecoy: isDecoy,
-                  derivedKey: derivedKey,
-                  onProgress: (processed, total) {
-                    onEncryptionProgress?.call(processed, total);
-                  },
-                );
-          onEncryptionProgress?.call(fileSize, fileSize);
 
-          if (!encResult.success) {
-            debugPrint('Encryption failed: ${encResult.error}');
-            await _deleteFileIfExists(vaultPath);
-            return null;
+          // ponytail: write to temp file so we can use the isolate pool.
+          // In-memory bytes path runs GCM on the main isolate, which crashes
+          // under batch concurrency. Pool needs a path; cheap write pays for itself.
+          final tempDir = await getTemporaryDirectory();
+          final tempPath =
+              '${tempDir.path}/lkr_enc_${DateTime.now().microsecondsSinceEpoch}';
+          await File(tempPath).writeAsBytes(compressedImageBytes);
+
+          try {
+            final encResult = await _encryptionService.encryptFileInIsolate(
+              tempPath,
+              vaultPath,
+              isDecoy: isDecoy,
+              useGcm: useGcm,
+              derivedKey: derivedKey,
+              onProgress: (processed, total) {
+                onEncryptionProgress?.call(processed, total);
+              },
+            );
+            onEncryptionProgress?.call(fileSize, fileSize);
+
+            if (!encResult.success) {
+              debugPrint('Encryption failed: ${encResult.error}');
+              await _deleteFileIfExists(vaultPath);
+              return null;
+            }
+
+            encryptionIv = encResult.iv;
+            fileSize = encResult.originalSize ?? fileSize;
+          } finally {
+            await _deleteFileIfExists(tempPath);
           }
-
-          encryptionIv = encResult.iv;
-          fileSize = encResult.originalSize ?? fileSize;
         } else {
           await File(vaultPath).writeAsBytes(compressedImageBytes);
         }
@@ -752,38 +758,19 @@ class VaultService {
         if (shouldEncrypt) {
           onEncryptionProgress?.call(0, fileSize);
           final useGcm = usedAlgorithm == EncryptionAlgorithm.aes256Gcm;
-          final useIsolateEncryption =
-              fileSize >= _largeFileIsolateThresholdBytes;
-          final encResult = useIsolateEncryption
-              ? await _encryptionService.encryptFileInIsolate(
-                  sourcePathToUse,
-                  vaultPath,
-                  isDecoy: isDecoy,
-                  useGcm: useGcm,
-                  derivedKey: derivedKey,
-                  onProgress: (processed, total) {
-                    onEncryptionProgress?.call(processed, total);
-                  },
-                )
-              : useGcm
-                  ? await _encryptionService.encryptFileStreamedGcm(
-                      sourcePathToUse,
-                      vaultPath,
-                      isDecoy: isDecoy,
-                      derivedKey: derivedKey,
-                      onProgress: (processed, total) {
-                        onEncryptionProgress?.call(processed, total);
-                      },
-                    )
-                  : await _encryptionService.encryptFileStreamed(
-                      sourcePathToUse,
-                      vaultPath,
-                      isDecoy: isDecoy,
-                      derivedKey: derivedKey,
-                      onProgress: (processed, total) {
-                        onEncryptionProgress?.call(processed, total);
-                      },
-                    );
+          // ponytail: always isolate. The <2MB threshold used to keep small
+          // files on the main isolate; with batch concurrency that still froze
+          // UI on import. Pool dispatch is cheap, no reason to special-case.
+          final encResult = await _encryptionService.encryptFileInIsolate(
+            sourcePathToUse,
+            vaultPath,
+            isDecoy: isDecoy,
+            useGcm: useGcm,
+            derivedKey: derivedKey,
+            onProgress: (processed, total) {
+              onEncryptionProgress?.call(processed, total);
+            },
+          );
           onEncryptionProgress?.call(fileSize, fileSize);
 
           if (!encResult.success) {
@@ -1144,7 +1131,9 @@ class VaultService {
     if (file.keyDerivationSalt == null || file.kdfIterations == null) return null;
     final masterKey = await _encryptionService.getMasterKey(isDecoy: isDecoy || file.isDecoy);
     final salt = base64Decode(file.keyDerivationSalt!);
-    return _encryptionService.deriveFileKey(masterKey, salt, file.kdfIterations!);
+    // ponytail: async (compute isolate). Sync PBKDF2 @ 100k iterations on the
+    // main isolate was the 5-7s UI freeze when opening encrypted files.
+    return _encryptionService.deriveFileKeyAsync(masterKey, salt, file.kdfIterations!);
   }
 
   /// Get the actual file from vault (decrypts if needed)

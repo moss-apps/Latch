@@ -37,13 +37,17 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
   bool _isConverting = false;
   String? _error;
   Uint8List? _decryptedData;
-  Uint8List? _plainFileData;
-  Uint8List? _convertedPdfData;
   String? _textContent;
   PdfViewerController? _pdfController;
   int _currentPage = 1;
   int _totalPages = 1;
   bool _isOfficeDocument = false;
+  // ponytail: pdfrx parses PdfViewer.data on the main isolate, which ANRs on
+  // large PDFs. We resolve a file path and hand it to PdfViewer.file so pdfrx
+  // does its own background load. _convertedPdfPath is a temp file we own and
+  // must delete on dispose.
+  String? _pdfPath;
+  String? _convertedPdfPath;
 
   @override
   void initState() {
@@ -66,8 +70,13 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
   void dispose() {
     // Clear decrypted data from memory
     _decryptedData = null;
-    _plainFileData = null;
-    _convertedPdfData = null;
+    // Clean up the converted-PDF temp file we wrote.
+    final convPath = _convertedPdfPath;
+    if (convPath != null) {
+      try {
+        File(convPath).deleteSync();
+      } catch (_) {}
+    }
     // Clean up temp decrypted files to prevent disk leaks
     _cleanupTempFiles();
     super.dispose();
@@ -154,8 +163,17 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
       if (!mounted) return;
 
       if (result.success && result.pdfData != null) {
+        // Write the converted PDF to a temp file so pdfrx can stream it
+        // instead of parsing the bytes on the main isolate.
+        final tempDir = await Directory.systemTemp.createTemp('lkr_conv');
+        final tempPath = '${tempDir.path}/${widget.file.originalName}.pdf';
+        await File(tempPath).writeAsBytes(result.pdfData!);
+        if (!mounted) {
+          await tempDir.delete(recursive: true);
+          return;
+        }
         setState(() {
-          _convertedPdfData = result.pdfData;
+          _convertedPdfPath = tempPath;
           _isLoading = false;
           _isConverting = false;
         });
@@ -189,37 +207,53 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
     });
 
     try {
-      if (widget.decryptedFile != null) {
-        final data = await widget.decryptedFile!.readAsBytes();
-        if (widget.file.isEncrypted && widget.file.encryptionIv != null) {
-          _decryptedData = data;
+      if (_isPdf) {
+        // PDFs: resolve the file path only. Reading bytes into a Uint8List
+        // forced PdfViewer.data to parse on the main isolate (ANR on large
+        // PDFs). PdfViewer.file lets pdfrx load in the background.
+        if (widget.decryptedFile != null) {
+          _pdfPath = widget.decryptedFile!.path;
+        } else if (widget.file.isEncrypted &&
+            widget.file.encryptionIv != null) {
+          final decryptedFile = await ref
+              .read(vaultServiceProvider)
+              .getVaultedFile(widget.file.id);
+          if (decryptedFile == null || !await decryptedFile.exists()) {
+            setState(() {
+              _error = 'Failed to decrypt document';
+              _isLoading = false;
+            });
+            return;
+          }
+          _pdfPath = decryptedFile.path;
         } else {
-          _plainFileData = data;
+          _pdfPath = widget.file.vaultPath;
         }
-      } else if (widget.file.isEncrypted && widget.file.encryptionIv != null) {
-        // Decrypt the file outside the main thread when possible.
-        final decryptedFile =
-            await ref.read(vaultServiceProvider).getVaultedFile(widget.file.id);
-        final data = decryptedFile != null
-            ? await decryptedFile.readAsBytes()
-            : await ref
-                .read(vaultServiceProvider)
-                .getDecryptedFileData(widget.file.id);
-        if (data == null) {
-          setState(() {
-            _error = 'Failed to decrypt document';
-            _isLoading = false;
-          });
-          return;
+      } else if (_isTextFile) {
+        Uint8List? bytes;
+        if (widget.decryptedFile != null) {
+          bytes = await widget.decryptedFile!.readAsBytes();
+        } else if (widget.file.isEncrypted &&
+            widget.file.encryptionIv != null) {
+          final decryptedFile = await ref
+              .read(vaultServiceProvider)
+              .getVaultedFile(widget.file.id);
+          bytes = decryptedFile != null
+              ? await decryptedFile.readAsBytes()
+              : await ref
+                  .read(vaultServiceProvider)
+                  .getDecryptedFileData(widget.file.id);
+          if (bytes == null) {
+            setState(() {
+              _error = 'Failed to decrypt document';
+              _isLoading = false;
+            });
+            return;
+          }
+        } else {
+          bytes = await File(widget.file.vaultPath).readAsBytes();
         }
-        _decryptedData = data;
-      } else if (_isPdf || _isTextFile) {
-        // Pre-load PDF/text bytes so the viewer does not block the UI thread.
-        _plainFileData = await File(widget.file.vaultPath).readAsBytes();
-      }
-
-      // Load text content for text files
-      if (_isTextFile) {
+        _decryptedData = bytes;
         await _loadTextContent();
       }
 
@@ -247,11 +281,11 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
         widget.file.mimeType.startsWith('text/');
   }
 
-  bool get _isConvertedPdf => _convertedPdfData != null;
+  bool get _isConvertedPdf => _convertedPdfPath != null;
 
   Future<void> _loadTextContent() async {
     try {
-      final bytes = _decryptedData ?? _plainFileData;
+      final bytes = _decryptedData;
       if (bytes != null) {
         _textContent = String.fromCharCodes(bytes);
       } else {
@@ -571,7 +605,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
   }
 
   Widget _buildConvertedPdfViewer() {
-    if (_convertedPdfData == null) {
+    if (_convertedPdfPath == null) {
       return Center(
         child: Text(
           'No PDF data available',
@@ -607,9 +641,8 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
         ),
         // PDF viewer
         Expanded(
-          child: PdfViewer.data(
-            _convertedPdfData!,
-            sourceName: '${widget.file.originalName}.pdf',
+          child: PdfViewer.file(
+            _convertedPdfPath!,
             controller: _pdfController,
             params: PdfViewerParams(
               pageDropShadow: BoxShadow(
@@ -635,8 +668,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
   }
 
   Widget _buildPdfViewer() {
-    final pdfData = _decryptedData ?? _plainFileData;
-    if (pdfData == null) {
+    if (_pdfPath == null) {
       return Center(
         child: Text(
           'No PDF data available',
@@ -648,9 +680,8 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
       );
     }
 
-    return PdfViewer.data(
-      pdfData,
-      sourceName: widget.file.originalName,
+    return PdfViewer.file(
+      _pdfPath!,
       controller: _pdfController,
       params: PdfViewerParams(
         pageDropShadow: BoxShadow(
