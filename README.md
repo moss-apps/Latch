@@ -235,7 +235,7 @@ flutter build apk --release --obfuscate --split-debug-info=./build/symbols
 #### Building from Source
 1. Clone the repository:
    ```bash
-   git clone https://github.com/heimin22/Locker.git
+   git clone https://github.com/moss-apps/Latch.git
    cd Locker
    ```
 2. Install dependencies:
@@ -290,7 +290,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 Latch is purely open-source and free. There are no premium features, ads, or paid components.
 
 ## Contributors
-- [@heimin22](https://github.com/heimin22) (Project creator)
+- [@ultraelectronica](https://github.com/ultraelectronica) (Project creator)
 
 ## Contributing
 Contributions are welcome. Please ensure all changes pass linting and testing before submitting pull requests.
