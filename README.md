@@ -12,306 +12,129 @@
 
 ---
 
-Latch is a secure, private media vault application built with Flutter for Android. It provides a safe space to hide and protect your sensitive photos, videos, and documents from prying eyes, with multiple layers of security including biometric authentication, optional AES-256 encryption, and an auto-kill feature that removes the app from the recent apps list when you leave.
+Latch is a private media vault for Android, written in Flutter. It hides
+photos, videos, and documents behind PIN/password/biometric auth, encrypts
+them with AES-256, and removes itself from the recents list when you leave
+(auto-kill).
 
-> **Renamed from Locker to Latch.** The repository directory is still `Locker`; the app and all user-facing references are now **Latch**.
+> Renamed from Locker to Latch. The repo directory is still `Locker`, but
+> the app and all user-facing references are **Latch**.
+> On Google Play: [Download Latch](https://play.google.com/store/apps/details?id=com.mossapps.locker).
 
-> **Now on Google Play** — [Download Latch](https://play.google.com/store/apps/details?id=com.mossapps.locker).
+## Features
 
-## Key Features
+**Vault**
+- Import from gallery, camera, or files; optionally delete the originals
+- Duplicate detection on import
+- Per-file encryption settings and compression
+- Local backup and restore
 
-### Core Functionality
-- **Media Vault**: Securely hide images, videos, and documents from your device gallery
-- **Gallery Import**: Import media directly from your device gallery with the option to delete originals
-- **Camera Integration**: Capture photos and videos directly into the vault
-- **Document Support**: Store and view PDFs, Office documents (Word, Excel, PowerPoint), and text files
-- **Custom Media Picker**: Built-in media picker with album browsing and multi-select support
-- **Custom Document Picker**: File browser for selecting documents from device storage
-- **Media Scanner**: Automatic duplicate detection when importing files
-- **Backup & Restore**: Create local backups of your vault and restore when needed
-- **Compression Options**: Choose compression levels for media files to save storage space
+**Organization**
+- Nested folders with drag-and-drop, breadcrumbs, and a tree view
+- Albums, color-coded tags, favorites
+- Grid/list explorer with filters, multi-select, sorting (date, name, size, type)
+- Search across name, tags, type, and date
 
-### Organization
-- **Folders**: Create nested folder structures with drag-and-drop import, breadcrumb navigation, and expandable tree view
-- **File Explorer**: Browse vault contents with grid/list views, filtering, multi-select, and sort controls
-- **Albums**: Create custom albums to organize your hidden files
-- **Tags**: Add color-coded tags to files for easy categorization and filtering
-- **Favorites**: Mark files as favorites for quick access
-- **Search**: Find files by name, tags, type, date, or other criteria
-- **Sorting**: Multiple sorting options including date, name, size, and type
+**Viewing**
+- Image viewer (pinch-zoom, slideshow)
+- Video player (speed, loop)
+- Song player with Flick handoff
+- PDF and Office document viewer
+- Export to Downloads or external apps
 
-### Viewing
-- **Image Viewer**: Full-screen image viewing with pinch-to-zoom and slideshow mode
-- **Video Player**: Built-in video player with playback controls, speed adjustment, and loop options
-- **Song Player**: Built-in audio playback with external app handoff support
-- **Document Viewer**: Native PDF rendering and Office document conversion for viewing
-- **File Export**: Export files to Downloads folder or open with external applications
-- **Performance Overlay**: Real-time display of FPS and performance metrics
+**Security**
+- PIN or password unlock, with biometrics
+- AES-256-GCM (default) or AES-256-CTR, with re-encryption of existing files
+- Argon2id master-key wrapping; per-file PBKDF2
+- Auto-kill, screenshot protection, secure delete
+- Decoy vault behind a separate PIN
 
-### Security Features
-- **PIN Authentication**: 6-digit PIN lock with secure storage
-- **Password Authentication**: Traditional password protection option
-- **Biometric Authentication**: Fingerprint and face recognition support
-- **Encryption**: AES-256-GCM (authenticated) and AES-256-CTR (fast) encryption for stored files
-- **Encryption Settings**: Choose encryption algorithm, re-encrypt existing files, manage keys
-- **PBKDF2 Key Derivation**: Configurable iteration count for master key derivation with salted hashing
-- **Auto-Kill**: Automatically removes app from recent apps when leaving
-- **Decoy Mode**: Set up a fake vault with a separate PIN to show if forced to unlock
-- **Secure Delete**: Overwrite files before deletion to prevent recovery
-- **Change Security**: Update PIN or password at any time with verification
-
-### Theme & Customization
-- **Dynamic Accent Colors**: Choose from multiple accent colors (Blue, Purple, Pink, Red, Orange, Teal, Green, Gunmetal)
-- **Custom Theme**: Personalize the app's look to match your style
-- **Performance Mode**: Adjust frame rate and performance settings for optimal experience
-- **Glassmorphism**: Modern unlock screen design with visual effects
+**Theme**
+- Accent colors, custom theming, glassmorphism unlock screen
 
 ## Moss Ecosystem
 
-Latch is part of the **Moss ecosystem** by Ultra Electronica, a suite of interconnected apps that share infrastructure and capabilities.
-
-### Apps in the Ecosystem
-- **Latch**: Secure media vault for hiding photos, videos, and documents
-- **Flick Player**: High-performance audiophile music player with UAC 2.0 support
-
-### Cross-App Integration
-Latch integrates with Flick Player through platform channels:
-- **Playback Handoff**: Latch can hand off audio playback to Flick for advanced audio engine features (EQ, effects, UAC 2.0 DAC output)
-- **Shared Infrastructure**: Last.fm scrobbling, adaptive theming, and library scanning are shared across Moss apps
-
-### Using Latch with Flick
-When you want to play an audio file stored in Latch using Flick's advanced audio capabilities:
-1. Select the audio file in Latch
-2. Choose to open with Flick Player
-3. Flick handles playback with its high-performance engine
-4. Last.fm scrobbling continues uninterrupted
+Latch is part of the Moss ecosystem. **Flick** is the companion music
+player (UAC 2.0 DAC support). Latch can hand audio playback to Flick and
+return via `locker://return`. Details in the
+[Flick Integration Guide](docs/flick_integration.md).
 
 ## Technology Stack
 
-### Frontend (Flutter)
+**Flutter**
+
 | Package | Purpose |
 |---------|---------|
 | `flutter_riverpod` | State management |
-| `flutter_secure_storage` | Secure storage for credentials and metadata |
+| `flutter_secure_storage` | Credentials and metadata |
 | `pointycastle` | AES-256 encryption |
-| `photo_manager` | Media gallery access and import |
+| `photo_manager` | Gallery access and import |
 | `pdfrx` | Native PDF rendering |
-| `syncfusion_flutter_pdf` | Office document conversion (Word/Excel/PowerPoint) |
+| `syncfusion_flutter_pdf` | Office document conversion |
 | `flutter_image_compress` | Image compression |
 | `video_compress` | Video compression |
-| `archive` | ZIP/RAR/7Z archive support |
-| `permission_handler` | Runtime permission management |
-| `local_auth` | Biometric authentication (fingerprint/face) |
-| `camera` | Camera integration for photo/video capture |
-| `just_audio` | Audio playback with external handoff support |
-| `in_app_update` | Google Play In-App Updates |
+| `archive` | ZIP/RAR/7Z support |
+| `permission_handler` | Runtime permissions |
+| `local_auth` | Biometric authentication |
+| `camera` | Photo/video capture |
+| `just_audio` | Audio playback |
+| `in_app_update` | Play Store updates |
 
-### Backend (Kotlin/Android)
+**Kotlin / Android**
+
 | Component | Purpose |
 |-----------|---------|
-| `MainActivity.kt` | Auto-kill feature, performance settings, content URI handling |
-| `AutoKillService` | Removes app from recent apps when backgrounded |
-| `PermissionHandler` | Android runtime permission management |
-
-## Project Structure
-
-```
-Locker/
-├── lib/                          # Flutter/Dart source
-│   ├── main.dart                 # Application entry point
-│   ├── autofill_app.dart         # Autofill entry point (separate app mode)
-│   ├── crypto/                   # Pure, testable crypto primitives
-│   │   ├── aes_gcm_cipher.dart   # AES-256-GCM one-shot
-│   │   ├── aes_ctr_cipher.dart   # AES-256-CTR one-shot
-│   │   ├── key_derivation.dart   # PBKDF2 + Argon2id + salt/IV generation
-│   │   ├── header_codec.dart     # Magic bytes + format detection + headers
-│   │   └── key_wrap.dart         # AEAD key wrap/unwrap
-│   ├── models/                   # Data models
-│   │   ├── vaulted_file.dart     # Vaulted file model
-│   │   ├── vault_folder.dart     # Folder model
-│   │   ├── album.dart            # Album and tag models
-│   │   ├── note.dart             # Note model
-│   │   ├── password_entry.dart   # Password entry model
-│   │   ├── encryption_algorithm.dart # Encryption algorithm enum
-│   │   └── accent_color.dart     # Accent color options
-│   ├── providers/                # Riverpod state providers
-│   │   ├── vault_providers.dart  # Vault state management
-│   │   ├── note_providers.dart   # Notes state
-│   │   ├── password_providers.dart # Passwords state
-│   │   ├── theme_provider.dart   # Theme management
-│   │   ├── performance_provider.dart # Performance settings
-│   │   └── explorer_providers.dart # Explorer state management
-│   ├── screens/                  # UI screens
-│   │   ├── unlock_screen.dart    # Authentication unlock screen
-│   │   ├── gallery_vault_screen.dart # Gallery import screen
-│   │   ├── vault_explorer_screen.dart # Vault explorer with folder management
-│   │   ├── media_viewer_screen.dart # Image/video viewer
-│   │   ├── document_viewer_screen.dart # PDF/Office document viewer
-│   │   ├── song_player_screen.dart # Audio player screen
-│   │   ├── note_list_screen.dart # Notes list + folders
-│   │   ├── note_editor_screen.dart # Note editor
-│   │   ├── password_list_screen.dart # Password manager
-│   │   ├── password_editor_screen.dart # Password entry editor
-│   │   ├── autofill_selection_screen.dart # Autofill target picker
-│   │   ├── folders_screen.dart   # Folder management screen
-│   │   ├── folder_detail_screen.dart # Folder detail with file management
-│   │   ├── encryption_settings_screen.dart # Encryption algorithm settings
-│   │   ├── vault_settings_screen.dart # Vault configuration
-│   │   └── ...                   # Setup, backup, camera, tags, albums, etc.
-│   ├── services/                 # Business logic services
-│   │   ├── auth_service.dart     # Authentication handling
-│   │   ├── encryption_service.dart # AES-256-GCM/CTR facade (delegates to crypto/)
-│   │   ├── vault_service.dart    # Core vault operations
-│   │   ├── backup_service.dart   # Backup and restore
-│   │   ├── crypto_isolate_pool.dart # Background crypto worker pool
-│   │   ├── note_service.dart     # Encrypted notes
-│   │   ├── password_service.dart # Password manager
-│   │   ├── decoy_service.dart    # Decoy vault
-│   │   ├── file_import_service.dart # Import orchestration
-│   │   ├── file_open_service.dart # Centralized file opening
-│   │   └── ...                   # Compression, permissions, updates, etc.
-│   ├── themes/                   # App theming
-│   │   ├── app_colors.dart       # Accent colors + FileTypeColors
-│   │   └── app_theme.dart        # Theme configuration
-│   ├── utils/                    # Utilities
-│   │   ├── path_utils.dart       # Centralized paths (downloads, source roots)
-│   │   ├── toast_utils.dart      # SnackBar-based toasts
-│   │   ├── secure_compare.dart   # Constant-time comparison
-│   │   ├── argon2_isolate.dart   # Argon2id via isolate
-│   │   ├── pbkdf2_isolate.dart   # PBKDF2 via isolate
-│   │   └── ...                   # Navigator key, clipboard, responsive, etc.
-│   └── widgets/                  # Reusable widgets
-│       ├── operation_progress_sheet.dart # Vault op progress dialog
-│       ├── adaptive_logo.dart    # Light/dark logo
-│       ├── explorer_file_grid.dart # Explorer grid widget
-│       ├── explorer_toolbar.dart  # Explorer toolbar widget
-│       ├── folder_breadcrumb_widget.dart # Breadcrumb navigation
-│       ├── folder_tree_widget.dart # Expandable folder tree
-│       └── ...                   # Note card, action sheets, dialogs, etc.
-├── android/                      # Android platform code
-│   └── app/src/main/kotlin/com/mossapps/locker/
-│       └── MainActivity.kt       # Auto-kill, performance, content URI handling
-├── assets/                       # Static assets
-│   ├── banner_locker.png         # App banner
-│   └── ...
-├── docs/                         # Architecture documentation
-│   ├── architecture_media.md     # Media encryption/compression design
-│   ├── unlock_autofill.md        # Unlock credential autofill design
-│   └── flick_integration.md      # Flick Player integration guide
-└── pubspec.yaml                  # Flutter dependencies
-```
+| `MainActivity.kt` | Auto-kill, performance settings, content URI handling |
+| `AutoKillService` | Removes app from recents when backgrounded |
+| `PermissionHandler` | Runtime permission management |
 
 ## Getting Started
 
-### Prerequisites
-- Flutter SDK 3.4.4 or higher
-- Dart SDK (included with Flutter)
-- Android SDK with API level 36
-- Java Development Kit (JDK) 17
-- Android device with Android 8.0 (API 26) or higher
+**Prerequisites:** Flutter 3.4.4+, Android SDK API 36, JDK 17, Android 8.0 (API 26)+ device.
 
-### Installation
-
-> **Latch is available on the [Google Play Store](https://play.google.com/store/apps/details?id=com.mossapps.locker)** and via [GitHub Releases](https://github.com/moss-apps/Latch/releases).
-
-### Running
 ```bash
-# Run in debug mode
-flutter run
-
-# Run on a specific device
-flutter run -d <device-id>
-```
-
-### Building
-```bash
-# Debug build
-flutter build apk --debug
-
-# Release build
+flutter pub get
+flutter run                                  # debug
+flutter run -d <device-id>                   # specific device
 flutter build apk --release --obfuscate --split-debug-info=./build/symbols
+flutter pub run flutter_launcher_icons       # regenerate icons (optional)
 ```
 
-#### Building from Source
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/moss-apps/Latch.git
-   cd Locker
-   ```
-2. Install dependencies:
-   ```bash
-   flutter pub get
-   ```
-3. Generate launcher icons (optional):
-   ```bash
-   flutter pub run flutter_launcher_icons
-   ```
-4. Build using the commands above
+## Permissions
 
-## Platform-Specific Notes
-
-### Android
-Latch is designed exclusively for Android, using Flutter for UI and Kotlin for native features:
-- **Auto-Kill**: Uses Android's activity lifecycle to remove the app from recent tasks when backgrounded
-- **Biometrics**: Leverages Android's BiometricPrompt API for fingerprint/face authentication
-- **Media Access**: Uses `photo_manager` to access device gallery media (requires storage permissions)
-- **Camera**: Integrates with Android's Camera API for photo/video capture
-
-#### Permissions
 | Permission | Purpose |
 |------------|---------|
-| READ_EXTERNAL_STORAGE | Access files on device (Android 12 and below) |
-| WRITE_EXTERNAL_STORAGE | Write files to device (Android 12 and below) |
-| READ_MEDIA_IMAGES | Access images (Android 13+) |
-| READ_MEDIA_VIDEO | Access videos (Android 13+) |
-| MANAGE_EXTERNAL_STORAGE | Full file access for hiding/unhiding (Android 11+) |
+| READ_EXTERNAL_STORAGE / WRITE_EXTERNAL_STORAGE | File access (Android ≤12) |
+| READ_MEDIA_IMAGES / READ_MEDIA_VIDEO | Media access (Android 13+) |
+| MANAGE_EXTERNAL_STORAGE | Full file access for hide/unhide (Android 11+) |
 | CAMERA | Capture photos and videos |
-| RECORD_AUDIO | Record audio with video |
+| RECORD_AUDIO | Audio with video |
 | USE_BIOMETRIC | Biometric authentication |
 
 ## Architecture
-Latch follows a service-based architecture with clear separation of concerns:
-- **Services Layer**: Business logic for authentication, encryption, file operations, and media handling
-- **Providers Layer**: Riverpod providers for reactive state management across UI components
-- **Screens**: Feature-specific UI screens for authentication, vault management, settings, and media viewing
-- **Native Backend**: Kotlin code for Android-specific features like auto-kill, permissions, and camera access
 
-All sensitive data (PIN, passwords, encryption keys) is stored via `flutter_secure_storage` in Android's Keystore system.
+Service-based, split into four layers: **Services** (auth, encryption,
+file ops, media), **Providers** (Riverpod reactive state), **Screens**
+(feature UI), and a **Kotlin backend** (auto-kill, permissions, camera).
+All sensitive data (PINs, passwords, keys) goes through
+`flutter_secure_storage` into Android's Keystore. See
+[Media Encryption & Compression](docs/architecture_media.md).
 
 ## Documentation
-Additional documentation available:
-- [Architecture Diagram](docs/architecture_media.md) - Detailed system architecture design covering compression, encryption, and file operations
-- [Unlock Autofill](docs/unlock_autofill.md) - How the opt-in unlock credential autofill delegation works and its security model
-- [Flick Integration Guide](docs/flick_integration.md) - Contract and implementation notes for making Flick a first-class Latch playback companion
 
-## License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-Latch is purely open-source and free. There are no premium features, ads, or paid components.
-
-## Contributors
-- [@ultraelectronica](https://github.com/ultraelectronica) (Project creator)
+- [Media Encryption & Compression](docs/architecture_media.md): compression, encryption, file ops
+- [Unlock Autofill](docs/unlock_autofill.md): unlock credential autofill and its security model
+- [Flick Integration Guide](docs/flick_integration.md): Flick playback handoff contract
 
 ## Contributing
-Contributions are welcome. Please ensure all changes pass linting and testing before submitting pull requests.
 
-### Code Style
-- Follow the Dart style guide
-- Run `flutter analyze` before submitting
-- Ensure all existing tests pass
+Fork → feature branch → `flutter analyze` + pass tests → pull request.
+Follow the Dart style guide.
 
-### Steps
-1. Fork the repository
-2. Create a feature branch:
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-3. Make your changes and commit:
-   ```bash
-   git commit -m "Add your feature description"
-   ```
-4. Push to your fork:
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-5. Open a Pull Request
+## License
+
+MIT, see [LICENSE](LICENSE). Free, no ads, no paid features.
+
+## Contributors
+
+- [@ultraelectronica](https://github.com/ultraelectronica) (creator)

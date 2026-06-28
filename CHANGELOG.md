@@ -1,13 +1,63 @@
 # Changelog
 
-All notable changes to Latch are documented in this file.
+Notable changes to Latch.
+
+## 0.15.0-beta.1
+
+### Password Vault & Autofill
+- **Password vault** — store, edit, and organize credentials inside the encrypted vault
+- **Password editor** with generator for strong random passwords
+- **Password list** with search, domain filtering, and multi-select
+- **Android Autofill service** — fill credentials in other apps and browsers
+- Autofill credential toggle with security warning dialog
+- Autofill support on PIN and password unlock inputs
+- **Clipboard auto-clear** after pasting passwords
+- Password index included in vault backups
+
+### Crypto Overhaul
+- **AEAD key-wrapping** for vault master key (AES-256-GCM wrapping)
+- **Argon2id** key derivation alongside PBKDF2
+- `HeaderCodec` for encrypted file format detection
+- Stateless **AES-256-GCM** and **AES-256-CTR** cipher primitives
+- **Key wrapping and biometric unlock** for master keys
+- Encryption key **re-wrapping** after password/PIN change
+- Constant-time string comparison for cryptographic operations
+- **PBKDF2 iterations increased to 600,000** (from 100,000)
+- Default encryption algorithm set to **AES-256-GCM**
+
+### Update System Rework
+- **GitHub-based updates** via `url_launcher` (non-Play Store installs)
+- Install source detection — Play Store vs sideload vs GitHub
+- Pre-release version ordering with `pub_semver`
+
+### Testing & Infrastructure
+- **CI workflow** for versionF branch
+- Unit tests: AES-256-GCM, CTR, crypto hygiene, password strength, PBKDF2 isolates, Argon2id KWK + key wrapping
+
+### UI Polish
+- Tooltips on song player, media viewer, and password editor buttons
+- SnackBar margin/shape/elevation styling
+- Search and sort actions moved to overflow menu
+- GestureDetector replaced with IconButton (accessibility)
+- `forceReload` parameter on vault cache loaders
+
+### Security Hardening
+- App backup disabled
+- Network security config for cleartext traffic policy
+- ProGuard minification on release builds; rules for Flutter, crypto, and autofill service
+
+### Cleanup
+- Firebase dependencies removed from Android Gradle config
+- Deprecated compression services and widgets removed
+- Redundant file-existence checks removed
+- Unused UI components, imports, and platform stubs removed
+- `cupertino_icons` and `encrypt` replaced with `device_info_plus`
+
+---
 
 ## 0.14.4-beta.5
 
 ### Security
-- **Argon2id key wrapping (H1)** — the vault master key is now wrapped by an Argon2id-derived key-wrapping key from the user credential; PIN/password actually protects the vault. Transparent migration on next unlock.
-- **KDF iterations 100k → 600k**; selectable options `[100k, 300k, 600k, 1M]`
-- **AES-256-GCM is the default cipher** for new media; silent CBC→CTR fallback removed
 - **Constant-time credential comparison** (`secure_compare.dart`) in AuthService and DecoyService verify paths; legacy SHA-256 branch padded with dummy PBKDF2 work
 - **Decoy PIN minimum 4 → 6 digits**
 - **Password-strength enforcement** — `minPasswordLength = 8` + `validatePasswordStrength()` centralized in AuthService
@@ -16,17 +66,17 @@ All notable changes to Latch are documented in this file.
 - Raw `$e` removed from all crypto/UI exception strings; detail kept in `debugPrint`
 
 ### Architecture
-- **Crypto module split (3.1)** — `encryption_service.dart` split into pure, tested modules under `lib/crypto/`: `AesGcmCipher`, `AesCtrCipher`, `KeyDerivation`, `HeaderCodec`, `KeyWrap`. `EncryptionService` is now a behavior-preserving facade. +33 round-trip/auth tests.
-- **Vault cache-NPE fix (3.2 partial)** — `refresh()` now swaps caches atomically instead of nulling first, closing the crash vector where an in-flight mutation could NPE on a nulled cache. Full repository split deferred.
+- **Crypto module split** — `encryption_service.dart` split into pure, tested modules under `lib/crypto/`: `AesGcmCipher`, `AesCtrCipher`, `KeyDerivation`, `HeaderCodec`, `KeyWrap`. `EncryptionService` is now a behavior-preserving facade. +33 round-trip/auth tests.
+- **Vault cache-NPE fix** — `refresh()` swaps caches atomically instead of nulling first, closing the crash vector where an in-flight mutation could NPE on a nulled cache. Full repository split deferred.
 
 ### UI & Cleanup
 - **Password vault integration** — open/create password entries from the gallery screen
 - **Search and sort** moved into the overflow menu
-- **Centralized toasts** (`ToastUtils` via global `navigatorKey`); `fluttertoast` dependency dropped
+- **Centralized toasts** (`ToastUtils` via global `navigatorKey`); `fluttertoast` dropped
 - **Centralized paths** (`PathUtils.getDownloadsDirectory()` + `androidSourceRoots`)
 - **FileTypeColors** map added to `app_colors.dart`
-- **Dead code purge** — deleted `OptimizedScrollView`, `OptimizedGridView`, `OptimizedThumbnail`, `PerformanceOverlayWidget`, `CompactPermissionWarning`, `showOperationProgressSheet`, `compression_options_dialog`, dead `locker_logo_512.png` asset, dead `_importFromDocuments` method
-- **Vestigial Firebase removed** — `google-services` plugin, `firebase-bom`, and `google-services.json` deleted (no Dart Firebase packages consumed)
+- **Dead code purge** — deleted `OptimizedScrollView`, `OptimizedGridView`, `OptimizedThumbnail`, `PerformanceOverlayWidget`, `CompactPermissionWarning`, `showOperationProgressSheet`, `compression_options_dialog`, dead `locker_logo_512.png`, dead `_importFromDocuments`
+- **Vestigial Firebase removed** — `google-services` plugin, `firebase-bom`, `google-services.json` (no Dart Firebase consumed)
 - **`.metadata` cleanup** — removed ios/linux/macos/web/windows platform entries
 
 ### Platform & Tooling
@@ -44,60 +94,6 @@ All notable changes to Latch are documented in this file.
 - `TextEditingController`s now disposed in dialogs/sheets (10 sites)
 - Sub-48px tap targets replaced with `IconButton`
 - `main.dart` update-check `StreamSubscription` stored + cancelled in `dispose()`
-
-## 0.15.0-beta.1
-
-### Password Vault & Autofill
-- **Password vault** — store, edit, and organize credentials inside the encrypted vault
-- **Password editor** with generator for strong random passwords
-- **Password list** with search, domain filtering, and multi-select
-- **Android Autofill service** — seamlessly fill credentials in other apps and browsers
-- Autofill credential toggle with security warning dialog
-- **Autofill support** on PIN and password unlock inputs
-- **Clipboard auto-clear** after pasting passwords
-- Password index included in vault backups
-
-### Crypto Overhaul
-- **AEAD key-wrapping** for vault master key (AES-256-GCM wrapping)
-- **Argon2id** key derivation alongside PBKDF2
-- `HeaderCodec` for encrypted file format detection
-- Stateless **AES-256-GCM** and **AES-256-CTR** cipher primitives
-- **Key wrapping and biometric unlock** for master keys
-- Encryption key **re-wrapping** after password/PIN change
-- Constant-time string comparison for cryptographic operations
-- **PBKDF2 iterations increased to 600,000** (from 100,000)
-- Default encryption algorithm set to **AES-256-GCM**
-
-### Update System Rework
-- **GitHub-based updates** via `url_launcher` (supports non-Play Store installs)
-- Install source detection — Play Store vs sideload vs GitHub
-- Pre-release version ordering with `pub_semver`
-
-### Testing & Infrastructure
-- **CI workflow** for versionF branch
-- Comprehensive unit tests for AES-256-GCM, CTR, crypto hygiene, password strength
-- PBKDF2 isolate test suite
-- Argon2id KWK derivation and AES-256-GCM key wrapping tests
-
-### UI Polish
-- Tooltips on song player, media viewer, and password editor buttons
-- SnackBar margin, shape, and elevation styling
-- Search and sort actions moved to overflow menu
-- GestureDetector replaced with IconButton for better accessibility
-- `forceReload` parameter on vault cache loaders
-
-### Security Hardening
-- App backup disabled
-- Network security config for cleartext traffic policy
-- ProGuard minification enabled for release builds
-- ProGuard rules for Flutter, crypto, and autofill service
-
-### Cleanup
-- Removed Firebase dependencies from Android Gradle config
-- Removed deprecated compression services and widgets
-- Removed redundant file existence checks across the codebase
-- Removed unused UI components, imports, and platform stubs
-- Replaced `cupertino_icons` and `encrypt` with `device_info_plus`
 
 ---
 
@@ -124,8 +120,7 @@ All notable changes to Latch are documented in this file.
 - **Resizable sidebar** in vault explorer
 - Checkmark icons on selected encryption algorithm chips
 - Dynamic accent color for slider thumb and track
-- Redesigned password setup and change security screens
-- Removed gradient backgrounds from security screens
+- Redesigned password setup and change security screens; gradients removed
 
 ### Architecture
 - **Centralized `FileOpenService`** — all vault file opening routed through a single service
@@ -143,18 +138,18 @@ All notable changes to Latch are documented in this file.
 ## 0.14.3-beta.4
 
 ### Always Up-to-Date Content
-- **"What's New"** highlights and **full changelog** now fetch from the GitHub repo on launch with ETag caching — new release notes propagate without an APK update
-- Bundled assets serve as instant fallback when offline
+- **"What's New"** highlights and **full changelog** fetch from GitHub on launch with ETag caching — release notes propagate without an APK update
+- Bundled assets serve as instant offline fallback
 
-### Video Player Improvements
+### Video Player
 - **Video load phases** with cancellation support and progress tracking
 
 ### Encryption Reliability
-- **CTR decryption** now writes to a temporary file and renames on success, preventing data loss on failure
+- **CTR decryption** writes to a temporary file and renames on success, preventing data loss on failure
 - **Progress callback** added to `getVaultedFile` for better UX during decryption
 
 ### Per-File Encryption
-- **Per-file encryption configuration** — each file can now have its own encryption algorithm and KDF settings
+- **Per-file encryption configuration** — each file can have its own encryption algorithm and KDF settings
 - **Encryption settings prompt** on every import flow, letting users choose per-file options
 - **Re-encrypt file picker screen** with selection UI and progress tracking, replacing the old dialog
 - **`derivedKey` parameter** for per-file key derivation
@@ -178,11 +173,11 @@ All notable changes to Latch are documented in this file.
 - Document viewer colors migrated to theme context
 - File overlay badges unified into a single container
 - File names and **type-specific icons** shown in grid thumbnails for all file types
-- **AnimatedSwitcher** for smooth view mode transitions
+- **AnimatedSwitcher** for smooth view-mode transitions
 
 ### Encryption Reliability
-- **Crash recovery** added to re-encryption journal — interrupted re-encryption operations can now resume safely
-- Encrypt output now written to a **temp file** and renamed on success, preventing corrupt vaulted files on failure
+- **Crash recovery** added to re-encryption journal — interrupted re-encryption operations resume safely
+- Encrypt output written to a **temp file** and renamed on success, preventing corrupt vaulted files on failure
 - Temp file cleanup on re-encryption success
 - **Non-empty final block** handling in GCM decryption worker
 
@@ -197,10 +192,10 @@ All notable changes to Latch are documented in this file.
 - **AES-256-GCM v2** authenticated encryption format with crypto isolate pool support
 - **Isolate-based crypto worker pool** for AES encryption/decryption, offloading heavy crypto from the UI thread
 - **PBKDF2 hashing** moved entirely to Dart isolates — no more direct Pointy Castle dependency on the main thread
-- **Dynamic KDF iterations** for password and PIN hashing, stored per-credential with automatic rotation on config changes
+- **Dynamic KDF iterations** for password and PIN hashing, stored per-credential with rotation on config changes
 - **Decoy credential migration**: KDF iteration counts stored per credential, rotate when vault settings change
 - **Re-encryption warning dialog**: detailed risk explanations shown before the confirmation dialog
-- **`needsMigration`** field added to `VaultedFile` for tracking files that need re-encryption
+- **`needsMigration`** field added to `VaultedFile` for tracking files needing re-encryption
 
 ### Media Selection & UX
 - New **hold-to-action** gesture: long-press triggers an action sheet instead of immediate selection
@@ -300,9 +295,5 @@ All notable changes to Latch are documented in this file.
 ---
 
 > **GitHub Releases Deprecated**
-> 
-> GitHub Releases for Latch are no longer maintained. The app is distributed exclusively through **Google Play Store** as a Closed Beta Test.
-> 
-> To join the Closed Beta, email: `moss_apps@proton.me`
 >
-> Old release APKs and tags are kept for historical reference only.
+> Latch is distributed exclusively via **Google Play Closed Beta**. Join: `moss_apps@proton.me`. Old release APKs/tags kept for historical reference.
