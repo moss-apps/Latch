@@ -196,7 +196,7 @@ Locker/
 │   └── ...
 ├── docs/                         # Architecture documentation
 │   ├── architecture_media.md     # Media encryption/compression design
-│   ├── improvement_roadmap.md    # Audit-driven backlog
+│   ├── unlock_autofill.md        # Unlock credential autofill design
 │   └── flick_integration.md      # Flick Player integration guide
 └── pubspec.yaml                  # Flutter dependencies
 ```
@@ -281,6 +281,7 @@ All sensitive data (PIN, passwords, encryption keys) is stored via `flutter_secu
 ## Documentation
 Additional documentation available:
 - [Architecture Diagram](docs/architecture_media.md) - Detailed system architecture design covering compression, encryption, and file operations
+- [Unlock Autofill](docs/unlock_autofill.md) - How the opt-in unlock credential autofill delegation works and its security model
 - [Flick Integration Guide](docs/flick_integration.md) - Contract and implementation notes for making Flick a first-class Latch playback companion
 
 ## License
