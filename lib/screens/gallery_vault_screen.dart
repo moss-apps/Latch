@@ -1828,8 +1828,8 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
           child: Container(
             decoration: BoxDecoration(
               color: context.isDarkMode
-                  ? Colors.black.withValues(alpha: 0.7)
-                  : Colors.white.withValues(alpha: 0.7),
+                  ? Colors.black
+                  : Colors.white,
               border: Border(
                 right: BorderSide(
                   color: context.isDarkMode
