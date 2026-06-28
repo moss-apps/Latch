@@ -2,13 +2,11 @@
 
 **Last updated: May 4, 2026**
 
-## Our Commitment
+Latch is built on-device-first. It does not collect, store, transmit, or
+share any personal information. Everything you do in Latch stays on your
+device, and your vault key never leaves it.
 
-Latch is built with privacy as its core principle. We believe your personal data should stay on your device, not on our servers. This app does not collect, store, transmit, or share any personal information.
-
-## Data We Do Not Collect
-
-Latch does not collect any data whatsoever. Specifically:
+## Data we do not collect
 
 - No personal information (name, email, phone number, etc.)
 - No usage analytics or telemetry
@@ -19,57 +17,53 @@ Latch does not collect any data whatsoever. Specifically:
 - No contacts, messages, or call logs
 - No browsing history or app usage data
 
-Everything you do in Latch stays on your device.
+## Camera access
 
-## Camera Access
+Requested only when you scan a QR code or take a photo to import into your
+vault. Never used in the background; captured media is stored locally and
+encrypted, never transmitted.
 
-Latch may request camera permission only when you choose to scan a QR code or take a photo to import into your vault. The camera is used solely for these purposes:
+## Media & files
 
-- QR code scanning for quick vault access
-- Capturing photos to store in your vault
+Files you import are AES-256 encrypted and stored locally. Latch never
+uploads, scans, analyzes, shares, or accesses your files without your
+explicit action.
 
-Camera access is never used in the background. No photos or video from your camera are transmitted to any server. All captured media is stored locally and encrypted on your device.
+## Storage permission
 
-## Media & Files
+Required to read files you want to vault and to write encrypted files to
+your device — used only on explicit import/export.
 
-Latch is a secure media vault. Files you import into Latch are encrypted using AES-256 encryption and stored locally on your device. We do not:
+## Biometric authentication
 
-- Upload your files to any cloud or server
-- Scan or analyze your files
-- Share your files with any third party
-- Access your files without your explicit action
+Biometric data is handled entirely by the OS. Latch only receives a
+success/failure signal and never stores or accesses your biometric data.
 
-Your vault key never leaves your device.
+## Third-party services
 
-## Storage Permission
+Latch integrates with no analytics, advertising, or tracking services. The
+only external connections are:
 
-Latch requires storage permission to read files you want to vault and to save encrypted files to your device. This permission is used only when you explicitly choose to import or export files.
+- Play Store update check (optional, user-triggered)
+- Ko-fi donation link (optional, opened in your browser)
 
-## Biometric Authentication
+Neither transmits personal data from Latch.
 
-If you choose to use fingerprint or face unlock, biometric data is handled entirely by your device operating system. Latch only receives a success or failure signal — it never stores or accesses your biometric data.
+## Local backups
 
-## Third-Party Services
+Backup files are saved to a location you choose on your device. Latch does
+not upload backups anywhere — you are responsible for securing them.
 
-Latch does not integrate with any third-party analytics, advertising, or tracking services. The only external connection is:
+## Children's privacy
 
-- Play Store update check (optional, triggered by you)
-- Donation link to Ko-fi (optional, opened in your browser)
+Latch does not knowingly collect any information from anyone, including
+children under 13. No data is collected, so none can be gathered from
+minors.
 
-Neither of these transmits any personal data from Latch.
+## Changes to this policy
 
-## Local Backups
-
-If you choose to create a local backup, the backup file is saved to a location you select on your device. Latch does not upload backups anywhere. You are responsible for securing your backup files.
-
-## Children's Privacy
-
-Latch does not knowingly collect any information from anyone, including children under 13. Since no data is collected at all, there is no risk of personal information being gathered from minors.
-
-## Changes to This Policy
-
-If we update this Privacy Policy, the changes will be reflected in the app. We encourage you to review this policy periodically.
+Updates are reflected in the app. Review periodically.
 
 ## Contact
 
-If you have any questions about this Privacy Policy, please reach out through the project repository.
+Questions about this policy: reach out through the project repository.
