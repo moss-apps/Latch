@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../themes/app_colors.dart';
 
-enum OperationType { hide, unhide, delete, encrypt }
+enum OperationType { hide, unhide, delete, encrypt, decrypt, reencrypt }
 
 class OperationProgressSheet extends StatefulWidget {
   final OperationType operationType;
@@ -163,6 +163,14 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
         icon = Icons.enhanced_encryption_outlined;
         color = Colors.orange;
         break;
+      case OperationType.decrypt:
+        icon = Icons.lock_open_outlined;
+        color = Colors.green;
+        break;
+      case OperationType.reencrypt:
+        icon = Icons.autorenew;
+        color = Colors.blue;
+        break;
     }
 
     return Container(
@@ -196,6 +204,10 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
         return 'Deleting Files';
       case OperationType.encrypt:
         return 'Encrypting Files';
+      case OperationType.decrypt:
+        return 'Removing Encryption';
+      case OperationType.reencrypt:
+        return 'Re-encrypting Files';
     }
   }
 
