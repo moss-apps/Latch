@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../utils/path_utils.dart';
 import '../models/album.dart';
@@ -10,7 +9,6 @@ import '../providers/explorer_providers.dart';
 import '../services/file_import_service.dart';
 import '../themes/app_colors.dart';
 import '../utils/toast_utils.dart';
-import '../widgets/folder_tree_widget.dart';
 import '../widgets/folder_breadcrumb_widget.dart';
 import '../widgets/explorer_file_grid.dart';
 import '../widgets/explorer_toolbar.dart';
@@ -31,11 +29,6 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descController = TextEditingController();
 
-  static const double _sidebarMinWidth = 180;
-  static const double _sidebarMaxWidthFraction = 0.7;
-  static const double _sidebarDefaultFraction = 0.55;
-  double? _sidebarWidth;
-
   @override
   void dispose() {
     _nameController.dispose();
@@ -47,16 +40,16 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
   Widget build(BuildContext context) {
     final isSelectionMode = ref.watch(isSelectionModeProvider);
     final selectedFiles = ref.watch(selectedFilesProvider);
-    final viewMode = ref.watch(explorerViewModeProvider);
     final currentFolderAsync = ref.watch(explorerCurrentFolderProvider);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: _buildAppBar(currentFolderAsync, isSelectionMode, selectedFiles),
-      body: _buildBody(viewMode),
+      body: _buildBody(),
       floatingActionButton: isSelectionMode
           ? null
           : FloatingActionButton.extended(
+              elevation: 0,
               onPressed: () => _showCreateFolderDialog(),
               backgroundColor: context.accentColor,
               icon: const Icon(Icons.create_new_folder, color: Colors.white),
@@ -158,78 +151,17 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
     );
   }
 
-  Widget _buildBody(ExplorerViewMode viewMode) {
-    final isSidebar = viewMode == ExplorerViewMode.sidebar;
-
-    if (isSidebar) {
-      final screenWidth = MediaQuery.of(context).size.width;
-      _sidebarWidth ??= screenWidth * _sidebarDefaultFraction;
-    }
-
-    final sidebarWidth = _sidebarWidth ?? 240;
-
-    final child = isSidebar
-        ? Row(
-            key: const ValueKey('sidebar-layout'),
-            children: [
-              SizedBox(
-                width: sidebarWidth,
-                child: FolderTreeWidget(
-                  onFolderLongPress: (folder) => _showFolderOptions(folder),
-                ),
-              ),
-              _SidebarResizer(
-                width: sidebarWidth,
-                minWidth: _sidebarMinWidth,
-                maxWidthFraction: _sidebarMaxWidthFraction,
-                onResize: (newWidth) {
-                  setState(() {
-                    _sidebarWidth = newWidth;
-                  });
-                },
-              ),
-              const VerticalDivider(width: 1, thickness: 1),
-              Expanded(
-                child: Column(
-                  children: [
-                    const ExplorerToolbar(),
-                    Expanded(
-                      child: ExplorerFileGrid(
-                        onFolderLongPress: (folder) => _showFolderOptions(folder),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          )
-        : Column(
-            key: const ValueKey('navigation-layout'),
-            children: [
-              const FolderBreadcrumbWidget(),
-              const ExplorerToolbar(),
-              Expanded(
-                child: ExplorerFileGrid(
-                  onFolderLongPress: (folder) => _showFolderOptions(folder),
-                ),
-              ),
-            ],
-          );
-
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 300),
-      switchInCurve: Curves.easeInOut,
-      switchOutCurve: Curves.easeInOut,
-      transitionBuilder: (child, animation) {
-        return FadeTransition(
-          opacity: animation,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.98, end: 1.0).animate(animation),
-            child: child,
+  Widget _buildBody() {
+    return Column(
+      children: [
+        const FolderBreadcrumbWidget(),
+        const ExplorerToolbar(),
+        Expanded(
+          child: ExplorerFileGrid(
+            onFolderLongPress: (folder) => _showFolderOptions(folder),
           ),
-        );
-      },
-      child: child,
+        ),
+      ],
     );
   }
 
@@ -1163,94 +1095,6 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
           : null,
       onTap: onTap,
       contentPadding: EdgeInsets.zero,
-    );
-  }
-}
-
-class _SidebarResizer extends StatefulWidget {
-  const _SidebarResizer({
-    required this.width,
-    required this.minWidth,
-    required this.maxWidthFraction,
-    required this.onResize,
-  });
-
-  final double width;
-  final double minWidth;
-  final double maxWidthFraction;
-  final ValueChanged<double> onResize;
-
-  @override
-  State<_SidebarResizer> createState() => _SidebarResizerState();
-}
-
-class _SidebarResizerState extends State<_SidebarResizer> {
-  bool _isDragging = false;
-
-  static const double _grabWidth = 28;
-
-  @override
-  Widget build(BuildContext context) {
-    final dividerColor = _isDragging
-        ? Theme.of(context).colorScheme.primary
-        : Theme.of(context).dividerColor;
-    final iconColor = _isDragging
-        ? Theme.of(context).colorScheme.primary
-        : Theme.of(context).hintColor;
-
-    return MouseRegion(
-      cursor: SystemMouseCursors.resizeColumn,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onHorizontalDragStart: (_) {
-          HapticFeedback.mediumImpact();
-          setState(() => _isDragging = true);
-        },
-        onHorizontalDragUpdate: (details) {
-          final screenWidth = MediaQuery.of(context).size.width;
-          final maxAllowed = screenWidth * widget.maxWidthFraction;
-          final newWidth = (widget.width + details.delta.dx)
-              .clamp(widget.minWidth, maxAllowed);
-          widget.onResize(newWidth);
-        },
-        onHorizontalDragEnd: (_) {
-          HapticFeedback.lightImpact();
-          setState(() => _isDragging = false);
-        },
-        onHorizontalDragCancel: () {
-          setState(() => _isDragging = false);
-        },
-        child: SizedBox(
-          width: _grabWidth,
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: Container(
-                    width: 2,
-                    color: dividerColor,
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Icon(
-                    Icons.drag_indicator,
-                    size: 16,
-                    color: iconColor,
-                  ),
-                ),
-                Expanded(
-                  child: Container(
-                    width: 2,
-                    color: dividerColor,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
