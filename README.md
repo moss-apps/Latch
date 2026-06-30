@@ -136,5 +136,11 @@ Follow the Dart style guide.
 MIT, see [LICENSE](LICENSE). Free, no ads, no paid features.
 
 ## Contributors
-
+  
 - [@ultraelectronica](https://github.com/ultraelectronica) (creator)
+
+## Transparency
+
+I build this with [OpenCode](https://opencode.ai). It writes some of the
+comments and docs, and it's bailed me out of more than a few nasty-ass bugs.
+The code, the design calls, and the fuck-ups are all mine.
