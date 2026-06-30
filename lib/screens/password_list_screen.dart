@@ -217,6 +217,7 @@ class _PasswordListScreenState extends ConsumerState<PasswordListScreen> {
                 ),
               ),
               backgroundColor: context.accentColor,
+              elevation: 0,
               child: const Icon(Icons.add, color: Colors.white),
             ),
     );

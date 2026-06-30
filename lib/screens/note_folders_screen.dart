@@ -176,6 +176,7 @@ class _NoteFoldersScreenState extends ConsumerState<NoteFoldersScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: _showCreateDialog,
         backgroundColor: context.accentColor,
+        elevation: 0,
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );

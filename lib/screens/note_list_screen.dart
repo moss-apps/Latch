@@ -240,6 +240,7 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
           : FloatingActionButton(
               onPressed: _showNewNoteSheet,
               backgroundColor: context.accentColor,
+              elevation: 0,
               child: const Icon(Icons.add, color: Colors.white),
             ),
     );

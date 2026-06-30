@@ -61,6 +61,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
       floatingActionButton: _isSelectionMode
           ? null
           : FloatingActionButton.extended(
+              elevation: 0,
               onPressed: () => _showAddOptions,
               backgroundColor: context.accentColor,
               icon: const Icon(Icons.add, color: Colors.white),

@@ -68,6 +68,7 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
+        elevation: 0,
         onPressed: _showCreateOptions,
         backgroundColor: context.accentColor,
         icon: const Icon(Icons.create_new_folder, color: Colors.white),
