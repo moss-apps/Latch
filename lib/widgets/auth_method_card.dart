@@ -19,8 +19,11 @@ class AuthMethodCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 2,
-      shadowColor: Colors.black12,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: context.borderColor, width: 1),
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
@@ -33,13 +36,13 @@ class AuthMethodCard extends StatelessWidget {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: AppColors.accentLight.withValues(alpha: 0.1),
+                  color: context.accentColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   icon,
                   size: 32,
-                  color: AppColors.accent,
+                  color: context.accentColor,
                 ),
               ),
 
@@ -55,7 +58,7 @@ class AuthMethodCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.lightTextPrimary,
+                        color: context.textPrimary,
                         fontFamily: 'ProductSans',
                       ),
                     ),
@@ -64,7 +67,7 @@ class AuthMethodCard extends StatelessWidget {
                       description,
                       style: TextStyle(
                         fontSize: 14,
-                        color: AppColors.lightTextSecondary,
+                        color: context.textSecondary,
                         fontFamily: 'ProductSans',
                       ),
                     ),
@@ -76,7 +79,7 @@ class AuthMethodCard extends StatelessWidget {
               Icon(
                 Icons.arrow_forward_ios,
                 size: 20,
-                color: AppColors.lightTextTertiary,
+                color: context.textTertiary,
               ),
             ],
           ),
