@@ -1337,7 +1337,14 @@ class EncryptionService {
     }
   }
 
-  /// Decrypt file in isolate pool (for large files, with real progress)
+  /// Decrypt file in isolate pool (for large files, with real progress).
+  ///
+  /// [cancelToken], if provided, is bound to the isolate job's kill handle as
+  /// soon as the job dispatches, so the caller can cancel it. Cancellation is
+  /// safe: the worker writes to `destinationPath.tmp` and only renames to
+  /// `destinationPath` on success, so killing it leaves no partial final file —
+  /// only an orphaned `.tmp` that VaultService.cleanupTemp reaps. The source
+  /// encrypted file is read-only.
   Future<FileDecryptionResult> decryptFileInIsolate(
     String encryptedPath,
     String destinationPath,
@@ -1345,6 +1352,7 @@ class EncryptionService {
     bool isDecoy = false,
     Uint8List? derivedKey,
     Function(int bytesProcessed, int totalBytes)? onProgress,
+    CancelToken? cancelToken,
   }) async {
     try {
       final encryptedFile = File(encryptedPath);
@@ -1355,7 +1363,15 @@ class EncryptionService {
         );
       }
 
+      if (cancelToken?.isCancelled == true) {
+        return FileDecryptionResult(success: false, error: 'Cancelled');
+      }
+
       final key = await _resolveKey(isDecoy: isDecoy, derivedKey: derivedKey);
+
+      if (cancelToken?.isCancelled == true) {
+        return FileDecryptionResult(success: false, error: 'Cancelled');
+      }
 
       final job = _pool!.decryptFile(
         encryptedPath: encryptedPath,
@@ -1364,6 +1380,7 @@ class EncryptionService {
         ivBase64: ivBase64,
         onProgress: onProgress,
       );
+      cancelToken?.bind(job.cancel);
 
       final result = await job.future;
 
