@@ -13,6 +13,7 @@ import '../services/auto_kill_service.dart';
 import '../themes/app_colors.dart';
 import '../utils/responsive_utils.dart';
 import '../utils/toast_utils.dart';
+import '../widgets/file_info_sheet.dart';
 import '../widgets/media_hold_action_sheet.dart';
 import 'optimized_image_widget.dart';
 
@@ -1088,83 +1089,7 @@ class ExplorerFileGrid extends ConsumerWidget {
   }
 
   void _showFileInfo(BuildContext ctx, VaultedFile file) {
-    String formatDate(DateTime date) {
-      return '${date.day}/${date.month}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-    }
-
-    showDialog(
-      context: ctx,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Theme.of(ctx).scaffoldBackgroundColor,
-        title: Text(
-          'File Info',
-          style: TextStyle(
-            fontFamily: 'ProductSans',
-            color: ctx.textPrimary,
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildInfoRow(ctx, 'Name', file.originalName),
-            const SizedBox(height: 12),
-            _buildInfoRow(ctx, 'Type', file.extension.toUpperCase()),
-            const SizedBox(height: 12),
-            _buildInfoRow(ctx, 'Size', file.formattedSize),
-            const SizedBox(height: 12),
-            _buildInfoRow(ctx, 'Added', formatDate(file.dateAdded)),
-            const SizedBox(height: 12),
-            _buildInfoRow(ctx, 'Encrypted', file.isEncrypted ? 'Yes' : 'No'),
-            if (file.lastViewed != null) ...[
-              const SizedBox(height: 12),
-              _buildInfoRow(ctx, 'Last Viewed', formatDate(file.lastViewed!)),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(
-              'Close',
-              style: TextStyle(
-                fontFamily: 'ProductSans',
-                color: ctx.accentColor,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(BuildContext context, String label, String value) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 80,
-          child: Text(
-            label,
-            style: TextStyle(
-              fontFamily: 'ProductSans',
-              color: context.textSecondary,
-              fontSize: 14,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: TextStyle(
-              fontFamily: 'ProductSans',
-              color: context.textPrimary,
-              fontSize: 14,
-            ),
-          ),
-        ),
-      ],
-    );
+    FileInfoSheet.show(ctx, file, title: 'File Info');
   }
 
   IconData _getFileIcon(String extension) {
