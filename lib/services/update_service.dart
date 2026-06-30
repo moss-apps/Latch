@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:in_app_update/in_app_update.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:pub_semver/pub_semver.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Where this build was installed from.
 enum InstallSource { playStore, github, unknown }
@@ -47,9 +48,11 @@ class UpdateService {
   static const _releasePageUrl =
       'https://github.com/moss-apps/Latch/releases/latest';
   static const _fetchTimeout = Duration(seconds: 8);
+  static const _skippedVersionKey = 'update_skipped_version';
 
   StreamSubscription<List<ConnectivityResult>>? _subscription;
   bool _isChecking = false;
+  String? _lastEmittedKey;
 
   InstallSource _installSource = InstallSource.unknown;
   InstallSource get installSource => _installSource;
@@ -97,13 +100,33 @@ class UpdateService {
       } else {
         _pendingUpdate = await _checkGitHubRelease();
       }
-      _updateController.add(_pendingUpdate);
+      _emit(_pendingUpdate);
     } catch (_) {
       _pendingUpdate = null;
-      _updateController.add(null);
+      _emit(null);
     } finally {
       _isChecking = false;
     }
+  }
+
+  void _emit(PendingUpdate? update) {
+    final key = update == null
+        ? null
+        : (update.latestVersion ?? update.source.name);
+    if (key == _lastEmittedKey) return;
+    _lastEmittedKey = key;
+    _updateController.add(update);
+  }
+
+  Future<void> skipVersion(String version) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_skippedVersionKey, version);
+  }
+
+  Future<bool> isVersionSkipped(String? version) async {
+    if (version == null) return false;
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_skippedVersionKey) == version;
   }
 
   Future<InstallSource> _detectInstallSource() async {
