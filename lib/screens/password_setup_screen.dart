@@ -314,6 +314,7 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
 
   Widget _buildContinueButton() {
     return Container(
+      width: double.infinity,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         gradient: LinearGradient(
