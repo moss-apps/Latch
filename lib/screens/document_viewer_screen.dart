@@ -12,6 +12,7 @@ import '../services/office_converter_service.dart';
 import '../themes/app_colors.dart';
 import '../utils/toast_utils.dart';
 import '../widgets/conversion_warning_dialog.dart';
+import '../widgets/file_info_sheet.dart';
 
 /// Document viewer for PDFs and text files
 class DocumentViewerScreen extends ConsumerStatefulWidget {
@@ -398,84 +399,13 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
   }
 
   void _showFileInfo() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => Container(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.7,
-        ),
-        decoration: BoxDecoration(
-          color: context.backgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Document Information',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: context.textPrimary,
-                        fontFamily: 'ProductSans',
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildInfoRow('Name', widget.file.originalName),
-                    _buildInfoRow('Type', widget.file.extension.toUpperCase()),
-                    _buildInfoRow('Size', widget.file.formattedSize),
-                    _buildInfoRow('Added', widget.file.formattedDateAdded),
-                    if (widget.file.isEncrypted)
-                      _buildInfoRow('Encrypted', 'Yes'),
-                    if (_isPdf && _totalPages > 0)
-                      _buildInfoRow('Pages', _totalPages.toString()),
-                    SizedBox(height: MediaQuery.of(context).padding.bottom),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontFamily: 'ProductSans',
-                color: context.textTertiary,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                fontFamily: 'ProductSans',
-                color: context.textPrimary,
-              ),
-            ),
-          ),
-        ],
-      ),
+    FileInfoSheet.show(
+      context,
+      widget.file,
+      title: 'Document Information',
+      extraRows: (_isPdf && _totalPages > 0)
+          ? [('Pages', _totalPages.toString())]
+          : null,
     );
   }
 

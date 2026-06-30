@@ -10,6 +10,7 @@ import '../models/vault_folder.dart';
 import '../models/encryption_algorithm.dart';
 import 'encryption_service.dart';
 import 'compression_service.dart';
+import 'crypto_isolate_pool.dart';
 
 class FileProgressInfo {
   final int current;
@@ -1136,11 +1137,17 @@ class VaultService {
     return _encryptionService.deriveFileKeyAsync(masterKey, salt, file.kdfIterations!);
   }
 
-  /// Get the actual file from vault (decrypts if needed)
+  /// Get the actual file from vault (decrypts if needed).
+  ///
+  /// [cancelToken] makes the operation cooperative: it is checked after the
+  /// (un-killable) key derivation and bound to the decrypt isolate's kill
+  /// handle, so cancellation during either stage unblocks promptly. A
+  /// cancelled call returns null and writes no final file.
   Future<File?> getVaultedFile(
     String fileId, {
     bool isDecoy = false,
     Function(int processed, int total)? onProgress,
+    CancelToken? cancelToken,
   }) async {
     final vaultedFile = await getFileById(fileId, isDecoy: isDecoy);
     if (vaultedFile == null) return null;
@@ -1157,6 +1164,10 @@ class VaultService {
       final format = _encryptionService.detectFileFormat(vaultedFile.vaultPath);
       final isLegacyCbc = (format == 0 || format == 3);
       final derivedKey = await _deriveKeyForFile(vaultedFile, isDecoy: isDecoy);
+
+      // Derive runs on `compute` and can't be killed; abort here if the user
+      // cancelled during that window so we never dispatch the decrypt job.
+      if (cancelToken?.isCancelled == true) return null;
 
       FileDecryptionResult result;
       if (isLegacyCbc) {
@@ -1183,8 +1194,11 @@ class VaultService {
           isDecoy: isDecoy,
           derivedKey: derivedKey,
           onProgress: onProgress,
+          cancelToken: cancelToken,
         );
       }
+
+      if (cancelToken?.isCancelled == true) return null;
 
       if (result.success && result.decryptedPath != null) {
         return File(result.decryptedPath!);
@@ -2209,7 +2223,9 @@ class VaultService {
   Future<int> reEncryptVault(
     EncryptionAlgorithm targetAlgorithm, {
     bool isDecoy = false,
-    Function(int current, int total)? onProgress,
+    Function(int current, int total, String currentFileName, int processedBytes,
+            int totalBytes)?
+        onProgress,
     Set<String>? fileFilter,
   }) async {
     try {
@@ -2247,25 +2263,59 @@ class VaultService {
           }
 
           encryptedFiles = files.where((f) => f.isEncrypted).toList();
+          // ponytail: journal recovery rebuilds from the full list (to restore
+          // IVs from vaultPath matches), so re-apply the selection here —
+          // without this a leftover journal makes reEncryptVault ignore
+          // fileFilter and process every encrypted file.
+          if (fileFilter != null && fileFilter.isNotEmpty) {
+            encryptedFiles =
+                encryptedFiles.where((f) => fileFilter.contains(f.id)).toList();
+          }
 
           if (isDecoy) { _cachedDecoyFiles = files; } else { _cachedFiles = files; }
           await _saveFileIndex(isDecoy: isDecoy);
         } catch (_) {}
       }
 
+      final totalBytes = encryptedFiles.fold<int>(0, (s, f) => s + f.fileSize);
+      var processedBytes = 0;
       int reEncryptedCount = 0;
 
       for (int i = 0; i < encryptedFiles.length; i++) {
-        onProgress?.call(i + 1, encryptedFiles.length);
-
         final file = encryptedFiles[i];
-        if (!await File(file.vaultPath).exists()) continue;
+        onProgress?.call(i, encryptedFiles.length, file.originalName,
+            processedBytes, totalBytes);
+
+        if (!await File(file.vaultPath).exists()) {
+          processedBytes += file.fileSize;
+          onProgress?.call(i + 1, encryptedFiles.length, file.originalName,
+              processedBytes, totalBytes);
+          continue;
+        }
+        // ponytail: an encrypted file with no stored IV is undecryptable on any
+        // path (the IV is never embedded in the file — pool encrypt returns it
+        // for the index to store). Skip it instead of throwing "IV must be at
+        // least 1 byte" and aborting the whole batch; matches removeEncryption's
+        // guard. These are legacy/orphaned entries, not normal imports.
+        if (file.encryptionIv == null || file.encryptionIv!.isEmpty) {
+          debugPrint(
+              'reEncryptVault: skipping ${file.originalName} (missing IV)');
+          processedBytes += file.fileSize;
+          onProgress?.call(i + 1, encryptedFiles.length, file.originalName,
+              processedBytes, totalBytes);
+          continue;
+        }
 
         final currentFormat = _encryptionService.detectFileFormat(file.vaultPath);
         final targetIsGcm = targetAlgorithm == EncryptionAlgorithm.aes256Gcm;
         final currentIsGcm = (currentFormat == 1 || currentFormat == 4);
 
-        if (currentIsGcm == targetIsGcm && currentFormat != 0 && currentFormat != 3) continue;
+        if (currentIsGcm == targetIsGcm && currentFormat != 0 && currentFormat != 3) {
+          processedBytes += file.fileSize;
+          onProgress?.call(i + 1, encryptedFiles.length, file.originalName,
+              processedBytes, totalBytes);
+          continue;
+        }
 
         await _storage.write(
           key: _reEncryptJournalKey,
@@ -2279,8 +2329,13 @@ class VaultService {
         final newSalt = _encryptionService.generateFileSalt();
         final newIterations = _cachedSettings?.kdfIterations ?? 100000;
         final masterKey = await _encryptionService.getMasterKey(isDecoy: isDecoy || file.isDecoy);
-        final newDerivedKey = _encryptionService.deriveFileKey(masterKey, newSalt, newIterations);
+        // ponytail: async (Compute isolate). Sync deriveFileKey @ 100k iterations
+        // per file on the main isolate was the re-encrypt hang; encrypt (line ~702)
+        // and the old-key derivation above both already use the async path.
+        final newDerivedKey = await _encryptionService.deriveFileKeyAsync(masterKey, newSalt, newIterations);
 
+        final baseBytes = processedBytes;
+        final halfBytes = file.fileSize ~/ 2;
         final newIv = await _encryptionService.reEncryptFile(
           file.vaultPath,
           file.encryptionIv ?? '',
@@ -2288,6 +2343,19 @@ class VaultService {
           isDecoy: isDecoy,
           oldDerivedKey: oldDerivedKey,
           newDerivedKey: newDerivedKey,
+          onProgress: onProgress == null
+              ? null
+              // ponytail: fold decrypt(0..half) then encrypt(half..full) into one
+              // monotonic budget so the bar advances across both pool stages.
+              : (processed, _, isEnc) => onProgress(
+                    i,
+                    encryptedFiles.length,
+                    file.originalName,
+                    baseBytes +
+                        (isEnc
+                            ? halfBytes + (processed ~/ 2)
+                            : processed ~/ 2),
+                    totalBytes),
         );
 
         journalIvs[file.vaultPath] = newIv;
@@ -2308,6 +2376,9 @@ class VaultService {
           );
           reEncryptedCount++;
         }
+        processedBytes += file.fileSize;
+        onProgress?.call(i + 1, encryptedFiles.length, file.originalName,
+            processedBytes, totalBytes);
       }
 
       if (isDecoy) {
@@ -2321,6 +2392,178 @@ class VaultService {
       return reEncryptedCount;
     } catch (e) {
       debugPrint('Re-encryption error: $e');
+      return -1;
+    }
+  }
+
+  /// Add encryption to currently-unencrypted vault files, in place.
+  /// Same reliability profile as reEncryptVault: isolate pool + async key
+  /// derivation + atomic temp/rename. [algorithm] picks CTR vs GCM.
+  /// ponytail: index saved ONCE at the end (not per file). A per-file save
+  /// jsonEncodes + re-writes the whole index N times through secure storage,
+  /// which froze the UI on batches — reEncryptVault saves once for the same
+  /// reason. Each file is still atomic (temp + rename), so a crash can only
+  /// ever leave a completed file's bytes consistent; the index is reconciled
+  /// by re-running the op against the still-eligible files.
+  Future<int> encryptVaultFiles(
+    EncryptionAlgorithm algorithm, {
+    bool isDecoy = false,
+    Function(int current, int total, String currentFileName, int processedBytes,
+            int totalBytes)?
+        onProgress,
+    Set<String>? fileFilter,
+  }) async {
+    try {
+      final files = await getAllFiles(isDecoy: isDecoy);
+      var targets = files.where((f) => !f.isEncrypted).toList();
+      if (fileFilter != null && fileFilter.isNotEmpty) {
+        targets = targets.where((f) => fileFilter.contains(f.id)).toList();
+      }
+      if (targets.isEmpty) return 0;
+
+      final iterations = _cachedSettings?.kdfIterations ?? 100000;
+      final totalBytes = targets.fold<int>(0, (s, f) => s + f.fileSize);
+      var processedBytes = 0;
+      var count = 0;
+
+      for (int i = 0; i < targets.length; i++) {
+        final file = targets[i];
+        onProgress?.call(i, targets.length, file.originalName, processedBytes,
+            totalBytes);
+        if (!await File(file.vaultPath).exists()) {
+          processedBytes += file.fileSize;
+          continue;
+        }
+
+        final salt = _encryptionService.generateFileSalt();
+        final masterKey = await _encryptionService.getMasterKey(isDecoy: isDecoy || file.isDecoy);
+        final derivedKey = await _encryptionService.deriveFileKeyAsync(masterKey, salt, iterations);
+
+        final baseBytes = processedBytes;
+        final newIv = await _encryptionService.encryptFileInPlace(
+          file.vaultPath,
+          useGcm: algorithm == EncryptionAlgorithm.aes256Gcm,
+          isDecoy: isDecoy,
+          derivedKey: derivedKey,
+          onProgress: onProgress == null
+              ? null
+              : (processed, _) => onProgress(
+                    i, targets.length, file.originalName,
+                    baseBytes + processed, totalBytes),
+        );
+
+        final idx = files.indexWhere((f) => f.id == file.id);
+        if (idx >= 0) {
+          files[idx] = file.copyWith(
+            isEncrypted: true,
+            encryptionIv: newIv,
+            encryptionAlgorithm: algorithm,
+            keyDerivationSalt: base64Encode(salt),
+            kdfIterations: iterations,
+          );
+          count++;
+        }
+        processedBytes += file.fileSize;
+        onProgress?.call(i + 1, targets.length, file.originalName,
+            processedBytes, totalBytes);
+      }
+
+      await _saveFileIndex(isDecoy: isDecoy);
+      return count;
+    } catch (e) {
+      // Persist whatever completed before the failure so the index matches disk.
+      try { await _saveFileIndex(isDecoy: isDecoy); } catch (_) {}
+      debugPrint('Encrypt-in-place error: $e');
+      return -1;
+    }
+  }
+
+  /// Remove encryption from encrypted vault files, decrypting them in place
+  /// so they are stored as plaintext. Same reliability profile as reEncryptVault.
+  Future<int> removeEncryption({
+    bool isDecoy = false,
+    Function(int current, int total, String currentFileName, int processedBytes,
+            int totalBytes)?
+        onProgress,
+    Set<String>? fileFilter,
+  }) async {
+    try {
+      final files = await getAllFiles(isDecoy: isDecoy);
+      var targets = files.where((f) => f.isEncrypted).toList();
+      if (fileFilter != null && fileFilter.isNotEmpty) {
+        targets = targets.where((f) => fileFilter.contains(f.id)).toList();
+      }
+      if (targets.isEmpty) return 0;
+
+      final totalBytes = targets.fold<int>(0, (s, f) => s + f.fileSize);
+      var processedBytes = 0;
+      var count = 0;
+
+      for (int i = 0; i < targets.length; i++) {
+        final file = targets[i];
+        onProgress?.call(i, targets.length, file.originalName, processedBytes,
+            totalBytes);
+        if (!await File(file.vaultPath).exists()) {
+          processedBytes += file.fileSize;
+          continue;
+        }
+        if (file.encryptionIv == null) {
+          processedBytes += file.fileSize;
+          continue;
+        }
+
+        final derivedKey = await _deriveKeyForFile(file, isDecoy: isDecoy);
+
+        final baseBytes = processedBytes;
+        await _encryptionService.decryptFileInPlace(
+          file.vaultPath,
+          file.encryptionIv!,
+          isDecoy: isDecoy,
+          derivedKey: derivedKey,
+          onProgress: onProgress == null
+              ? null
+              : (processed, _) => onProgress(
+                    i, targets.length, file.originalName,
+                    baseBytes + processed, totalBytes),
+        );
+
+        final idx = files.indexWhere((f) => f.id == file.id);
+        if (idx >= 0) {
+          // copyWith can't null out fields, so rebuild clearing the crypto ones.
+          files[idx] = VaultedFile(
+            id: file.id,
+            originalName: file.originalName,
+            vaultPath: file.vaultPath,
+            originalPath: file.originalPath,
+            type: file.type,
+            mimeType: file.mimeType,
+            fileSize: file.fileSize,
+            dateAdded: file.dateAdded,
+            dateModified: DateTime.now(),
+            thumbnailPath: file.thumbnailPath,
+            metadata: file.metadata,
+            tags: file.tags,
+            isFavorite: file.isFavorite,
+            isEncrypted: false,
+            isDecoy: file.isDecoy,
+            lastViewed: file.lastViewed,
+            viewCount: file.viewCount,
+            notes: file.notes,
+            albumIds: file.albumIds,
+            folderId: file.folderId,
+          );
+          count++;
+        }
+        processedBytes += file.fileSize;
+        onProgress?.call(i + 1, targets.length, file.originalName,
+            processedBytes, totalBytes);
+      }
+
+      await _saveFileIndex(isDecoy: isDecoy);
+      return count;
+    } catch (e) {
+      try { await _saveFileIndex(isDecoy: isDecoy); } catch (_) {}
+      debugPrint('Remove-encryption error: $e');
       return -1;
     }
   }

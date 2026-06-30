@@ -34,7 +34,7 @@ class ExplorerToolbar extends ConsumerWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (currentFolderId != null && viewMode == ExplorerViewMode.navigation)
+              if (currentFolderId != null && viewMode == ExplorerViewMode.list)
                 currentFolderAsync.when(
                   loading: () => const SizedBox.shrink(),
                   error: (_, __) => const SizedBox.shrink(),
@@ -72,19 +72,19 @@ class ExplorerToolbar extends ConsumerWidget {
               // View Mode Toggle
               IconButton(
                 icon: Icon(
-                  viewMode == ExplorerViewMode.navigation
-                      ? Icons.account_tree_outlined
-                      : Icons.grid_view_outlined,
+                  viewMode == ExplorerViewMode.list
+                      ? Icons.grid_view_outlined
+                      : Icons.view_list_outlined,
                   size: 20,
                   color: context.textSecondary,
                 ),
-                tooltip: viewMode == ExplorerViewMode.navigation
-                    ? 'Switch to Sidebar Tree'
-                    : 'Switch to Grid Navigation',
+                tooltip: viewMode == ExplorerViewMode.list
+                    ? 'Switch to Grid View'
+                    : 'Switch to List View',
                 onPressed: () {
-                  final newMode = viewMode == ExplorerViewMode.navigation
-                      ? ExplorerViewMode.sidebar
-                      : ExplorerViewMode.navigation;
+                  final newMode = viewMode == ExplorerViewMode.list
+                      ? ExplorerViewMode.grid
+                      : ExplorerViewMode.list;
                   ref.read(explorerViewModeProvider.notifier).state = newMode;
                 },
               ),

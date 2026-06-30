@@ -66,6 +66,7 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
         data: (albums) => _buildAlbumsList(albums),
       ),
       floatingActionButton: FloatingActionButton.extended(
+        elevation: 0,
         onPressed: _showCreateAlbumDialog,
         backgroundColor: context.accentColor,
         icon: const Icon(Icons.add, color: Colors.white),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../themes/app_colors.dart';
 
-enum OperationType { hide, unhide, delete, encrypt }
+enum OperationType { hide, unhide, delete, encrypt, decrypt, reencrypt }
 
 class OperationProgressSheet extends StatefulWidget {
   final OperationType operationType;
@@ -109,7 +109,8 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
                   child: ElevatedButton(
                     onPressed: () => Navigator.pop(context),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accent,
+                      backgroundColor: context.accentColor,
+                      elevation: 0,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -163,6 +164,14 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
         icon = Icons.enhanced_encryption_outlined;
         color = Colors.orange;
         break;
+      case OperationType.decrypt:
+        icon = Icons.lock_open_outlined;
+        color = Colors.green;
+        break;
+      case OperationType.reencrypt:
+        icon = Icons.autorenew;
+        color = Colors.blue;
+        break;
     }
 
     return Container(
@@ -196,6 +205,10 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
         return 'Deleting Files';
       case OperationType.encrypt:
         return 'Encrypting Files';
+      case OperationType.decrypt:
+        return 'Removing Encryption';
+      case OperationType.reencrypt:
+        return 'Re-encrypting Files';
     }
   }
 
@@ -389,17 +402,19 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
   }
 
   Widget _buildCompleteState() {
+    final successColor =
+        context.isDarkMode ? AppColors.darkSuccess : AppColors.success;
     return Column(
       children: [
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.green.withValues(alpha: 0.1),
+            color: successColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             children: [
-              const Icon(Icons.check_circle, color: Colors.green, size: 32),
+              Icon(Icons.check_circle, color: successColor, size: 32),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(

@@ -61,6 +61,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
           : _buildTagsListView(tagsAsync),
       floatingActionButton: _selectedTag == null
           ? FloatingActionButton.extended(
+              elevation: 0,
               onPressed: _showCreateTagDialog,
               backgroundColor: context.accentColor,
               icon: const Icon(Icons.add, color: Colors.white),
@@ -308,6 +309,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: context.accentColor,
               foregroundColor: Colors.white,
+              elevation: 0,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),

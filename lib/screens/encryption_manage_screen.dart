@@ -5,30 +5,38 @@ import '../models/vaulted_file.dart';
 import '../providers/vault_providers.dart';
 import '../themes/app_colors.dart';
 import '../widgets/operation_progress_sheet.dart';
-import '../widgets/re_encrypt_warning_dialog.dart';
 
-class ReEncryptFilePickerScreen extends ConsumerStatefulWidget {
-  final EncryptionAlgorithm targetAlgorithm;
+class EncryptionManageScreen extends ConsumerStatefulWidget {
+  final VaultEncryptionAction action;
 
-  const ReEncryptFilePickerScreen({
+  /// Algorithm to apply when adding encryption. Ignored for removeEncryption.
+  final EncryptionAlgorithm algorithm;
+
+  const EncryptionManageScreen({
     super.key,
-    required this.targetAlgorithm,
+    required this.action,
+    required this.algorithm,
   });
 
   @override
-  ConsumerState<ReEncryptFilePickerScreen> createState() =>
-      _ReEncryptFilePickerScreenState();
+  ConsumerState<EncryptionManageScreen> createState() =>
+      _EncryptionManageScreenState();
 }
 
-class _ReEncryptFilePickerScreenState
-    extends ConsumerState<ReEncryptFilePickerScreen> {
+class _EncryptionManageScreenState
+    extends ConsumerState<EncryptionManageScreen> {
   final Set<String> _selectedIds = {};
-  bool _isReEncrypting = false;
+  bool _isRunning = false;
   String _searchQuery = '';
 
-  void _setSearchQuery(String value) {
-    setState(() => _searchQuery = value.trim().toLowerCase());
-  }
+  static const int _largeFileThresholdBytes = 50 * 1024 * 1024;
+
+  bool get _isEncrypt => widget.action == VaultEncryptionAction.encrypt;
+
+  String get _actionVerb => _isEncrypt ? 'Encrypt' : 'Remove Encryption';
+
+  void _setSearchQuery(String value) =>
+      setState(() => _searchQuery = value.trim().toLowerCase());
 
   String _formatSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
@@ -40,7 +48,7 @@ class _ReEncryptFilePickerScreenState
   }
 
   String _formatAlgorithm(EncryptionAlgorithm? algo) {
-    if (algo == null) return 'Unknown';
+    if (algo == null) return 'None';
     return algo == EncryptionAlgorithm.aes256Ctr ? 'AES-CTR' : 'AES-GCM';
   }
 
@@ -59,21 +67,37 @@ class _ReEncryptFilePickerScreenState
     }
   }
 
+  List<VaultedFile> _eligibleFiles(AsyncValue<List<VaultedFile>> filesAsync) {
+    return filesAsync.whenOrNull(
+          data: (files) => files
+              .where((f) => _isEncrypt ? !f.isEncrypted : f.isEncrypted)
+              .toList(),
+        ) ??
+        [];
+  }
+
+  List<VaultedFile> _applySearchFilter(List<VaultedFile> files) {
+    if (_searchQuery.isEmpty) return files;
+    return files
+        .where((f) => f.originalName.toLowerCase().contains(_searchQuery))
+        .toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final filesAsync = ref.watch(vaultNotifierProvider);
-    final encryptedFiles = _encryptedFiles(filesAsync);
-    final filteredFiles = _applySearchFilter(encryptedFiles);
+    final eligible = _eligibleFiles(filesAsync);
+    final filtered = _applySearchFilter(eligible);
 
     return Scaffold(
       backgroundColor: context.backgroundColor,
       appBar: AppBar(
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: context.textPrimary),
-          onPressed: _isReEncrypting ? null : () => Navigator.pop(context),
+          onPressed: _isRunning ? null : () => Navigator.pop(context),
         ),
         title: Text(
-          'Select Files to Re-Encrypt',
+          'Select Files to $_actionVerb',
           style: TextStyle(
             fontFamily: 'ProductSans',
             color: context.textPrimary,
@@ -83,12 +107,11 @@ class _ReEncryptFilePickerScreenState
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          if (!_isReEncrypting)
+          if (!_isRunning)
             TextButton(
               onPressed: () {
                 setState(() {
-                  final filteredIds =
-                      filteredFiles.map((f) => f.id).toSet();
+                  final filteredIds = filtered.map((f) => f.id).toSet();
                   if (filteredIds.every((id) => _selectedIds.contains(id))) {
                     _selectedIds.removeAll(filteredIds);
                   } else {
@@ -97,8 +120,8 @@ class _ReEncryptFilePickerScreenState
                 });
               },
               child: Text(
-                filteredFiles.isNotEmpty &&
-                        filteredFiles.every((f) => _selectedIds.contains(f.id))
+                filtered.isNotEmpty &&
+                        filtered.every((f) => _selectedIds.contains(f.id))
                     ? 'Deselect All'
                     : 'Select All',
                 style: TextStyle(
@@ -122,16 +145,22 @@ class _ReEncryptFilePickerScreenState
             ),
           ),
         ),
-        data: (files) {
-          if (encryptedFiles.isEmpty) {
+        data: (_) {
+          if (eligible.isEmpty) {
             return Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.lock_open, size: 64, color: context.textTertiary),
+                  Icon(
+                    _isEncrypt ? Icons.lock_open : Icons.lock_outline,
+                    size: 64,
+                    color: context.textTertiary,
+                  ),
                   const SizedBox(height: 16),
                   Text(
-                    'No encrypted files',
+                    _isEncrypt
+                        ? 'No unencrypted files'
+                        : 'No encrypted files',
                     style: TextStyle(
                       fontFamily: 'ProductSans',
                       fontSize: 18,
@@ -154,12 +183,16 @@ class _ReEncryptFilePickerScreenState
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline, color: context.accentColor, size: 20),
+                    Icon(Icons.info_outline,
+                        color: context.accentColor, size: 20),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Target: ${widget.targetAlgorithm.displayName}\n'
-                        '${_selectedIds.length} of ${filteredFiles.length} selected',
+                        _isEncrypt
+                            ? 'Will encrypt with ${widget.algorithm.displayName}\n'
+                                '${_selectedIds.length} of ${filtered.length} selected'
+                            : 'Encryption will be removed (files stored as plaintext)\n'
+                                '${_selectedIds.length} of ${filtered.length} selected',
                         style: TextStyle(
                           fontFamily: 'ProductSans',
                           fontSize: 13,
@@ -185,16 +218,19 @@ class _ReEncryptFilePickerScreenState
                       fontFamily: 'ProductSans',
                       color: context.textTertiary,
                     ),
-                    prefixIcon: Icon(Icons.search, color: context.textTertiary),
+                    prefixIcon:
+                        Icon(Icons.search, color: context.textTertiary),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
-                            icon: Icon(Icons.clear, color: context.textTertiary),
+                            icon:
+                                Icon(Icons.clear, color: context.textTertiary),
                             onPressed: () => _setSearchQuery(''),
                           )
                         : null,
                     filled: true,
                     fillColor: context.surfaceColor,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    contentPadding:
+                        const EdgeInsets.symmetric(vertical: 12),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(color: context.dividerColor),
@@ -212,7 +248,7 @@ class _ReEncryptFilePickerScreenState
               ),
               const SizedBox(height: 8),
               Expanded(
-                child: filteredFiles.isEmpty
+                child: filtered.isEmpty
                     ? Center(
                         child: Text(
                           'No files match your search',
@@ -225,19 +261,17 @@ class _ReEncryptFilePickerScreenState
                       )
                     : ListView.builder(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: filteredFiles.length,
+                        itemCount: filtered.length,
                         itemBuilder: (context, index) {
-                          final file = filteredFiles[index];
+                          final file = filtered[index];
                           final isSelected = _selectedIds.contains(file.id);
-                          final needsReEncrypt =
-                              file.encryptionAlgorithm != widget.targetAlgorithm;
-
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 8),
                             child: Container(
                               decoration: BoxDecoration(
                                 color: isSelected
-                                    ? context.accentColor.withValues(alpha: 0.08)
+                                    ? context.accentColor
+                                        .withValues(alpha: 0.08)
                                     : context.surfaceColor,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
@@ -265,20 +299,19 @@ class _ReEncryptFilePickerScreenState
                                 ),
                                 subtitle: Row(
                                   children: [
-                                    if (file.fileSize > _largeFileThresholdBytes) ...[
-                                      Icon(Icons.warning_amber, size: 14, color: Colors.orange),
+                                    if (file.fileSize >
+                                        _largeFileThresholdBytes) ...[
+                                      Icon(Icons.warning_amber,
+                                          size: 14, color: Colors.orange),
                                       const SizedBox(width: 4),
                                     ],
                                     Expanded(
                                       child: Text(
-                                        '${_formatSize(file.fileSize)} • ${_formatAlgorithm(file.encryptionAlgorithm)}'
-                                        '${needsReEncrypt ? ' → ${_formatAlgorithm(widget.targetAlgorithm)}' : ' (no change)'}',
+                                        '${_formatSize(file.fileSize)} • ${_formatAlgorithm(file.encryptionAlgorithm)}',
                                         style: TextStyle(
                                           fontFamily: 'ProductSans',
                                           fontSize: 12,
-                                          color: needsReEncrypt
-                                              ? context.textSecondary
-                                              : context.textTertiary,
+                                          color: context.textSecondary,
                                         ),
                                       ),
                                     ),
@@ -286,7 +319,7 @@ class _ReEncryptFilePickerScreenState
                                 ),
                                 trailing: Checkbox(
                                   value: isSelected,
-                                  onChanged: _isReEncrypting
+                                  onChanged: _isRunning
                                       ? null
                                       : (value) {
                                           setState(() {
@@ -299,7 +332,7 @@ class _ReEncryptFilePickerScreenState
                                         },
                                   activeColor: context.accentColor,
                                 ),
-                                onTap: _isReEncrypting
+                                onTap: _isRunning
                                     ? null
                                     : () {
                                         setState(() {
@@ -321,12 +354,12 @@ class _ReEncryptFilePickerScreenState
                 child: SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
-                    onPressed: _selectedIds.isEmpty || _isReEncrypting
+                    onPressed: _selectedIds.isEmpty || _isRunning
                         ? null
-                        : () => _startReEncrypt(),
-                    icon: const Icon(Icons.sync),
+                        : _start,
+                    icon: Icon(_isEncrypt ? Icons.lock_outline : Icons.lock_open),
                     label: Text(
-                      'Re-Encrypt ${_selectedIds.length} File(s)',
+                      '$_actionVerb ${_selectedIds.length} File(s)',
                       style: const TextStyle(fontFamily: 'ProductSans'),
                     ),
                     style: FilledButton.styleFrom(
@@ -344,26 +377,12 @@ class _ReEncryptFilePickerScreenState
     );
   }
 
-  static const int _largeFileThresholdBytes = 50 * 1024 * 1024;
-
-  List<VaultedFile> _encryptedFiles(AsyncValue<List<VaultedFile>> filesAsync) {
-    return filesAsync.whenOrNull(
-          data: (files) => files.where((f) => f.isEncrypted).toList(),
-        ) ??
-        [];
-  }
-
-  List<VaultedFile> _applySearchFilter(List<VaultedFile> files) {
-    if (_searchQuery.isEmpty) return files;
-    return files
-        .where((f) => f.originalName.toLowerCase().contains(_searchQuery))
-        .toList();
-  }
-
-  Future<void> _startReEncrypt() async {
-    final encryptedFiles = _encryptedFiles(ref.read(vaultNotifierProvider));
-    final largeFiles = encryptedFiles
-        .where((f) => _selectedIds.contains(f.id) && f.fileSize > _largeFileThresholdBytes)
+  Future<void> _start() async {
+    final eligible = _eligibleFiles(ref.read(vaultNotifierProvider));
+    final largeFiles = eligible
+        .where((f) =>
+            _selectedIds.contains(f.id) &&
+            f.fileSize > _largeFileThresholdBytes)
         .toList();
 
     if (largeFiles.isNotEmpty) {
@@ -373,7 +392,8 @@ class _ReEncryptFilePickerScreenState
           backgroundColor: context.surfaceColor,
           title: Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 24),
+              Icon(Icons.warning_amber_rounded,
+                  color: Colors.orange, size: 24),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -386,54 +406,24 @@ class _ReEncryptFilePickerScreenState
               ),
             ],
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${largeFiles.length} file(s) over 50MB will be re-encrypted. This may take a long time and could corrupt files if interrupted.',
-                style: TextStyle(
-                  fontFamily: 'ProductSans',
-                  color: context.textSecondary,
-                  fontSize: 14,
-                ),
-              ),
-              const SizedBox(height: 12),
-              ...largeFiles.take(5).map((f) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  '• ${f.originalName} (${_formatSize(f.fileSize)})',
-                  style: TextStyle(
-                    fontFamily: 'ProductSans',
-                    fontSize: 12,
-                    color: context.textTertiary,
-                  ),
-                ),
-              )),
-              if (largeFiles.length > 5)
-                Text(
-                  '...and ${largeFiles.length - 5} more',
-                  style: TextStyle(
-                    fontFamily: 'ProductSans',
-                    fontSize: 12,
-                    color: context.textTertiary,
-                  ),
-                ),
-            ],
+          content: Text(
+            '${largeFiles.length} file(s) over 50MB will be processed. This may '
+            'take a long time and could corrupt files if interrupted.',
+            style: TextStyle(
+              fontFamily: 'ProductSans',
+              color: context.textSecondary,
+              fontSize: 14,
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: Text(
-                'Cancel',
-                style: TextStyle(color: context.textSecondary),
-              ),
+              child: Text('Cancel',
+                  style: TextStyle(color: context.textSecondary)),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.orange,
-              ),
+              style: FilledButton.styleFrom(backgroundColor: Colors.orange),
               child: const Text('Proceed'),
             ),
           ],
@@ -442,12 +432,80 @@ class _ReEncryptFilePickerScreenState
       if (proceed != true || !mounted) return;
     }
 
-    final warningAcknowledged = await showReEncryptWarningDialog(
+    final confirmed = await showDialog<bool>(
       context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: context.surfaceColor,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded,
+                color: AppColors.warning, size: 28),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                '$_actionVerb Warning',
+                style: TextStyle(
+                  fontFamily: 'ProductSans',
+                  fontWeight: FontWeight.bold,
+                  color: context.textPrimary,
+                  fontSize: 20,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          _isEncrypt
+              ? 'Each selected file will be rewritten with encryption. If the '
+                  'process is interrupted — dead battery, crash, force-stop, or '
+                  'running out of storage — some files may be left corrupted and '
+                  'permanently unrecoverable. Ensure your device is charged and '
+                  'has enough free storage before continuing.'
+              : 'Each selected file will be decrypted and rewritten as plaintext, '
+                  'removing its encryption. If the process is interrupted, some '
+                  'files may be left corrupted and permanently unrecoverable. '
+                  'Ensure your device is charged and has enough free storage '
+                  'before continuing.',
+          style: TextStyle(
+            fontFamily: 'ProductSans',
+            color: context.textSecondary,
+            fontSize: 14,
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel',
+                style: TextStyle(color: context.textSecondary)),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
+            ),
+            child: const Text('I Understand, Continue',
+                style: TextStyle(fontFamily: 'ProductSans')),
+          ),
+        ],
+      ),
     );
-    if (warningAcknowledged != true || !mounted) return;
+    if (confirmed != true || !mounted) return;
 
-    setState(() => _isReEncrypting = true);
+    await _runWithBottomSheet();
+  }
+
+  // Runs the operation off the main isolate (pool) and surfaces progress as a
+  // modal bottom sheet — same pattern as gallery_vault_screen batch ops. The
+  // sheet stays open during the await, then shows a Done state on success.
+  Future<void> _runWithBottomSheet() async {
+    setState(() => _isRunning = true);
 
     final progressState = ValueNotifier<OperationProgressState>(
       OperationProgressState(
@@ -455,7 +513,7 @@ class _ReEncryptFilePickerScreenState
         currentFileName: 'Preparing...',
         statusMessage: 'Starting...',
         isProcessing: true,
-        isEncrypting: true,
+        isEncrypting: _isEncrypt,
       ),
     );
 
@@ -487,7 +545,8 @@ class _ReEncryptFilePickerScreenState
       builder: (ctx) => ValueListenableBuilder<OperationProgressState>(
         valueListenable: progressState,
         builder: (context, state, _) => OperationProgressSheet(
-          operationType: OperationType.reencrypt,
+          operationType:
+              _isEncrypt ? OperationType.encrypt : OperationType.decrypt,
           totalFiles: state.totalFiles,
           currentFile: state.currentFile,
           currentFileName: state.currentFileName,
@@ -501,29 +560,34 @@ class _ReEncryptFilePickerScreenState
       ),
     );
 
-    final result = await ref.read(vaultServiceProvider).reEncryptVault(
-          widget.targetAlgorithm,
-          fileFilter: _selectedIds,
-          onProgress: onProgress,
-        );
+    final vaultService = ref.read(vaultServiceProvider);
+    final result = _isEncrypt
+        ? await vaultService.encryptVaultFiles(
+            widget.algorithm,
+            fileFilter: _selectedIds,
+            onProgress: onProgress,
+          )
+        : await vaultService.removeEncryption(
+            fileFilter: _selectedIds,
+            onProgress: onProgress,
+          );
 
     if (!mounted) {
       progressState.dispose();
       return;
     }
 
-    ref.invalidate(vaultSettingsProvider);
     ref.invalidate(vaultNotifierProvider);
 
     if (result < 0) {
       Navigator.of(context).pop(); // close sheet
       progressState.dispose();
-      setState(() => _isReEncrypting = false);
+      setState(() => _isRunning = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'Re-encryption failed',
-            style: TextStyle(fontFamily: 'ProductSans'),
+            '$_actionVerb failed',
+            style: const TextStyle(fontFamily: 'ProductSans'),
           ),
         ),
       );
@@ -541,7 +605,7 @@ class _ReEncryptFilePickerScreenState
     await sheetFuture; // user taps Done
     progressState.dispose();
     if (!mounted) return;
-    setState(() => _isReEncrypting = false);
-    Navigator.of(context).pop(); // pop picker
+    setState(() => _isRunning = false);
+    Navigator.of(context).pop(); // pop picker, return to settings
   }
 }

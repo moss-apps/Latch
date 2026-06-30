@@ -4,6 +4,7 @@ import '../models/encryption_algorithm.dart';
 import '../providers/vault_providers.dart';
 import '../services/vault_service.dart';
 import '../themes/app_colors.dart';
+import 'encryption_manage_screen.dart';
 import 're_encrypt_file_picker_screen.dart';
 
 class EncryptionSettingsScreen extends ConsumerStatefulWidget {
@@ -104,6 +105,67 @@ class _EncryptionSettingsScreenState
                   backgroundColor: context.accentColor,
                   foregroundColor: Colors.white,
                 ),
+              ),
+              const SizedBox(height: 24),
+              _buildSectionTitle(context, 'Manage File Encryption'),
+              const SizedBox(height: 8),
+              Text(
+                'Encrypt unencrypted files, or remove encryption to store files as plaintext.',
+                style: TextStyle(
+                  fontFamily: 'ProductSans',
+                  fontSize: 12,
+                  color: context.textTertiary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => EncryptionManageScreen(
+                            action: VaultEncryptionAction.encrypt,
+                            algorithm: settings.encryptionAlgorithm,
+                          ),
+                        ),
+                      ),
+                      icon: const Icon(Icons.lock_outline),
+                      label: const Text(
+                        'Encrypt',
+                        style: TextStyle(fontFamily: 'ProductSans'),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: context.accentColor,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => EncryptionManageScreen(
+                            action: VaultEncryptionAction.removeEncryption,
+                            algorithm: settings.encryptionAlgorithm,
+                          ),
+                        ),
+                      ),
+                      icon: const Icon(Icons.lock_open),
+                      label: const Text(
+                        'Remove',
+                        style: TextStyle(fontFamily: 'ProductSans'),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: context.surfaceColor,
+                        foregroundColor: context.textPrimary,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
               _buildSectionTitle(context, 'Current Configuration'),

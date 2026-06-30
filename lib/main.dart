@@ -83,10 +83,10 @@ class _AppInitializerState extends ConsumerState<AppInitializer> {
     _checkAuthStatus();
 
     final updateService = ref.read(updateServiceProvider);
-    _updateSub = updateService.onUpdateCheck.listen((update) {
-      if (update != null) {
-        _showUpdateDialog(update);
-      }
+    _updateSub = updateService.onUpdateCheck.listen((update) async {
+      if (update == null) return;
+      if (await updateService.isVersionSkipped(update.latestVersion)) return;
+      _showUpdateDialog(update);
     });
   }
 
@@ -120,6 +120,16 @@ class _AppInitializerState extends ConsumerState<AppInitializer> {
             onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Later'),
           ),
+          if (!isPlayStore && update.latestVersion != null)
+            TextButton(
+              onPressed: () {
+                ref
+                    .read(updateServiceProvider)
+                    .skipVersion(update.latestVersion!);
+                Navigator.pop(dialogContext);
+              },
+              child: const Text("Don't show again"),
+            ),
           FilledButton(
             onPressed: () {
               Navigator.pop(dialogContext);

@@ -1337,7 +1337,14 @@ class EncryptionService {
     }
   }
 
-  /// Decrypt file in isolate pool (for large files, with real progress)
+  /// Decrypt file in isolate pool (for large files, with real progress).
+  ///
+  /// [cancelToken], if provided, is bound to the isolate job's kill handle as
+  /// soon as the job dispatches, so the caller can cancel it. Cancellation is
+  /// safe: the worker writes to `destinationPath.tmp` and only renames to
+  /// `destinationPath` on success, so killing it leaves no partial final file —
+  /// only an orphaned `.tmp` that VaultService.cleanupTemp reaps. The source
+  /// encrypted file is read-only.
   Future<FileDecryptionResult> decryptFileInIsolate(
     String encryptedPath,
     String destinationPath,
@@ -1345,6 +1352,7 @@ class EncryptionService {
     bool isDecoy = false,
     Uint8List? derivedKey,
     Function(int bytesProcessed, int totalBytes)? onProgress,
+    CancelToken? cancelToken,
   }) async {
     try {
       final encryptedFile = File(encryptedPath);
@@ -1355,7 +1363,15 @@ class EncryptionService {
         );
       }
 
+      if (cancelToken?.isCancelled == true) {
+        return FileDecryptionResult(success: false, error: 'Cancelled');
+      }
+
       final key = await _resolveKey(isDecoy: isDecoy, derivedKey: derivedKey);
+
+      if (cancelToken?.isCancelled == true) {
+        return FileDecryptionResult(success: false, error: 'Cancelled');
+      }
 
       final job = _pool!.decryptFile(
         encryptedPath: encryptedPath,
@@ -1364,6 +1380,7 @@ class EncryptionService {
         ivBase64: ivBase64,
         onProgress: onProgress,
       );
+      cancelToken?.bind(job.cancel);
 
       final result = await job.future;
 
@@ -1486,9 +1503,9 @@ class EncryptionService {
     bool isDecoy = false,
     Uint8List? oldDerivedKey,
     Uint8List? newDerivedKey,
+    void Function(int bytesProcessed, int totalBytes, bool isEncrypt)? onProgress,
   }) async {
-    final format = detectFileFormat(filePath);
-    final isLegacyCbc = (format == 0 || format == 3);
+    final isLegacyCbc = _isLegacyCbcFile(filePath);
 
     final key = await _resolveKey(isDecoy: isDecoy, derivedKey: oldDerivedKey);
     final tempDir = await _createAppPrivateTemp('lkr_reencrypt_');
@@ -1509,6 +1526,9 @@ class EncryptionService {
           destinationPath: tempDecPath,
           key: key,
           ivBase64: oldIvBase64,
+          onProgress: onProgress == null
+              ? null
+              : (p, t) => onProgress(p, t, false),
         );
         final decResult = await decJob.future;
         if (decResult.needsMigration) {
@@ -1523,6 +1543,9 @@ class EncryptionService {
         destinationPath: filePath,
         key: newKey,
         useGcm: useGcm,
+        onProgress: onProgress == null
+            ? null
+            : (p, t) => onProgress(p, t, true),
       );
       final encResult = await encJob.future;
 
@@ -1538,9 +1561,104 @@ class EncryptionService {
     }
   }
 
+  /// Encrypt a plaintext file in place, overwriting [filePath] with ciphertext.
+  /// Atomic: the pool writes a temp file, then we rename it onto [filePath].
+  /// Adds encryption to an already-vaulted plaintext file. Returns the new IV (base64).
+  Future<String> encryptFileInPlace(
+    String filePath, {
+    required bool useGcm,
+    bool isDecoy = false,
+    required Uint8List derivedKey,
+    void Function(int bytesProcessed, int totalBytes)? onProgress,
+  }) async {
+    final tempDir = await _createAppPrivateTemp('lkr_encrypt_');
+    final tempEncPath = '${tempDir.path}/encrypted';
+    try {
+      try { await File('$filePath.tmp').delete(); } catch (_) {}
+
+      final key = await _resolveKey(isDecoy: isDecoy, derivedKey: derivedKey);
+      final encJob = _pool!.encryptFile(
+        sourcePath: filePath,
+        destinationPath: tempEncPath,
+        key: key,
+        useGcm: useGcm,
+        onProgress: onProgress,
+      );
+      final encResult = await encJob.future;
+
+      // pool wrote tempEncPath.tmp -> tempEncPath; atomically replace the original.
+      await File(tempEncPath).rename(filePath);
+      return encResult.ivBase64!;
+    } finally {
+      try { await tempDir.delete(recursive: true); } catch (_) {}
+    }
+  }
+
+  /// Decrypt a file in place, overwriting [filePath] with plaintext and thus
+  /// removing its encryption. Atomic via temp + rename. Legacy CBC is decrypted
+  /// to memory (like reEncryptFile); GCM/CTR go through the isolate pool.
+  Future<void> decryptFileInPlace(
+    String filePath,
+    String ivBase64, {
+    bool isDecoy = false,
+    Uint8List? derivedKey,
+    void Function(int bytesProcessed, int totalBytes)? onProgress,
+  }) async {
+    final isLegacyCbc = _isLegacyCbcFile(filePath);
+    final tempDir = await _createAppPrivateTemp('lkr_decrypt_');
+    final tempDecPath = '${tempDir.path}/decrypted';
+    try {
+      try { await File('$filePath.tmp').delete(); } catch (_) {}
+
+      if (isLegacyCbc) {
+        final decrypted = await decryptFileToMemory(
+          filePath, ivBase64,
+          isDecoy: isDecoy, derivedKey: derivedKey,
+        );
+        if (!decrypted.success || decrypted.data == null) {
+          throw Exception('Failed to decrypt CBC file: ${decrypted.error}');
+        }
+        await File(tempDecPath).writeAsBytes(decrypted.data!);
+      } else {
+        final key = await _resolveKey(isDecoy: isDecoy, derivedKey: derivedKey);
+        final decJob = _pool!.decryptFile(
+          encryptedPath: filePath,
+          destinationPath: tempDecPath,
+          key: key,
+          ivBase64: ivBase64,
+          onProgress: onProgress,
+        );
+        await decJob.future;
+      }
+
+      await File(tempDecPath).rename(filePath);
+    } finally {
+      try { await tempDir.delete(recursive: true); } catch (_) {}
+    }
+  }
+
   /// Check what encryption format a file uses
   /// Returns: 0=unknown/legacy CBC, 1=GCM, 2=CTR, 3=CBC with header
   int detectFileFormat(String filePath) => HeaderCodec.detectFormatFromFile(filePath);
+
+  // ponytail: direct magic-byte check instead of detectFileFormat, whose LE/BE
+  // mismatch in header_codec.dart always returns 0 (format unknown). GCM/CTR
+  // must reach the streaming isolate pool; only real CBC (or unreadable) keeps
+  // the proven whole-file decryptFileToMemory path. Upgrade path: fix the
+  // header_codec endianness bug and this collapses back to detectFileFormat.
+  bool _isLegacyCbcFile(String path) {
+    try {
+      final f = File(path).openSync(mode: FileMode.read);
+      final b = f.readSync(4);
+      f.closeSync();
+      if (b.length < 4) return true;
+      // On-disk prefix is always 0x4C,0x4B,0x52,X. X: 0x47=GCMv1,0x32=GCMv2,0x53=CTR,0x44=CBC.
+      final tag = b[3];
+      return tag != 0x47 && tag != 0x32 && tag != 0x53;
+    } catch (_) {
+      return true;
+    }
+  }
 
   static const String _rotationJournalKey = 'key_rotation_journal';
   static const String _oldMasterKeyKey = 'vault_master_key_old';

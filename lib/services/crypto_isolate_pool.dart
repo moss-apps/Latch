@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:pointycastle/export.dart';
@@ -301,6 +300,34 @@ class CryptoJob<T> {
     required this.future,
     required this.cancel,
   });
+}
+
+/// Cooperative cancellation handle threaded through the decrypt pipeline.
+///
+/// Bundles two things the open flow needs to cancel cleanly:
+/// - a flag the orchestrator checks at stage boundaries (e.g. after the
+///   un-killable PBKDF2 key derivation, before dispatching decrypt), and
+/// - an isolate-kill hook [bind]ed by the crypto layer when a killable job
+///   actually starts.
+///
+/// [cancel] is idempotent. Derivation runs on `compute` and cannot be killed
+/// mid-call; cancelling during derive flips the flag so the next boundary
+/// aborts, and the orphaned derive result is discarded (bounded cost).
+class CancelToken {
+  bool _cancelled = false;
+  VoidCallback? _kill;
+
+  bool get isCancelled => _cancelled;
+
+  void cancel() {
+    if (_cancelled) return;
+    _cancelled = true;
+    _kill?.call();
+  }
+
+  /// Attach the isolate job's kill handle. Called by the crypto layer when a
+  /// killable job starts. Single-use per token.
+  void bind(VoidCallback kill) => _kill = kill;
 }
 
 class PoolEncryptResult {

@@ -216,6 +216,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
 
   Widget _buildSetupButton() {
     return Container(
+      width: double.infinity,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         gradient: LinearGradient(

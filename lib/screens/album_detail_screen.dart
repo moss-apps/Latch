@@ -50,6 +50,7 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
       floatingActionButton: _isSelectionMode
           ? null
           : FloatingActionButton.extended(
+              elevation: 0,
               onPressed: _showAddFilesSheet,
               backgroundColor: context.accentColor,
               icon: const Icon(Icons.add, color: Colors.white),
