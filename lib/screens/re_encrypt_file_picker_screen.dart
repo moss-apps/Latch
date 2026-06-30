@@ -4,6 +4,7 @@ import '../models/encryption_algorithm.dart';
 import '../models/vaulted_file.dart';
 import '../providers/vault_providers.dart';
 import '../themes/app_colors.dart';
+import '../widgets/operation_progress_sheet.dart';
 import '../widgets/re_encrypt_warning_dialog.dart';
 
 class ReEncryptFilePickerScreen extends ConsumerStatefulWidget {
@@ -21,8 +22,13 @@ class ReEncryptFilePickerScreen extends ConsumerStatefulWidget {
 
 class _ReEncryptFilePickerScreenState
     extends ConsumerState<ReEncryptFilePickerScreen> {
-  Set<String> _selectedIds = {};
+  final Set<String> _selectedIds = {};
   bool _isReEncrypting = false;
+  String _searchQuery = '';
+
+  void _setSearchQuery(String value) {
+    setState(() => _searchQuery = value.trim().toLowerCase());
+  }
 
   String _formatSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
@@ -56,7 +62,8 @@ class _ReEncryptFilePickerScreenState
   @override
   Widget build(BuildContext context) {
     final filesAsync = ref.watch(vaultNotifierProvider);
-    final reEncryptProgress = ref.watch(reEncryptProvider);
+    final encryptedFiles = _encryptedFiles(filesAsync);
+    final filteredFiles = _applySearchFilter(encryptedFiles);
 
     return Scaffold(
       backgroundColor: context.backgroundColor,
@@ -80,17 +87,18 @@ class _ReEncryptFilePickerScreenState
             TextButton(
               onPressed: () {
                 setState(() {
-                  if (_selectedIds.length == _encryptedFiles(filesAsync).length) {
-                    _selectedIds = {};
+                  final filteredIds =
+                      filteredFiles.map((f) => f.id).toSet();
+                  if (filteredIds.every((id) => _selectedIds.contains(id))) {
+                    _selectedIds.removeAll(filteredIds);
                   } else {
-                    _selectedIds = _encryptedFiles(filesAsync)
-                        .map((f) => f.id)
-                        .toSet();
+                    _selectedIds.addAll(filteredIds);
                   }
                 });
               },
               child: Text(
-                _selectedIds.length == _encryptedFiles(filesAsync).length
+                filteredFiles.isNotEmpty &&
+                        filteredFiles.every((f) => _selectedIds.contains(f.id))
                     ? 'Deselect All'
                     : 'Select All',
                 style: TextStyle(
@@ -115,8 +123,6 @@ class _ReEncryptFilePickerScreenState
           ),
         ),
         data: (files) {
-          final encryptedFiles = _encryptedFiles(filesAsync);
-
           if (encryptedFiles.isEmpty) {
             return Center(
               child: Column(
@@ -153,7 +159,7 @@ class _ReEncryptFilePickerScreenState
                     Expanded(
                       child: Text(
                         'Target: ${widget.targetAlgorithm.displayName}\n'
-                        '${_selectedIds.length} of ${encryptedFiles.length} selected',
+                        '${_selectedIds.length} of ${filteredFiles.length} selected',
                         style: TextStyle(
                           fontFamily: 'ProductSans',
                           fontSize: 13,
@@ -164,137 +170,151 @@ class _ReEncryptFilePickerScreenState
                   ],
                 ),
               ),
-              if (reEncryptProgress.isInProgress && _isReEncrypting)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    children: [
-                      LinearProgressIndicator(
-                        value: reEncryptProgress.total > 0
-                            ? reEncryptProgress.current /
-                                reEncryptProgress.total
-                            : null,
-                        backgroundColor: context.dividerColor,
-                        valueColor: AlwaysStoppedAnimation(context.accentColor),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Re-encrypting ${reEncryptProgress.current} of ${reEncryptProgress.total}...',
-                        style: TextStyle(
-                          fontFamily: 'ProductSans',
-                          fontSize: 12,
-                          color: context.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: TextField(
+                  onChanged: _setSearchQuery,
+                  style: TextStyle(
+                    fontFamily: 'ProductSans',
+                    color: context.textPrimary,
+                    fontSize: 14,
                   ),
-                ),
-              if (reEncryptProgress.error != null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Text(
-                    reEncryptProgress.error!,
-                    style: const TextStyle(
+                  decoration: InputDecoration(
+                    hintText: 'Search files...',
+                    hintStyle: TextStyle(
                       fontFamily: 'ProductSans',
-                      color: Colors.red,
-                      fontSize: 12,
+                      color: context.textTertiary,
+                    ),
+                    prefixIcon: Icon(Icons.search, color: context.textTertiary),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(Icons.clear, color: context.textTertiary),
+                            onPressed: () => _setSearchQuery(''),
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: context.surfaceColor,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: context.dividerColor),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: context.dividerColor),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: context.accentColor),
                     ),
                   ),
                 ),
+              ),
+              const SizedBox(height: 8),
               Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: encryptedFiles.length,
-                  itemBuilder: (context, index) {
-                    final file = encryptedFiles[index];
-                    final isSelected = _selectedIds.contains(file.id);
-                    final needsReEncrypt =
-                        file.encryptionAlgorithm != widget.targetAlgorithm;
-
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? context.accentColor.withValues(alpha: 0.08)
-                              : context.surfaceColor,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isSelected
-                                ? context.accentColor
-                                : context.dividerColor,
+                child: filteredFiles.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No files match your search',
+                          style: TextStyle(
+                            fontFamily: 'ProductSans',
+                            fontSize: 16,
+                            color: context.textSecondary,
                           ),
                         ),
-                        child: ListTile(
-                          leading: Icon(
-                            _iconForType(file.type),
-                            color: isSelected
-                                ? context.accentColor
-                                : context.textSecondary,
-                          ),
-                          title: Text(
-                            file.originalName,
-                            style: TextStyle(
-                              fontFamily: 'ProductSans',
-                              fontSize: 14,
-                              color: context.textPrimary,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: Row(
-                            children: [
-                              if (file.fileSize > _largeFileThresholdBytes) ...[
-                                Icon(Icons.warning_amber, size: 14, color: Colors.orange),
-                                const SizedBox(width: 4),
-                              ],
-                              Expanded(
-                                child: Text(
-                                  '${_formatSize(file.fileSize)} • ${_formatAlgorithm(file.encryptionAlgorithm)}'
-                                  '${needsReEncrypt ? ' → ${_formatAlgorithm(widget.targetAlgorithm)}' : ' (no change)'}',
-                                  style: TextStyle(
-                                    fontFamily: 'ProductSans',
-                                    fontSize: 12,
-                                    color: needsReEncrypt
-                                        ? context.textSecondary
-                                        : context.textTertiary,
-                                  ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: filteredFiles.length,
+                        itemBuilder: (context, index) {
+                          final file = filteredFiles[index];
+                          final isSelected = _selectedIds.contains(file.id);
+                          final needsReEncrypt =
+                              file.encryptionAlgorithm != widget.targetAlgorithm;
+
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? context.accentColor.withValues(alpha: 0.08)
+                                    : context.surfaceColor,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? context.accentColor
+                                      : context.dividerColor,
                                 ),
                               ),
-                            ],
-                          ),
-                          trailing: Checkbox(
-                            value: isSelected,
-                            onChanged: _isReEncrypting
-                                ? null
-                                : (value) {
-                                    setState(() {
-                                      if (value == true) {
-                                        _selectedIds.add(file.id);
-                                      } else {
-                                        _selectedIds.remove(file.id);
-                                      }
-                                    });
-                                  },
-                            activeColor: context.accentColor,
-                          ),
-                          onTap: _isReEncrypting
-                              ? null
-                              : () {
-                                  setState(() {
-                                    if (isSelected) {
-                                      _selectedIds.remove(file.id);
-                                    } else {
-                                      _selectedIds.add(file.id);
-                                    }
-                                  });
-                                },
-                        ),
+                              child: ListTile(
+                                leading: Icon(
+                                  _iconForType(file.type),
+                                  color: isSelected
+                                      ? context.accentColor
+                                      : context.textSecondary,
+                                ),
+                                title: Text(
+                                  file.originalName,
+                                  style: TextStyle(
+                                    fontFamily: 'ProductSans',
+                                    fontSize: 14,
+                                    color: context.textPrimary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                subtitle: Row(
+                                  children: [
+                                    if (file.fileSize > _largeFileThresholdBytes) ...[
+                                      Icon(Icons.warning_amber, size: 14, color: Colors.orange),
+                                      const SizedBox(width: 4),
+                                    ],
+                                    Expanded(
+                                      child: Text(
+                                        '${_formatSize(file.fileSize)} • ${_formatAlgorithm(file.encryptionAlgorithm)}'
+                                        '${needsReEncrypt ? ' → ${_formatAlgorithm(widget.targetAlgorithm)}' : ' (no change)'}',
+                                        style: TextStyle(
+                                          fontFamily: 'ProductSans',
+                                          fontSize: 12,
+                                          color: needsReEncrypt
+                                              ? context.textSecondary
+                                              : context.textTertiary,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                trailing: Checkbox(
+                                  value: isSelected,
+                                  onChanged: _isReEncrypting
+                                      ? null
+                                      : (value) {
+                                          setState(() {
+                                            if (value == true) {
+                                              _selectedIds.add(file.id);
+                                            } else {
+                                              _selectedIds.remove(file.id);
+                                            }
+                                          });
+                                        },
+                                  activeColor: context.accentColor,
+                                ),
+                                onTap: _isReEncrypting
+                                    ? null
+                                    : () {
+                                        setState(() {
+                                          if (isSelected) {
+                                            _selectedIds.remove(file.id);
+                                          } else {
+                                            _selectedIds.add(file.id);
+                                          }
+                                        });
+                                      },
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                    );
-                  },
-                ),
               ),
               Padding(
                 padding: const EdgeInsets.all(16),
@@ -331,6 +351,13 @@ class _ReEncryptFilePickerScreenState
           data: (files) => files.where((f) => f.isEncrypted).toList(),
         ) ??
         [];
+  }
+
+  List<VaultedFile> _applySearchFilter(List<VaultedFile> files) {
+    if (_searchQuery.isEmpty) return files;
+    return files
+        .where((f) => f.originalName.toLowerCase().contains(_searchQuery))
+        .toList();
   }
 
   Future<void> _startReEncrypt() async {
@@ -421,21 +448,100 @@ class _ReEncryptFilePickerScreenState
     if (warningAcknowledged != true || !mounted) return;
 
     setState(() => _isReEncrypting = true);
-    await ref.read(reEncryptProvider.notifier).reEncryptVault(
+
+    final progressState = ValueNotifier<OperationProgressState>(
+      OperationProgressState(
+        totalFiles: _selectedIds.length,
+        currentFileName: 'Preparing...',
+        statusMessage: 'Starting...',
+        isProcessing: true,
+        isEncrypting: true,
+      ),
+    );
+
+    if (!mounted) {
+      progressState.dispose();
+      return;
+    }
+
+    void onProgress(
+      int current, int total, String name, int processed, int totalBytes,
+    ) {
+      progressState.value = progressState.value.copyWith(
+        totalFiles: total,
+        currentFile: current,
+        currentFileName: name,
+        totalSizeBytes: totalBytes,
+        processedSizeBytes: processed,
+        statusMessage: current >= total
+            ? 'Finalizing...'
+            : 'Processing ${current + 1} of $total...',
+      );
+    }
+
+    final sheetFuture = showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isDismissible: false,
+      enableDrag: false,
+      builder: (ctx) => ValueListenableBuilder<OperationProgressState>(
+        valueListenable: progressState,
+        builder: (context, state, _) => OperationProgressSheet(
+          operationType: OperationType.reencrypt,
+          totalFiles: state.totalFiles,
+          currentFile: state.currentFile,
+          currentFileName: state.currentFileName,
+          totalSizeBytes: state.totalSizeBytes,
+          processedSizeBytes: state.processedSizeBytes,
+          statusMessage: state.statusMessage,
+          isProcessing: state.isProcessing,
+          isComplete: state.isComplete,
+          isEncrypting: state.isEncrypting,
+        ),
+      ),
+    );
+
+    final result = await ref.read(vaultServiceProvider).reEncryptVault(
           widget.targetAlgorithm,
           fileFilter: _selectedIds,
+          onProgress: onProgress,
         );
-    if (mounted) {
+
+    if (!mounted) {
+      progressState.dispose();
+      return;
+    }
+
+    ref.invalidate(vaultSettingsProvider);
+    ref.invalidate(vaultNotifierProvider);
+
+    if (result < 0) {
+      Navigator.of(context).pop(); // close sheet
+      progressState.dispose();
       setState(() => _isReEncrypting = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text(
-            'Re-encryption complete',
+            'Re-encryption failed',
             style: TextStyle(fontFamily: 'ProductSans'),
           ),
         ),
       );
-      ref.invalidate(vaultNotifierProvider);
+      return;
     }
+
+    progressState.value = progressState.value.copyWith(
+      isComplete: true,
+      isProcessing: false,
+      currentFile: progressState.value.totalFiles,
+      processedSizeBytes: progressState.value.totalSizeBytes,
+      statusMessage: 'Completed successfully',
+    );
+
+    await sheetFuture; // user taps Done
+    progressState.dispose();
+    if (!mounted) return;
+    setState(() => _isReEncrypting = false);
+    Navigator.of(context).pop(); // pop picker
   }
 }
