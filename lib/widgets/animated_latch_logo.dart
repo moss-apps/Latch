@@ -85,8 +85,8 @@ class _LatchLogoPainter extends CustomPainter {
       ..sort((a, b) =>
           (_raw[a] - center).distance.compareTo((_raw[b] - center).distance));
 
-    const staggerSpan = 1.0;
-    const dotDur = 0.85;
+    const staggerSpan = 0.50;
+    const dotDur = 0.25;
     final n = _raw.length;
     final out = <_Dot>[];
     for (var k = 0; k < n; k++) {
