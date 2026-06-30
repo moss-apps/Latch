@@ -109,7 +109,7 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
                   child: ElevatedButton(
                     onPressed: () => Navigator.pop(context),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accent,
+                      backgroundColor: context.accentColor,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -401,17 +401,19 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
   }
 
   Widget _buildCompleteState() {
+    final successColor =
+        context.isDarkMode ? AppColors.darkSuccess : AppColors.success;
     return Column(
       children: [
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.green.withValues(alpha: 0.1),
+            color: successColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             children: [
-              const Icon(Icons.check_circle, color: Colors.green, size: 32),
+              Icon(Icons.check_circle, color: successColor, size: 32),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
