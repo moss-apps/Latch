@@ -10,6 +10,7 @@ import '../models/vault_folder.dart';
 import '../models/encryption_algorithm.dart';
 import 'encryption_service.dart';
 import 'compression_service.dart';
+import 'crypto_isolate_pool.dart';
 
 class FileProgressInfo {
   final int current;
@@ -1136,11 +1137,17 @@ class VaultService {
     return _encryptionService.deriveFileKeyAsync(masterKey, salt, file.kdfIterations!);
   }
 
-  /// Get the actual file from vault (decrypts if needed)
+  /// Get the actual file from vault (decrypts if needed).
+  ///
+  /// [cancelToken] makes the operation cooperative: it is checked after the
+  /// (un-killable) key derivation and bound to the decrypt isolate's kill
+  /// handle, so cancellation during either stage unblocks promptly. A
+  /// cancelled call returns null and writes no final file.
   Future<File?> getVaultedFile(
     String fileId, {
     bool isDecoy = false,
     Function(int processed, int total)? onProgress,
+    CancelToken? cancelToken,
   }) async {
     final vaultedFile = await getFileById(fileId, isDecoy: isDecoy);
     if (vaultedFile == null) return null;
@@ -1157,6 +1164,10 @@ class VaultService {
       final format = _encryptionService.detectFileFormat(vaultedFile.vaultPath);
       final isLegacyCbc = (format == 0 || format == 3);
       final derivedKey = await _deriveKeyForFile(vaultedFile, isDecoy: isDecoy);
+
+      // Derive runs on `compute` and can't be killed; abort here if the user
+      // cancelled during that window so we never dispatch the decrypt job.
+      if (cancelToken?.isCancelled == true) return null;
 
       FileDecryptionResult result;
       if (isLegacyCbc) {
@@ -1183,8 +1194,11 @@ class VaultService {
           isDecoy: isDecoy,
           derivedKey: derivedKey,
           onProgress: onProgress,
+          cancelToken: cancelToken,
         );
       }
+
+      if (cancelToken?.isCancelled == true) return null;
 
       if (result.success && result.decryptedPath != null) {
         return File(result.decryptedPath!);
