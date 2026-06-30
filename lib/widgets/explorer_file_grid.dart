@@ -61,11 +61,8 @@ class ExplorerFileGrid extends ConsumerWidget {
                   ),
                 ),
                 data: (files) {
-                  // In Sidebar Mode, we only show files in the grid
-                  final showFoldersInGrid =
-                      viewMode == ExplorerViewMode.navigation;
-                  final displayFolders =
-                      showFoldersInGrid ? folders : <VaultFolder>[];
+                  final isListView = viewMode == ExplorerViewMode.list;
+                  final displayFolders = folders;
 
                   if (displayFolders.isEmpty && files.isEmpty) {
                     return _buildEmptyState(context);
@@ -73,8 +70,7 @@ class ExplorerFileGrid extends ConsumerWidget {
 
                   // Combine folders and files into a single mixed list index
                   final folderCount = displayFolders.length;
-                  final fileCount = files.length;
-                  final totalItems = folderCount + fileCount;
+                  final totalItems = folderCount + files.length;
 
                   return RefreshIndicator(
                     onRefresh: () async {
@@ -83,43 +79,76 @@ class ExplorerFileGrid extends ConsumerWidget {
                       ref.invalidate(unfiledFilesProvider);
                     },
                     color: context.accentColor,
-                    child: GridView.builder(
-                      padding: const EdgeInsets.all(12),
-                      gridDelegate: ResponsiveGridDelegate.responsive(
-                        context,
-                        compact: 3,
-                        medium: 4,
-                        expanded: 6,
-                        crossAxisSpacing: 8,
-                        mainAxisSpacing: 8,
-                        childAspectRatio: 1,
-                      ),
-                      itemCount: totalItems,
-                      itemBuilder: (context, index) {
-                        if (index < folderCount) {
-                          // Render Folder Card
-                          return _buildFolderGridItem(
-                            context,
-                            ref,
-                            displayFolders[index],
-                          );
-                        } else {
-                          // Render File Card
-                          final fileIndex = index - folderCount;
-                          final file = files[fileIndex];
-                          final isSelected = selectedFiles.contains(file.id);
+                    child: isListView
+                        ? ListView.builder(
+                            padding: const EdgeInsets.all(12),
+                            itemCount: totalItems,
+                            itemBuilder: (context, index) {
+                              if (index < folderCount) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: _buildFolderListItem(
+                                    context,
+                                    ref,
+                                    displayFolders[index],
+                                  ),
+                                );
+                              }
+                              final file = files[index - folderCount];
+                              final isSelected =
+                                  selectedFiles.contains(file.id);
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: _buildFileListItem(
+                                  context,
+                                  ref,
+                                  file,
+                                  files,
+                                  isSelected,
+                                  isSelectionMode,
+                                ),
+                              );
+                            },
+                          )
+                        : GridView.builder(
+                            padding: const EdgeInsets.all(12),
+                            gridDelegate:
+                                ResponsiveGridDelegate.responsive(
+                              context,
+                              compact: 3,
+                              medium: 4,
+                              expanded: 6,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8,
+                              childAspectRatio: 1,
+                            ),
+                            itemCount: totalItems,
+                            itemBuilder: (context, index) {
+                              if (index < folderCount) {
+                                // Render Folder Card
+                                return _buildFolderGridItem(
+                                  context,
+                                  ref,
+                                  displayFolders[index],
+                                );
+                              } else {
+                                // Render File Card
+                                final fileIndex = index - folderCount;
+                                final file = files[fileIndex];
+                                final isSelected =
+                                    selectedFiles.contains(file.id);
 
-                          return _buildFileGridItem(
-                            context,
-                            ref,
-                            file,
-                            files, // Pass displaying files list for the viewer carousel
-                            isSelected,
-                            isSelectionMode,
-                          );
-                        }
-                      },
-                    ),
+                                return _buildFileGridItem(
+                                  context,
+                                  ref,
+                                  file,
+                                  files, // Pass displaying files list for the viewer carousel
+                                  isSelected,
+                                  isSelectionMode,
+                                );
+                              }
+                            },
+                          ),
                   );
                 },
               );
@@ -278,6 +307,176 @@ class ExplorerFileGrid extends ConsumerWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFolderListItem(
+    BuildContext context,
+    WidgetRef ref,
+    VaultFolder folder,
+  ) {
+    return GestureDetector(
+      onTap: () {
+        ref.read(explorerCurrentFolderIdProvider.notifier).state = folder.id;
+      },
+      onLongPress:
+          onFolderLongPress != null ? () => onFolderLongPress!(folder) : null,
+      child: Container(
+        decoration: BoxDecoration(
+          color: context.backgroundSecondary,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: context.borderColor.withValues(alpha: 0.5),
+            width: 1,
+          ),
+        ),
+        child: ListTile(
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          leading: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: context.accentColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(Icons.folder, color: context.accentColor, size: 24),
+          ),
+          title: Text(
+            folder.name,
+            style: TextStyle(
+              fontFamily: 'ProductSans',
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: context.textPrimary,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: Text(
+            '${folder.fileCount} file${folder.fileCount == 1 ? '' : 's'}',
+            style: TextStyle(
+              fontFamily: 'ProductSans',
+              fontSize: 11,
+              color: context.textSecondary,
+            ),
+          ),
+          trailing: Icon(Icons.chevron_right, color: context.textTertiary),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFileListItem(
+    BuildContext context,
+    WidgetRef ref,
+    VaultedFile file,
+    List<VaultedFile> allFiles,
+    bool isSelected,
+    bool isSelectionMode,
+  ) {
+    return GestureDetector(
+      onTap: () {
+        if (isSelectionMode) {
+          _toggleSelection(ref, file.id);
+        } else {
+          _showMediaHoldActionSheet(context, ref, file, allFiles);
+        }
+      },
+      onLongPress: () {
+        if (!isSelectionMode) {
+          HapticFeedback.mediumImpact();
+          _showMediaHoldActionSheet(context, ref, file, allFiles);
+        }
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: isSelected
+              ? context.accentColor.withValues(alpha: 0.08)
+              : context.backgroundSecondary,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? context.accentColor
+                : context.borderColor.withValues(alpha: 0.5),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: ListTile(
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          leading: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: _buildFileThumbnail(file, context),
+                ),
+              ),
+              if (isSelectionMode)
+                Positioned(
+                  bottom: -2,
+                  right: -2,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isSelected ? context.accentColor : Colors.white,
+                      border: Border.all(
+                        color:
+                            isSelected ? context.accentColor : Colors.black45,
+                        width: 2,
+                      ),
+                    ),
+                    padding: const EdgeInsets.all(2),
+                    child: isSelected
+                        ? const Icon(Icons.check,
+                            size: 12, color: Colors.white)
+                        : const SizedBox(width: 12, height: 12),
+                  ),
+                ),
+            ],
+          ),
+          title: Row(
+            children: [
+              if (file.isFavorite)
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Icon(Icons.favorite, size: 14, color: Colors.red),
+                ),
+              Expanded(
+                child: Text(
+                  file.originalName,
+                  style: TextStyle(
+                    fontFamily: 'ProductSans',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: context.textPrimary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          subtitle: Text(
+            '${file.type.displayName} \u2022 ${file.formattedSize} \u2022 ${file.formattedDateAdded}',
+            style: TextStyle(
+              fontFamily: 'ProductSans',
+              fontSize: 11,
+              color: context.textSecondary,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          trailing: file.isVideo
+              ? Icon(Icons.play_circle_outline,
+                  color: context.textSecondary, size: 22)
+              : null,
         ),
       ),
     );
