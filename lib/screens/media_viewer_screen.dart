@@ -13,6 +13,7 @@ import '../providers/vault_providers.dart';
 import '../services/auto_kill_service.dart';
 import '../themes/app_colors.dart';
 import '../utils/toast_utils.dart';
+import '../widgets/file_info_sheet.dart';
 
 enum _VideoLoadPhase { idle, decrypting, initializing, ready }
 
@@ -502,86 +503,15 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
 
   void _showFileInfo() {
     final file = _files[_currentIndex];
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => Container(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.7,
-        ),
-        decoration: BoxDecoration(
-          color: context.backgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'File Information',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: context.textPrimary,
-                        fontFamily: 'ProductSans',
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildInfoRow('Name', file.originalName),
-                    _buildInfoRow('Type', file.type.displayName),
-                    _buildInfoRow('Size', file.formattedSize),
-                    _buildInfoRow('Added', file.formattedDateAdded),
-                    if (file.isEncrypted) _buildInfoRow('Encrypted', 'Yes'),
-                    if (file.hasTags)
-                      _buildInfoRow('Tags', file.tags.join(', ')),
-                    if (file.viewCount > 0)
-                      _buildInfoRow('Views', file.viewCount.toString()),
-                    SizedBox(height: MediaQuery.of(context).padding.bottom),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontFamily: 'ProductSans',
-                color: context.textTertiary,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                fontFamily: 'ProductSans',
-                color: context.textPrimary,
-              ),
-            ),
-          ),
-        ],
-      ),
+    final extra = <(String, String)>[];
+    if (file.hasTags) extra.add(('Tags', file.tags.join(', ')));
+    if (file.viewCount > 0) extra.add(('Views', file.viewCount.toString()));
+    FileInfoSheet.show(
+      context,
+      file,
+      title: 'File Information',
+      typeLabel: file.type.displayName,
+      extraRows: extra.isEmpty ? null : extra,
     );
   }
 
