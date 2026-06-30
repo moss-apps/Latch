@@ -20,6 +20,7 @@ import '../services/whats_new_service.dart';
 import '../themes/app_colors.dart';
 import '../utils/toast_utils.dart';
 import '../utils/responsive_utils.dart';
+import '../widgets/file_info_sheet.dart';
 import '../widgets/office_conversion_confirm_dialog.dart';
 import '../widgets/per_file_encryption_sheet.dart';
 import 'albums_screen.dart';
@@ -1739,83 +1740,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
 
   /// Show file info dialog
   void _showFileInfo(VaultedFile file) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        title: Text(
-          'File Info',
-          style: TextStyle(
-            fontFamily: 'ProductSans',
-            color: context.textPrimary,
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildInfoRow('Name', file.originalName),
-            const SizedBox(height: 12),
-            _buildInfoRow('Type', file.extension.toUpperCase()),
-            const SizedBox(height: 12),
-            _buildInfoRow('Size', file.formattedSize),
-            const SizedBox(height: 12),
-            _buildInfoRow('Added', _formatDate(file.dateAdded)),
-            const SizedBox(height: 12),
-            _buildInfoRow('Encrypted', file.isEncrypted ? 'Yes' : 'No'),
-            if (file.lastViewed != null) ...[
-              const SizedBox(height: 12),
-              _buildInfoRow('Last Viewed', _formatDate(file.lastViewed!)),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Close',
-              style: TextStyle(
-                fontFamily: 'ProductSans',
-                color: context.accentColor,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 80,
-          child: Text(
-            label,
-            style: TextStyle(
-              fontFamily: 'ProductSans',
-              color: context.textSecondary,
-              fontSize: 14,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: TextStyle(
-              fontFamily: 'ProductSans',
-              color: context.textPrimary,
-              fontSize: 14,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    FileInfoSheet.show(context, file, title: 'File Info');
   }
 
   IconData _getFileIcon(String extension) {
