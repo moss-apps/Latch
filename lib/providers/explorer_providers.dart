@@ -6,22 +6,22 @@ import 'vault_providers.dart';
 
 /// View modes supported by the vault file explorer
 enum ExplorerViewMode {
-  sidebar,
-  navigation;
+  grid,
+  list;
 
   String get displayName {
     switch (this) {
-      case ExplorerViewMode.sidebar:
-        return 'Sidebar Tree';
-      case ExplorerViewMode.navigation:
-        return 'Grid Navigation';
+      case ExplorerViewMode.grid:
+        return 'Grid View';
+      case ExplorerViewMode.list:
+        return 'List View';
     }
   }
 }
 
 /// Provider for current explorer view mode
 final explorerViewModeProvider = StateProvider<ExplorerViewMode>((ref) {
-  return ExplorerViewMode.navigation;
+  return ExplorerViewMode.grid;
 });
 
 /// Provider for the currently viewed folder ID (null represents the root vault folder)
