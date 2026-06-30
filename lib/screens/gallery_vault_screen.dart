@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/path_utils.dart';
 import '../models/encryption_algorithm.dart';
 import '../models/vaulted_file.dart';
@@ -43,6 +44,35 @@ import '../widgets/media_hold_action_sheet.dart';
 import '../widgets/media_multi_select_action_sheet.dart';
 import '../widgets/whats_new_bottom_sheet.dart';
 
+/// Categories shown in the gallery bottom bar.
+enum VaultCategory { all, images, videos, songs, docs }
+
+extension VaultCategoryX on VaultCategory {
+  VaultedFileType? get filterType => switch (this) {
+        VaultCategory.all => null,
+        VaultCategory.images => VaultedFileType.image,
+        VaultCategory.videos => VaultedFileType.video,
+        VaultCategory.songs => VaultedFileType.song,
+        VaultCategory.docs => VaultedFileType.document,
+      };
+
+  IconData get icon => switch (this) {
+        VaultCategory.all => Icons.grid_view_rounded,
+        VaultCategory.images => Icons.image_outlined,
+        VaultCategory.videos => Icons.videocam_outlined,
+        VaultCategory.songs => Icons.music_note_outlined,
+        VaultCategory.docs => Icons.description_outlined,
+      };
+
+  String get label => switch (this) {
+        VaultCategory.all => 'All',
+        VaultCategory.images => 'Images',
+        VaultCategory.videos => 'Videos',
+        VaultCategory.songs => 'Songs',
+        VaultCategory.docs => 'Docs',
+      };
+}
+
 /// Gallery vault screen - main screen after authentication
 class GalleryVaultScreen extends ConsumerStatefulWidget {
   const GalleryVaultScreen({super.key});
@@ -51,9 +81,10 @@ class GalleryVaultScreen extends ConsumerStatefulWidget {
   ConsumerState<GalleryVaultScreen> createState() => _GalleryVaultScreenState();
 }
 
-class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
+  VaultCategory _selectedCategory = VaultCategory.all;
+  List<VaultCategory> _enabledCategories = VaultCategory.values;
+  late final PageController _pageController;
   final FileImportService _importService = FileImportService.instance;
   final Map<String, GlobalKey> _selectionTileKeys = {};
 
@@ -75,13 +106,14 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _pageController = PageController();
+    _loadEnabledCategories();
     _initializeVault();
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _pageController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -131,23 +163,28 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
           // Permission warning banner for All Files Access
           const PermissionWarningBanner(),
           if (_isImporting) _buildImportProgress(),
-          if (_isSearching) _buildSearchBar(),
-          _buildTabBar(filesAsync),
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 300),
+            crossFadeState: _isSearching
+                ? CrossFadeState.showFirst
+                : CrossFadeState.showSecond,
+            firstChild: _buildSearchBar(),
+            secondChild: const SizedBox(height: 0, width: double.infinity),
+            sizeCurve: Curves.easeInOut,
+          ),
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildFileGrid(null, filesAsync),
-                _buildFileGrid(VaultedFileType.image, filesAsync),
-                _buildFileGrid(VaultedFileType.video, filesAsync),
-                _buildFileGrid(VaultedFileType.song, filesAsync),
-                _buildFileGrid(VaultedFileType.document, filesAsync),
-              ],
+            child: PageView(
+              controller: _pageController,
+              onPageChanged: (index) =>
+                  setState(() => _selectedCategory = _enabledCategories[index]),
+              children: _enabledCategories
+                  .map((c) => _buildFileGrid(c.filterType, filesAsync))
+                  .toList(),
             ),
           ),
         ],
       ),
-      floatingActionButton: isSelectionMode ? null : _buildFAB(),
+      bottomNavigationBar: _buildBottomBar(isSelectionMode),
       drawer: _buildDrawer(),
     );
   }
@@ -231,6 +268,9 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
               case 'settings':
                 _openSettingsScreen();
                 break;
+              case 'customize_bar':
+                _showCustomizeBarSheet();
+                break;
               case 'refresh':
                 ref.read(vaultNotifierProvider.notifier).refresh();
                 break;
@@ -268,6 +308,16 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
               ),
             ),
             const PopupMenuItem(
+              value: 'customize_bar',
+              child: Row(
+                children: [
+                  Icon(Icons.tune, size: 20),
+                  SizedBox(width: 12),
+                  Text('Customize Bar'),
+                ],
+              ),
+            ),
+            const PopupMenuItem(
               value: 'settings',
               child: Row(
                 children: [
@@ -296,7 +346,6 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
   Widget _buildSearchBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: context.backgroundSecondary,
       child: TextField(
         controller: _searchController,
         decoration: InputDecoration(
@@ -311,7 +360,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
             borderSide: BorderSide.none,
           ),
           filled: true,
-          fillColor: AppColors.lightBackground,
+          fillColor: context.backgroundSecondary,
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
@@ -360,108 +409,310 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
     );
   }
 
-  Widget _buildTabBar(AsyncValue<List<VaultedFile>> filesAsync) {
-    final files = filesAsync.value ?? [];
-
-    // Compute counts once to avoid O(n) scans on every build
-    int imageCount = 0;
-    int videoCount = 0;
-    int songCount = 0;
-    int docCount = 0;
-    for (final f in files) {
-      switch (f.type) {
-        case VaultedFileType.image:
-          imageCount++;
-          break;
-        case VaultedFileType.video:
-          videoCount++;
-          break;
-        case VaultedFileType.song:
-          songCount++;
-          break;
-        case VaultedFileType.document:
-        case VaultedFileType.other:
-          docCount++;
-          break;
-      }
-    }
-
+  Widget _buildBottomBar(bool isSelectionMode) {
     return Container(
       decoration: BoxDecoration(
         color: context.backgroundColor,
         border: Border(
-          bottom: BorderSide(color: AppColors.lightDivider, width: 1),
+          top: BorderSide(color: context.dividerColor, width: 1),
         ),
       ),
-      child: TabBar(
-        controller: _tabController,
-        labelColor: context.accentColor,
-        unselectedLabelColor: AppColors.lightTextTertiary,
-        indicatorColor: context.accentColor,
-        indicatorWeight: 3,
-        isScrollable: true,
-        labelStyle: const TextStyle(
-          fontFamily: 'ProductSans',
-          fontWeight: FontWeight.w600,
-          fontSize: 14,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: SizedBox(
+            height: 64,
+            child: Row(
+              children: [
+                if (!isSelectionMode) _buildImportBarItem(),
+                ..._enabledCategories.map(_buildCategoryItem),
+              ],
+            ),
+          ),
         ),
-        unselectedLabelStyle: const TextStyle(
-          fontFamily: 'ProductSans',
-          fontWeight: FontWeight.normal,
-          fontSize: 14,
+      ),
+    );
+  }
+
+  Widget _buildImportBarItem() {
+    return Expanded(
+      child: Tooltip(
+        message: 'Import files',
+        child: InkWell(
+          onTap: _showImportDialog,
+          customBorder: const CircleBorder(),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [
+                      context.accentColor,
+                      context.accentColor.withValues(alpha: 0.8),
+                    ],
+                  ),
+                ),
+                child: const Icon(Icons.add, color: Colors.white, size: 22),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Import',
+                style: TextStyle(
+                  fontFamily: 'ProductSans',
+                  fontSize: 11,
+                  color: context.textSecondary,
+                ),
+              ),
+            ],
+          ),
         ),
-        tabs: [
-          Tab(
-            child: Row(
+      ),
+    );
+  }
+
+  Widget _buildCategoryItem(VaultCategory category) {
+    final selected = category == _selectedCategory;
+    final color = selected ? context.accentColor : AppColors.lightTextTertiary;
+    return Expanded(
+      child: Tooltip(
+        message: category.label,
+        child: InkWell(
+          onTap: () {
+            final index = _enabledCategories.indexOf(category);
+            _pageController.animateToPage(
+              index,
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+            );
+          },
+          customBorder: const CircleBorder(),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(category.icon, size: 24, color: color),
+              const SizedBox(height: 2),
+              Text(
+                category.label,
+                style: TextStyle(
+                  fontFamily: 'ProductSans',
+                  fontSize: 11,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static const _enabledCategoriesKey = 'gallery_bottom_bar_categories';
+
+  Future<void> _loadEnabledCategories() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getStringList(_enabledCategoriesKey);
+    if (raw == null || raw.isEmpty) return;
+    final parsed = <VaultCategory>[];
+    for (final name in raw) {
+      final match = VaultCategory.values.firstWhere(
+        (e) => e.name == name,
+        orElse: () => VaultCategory.all,
+      );
+      if (!parsed.contains(match)) parsed.add(match);
+    }
+    if (parsed.isEmpty || !mounted) return;
+    setState(() {
+      _enabledCategories = parsed;
+      if (!_enabledCategories.contains(_selectedCategory)) {
+        _selectedCategory = _enabledCategories.first;
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final index = _enabledCategories.indexOf(_selectedCategory);
+      if (index != -1 && _pageController.hasClients) {
+        _pageController.jumpToPage(index);
+      }
+    });
+  }
+
+  Future<void> _persistEnabledCategories() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(
+      _enabledCategoriesKey,
+      _enabledCategories.map((c) => c.name).toList(),
+    );
+  }
+
+  void _showCustomizeBarSheet() {
+    var order = <VaultCategory>[
+      ..._enabledCategories,
+      ...VaultCategory.values.where((c) => !_enabledCategories.contains(c)),
+    ];
+    var enabled = Set<VaultCategory>.from(_enabledCategories);
+
+    void apply(StateSetter setSheetState, void Function() mutate) {
+      setSheetState(mutate);
+      final newEnabled = order.where((c) => enabled.contains(c)).toList();
+      setState(() {
+        _enabledCategories = newEnabled;
+        if (!_enabledCategories.contains(_selectedCategory)) {
+          _selectedCategory = _enabledCategories.contains(VaultCategory.all)
+              ? VaultCategory.all
+              : _enabledCategories.first;
+        }
+      });
+      _persistEnabledCategories();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final index = _enabledCategories.indexOf(_selectedCategory);
+        if (index != -1 && _pageController.hasClients) {
+          _pageController.jumpToPage(index);
+        }
+      });
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          return Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.7,
+            ),
+            decoration: BoxDecoration(
+              color: context.backgroundColor,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.grid_view_rounded, size: 18),
-                const SizedBox(width: 6),
-                Text('All (${files.length})'),
+                Container(
+                  margin: const EdgeInsets.only(top: 12),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: context.borderColor,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Customize Bottom Bar',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: context.textPrimary,
+                        fontFamily: 'ProductSans',
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Drag to reorder. Toggle to show or hide.',
+                      style: TextStyle(
+                        fontFamily: 'ProductSans',
+                        fontSize: 13,
+                        color: context.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+                Flexible(
+                  child: ReorderableListView.builder(
+                    buildDefaultDragHandles: false,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    itemCount: order.length,
+                    onReorder: (oldIndex, newIndex) {
+                      apply(setSheetState, () {
+                        final to = newIndex > oldIndex ? newIndex - 1 : newIndex;
+                        final item = order.removeAt(oldIndex);
+                        order.insert(to, item);
+                      });
+                    },
+                    itemBuilder: (context, i) {
+                      final cat = order[i];
+                      final isEnabled = enabled.contains(cat);
+                      return SwitchListTile(
+                        key: ValueKey(cat),
+                        value: isEnabled,
+                        onChanged: (v) {
+                          apply(setSheetState, () {
+                            if (v) {
+                              enabled.add(cat);
+                            } else if (enabled.length > 1) {
+                              enabled.remove(cat);
+                            }
+                          });
+                        },
+                        activeThumbColor: context.accentColor,
+                        secondary: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ReorderableDragStartListener(
+                              index: i,
+                              child: Icon(Icons.drag_indicator,
+                                  color: context.textTertiary),
+                            ),
+                            Icon(cat.icon, color: context.accentColor),
+                          ],
+                        ),
+                        title: Text(
+                          cat.label,
+                          style: const TextStyle(fontFamily: 'ProductSans'),
+                        ),
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 20),
+                      );
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: context.accentColor,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Done',
+                        style: TextStyle(
+                          fontFamily: 'ProductSans',
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(height: MediaQuery.of(context).padding.bottom),
               ],
             ),
-          ),
-          Tab(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.image_outlined, size: 18),
-                const SizedBox(width: 6),
-                Text('Images ($imageCount)'),
-              ],
-            ),
-          ),
-          Tab(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.videocam_outlined, size: 18),
-                const SizedBox(width: 6),
-                Text('Videos ($videoCount)'),
-              ],
-            ),
-          ),
-          Tab(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.music_note_outlined, size: 18),
-                const SizedBox(width: 6),
-                Text('Songs ($songCount)'),
-              ],
-            ),
-          ),
-          Tab(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.description_outlined, size: 18),
-                const SizedBox(width: 6),
-                Text('Docs ($docCount)'),
-              ],
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -1004,27 +1255,10 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
 
     return Container(
       color: color.withValues(alpha: 0.1),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 36, color: color),
-          const SizedBox(height: 4),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(
-              file.originalName,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: color,
-                fontFamily: 'ProductSans',
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ],
+      // ponytail: filename is drawn once by the tile's bottom overlay bar;
+      // placeholder is icon-only like image/video thumbnails.
+      child: Center(
+        child: Icon(icon, size: 36, color: color),
       ),
     );
   }
@@ -1098,13 +1332,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
 
   List<VaultedFile> _getVisibleFiles() {
     final allFiles = ref.read(vaultNotifierProvider).value ?? [];
-    final filterType = switch (_tabController.index) {
-      1 => VaultedFileType.image,
-      2 => VaultedFileType.video,
-      3 => VaultedFileType.song,
-      4 => VaultedFileType.document,
-      _ => null,
-    };
+    final filterType = _selectedCategory.filterType;
 
     List<VaultedFile> files;
     if (filterType == null) {
@@ -1165,34 +1393,43 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
     );
   }
 
-  void _openNoteFromVault(String noteId) {
-    final notesAsync = ref.read(notesNotifierProvider);
-    notesAsync.whenData((notes) {
-      final note = notes.where((n) => n.id == noteId).firstOrNull;
-      if (note != null && mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => NoteEditorScreen(note: note),
-          ),
-        );
-      }
-    });
+  Future<void> _openNoteFromVault(String noteId) async {
+    var notesAsync = ref.read(notesNotifierProvider);
+    // ponytail: first read of a cold provider returns loading; reload + re-read
+    // only in that case so the hot path stays a single cached read.
+    if (notesAsync.isLoading) {
+      await ref.read(notesNotifierProvider.notifier).loadNotes();
+      notesAsync = ref.read(notesNotifierProvider);
+    }
+    if (!mounted) return;
+    final note = notesAsync.value?.where((n) => n.id == noteId).firstOrNull;
+    if (note != null) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => NoteEditorScreen(note: note),
+        ),
+      );
+    }
   }
 
-  void _openPasswordFromVault(String passwordId) {
-    final passwordsAsync = ref.read(passwordsNotifierProvider);
-    passwordsAsync.whenData((passwords) {
-      final entry = passwords.where((p) => p.id == passwordId).firstOrNull;
-      if (entry != null && mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => PasswordEditorScreen(entry: entry),
-          ),
-        );
-      }
-    });
+  Future<void> _openPasswordFromVault(String passwordId) async {
+    var passwordsAsync = ref.read(passwordsNotifierProvider);
+    if (passwordsAsync.isLoading) {
+      await ref.read(passwordsNotifierProvider.notifier).loadPasswords();
+      passwordsAsync = ref.read(passwordsNotifierProvider);
+    }
+    if (!mounted) return;
+    final entry =
+        passwordsAsync.value?.where((p) => p.id == passwordId).firstOrNull;
+    if (entry != null) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PasswordEditorScreen(entry: entry),
+        ),
+      );
+    }
   }
 
   /// Show options for files that don't have a preview
@@ -1779,42 +2016,6 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
     );
   }
 
-  Widget _buildFAB() {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          colors: [
-            context.accentColor,
-            context.accentColor.withValues(alpha: 0.8),
-          ],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: context.accentColor.withValues(alpha: 0.4),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: FloatingActionButton.extended(
-        onPressed: _showImportDialog,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text(
-          'Import',
-          style: TextStyle(
-            fontFamily: 'ProductSans',
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-            fontSize: 15,
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildDrawer() {
     return Drawer(
       backgroundColor: Colors.transparent,
@@ -1846,9 +2047,13 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
                   child: ListView(
                     padding: EdgeInsets.zero,
                     children: [
-                      _buildDrawerItem(
+                      _buildDrawerSection('Library'),
+                      _buildCountedDrawerItem(
                         icon: Icons.folder_outlined,
                         title: 'Albums',
+                        countOf: (ref) => ref
+                            .watch(albumsProvider)
+                            .maybeWhen(data: (l) => l.length, orElse: () => null),
                         onTap: () {
                           Navigator.pop(context);
                           Navigator.push(
@@ -1858,9 +2063,12 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
                           );
                         },
                       ),
-                      _buildDrawerItem(
+                      _buildCountedDrawerItem(
                         icon: Icons.folder_copy_outlined,
                         title: 'Folders',
+                        countOf: (ref) => ref
+                            .watch(foldersProvider)
+                            .maybeWhen(data: (l) => l.length, orElse: () => null),
                         onTap: () {
                           Navigator.pop(context);
                           Navigator.push(
@@ -1870,9 +2078,16 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
                           );
                         },
                       ),
-                      _buildDrawerItem(
+                      _buildCountedDrawerItem(
                         icon: Icons.explore_outlined,
                         title: 'File Explorer',
+                        countOf: (ref) => ref
+                            .watch(fileCountsProvider)
+                            .maybeWhen(
+                              data: (m) =>
+                                  m.values.fold<int>(0, (s, c) => s + c),
+                              orElse: () => null,
+                            ),
                         onTap: () {
                           Navigator.pop(context);
                           Navigator.push(
@@ -1883,9 +2098,12 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
                           );
                         },
                       ),
-                      _buildDrawerItem(
+                      _buildCountedDrawerItem(
                         icon: Icons.favorite_outline,
                         title: 'Favorites',
+                        countOf: (ref) => ref
+                            .watch(favoriteFilesProvider)
+                            .maybeWhen(data: (l) => l.length, orElse: () => null),
                         onTap: () {
                           Navigator.pop(context);
                           Navigator.push(
@@ -1895,9 +2113,12 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
                           );
                         },
                       ),
-                      _buildDrawerItem(
+                      _buildCountedDrawerItem(
                         icon: Icons.label_outline,
                         title: 'Tags',
+                        countOf: (ref) => ref
+                            .watch(tagsProvider)
+                            .maybeWhen(data: (l) => l.length, orElse: () => null),
                         onTap: () {
                           Navigator.pop(context);
                           Navigator.push(
@@ -1907,19 +2128,11 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
                           );
                         },
                       ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        child: Divider(
-                          color: context.isDarkMode
-                              ? Colors.white.withValues(alpha: 0.1)
-                              : Colors.black.withValues(alpha: 0.1),
-                          thickness: 1,
-                        ),
-                      ),
+                      _buildDrawerSection('Security'),
                       _buildDrawerItem(
                         icon: Icons.security,
                         title: 'Security Settings',
+                        showChevron: true,
                         onTap: () {
                           Navigator.pop(context);
                           _openSettingsScreen();
@@ -1929,6 +2142,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
                         icon: Icons.shield_outlined,
                         title: 'Decoy Mode',
                         subtitle: 'Set up fake vault',
+                        showChevron: true,
                         onTap: () {
                           Navigator.pop(context);
                           _showDecoyModeSheet();
@@ -2025,10 +2239,47 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
     );
   }
 
+  Widget _buildDrawerSection(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(28, 20, 16, 8),
+      child: Text(
+        title.toUpperCase(),
+        style: TextStyle(
+          fontFamily: 'ProductSans',
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.2,
+          color: context.textTertiary,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCountedDrawerItem({
+    required IconData icon,
+    required String title,
+    required int? Function(WidgetRef ref) countOf,
+    required VoidCallback onTap,
+  }) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final count = countOf(ref);
+        return _buildDrawerItem(
+          icon: icon,
+          title: title,
+          badge: count?.toString(),
+          onTap: onTap,
+        );
+      },
+    );
+  }
+
   Widget _buildDrawerItem({
     required IconData icon,
     required String title,
     String? subtitle,
+    String? badge,
+    bool showChevron = false,
     required VoidCallback onTap,
   }) {
     return Padding(
@@ -2087,11 +2338,30 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen>
                       ],
                     ),
                   ),
-                  Icon(
-                    Icons.chevron_right,
-                    color: context.textTertiary,
-                    size: 20,
-                  ),
+                  if (badge != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: context.accentColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        badge,
+                        style: TextStyle(
+                          fontFamily: 'ProductSans',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: context.accentColor,
+                        ),
+                      ),
+                    )
+                  else if (showChevron)
+                    Icon(
+                      Icons.chevron_right,
+                      color: context.textTertiary,
+                      size: 20,
+                    ),
                 ],
               ),
             ),
