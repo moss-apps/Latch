@@ -55,6 +55,65 @@ class WhatsNewService {
   /// The key MUST match `PackageInfo.version` exactly (the `+buildNumber`
   /// suffix is ignored).
   static const Map<String, List<WhatsNewSection>> _builtIn = {
+    '0.16.0-beta.1': [
+      WhatsNewSection(
+        title: 'Encryption Management',
+        items: [
+          WhatsNewItem(
+            icon: Icons.shield_outlined,
+            title: 'Batch encrypt/decrypt',
+            description:
+                'New encryption management screen lets you encrypt or remove encryption from multiple files at once with progress tracking.',
+          ),
+          WhatsNewItem(
+            icon: Icons.lock_outlined,
+            title: 'Per-file encryption control',
+            description:
+                'Add or strip encryption from individual files in-place with full progress feedback.',
+          ),
+        ],
+      ),
+      WhatsNewSection(
+        title: 'Explorer & Navigation',
+        items: [
+          WhatsNewItem(
+            icon: Icons.build_outlined,
+            title: 'List & grid views',
+            description:
+                'Toggle between list and grid layouts in the vault explorer — cleaner and simpler than the old sidebar.',
+          ),
+          WhatsNewItem(
+            icon: Icons.filter_list,
+            title: 'Category filter bar',
+            description:
+                'Quickly filter your gallery by file type with the new bottom filter bar.',
+          ),
+        ],
+      ),
+      WhatsNewSection(
+        title: 'Performance',
+        items: [
+          WhatsNewItem(
+            icon: Icons.speed,
+            title: 'Cancelable operations',
+            description:
+                'File opening and decryption can now be cancelled mid-operation — no more waiting for slow files.',
+          ),
+          WhatsNewItem(
+            icon: Icons.bug_report_outlined,
+            title: 'Large PDF fix',
+            description:
+                'PDF viewer now streams from disk instead of loading into memory, fixing ANR crashes on large documents.',
+          ),
+          WhatsNewItem(
+            icon: Icons.auto_awesome_outlined,
+            title: 'Animated logo',
+            description:
+                'A new animated Latch logo greets you on the auth screen with a staggered entrance animation.',
+          ),
+        ],
+      ),
+    ],
     '0.15.0-beta.1': [
       WhatsNewSection(
         title: 'Password Vault & Autofill',
@@ -292,6 +351,8 @@ class WhatsNewService {
         return Icons.note_outlined;
       case 'mic_outlined':
         return Icons.mic_outlined;
+      case 'filter_list':
+        return Icons.filter_list;
       case 'info_outlined':
         return Icons.info_outlined;
       default:
