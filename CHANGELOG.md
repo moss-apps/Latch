@@ -2,6 +2,55 @@
 
 Notable changes to Latch.
 
+## 0.16.0-beta.1
+
+### Encryption Management
+- **Encryption management screen** for batch encrypt/decrypt of vault files
+- `encryptFileInPlace` and `decryptFileInPlace` with progress callbacks
+- Decrypt and re-encrypt operations added to progress sheet
+- **Search filter and select-all scoping** in the re-encrypt file picker
+- Fixed magic-byte constants to match little-endian read order
+
+### Explorer Redesign
+- View modes renamed from sidebar/navigation to **list/grid**
+- **List view mode** added to explorer file grid
+- Removed sidebar view and resizer widget — simplified navigation
+
+### Animated Latch Logo
+- **Animated Latch logo widget** with staggered entrance animation
+- Animated logo entrance on auth method selection screen
+- Reduced animation duration and stagger span for snappier feel
+
+### Performance Optimizations
+- **Cancel token support** — cooperative cancellation for decrypt pipeline, file opening, and isolate operations
+- Decrypted image cache switched from bytes to **File** to reduce memory pressure
+- PDF viewer switched from bytes to **file path** to avoid ANR on large documents
+- Encryption migrated to isolate pool; key derivation made async
+
+### Update System
+- **Skip version** option in update dialog
+- Deduplicated update emission to prevent repeated prompts
+
+### UI Polish
+- Removed FAB elevation across all screens
+- Removed default elevation and shadows from buttons
+- Category filter bottom bar in gallery vault
+- Theme-aware accent and success colors
+- Context-based theming for AuthMethodCard
+- Removed overlay transparency from container decoration
+
+### Shared Components
+- **FileInfoSheet** — reusable bottom sheet for file metadata and actions
+- Extracted from multiple duplicated implementations into a single shared widget
+
+### Cleanup
+- Removed unused re-encryption feature
+- Trimmed changelog; condensed README to core details
+- Updated repository URLs and contributor info
+- Added Google Play badge and transparency section to README
+
+---
+
 ## 0.15.0-beta.1
 
 ### Password Vault & Autofill

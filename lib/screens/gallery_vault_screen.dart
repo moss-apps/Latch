@@ -139,7 +139,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
     if (!await service.shouldShow()) return;
 
     final version = await service.currentVersion();
-    final sections = service.highlightsFor(version);
+    final sections = await service.highlightsFor(version);
     if (sections.isEmpty || !mounted) return;
 
     await WhatsNewBottomSheet.show(
