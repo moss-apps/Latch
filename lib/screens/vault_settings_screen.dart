@@ -798,7 +798,7 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
     WhatsNewService.instance.startRemoteRefresh();
     final service = WhatsNewService.instance;
     final version = await service.currentVersion();
-    final sections = service.highlightsFor(version);
+    final sections = await service.highlightsFor(version);
 
     if (!mounted) return;
 
