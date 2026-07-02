@@ -8,21 +8,13 @@ const int kFormatCtr = 2;
 const int kFormatCbc = 3;
 const int kFormatGcmV2 = 4;
 
-/// Little-endian u32 magic bytes for each on-disk format.
-///
-/// ponytail: these constants are byte-reversed relative to the little-endian
-/// read in [detectFormat] (on-disk bytes are 0x4C,0x4B,0x52,X but the constant
-/// stores them big-endian), so [detectFormat] currently always returns
-/// kFormatUnknown for real files. The decrypt hot-path checks bytes
-/// individually and is unaffected; only re-encryption/rotation use
-/// detectFormat (and fall back to the auto-detecting CBC path). Fix: redefine
-/// as the LE-combined value (e.g. kMagicGcmV2 = 0x32524B4C) — left as-is here
-/// to keep this refactor behavior-neutral; rotateKey routing should be
-/// verified before flipping.
-const int kMagicGcmV1 = 0x4C4B5247; // 'L','K','R','G'
-const int kMagicGcmV2 = 0x4C4B5232; // 'L','K','R','2'
-const int kMagicCtr = 0x4C4B5253; // 'L','K','R','S'
-const int kMagicCbc = 0x4C4B5244; // 'L','K','R','D'
+/// Magic words for each on-disk format, combined the same way
+/// [detectFormat] reads them (LE: X<<24 | 0x52<<16 | 0x4B<<8 | 0x4C). The
+/// on-disk prefix is always 0x4C,0x4B,0x52,X.
+const int kMagicGcmV1 = 0x47524B4C; // 'L','K','R','G'
+const int kMagicGcmV2 = 0x32524B4C; // 'L','K','R','2'
+const int kMagicCtr = 0x53524B4C; // 'L','K','R','S'
+const int kMagicCbc = 0x44524B4C; // 'L','K','R','D'
 
 /// AES-GCM authentication tag size in bytes.
 const int kGcmTagSize = 16;

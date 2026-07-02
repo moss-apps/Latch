@@ -161,13 +161,12 @@ void main() {
       expect(header[3], 0x53); // 'S'
     });
 
-    test('detectFormat recognises LE-correct magic bytes', () {
-      // ponytail: real on-disk magic is BE-laid-out (0x4C,0x4B,0x52,X) but
-      // detectFormat combines LE, so the shipped BE constants never match and
-      // detectFormat returns kFormatUnknown for real files. Asserting that
-      // current contract here; see header_codec.dart for the fix path.
-      final leBytes = Uint8List.fromList([0x32, 0x52, 0x4B, 0x4C]);
-      expect(HeaderCodec.detectFormat(leBytes), kFormatGcmV2);
+    test('detectFormat recognises real on-disk magic bytes', () {
+      // On-disk prefix is 0x4C,0x4B,0x52,X; detectFormat must map it correctly.
+      expect(HeaderCodec.detectFormat([0x4C, 0x4B, 0x52, 0x32]), kFormatGcmV2);
+      expect(HeaderCodec.detectFormat([0x4C, 0x4B, 0x52, 0x47]), kFormatGcmV1);
+      expect(HeaderCodec.detectFormat([0x4C, 0x4B, 0x52, 0x53]), kFormatCtr);
+      expect(HeaderCodec.detectFormat([0x4C, 0x4B, 0x52, 0x44]), kFormatCbc);
     });
 
     test('detectFormat returns unknown for garbage', () {
@@ -175,7 +174,7 @@ void main() {
       expect(HeaderCodec.detectFormat([1, 2]), kFormatUnknown);
     });
 
-    test('v2 header bytes are correct even though detectFormat is LE-mismatched', () {
+    test('v2 header bytes are correct on disk', () {
       final header = HeaderCodec.encodeV2Header(42);
       // The on-disk prefix is the source of truth for the decrypt hot-path:
       expect(header[0], 0x4C);
