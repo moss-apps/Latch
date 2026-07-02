@@ -1641,11 +1641,9 @@ class EncryptionService {
   /// Returns: 0=unknown/legacy CBC, 1=GCM, 2=CTR, 3=CBC with header
   int detectFileFormat(String filePath) => HeaderCodec.detectFormatFromFile(filePath);
 
-  // ponytail: direct magic-byte check instead of detectFileFormat, whose LE/BE
-  // mismatch in header_codec.dart always returns 0 (format unknown). GCM/CTR
-  // must reach the streaming isolate pool; only real CBC (or unreadable) keeps
-  // the proven whole-file decryptFileToMemory path. Upgrade path: fix the
-  // header_codec endianness bug and this collapses back to detectFileFormat.
+  // ponytail: direct magic-byte check for re-encryption routing. detectFileFormat
+  // now returns the real format, but this keeps a single read + no format-int
+  // indirection on the hot re-encrypt path.
   bool _isLegacyCbcFile(String path) {
     try {
       final f = File(path).openSync(mode: FileMode.read);
