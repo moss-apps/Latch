@@ -916,7 +916,7 @@ class _FolderImportPickerScreen extends StatefulWidget {
 
 class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
   String? _currentPath;
-  List<String> _pathStack = [];
+  final List<String> _pathStack = [];
   List<FileSystemEntity> _subdirs = [];
   bool _isLoading = true;
   String? _error;
