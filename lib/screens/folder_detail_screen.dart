@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import '../models/album.dart';
 import '../models/vault_folder.dart';
 import '../models/vaulted_file.dart';
+import '../widgets/encrypted_thumbnail.dart';
 import '../providers/vault_providers.dart';
 import '../services/file_import_service.dart';
 import '../services/vault_service.dart';
@@ -525,6 +526,9 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
 
   Widget _buildFileThumbnail(VaultedFile file) {
     if (file.isImage) {
+      if (file.isEncrypted) {
+        return EncryptedThumbnail(file: file);
+      }
       final imageFile = File(file.vaultPath);
       return Image.file(
         imageFile,
@@ -1529,6 +1533,9 @@ class _AddFilesToFolderSheetState
 
   Widget _buildFileThumbnail(VaultedFile file) {
     if (file.isImage) {
+      if (file.isEncrypted) {
+        return EncryptedThumbnail(file: file);
+      }
       final imageFile = File(file.vaultPath);
       return FutureBuilder<bool>(
         future: imageFile.exists(),
