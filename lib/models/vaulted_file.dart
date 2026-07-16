@@ -67,6 +67,7 @@ class VaultedFile {
   final DateTime dateAdded;
   final DateTime? dateModified;
   final String? thumbnailPath;
+  final String? thumbnailIv; // IV for encrypted thumbnail (mirrors encryptionIv)
   final Map<String, dynamic>? metadata;
 
   // New fields for organization
@@ -96,6 +97,7 @@ class VaultedFile {
     required this.dateAdded,
     this.dateModified,
     this.thumbnailPath,
+    this.thumbnailIv,
     this.metadata,
     this.tags = const [],
     this.isFavorite = false,
@@ -125,6 +127,7 @@ class VaultedFile {
     DateTime? dateAdded,
     DateTime? dateModified,
     String? thumbnailPath,
+    String? thumbnailIv,
     Map<String, dynamic>? metadata,
     List<String>? tags,
     bool? isFavorite,
@@ -152,6 +155,7 @@ class VaultedFile {
       dateAdded: dateAdded ?? this.dateAdded,
       dateModified: dateModified ?? this.dateModified,
       thumbnailPath: thumbnailPath ?? this.thumbnailPath,
+      thumbnailIv: thumbnailIv ?? this.thumbnailIv,
       metadata: metadata ?? this.metadata,
       tags: tags ?? List.from(this.tags),
       isFavorite: isFavorite ?? this.isFavorite,
@@ -271,6 +275,7 @@ class VaultedFile {
       'dateAdded': dateAdded.toIso8601String(),
       'dateModified': dateModified?.toIso8601String(),
       'thumbnailPath': thumbnailPath,
+      'thumbnailIv': thumbnailIv,
       'metadata': metadata,
       'tags': tags,
       'isFavorite': isFavorite,
@@ -304,6 +309,7 @@ class VaultedFile {
           ? DateTime.parse(json['dateModified'] as String)
           : null,
       thumbnailPath: json['thumbnailPath'] as String?,
+      thumbnailIv: json['thumbnailIv'] as String?,
       metadata: json['metadata'] as Map<String, dynamic>?,
       tags:
           (json['tags'] as List<dynamic>?)?.map((e) => e as String).toList() ??

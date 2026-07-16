@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/album.dart';
 import '../models/vaulted_file.dart';
+import '../widgets/encrypted_thumbnail.dart';
 import '../providers/vault_providers.dart';
 import '../themes/app_colors.dart';
 import '../utils/toast_utils.dart';
@@ -234,6 +235,9 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
           if (snapshot.hasData && snapshot.data != null) {
             final file = snapshot.data!;
             if (file.isImage) {
+              if (file.isEncrypted) {
+                return EncryptedThumbnail(file: file);
+              }
               final imageFile = File(file.vaultPath);
               return Image.file(
                 imageFile,
@@ -259,6 +263,9 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
           if (snapshot.hasData && snapshot.data!.isNotEmpty) {
             final imageFiles = snapshot.data!.where((f) => f.isImage).toList();
             if (imageFiles.isNotEmpty) {
+              if (imageFiles.first.isEncrypted) {
+                return EncryptedThumbnail(file: imageFiles.first);
+              }
               final imageFile = File(imageFiles.first.vaultPath);
               return Image.file(
                 imageFile,
@@ -1018,14 +1025,29 @@ class _ChangeCoverSheetState extends ConsumerState<_ChangeCoverSheet> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(isSelected ? 5 : 8),
               child: file.isImage
-                    ? Image.file(
-                        File(file.vaultPath),
-                        fit: BoxFit.cover,
-                        cacheWidth: 200,
-                        filterQuality: FilterQuality.low,
-                        errorBuilder: (_, __, ___) => _buildPlaceholder(),
-                      )
-                  : _buildVideoPlaceholder(),
+                    ? (file.isEncrypted
+                        ? EncryptedThumbnail(file: file)
+                        : Image.file(
+                            File(file.vaultPath),
+                            fit: BoxFit.cover,
+                            cacheWidth: 200,
+                            filterQuality: FilterQuality.low,
+                            errorBuilder: (_, __, ___) => _buildPlaceholder(),
+                          ))
+                  : (file.isVideo && file.isEncrypted
+                      ? Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            EncryptedThumbnail(file: file),
+                            Container(
+                              color: Colors.black26,
+                              child: const Center(
+                                child: Icon(Icons.play_circle_outline, size: 32, color: Colors.white70),
+                              ),
+                            ),
+                          ],
+                        )
+                      : _buildVideoPlaceholder()),
             ),
           ),
           // Selection indicator

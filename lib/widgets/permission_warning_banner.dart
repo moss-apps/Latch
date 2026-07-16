@@ -175,16 +175,23 @@ class _PermissionWarningBannerState extends ConsumerState<PermissionWarningBanne
                     ),
                   ),
                   // Dismiss button
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _isDismissed = true;
-                      });
-                    },
-                    child: Icon(
-                      Icons.close,
-                      color: Colors.white.withValues(alpha: 0.7),
-                      size: 20,
+                  Semantics(
+                    button: true,
+                    label: 'Dismiss warning',
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _isDismissed = true;
+                        });
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.all(8),
+                        child: Icon(
+                          Icons.close,
+                          color: Color(0xB3FFFFFF),
+                          size: 20,
+                        ),
+                      ),
                     ),
                   ),
                 ],

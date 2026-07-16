@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:open_filex/open_filex.dart';
 import '../utils/path_utils.dart';
 import '../models/vaulted_file.dart';
+import '../widgets/encrypted_thumbnail.dart';
 import '../models/album.dart';
 import '../providers/vault_providers.dart';
 import '../services/auto_kill_service.dart';
@@ -309,6 +310,9 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
 
   Widget _buildFileThumbnail(VaultedFile file) {
     if (file.isImage) {
+      if (file.isEncrypted) {
+        return EncryptedThumbnail(file: file);
+      }
       final imageFile = File(file.vaultPath);
       return FutureBuilder<bool>(
         future: imageFile.exists(),
@@ -329,6 +333,20 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     }
 
     if (file.isVideo) {
+      if (file.isEncrypted) {
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            EncryptedThumbnail(file: file),
+            Container(
+              color: Colors.black26,
+              child: const Center(
+                child: Icon(Icons.play_circle_outline, size: 48, color: Colors.white70),
+              ),
+            ),
+          ],
+        );
+      }
       return Stack(
         fit: StackFit.expand,
         children: [

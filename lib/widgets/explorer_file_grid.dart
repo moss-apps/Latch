@@ -15,6 +15,7 @@ import '../utils/responsive_utils.dart';
 import '../utils/toast_utils.dart';
 import '../widgets/file_info_sheet.dart';
 import '../widgets/media_hold_action_sheet.dart';
+import 'encrypted_thumbnail.dart';
 import 'optimized_image_widget.dart';
 
 class ExplorerFileGrid extends ConsumerWidget {
@@ -626,12 +627,17 @@ class ExplorerFileGrid extends ConsumerWidget {
 
   Widget _buildFileThumbnail(VaultedFile file, BuildContext context) {
     if (file.isImage) {
+      if (file.isEncrypted) {
+        return EncryptedThumbnail(file: file);
+      }
       final path = file.thumbnailPath ?? file.vaultPath;
       return OptimizedImageWidget(
         imageFile: File(path),
         fit: BoxFit.cover,
         errorWidget: _buildFilePlaceholder(file, context),
       );
+    } else if (file.isEncrypted) {
+      return EncryptedThumbnail(file: file);
     } else if (file.thumbnailPath != null) {
       return OptimizedImageWidget(
         imageFile: File(file.thumbnailPath!),
