@@ -20,6 +20,7 @@ import '../services/whats_new_service.dart';
 import '../themes/app_colors.dart';
 import '../utils/toast_utils.dart';
 import '../utils/responsive_utils.dart';
+import '../widgets/encrypted_thumbnail.dart';
 import '../widgets/file_info_sheet.dart';
 import '../widgets/office_conversion_confirm_dialog.dart';
 import '../widgets/per_file_encryption_sheet.dart';
@@ -1177,6 +1178,9 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
   Widget _buildFileThumbnail(VaultedFile file) {
     // Show image thumbnail
     if (file.isImage) {
+      if (file.isEncrypted) {
+        return EncryptedThumbnail(file: file);
+      }
       final imageFile = File(file.vaultPath);
 
       return Image.file(
@@ -1200,6 +1204,24 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
 
     // Show video thumbnail (first frame preview)
     if (file.isVideo) {
+      if (file.isEncrypted) {
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            EncryptedThumbnail(file: file),
+            Container(
+              color: Colors.black26,
+              child: const Center(
+                child: Icon(
+                  Icons.play_circle_outline,
+                  size: 48,
+                  color: Colors.white70,
+                ),
+              ),
+            ),
+          ],
+        );
+      }
       // Try to show video thumbnail from the vault path
       // Videos don't have a simple thumbnail, so we use a styled placeholder
       return Stack(
