@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/vault_folder.dart';
 import '../models/vaulted_file.dart';
+import '../widgets/encrypted_thumbnail.dart';
 import '../providers/vault_providers.dart';
 import '../services/file_import_service.dart';
 import '../themes/app_colors.dart';
@@ -230,6 +231,9 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen> {
           if (snapshot.hasData && snapshot.data != null) {
             final file = snapshot.data!;
             if (file.isImage) {
+              if (file.isEncrypted) {
+                return EncryptedThumbnail(file: file);
+              }
               final imageFile = File(file.vaultPath);
               return Image.file(
                 imageFile,
