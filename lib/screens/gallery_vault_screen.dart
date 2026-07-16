@@ -641,11 +641,10 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                     buildDefaultDragHandles: false,
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     itemCount: order.length,
-                    onReorder: (oldIndex, newIndex) {
+                    onReorderItem: (oldIndex, newIndex) {
                       apply(setSheetState, () {
-                        final to = newIndex > oldIndex ? newIndex - 1 : newIndex;
                         final item = order.removeAt(oldIndex);
-                        order.insert(to, item);
+                        order.insert(newIndex, item);
                       });
                     },
                     itemBuilder: (context, i) {
@@ -4321,7 +4320,7 @@ class _FolderImportPickerScreen extends StatefulWidget {
 
 class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
   String? _currentPath;
-  List<String> _pathStack = [];
+  final List<String> _pathStack = [];
   List<FileSystemEntity> _subdirs = [];
   bool _isLoading = true;
   String? _error;
