@@ -4032,27 +4032,39 @@ class _ImportOptionsSheet extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-            child: Column(
+            padding: const EdgeInsets.fromLTRB(20, 20, 8, 0),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Import Files',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: context.textPrimary,
-                    fontFamily: 'ProductSans',
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Import Files',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: context.textPrimary,
+                          fontFamily: 'ProductSans',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Files will be encrypted and hidden securely',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: context.textSecondary,
+                          fontFamily: 'ProductSans',
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Files will be encrypted and hidden securely',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: context.textSecondary,
-                    fontFamily: 'ProductSans',
-                  ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  tooltip: 'Close',
+                  onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
             ),
