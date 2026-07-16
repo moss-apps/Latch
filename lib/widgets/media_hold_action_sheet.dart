@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/vaulted_file.dart';
 import '../themes/app_colors.dart';
+import 'encrypted_thumbnail.dart';
 
 /// A contextual bottom sheet shown when long-pressing a media file.
 /// Provides quick one-tap actions without entering selection mode.
@@ -147,17 +148,29 @@ class MediaHoldActionSheet extends StatelessWidget {
 
   Widget _buildPreview(BuildContext context) {
     final size = 100.0;
-    if (file.isImage && File(file.vaultPath).existsSync()) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Image.file(
-          File(file.vaultPath),
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _buildFallbackPreview(context),
-        ),
-      );
+    if (file.isImage) {
+      if (file.isEncrypted) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: SizedBox(
+            width: size,
+            height: size,
+            child: EncryptedThumbnail(file: file),
+          ),
+        );
+      }
+      if (File(file.vaultPath).existsSync()) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Image.file(
+            File(file.vaultPath),
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _buildFallbackPreview(context),
+          ),
+        );
+      }
     }
     return _buildFallbackPreview(context);
   }
