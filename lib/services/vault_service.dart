@@ -11,6 +11,8 @@ import '../models/encryption_algorithm.dart';
 import 'encryption_service.dart';
 import 'compression_service.dart';
 import 'crypto_isolate_pool.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:video_compress/video_compress.dart';
 
 class FileProgressInfo {
   final int current;
@@ -54,6 +56,12 @@ class _BatchPreparationResult {
   });
 }
 
+class _StoredThumb {
+  final String path;
+  final String iv;
+  const _StoredThumb(this.path, this.iv);
+}
+
 /// Service for managing vaulted files storage
 class VaultService {
   VaultService._();
@@ -85,6 +93,17 @@ class VaultService {
   List<VaultFolder>? _cachedFolders;
   List<TagInfo>? _cachedTags;
   VaultSettings? _cachedSettings;
+
+  // ponytail: in-memory encrypted-thumb cache + in-flight dedupe. Mirrors the
+  // accepted security model (plaintext persists like _decryptedFileCache /
+  // master key until process death); cleared in clearVault.
+  final Map<String, Uint8List> _thumbnailCache = {};
+  final Map<String, Future<Uint8List?>> _thumbnailInFlight = {};
+  static const int _thumbnailCacheLimit = 200;
+  // ponytail: single-flight lock over thumbnail generation — only one full-file
+  // decrypt + image decode runs at a time so a grid of N encrypted files can't
+  // OOM/ANR the app. Fan out (small semaphore) only if first-load latency bites.
+  Future<void> _thumbGenLock = Future.value();
 
   /// Initialize the vault service
   Future<void> initialize() async {
@@ -799,6 +818,48 @@ class VaultService {
           .toString()
           .substring(0, 24);
 
+      // Generate an encrypted thumbnail at import (images + videos). Failure is
+      // non-fatal — the grid falls back to lazy regen via getThumbnailBytes.
+      String? thumbPath;
+      String? thumbIv;
+      if (shouldEncrypt &&
+          derivedKey != null &&
+          (type == VaultedFileType.image ||
+              type == VaultedFileType.video)) {
+        String? reconstructedTemp;
+        try {
+          File? plainFile;
+          if (await File(sourcePathToUse).exists()) {
+            plainFile = File(sourcePathToUse);
+          } else if (compressedImageBytes != null) {
+            final tmp = await getTemporaryDirectory();
+            reconstructedTemp =
+                '${tmp.path}/lkr_thumb_src_${DateTime.now().microsecondsSinceEpoch}';
+            plainFile = File(reconstructedTemp);
+            await plainFile.writeAsBytes(compressedImageBytes);
+          }
+          if (plainFile != null) {
+            final thumbBytes = await _generateThumbBytes(plainFile, type);
+            if (thumbBytes != null) {
+              final stored = await _encryptAndStoreThumbnail(
+                thumbBytes,
+                fileId: fileId,
+                derivedKey: derivedKey,
+                isDecoy: isDecoy,
+              );
+              thumbPath = stored?.path;
+              thumbIv = stored?.iv;
+            }
+          }
+        } catch (e) {
+          debugPrint('[Vault] import-time thumbnail generation failed: $e');
+        } finally {
+          if (reconstructedTemp != null) {
+            await _deleteFileIfExists(reconstructedTemp);
+          }
+        }
+      }
+
       return _PreparedVaultAddition(
         vaultedFile: VaultedFile(
           id: fileId,
@@ -818,6 +879,8 @@ class VaultService {
           isDecoy: isDecoy,
           tags: normalizedTags,
           albumIds: normalizedAlbumIds,
+          thumbnailPath: thumbPath,
+          thumbnailIv: thumbIv,
         ),
       );
     } catch (e) {
@@ -1207,6 +1270,177 @@ class VaultService {
     }
 
     return file;
+  }
+
+  // ---- Encrypted thumbnails ----
+  // Thumbs are GCM-encrypted with the file's per-file derived key + a fresh IV
+  // (stored in thumbnailIv), independent of the file's own algorithm. GCM auth
+  // lets us detect a stale thumb (e.g. after re-encrypt changed the key) and
+  // transparently regenerate. No plaintext thumb is ever at rest.
+
+  /// Decrypt (or lazily generate) the encrypted thumbnail bytes for [file].
+  /// Returns null for unencrypted files (callers render vaultPath directly) or
+  /// when no thumb can be produced.
+  Future<Uint8List?> getThumbnailBytes(VaultedFile file) async {
+    if (!file.isEncrypted) return null;
+    final cached = _thumbnailCache[file.id];
+    if (cached != null) return cached;
+    // ponytail: dedupe concurrent fetches so a fast scroll doesn't kick off
+    // N parallel full-decrypts for the same file.
+    final inFlight = _thumbnailInFlight[file.id];
+    if (inFlight != null) return inFlight;
+    final fut = _loadOrRegenerateThumbnail(file);
+    _thumbnailInFlight[file.id] = fut;
+    try {
+      final bytes = await fut;
+      if (bytes != null) _cacheThumbnail(file.id, bytes);
+      return bytes;
+    } finally {
+      _thumbnailInFlight.remove(file.id);
+    }
+  }
+
+  void _cacheThumbnail(String id, Uint8List bytes) {
+    _thumbnailCache[id] = bytes;
+    // ponytail: naive FIFO eviction — Map preserves insertion order, so
+    // dropping the first entry bounds the cache. Real LRU if hit-rate matters.
+    if (_thumbnailCache.length > _thumbnailCacheLimit) {
+      _thumbnailCache.remove(_thumbnailCache.keys.first);
+    }
+  }
+
+  Future<Uint8List?> _loadOrRegenerateThumbnail(VaultedFile file) {
+    // ponytail: serialize to one-at-a-time (see _thumbGenLock). Prevents a grid
+    // of N encrypted files from decrypting N full images concurrently (OOM/ANR).
+    final prev = _thumbGenLock;
+    final result = prev.then((_) => _loadOrRegenerateThumbnailLocked(file));
+    _thumbGenLock = result.then((_) {}, onError: (_) {});
+    return result;
+  }
+
+  Future<Uint8List?> _loadOrRegenerateThumbnailLocked(VaultedFile file) async {
+    if (file.thumbnailPath != null && file.thumbnailIv != null) {
+      final thumbFile = File(file.thumbnailPath!);
+      if (await thumbFile.exists()) {
+        final derivedKey = await _deriveKeyForFile(file);
+        final res = await _encryptionService.decryptStreamedFileToMemoryGcm(
+          file.thumbnailPath!,
+          file.thumbnailIv!,
+          isDecoy: file.isDecoy,
+          derivedKey: derivedKey,
+        );
+        if (res.success && res.data != null) return res.data;
+        // Auth failure / stale key (e.g. post re-encrypt): fall through to regen.
+      }
+    }
+    return _regenerateThumbnail(file);
+  }
+
+  Future<Uint8List?> _regenerateThumbnail(VaultedFile file) async {
+    final plaintext = await getVaultedFile(file.id, isDecoy: file.isDecoy);
+    if (plaintext == null) return null;
+    try {
+      final thumbBytes = await _generateThumbBytes(plaintext, file.type);
+      if (thumbBytes == null) return null;
+      final derivedKey = await _deriveKeyForFile(file);
+      if (derivedKey != null) {
+        final stored = await _encryptAndStoreThumbnail(
+          thumbBytes,
+          fileId: file.id,
+          derivedKey: derivedKey,
+          isDecoy: file.isDecoy,
+        );
+        if (stored != null) {
+          await _persistThumbnailRecord(
+            file.id,
+            stored.path,
+            stored.iv,
+            isDecoy: file.isDecoy,
+          );
+        }
+      }
+      return thumbBytes;
+    } finally {
+      try {
+        if (await plaintext.exists()) await plaintext.delete();
+      } catch (_) {}
+    }
+  }
+
+  /// Produce small JPEG bytes for an image or the first frame of a video.
+  /// Both plugins are platform-channel backed -> only callable on a device.
+  Future<Uint8List?> _generateThumbBytes(
+    File plaintext,
+    VaultedFileType type,
+  ) async {
+    try {
+      if (type == VaultedFileType.video) {
+        return await VideoCompress.getByteThumbnail(plaintext.path, quality: 70);
+      }
+      return await FlutterImageCompress.compressWithFile(
+        plaintext.path,
+        minWidth: 300,
+        minHeight: 300,
+        quality: 70,
+      );
+    } catch (e) {
+      debugPrint('[Vault] thumbnail generation failed: $e');
+      return null;
+    }
+  }
+
+  /// Encrypt [thumbBytes] to `thumbnails/<fileId>.thumb.enc` with a fresh IV.
+  /// Reuses the isolate encrypt path so the on-disk format matches the GCM
+  /// decrypt-to-memory reader. Returns null on failure.
+  Future<_StoredThumb?> _encryptAndStoreThumbnail(
+    Uint8List thumbBytes, {
+    required String fileId,
+    required Uint8List derivedKey,
+    required bool isDecoy,
+  }) async {
+    final dir = isDecoy
+        ? await _ensureDecoyDirectory()
+        : await _ensureVaultDirectory();
+    final thumbPath = '${dir.path}/thumbnails/$fileId.thumb.enc';
+    final tempDir = await getTemporaryDirectory();
+    final tempPath =
+        '${tempDir.path}/lkr_thumb_${DateTime.now().microsecondsSinceEpoch}';
+    await File(tempPath).writeAsBytes(thumbBytes);
+    try {
+      final res = await _encryptionService.encryptFileInIsolate(
+        tempPath,
+        thumbPath,
+        isDecoy: isDecoy,
+        useGcm: true,
+        derivedKey: derivedKey,
+      );
+      if (!res.success || res.iv == null) return null;
+      return _StoredThumb(thumbPath, res.iv!);
+    } catch (e) {
+      debugPrint('[Vault] thumbnail encrypt failed: $e');
+      return null;
+    } finally {
+      await _deleteFileIfExists(tempPath);
+    }
+  }
+
+  Future<void> _persistThumbnailRecord(
+    String fileId,
+    String path,
+    String iv, {
+    required bool isDecoy,
+  }) async {
+    final files = await _loadFileIndex(isDecoy: isDecoy);
+    final idx = files.indexWhere((f) => f.id == fileId);
+    if (idx == -1) return;
+    files[idx] = files[idx].copyWith(thumbnailPath: path, thumbnailIv: iv);
+    await _saveFileIndex(isDecoy: isDecoy);
+  }
+
+  /// Drop the in-memory thumbnail cache. Called on vault clear / logout flows.
+  void clearThumbnailCache() {
+    _thumbnailCache.clear();
+    _thumbnailInFlight.clear();
   }
 
   /// Get decrypted file data in memory (for viewing)
@@ -2368,6 +2602,14 @@ class VaultService {
 
         final fileIndex = files.indexWhere((f) => f.id == file.id);
         if (fileIndex >= 0) {
+          // ponytail: per-file key changed → the stored thumb ciphertext is
+          // undecryptable. Delete it; getThumbnailBytes lazily regenerates with
+          // the new key. In-memory cache (still the correct image) is left as-is.
+          if (file.thumbnailPath != null) {
+            try {
+              await File(file.thumbnailPath!).delete();
+            } catch (_) {}
+          }
           files[fileIndex] = file.copyWith(
             encryptionIv: newIv,
             encryptionAlgorithm: targetAlgorithm,
@@ -2530,6 +2772,14 @@ class VaultService {
         final idx = files.indexWhere((f) => f.id == file.id);
         if (idx >= 0) {
           // copyWith can't null out fields, so rebuild clearing the crypto ones.
+          // ponytail: file is now plaintext, grids render vaultPath directly and
+          // getThumbnailBytes returns null for unencrypted files — so drop the
+          // thumb field and delete the now-orphaned ciphertext thumb.
+          if (file.thumbnailPath != null) {
+            try {
+              await File(file.thumbnailPath!).delete();
+            } catch (_) {}
+          }
           files[idx] = VaultedFile(
             id: file.id,
             originalName: file.originalName,
@@ -2540,7 +2790,6 @@ class VaultService {
             fileSize: file.fileSize,
             dateAdded: file.dateAdded,
             dateModified: DateTime.now(),
-            thumbnailPath: file.thumbnailPath,
             metadata: file.metadata,
             tags: file.tags,
             isFavorite: file.isFavorite,
@@ -2595,6 +2844,7 @@ class VaultService {
         await _storage.delete(key: _tagsKey);
         _vaultDirectory = null;
       }
+      clearThumbnailCache();
     } catch (e) {
       debugPrint('Error clearing vault: $e');
     }
