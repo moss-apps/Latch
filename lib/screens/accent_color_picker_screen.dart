@@ -1,5 +1,5 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/accent_color.dart';
 import '../providers/theme_provider.dart';
@@ -112,115 +112,110 @@ class AccentColorPickerScreen extends ConsumerWidget {
     final displayColor = color.getColor(isDarkMode ? Brightness.dark : Brightness.light);
     final variantColor = color.getVariantColor(isDarkMode ? Brightness.dark : Brightness.light);
 
-    return ClipRRect(
+    return InkWell(
+      onTap: () async {
+        HapticFeedback.selectionClick();
+        await ref.read(accentColorProvider.notifier).setAccentColor(color);
+      },
       borderRadius: BorderRadius.circular(16),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: InkWell(
-          onTap: () async {
-            await ref.read(accentColorProvider.notifier).setAccentColor(color);
-          },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [displayColor, variantColor],
+          ),
           borderRadius: BorderRadius.circular(16),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [displayColor, variantColor],
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isSelected
-                    ? Colors.white.withValues(alpha: 0.6)
-                    : Colors.white.withValues(alpha: 0.2),
-                width: isSelected ? 3 : 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: displayColor.withValues(alpha: 0.3),
-                  blurRadius: isSelected ? 16 : 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+          border: Border.all(
+            color: isSelected
+                ? Colors.white.withValues(alpha: 0.6)
+                : Colors.white.withValues(alpha: 0.2),
+            width: isSelected ? 3 : 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: displayColor.withValues(alpha: 0.3),
+              blurRadius: isSelected ? 16 : 8,
+              offset: const Offset(0, 4),
             ),
-            child: Stack(
-              children: [
-                // Color name
-                Positioned(
-                  left: 16,
-                  bottom: 16,
-                  right: 16,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        color.name,
-                        style: const TextStyle(
-                          fontSize: 16,
+          ],
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              left: 16,
+              bottom: 16,
+              right: 16,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    color.name,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                      fontFamily: 'ProductSans',
+                      shadows: [
+                        Shadow(
+                          color: Colors.black26,
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (isSelected) ...[
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'Active',
+                        style: TextStyle(
+                          fontSize: 11,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
                           fontFamily: 'ProductSans',
-                          shadows: [
-                            Shadow(
-                              color: Colors.black26,
-                              blurRadius: 4,
-                            ),
-                          ],
                         ),
-                      ),
-                      if (isSelected) ...[
-                        const SizedBox(height: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            'Active',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                              fontFamily: 'ProductSans',
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                // Check icon for selected
-                if (isSelected)
-                  Positioned(
-                    top: 12,
-                    right: 12,
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.2),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Icon(
-                        Icons.check,
-                        size: 18,
-                        color: displayColor,
                       ),
                     ),
-                  ),
-              ],
+                  ],
+                ],
+              ),
             ),
-          ),
+            if (isSelected)
+              Positioned(
+                top: 12,
+                right: 12,
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    Icons.check,
+                    size: 18,
+                    color: displayColor,
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
