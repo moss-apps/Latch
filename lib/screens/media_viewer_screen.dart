@@ -55,6 +55,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   double _playbackSpeed = 1.0;
   bool _isLooping = false;
   bool _isMuted = false;
+  bool _forceLandscape = false;
   double? _decryptProgress;
 
   // Cancel token for in-flight video loads
@@ -98,6 +99,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
     _cleanupTempFiles();
     // Restore system UI
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     super.dispose();
   }
 
@@ -287,6 +289,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
       _videoPhase = _VideoLoadPhase.idle;
       _isVideoPlaying = false;
       _decryptProgress = null;
+      if (!_files[index].isVideo && _forceLandscape) {
+        _forceLandscape = false;
+        SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+      }
     });
 
     // Dispose old controller after rebuild to avoid blocking swipe animation
@@ -316,6 +322,20 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   void _toggleLooping() async {
     setState(() => _isLooping = !_isLooping);
     await _videoController?.setLooping(_isLooping);
+  }
+
+  // ponytail: locks the device to portrait or landscape so a video can be
+  // watched in either orientation. Pure global side effect, no per-axis work.
+  void _toggleOrientation() {
+    setState(() => _forceLandscape = !_forceLandscape);
+    if (_forceLandscape) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    } else {
+      SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    }
   }
 
   void _startSlideshow() {
@@ -1091,15 +1111,6 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
               tooltip: 'Favorite',
               onPressed: _toggleFavorite,
             ),
-            if (file.isVideo)
-              IconButton(
-                icon: Icon(
-                  _isLooping ? Icons.repeat_one : Icons.repeat,
-                  color: _isLooping ? AppColors.accent : Colors.white,
-                ),
-                tooltip: 'Loop',
-                onPressed: _toggleLooping,
-              ),
             IconButton(
               icon: const Icon(Icons.info_outline, color: Colors.white),
               tooltip: 'File info',
@@ -1197,8 +1208,16 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                    IconButton(
-                     icon: Icon(
-                       _isMuted ? Icons.volume_off : Icons.volume_up,
+                      icon: Icon(
+                        _isLooping ? Icons.repeat_one : Icons.repeat,
+                        color: _isLooping ? AppColors.accent : Colors.white,
+                      ),
+                      tooltip: 'Loop',
+                      onPressed: _toggleLooping,
+                    ),
+                   IconButton(
+                      icon: Icon(
+                        _isMuted ? Icons.volume_off : Icons.volume_up,
                        color: Colors.white,
                      ),
                      tooltip: _isMuted ? 'Unmute' : 'Mute',
@@ -1242,18 +1261,32 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                         } else {
                           _playbackSpeed = 1.0;
                         }
-                        _videoController?.setPlaybackSpeed(_playbackSpeed);
+_videoController?.setPlaybackSpeed(_playbackSpeed);
                       });
-                    },
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+                     },
+                   ),
+                    IconButton(
+                      icon: Icon(
+                        _forceLandscape
+                            ? Icons.stay_current_portrait
+                            : Icons.stay_current_landscape,
+                        color: _forceLandscape
+                            ? AppColors.accent
+                            : Colors.white,
+                      ),
+                      tooltip: _forceLandscape
+                          ? 'Play vertically'
+                          : 'Play horizontally',
+                      onPressed: _toggleOrientation,
+                    ),
+                 ],
+               ),
+             ],
+           ),
+         ),
+       ),
+     );
+   }
 
   Widget _buildImageBottomControls(VaultedFile file) {
     return Positioned(
