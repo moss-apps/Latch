@@ -2,6 +2,38 @@
 
 Notable changes to Latch.
 
+## 0.16.1-beta.2
+
+### Encrypted Thumbnails
+- **Encrypted thumbnail generation and caching** for images and videos
+- Encrypted files now show an encrypted thumbnail instead of a generic icon
+- Applied across gallery vault, favorites, albums, tags, and explorer screens
+- `thumbnailIv` field added to `VaultedFile` model
+- GCM encryption roundtrip tests for thumbnail invariants
+
+### What's New Service
+- Replaced hardcoded highlights map with **bundled asset lookup** using `rootBundle`
+- Semver-based version comparison for more reliable version matching
+
+### UI Polish
+- `BackdropFilter` replaced with `AnimatedContainer` for smoother transitions
+- Haptic feedback on interactive elements
+- Close button added to import options sheet
+- Accessibility label and larger tap target on dismiss button
+
+### Backup
+- Local backup screen refactored for visual consistency and progress tracking
+
+### Fixes
+- Fixed `ReorderableListView` reorder logic
+- Added missing `final` modifier to `_pathStack` in folder import picker
+- Fixed missing `await` on `highlightsFor` calls
+
+### Infrastructure
+- Graphify output directory added to `.gitignore`
+
+---
+
 ## 0.16.0-beta.1
 
 ### Encryption Management
