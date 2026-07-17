@@ -1,4 +1,41 @@
 {
+  "0.16.1-beta.2": [
+    {
+      "title": "Encrypted Thumbnails",
+      "items": [
+        {
+          "icon": "photo_library_outlined",
+          "title": "Thumbnail privacy",
+          "description": "Encrypted files now show a generated encrypted thumbnail instead of a generic icon — you can see what's there without decrypting everything."
+        },
+        {
+          "icon": "build_outlined",
+          "title": "Thumbnail caching",
+          "description": "Encrypted thumbnails are generated once and cached, making gallery browsing much faster for encrypted vaults."
+        }
+      ]
+    },
+    {
+      "title": "Polish & Fixes",
+      "items": [
+        {
+          "icon": "new_releases_outlined",
+          "title": "UI refinements",
+          "description": "Smoother transitions, haptic feedback on key interactions, and a close button on the import options sheet."
+        },
+        {
+          "icon": "bug_report_outlined",
+          "title": "ReorderList fix",
+          "description": "Fixed ReorderableListView drag-to-reorder behaviour in folder views."
+        },
+        {
+          "icon": "system_update_outlined",
+          "title": "Smarter What's New",
+          "description": "Version checks now use proper semver comparison — no more missing highlights due to version string mismatches."
+        }
+      ]
+    }
+  ],
   "0.16.0-beta.1": [
     {
       "title": "Encryption Management",
