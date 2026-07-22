@@ -9,6 +9,7 @@ import 'package:photo_manager/photo_manager.dart';
 import '../models/encryption_algorithm.dart';
 import '../models/vaulted_file.dart';
 import '../models/vault_folder.dart';
+import '../models/file_to_vault.dart';
 import 'auto_kill_service.dart';
 import 'decoy_service.dart';
 import 'media_scanner_service.dart';

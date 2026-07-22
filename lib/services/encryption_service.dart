@@ -20,8 +20,10 @@ import 'crypto_isolate_pool.dart';
 // in-memory key cache, the isolate pool, and the file streaming orchestration.
 const int _streamChunkSize = 1024 * 1024;
 
-/// AES-256 Encryption Service for secure file encryption
-/// Uses AES-256-CBC mode with PKCS7 padding
+/// AES-256 Encryption Service for secure file encryption.
+/// Default: AES-256-GCM (authenticated); AES-256-CTR is selectable.
+/// CBC is decrypt-only legacy for migration. Per-file keys via PBKDF2,
+/// master key wrapped with Argon2id.
 class EncryptionService {
   EncryptionService._();
   static final EncryptionService instance = EncryptionService._();

@@ -13,6 +13,7 @@ import 'auto_kill_service.dart';
 import 'decoy_service.dart';
 import 'encryption_service.dart';
 import 'vault_service.dart';
+import '../models/vault_settings.dart';
 
 /// Authentication service that handles password and biometric authentication
 class AuthService {

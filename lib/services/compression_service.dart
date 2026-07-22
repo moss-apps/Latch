@@ -59,7 +59,10 @@ class CompressionService {
 
   Future<Uint8List?> _compressJpegKeepOriginalSize(Uint8List bytes) async {
     try {
-      final result = BicubicResizer.resizeJpeg(
+      // ponytail: resizeJpegAsync runs the native FFI pipeline in an isolate
+      // (package ships the wrapper). Keeps the decode→resize→encode off the UI
+      // thread during image import.
+      final result = await BicubicResizer.resizeJpegAsync(
         jpegBytes: bytes,
         outputWidth: 4096,
         outputHeight: 4096,
