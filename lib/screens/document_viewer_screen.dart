@@ -9,6 +9,7 @@ import '../models/vaulted_file.dart';
 import '../providers/vault_providers.dart';
 import '../services/auto_kill_service.dart';
 import '../services/office_converter_service.dart';
+import '../services/vault_service.dart';
 import '../themes/app_colors.dart';
 import '../utils/toast_utils.dart';
 import '../widgets/conversion_warning_dialog.dart';
@@ -85,7 +86,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
 
   void _cleanupTempFiles() {
     try {
-      ref.read(vaultServiceProvider).cleanupTemp();
+      VaultService.instance.cleanupTemp();
     } catch (e) {
       debugPrint('Error cleaning up temp files: $e');
     }
@@ -580,6 +581,14 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
                 blurRadius: 10,
                 offset: const Offset(0, 2),
               ),
+              scrollPhysics: const ClampingScrollPhysics(),
+              viewerOverlayBuilder: (context, size, handleLinkTap) => [
+                PdfViewerScrollThumb(
+                  controller: _pdfController!,
+                  thumbBuilder: (context, thumbSize, pageNumber, controller) =>
+                      _buildScrollThumb(thumbSize, pageNumber),
+                ),
+              ],
               onViewerReady: (document, controller) {
                 setState(() {
                   _totalPages = document.pages.length;
@@ -619,6 +628,14 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
           blurRadius: 10,
           offset: const Offset(0, 2),
         ),
+        scrollPhysics: const ClampingScrollPhysics(),
+        viewerOverlayBuilder: (context, size, handleLinkTap) => [
+          PdfViewerScrollThumb(
+            controller: _pdfController!,
+            thumbBuilder: (context, thumbSize, pageNumber, controller) =>
+                _buildScrollThumb(thumbSize, pageNumber),
+          ),
+        ],
         onViewerReady: (document, controller) {
           setState(() {
             _totalPages = document.pages.length;
@@ -734,6 +751,35 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildScrollThumb(Size thumbSize, int? pageNumber) {
+    return Container(
+      width: thumbSize.width,
+      height: thumbSize.height,
+      decoration: BoxDecoration(
+        color: context.backgroundColor,
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: context.dividerColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Text(
+          pageNumber?.toString() ?? '',
+          style: TextStyle(
+            fontSize: 12,
+            color: context.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
     );
   }

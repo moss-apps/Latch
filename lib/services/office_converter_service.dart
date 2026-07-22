@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:isolate';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -58,6 +59,25 @@ class OfficeConverterService {
   static const List<String> convertibleExtensions = [
     'docx', 'odt', 'rtf', // Currently supported for on-device conversion
   ];
+
+  // ponytail: font loaded once on the main isolate (rootBundle is platform-
+  // channel-backed, unavailable in a spawned isolate) then passed into the
+  // conversion worker.
+  static Uint8List? _cachedFontBytes;
+  static bool _fontLoaded = false;
+
+  static Future<Uint8List?> _loadFontBytes() async {
+    if (_fontLoaded) return _cachedFontBytes;
+    _fontLoaded = true;
+    try {
+      final fontData = await rootBundle.load('fonts/productsans_regular.ttf');
+      _cachedFontBytes = fontData.buffer.asUint8List();
+    } catch (e) {
+      debugPrint('Could not load custom font for PDF: $e');
+      _cachedFontBytes = null;
+    }
+    return _cachedFontBytes;
+  }
 
   /// Check if a file extension is an Office document
   static bool isOfficeDocument(String extension) {
@@ -134,33 +154,45 @@ class OfficeConverterService {
   ) async {
     final fileType = getFileType(extension);
 
+    if (fileType == OfficeFileType.unknown) {
+      return ConversionResult(success: false, error: 'Unknown file format');
+    }
+
+    const requiresExternal = {
+      OfficeFileType.xlsx,
+      OfficeFileType.xls,
+      OfficeFileType.ods,
+      OfficeFileType.pptx,
+      OfficeFileType.ppt,
+      OfficeFileType.odp,
+      OfficeFileType.doc,
+    };
+    if (requiresExternal.contains(fileType)) {
+      return ConversionResult(
+        success: false,
+        requiresExternalApp: true,
+        error: 'This file format requires an external app to view.',
+      );
+    }
+
     try {
-      switch (fileType) {
-        case OfficeFileType.docx:
-          return await _convertDocxToPdf(fileData, fileName);
-        case OfficeFileType.odt:
-          return await _convertOdtToPdf(fileData, fileName);
-        case OfficeFileType.rtf:
-          return await _convertRtfToPdf(fileData, fileName);
-        case OfficeFileType.xlsx:
-        case OfficeFileType.xls:
-        case OfficeFileType.ods:
-        case OfficeFileType.pptx:
-        case OfficeFileType.ppt:
-        case OfficeFileType.odp:
-        case OfficeFileType.doc:
-          // These formats require external app opening
-          return ConversionResult(
-            success: false,
-            requiresExternalApp: true,
-            error: 'This file format requires an external app to view.',
-          );
-        case OfficeFileType.unknown:
-          return ConversionResult(
-            success: false,
-            error: 'Unknown file format',
-          );
-      }
+      final fontBytes = await _loadFontBytes();
+      // ponytail: ZIP decode + XML parse + PDF layout are pure Dart, so they
+      // run in an isolate to keep the UI thread free during docx/odt/rtf
+      // import. Static methods => no `this` capture sent across.
+      return await Isolate.run(() async {
+        switch (fileType) {
+          case OfficeFileType.docx:
+            return await _convertDocxToPdf(fileData, fileName, fontBytes);
+          case OfficeFileType.odt:
+            return await _convertOdtToPdf(fileData, fileName, fontBytes);
+          case OfficeFileType.rtf:
+            return await _convertRtfToPdf(fileData, fileName, fontBytes);
+          default:
+            return ConversionResult(
+                success: false, error: 'Unsupported file format');
+        }
+      });
     } catch (e) {
       debugPrint('Error converting document: $e');
       return ConversionResult(
@@ -171,8 +203,8 @@ class OfficeConverterService {
   }
 
   /// Convert DOCX to PDF
-  Future<ConversionResult> _convertDocxToPdf(
-      Uint8List fileData, String fileName) async {
+  static Future<ConversionResult> _convertDocxToPdf(
+      Uint8List fileData, String fileName, Uint8List? fontBytes) async {
     try {
       // Extract text content from DOCX
       final content = await _extractDocxContent(fileData);
@@ -185,7 +217,7 @@ class OfficeConverterService {
       }
 
       // Create PDF with extracted content
-      final pdfData = await _createPdfFromContent(content, fileName);
+      final pdfData = await _createPdfFromContent(content, fileName, fontBytes);
 
       return ConversionResult(
         success: true,
@@ -201,8 +233,8 @@ class OfficeConverterService {
   }
 
   /// Convert ODT to PDF
-  Future<ConversionResult> _convertOdtToPdf(
-      Uint8List fileData, String fileName) async {
+  static Future<ConversionResult> _convertOdtToPdf(
+      Uint8List fileData, String fileName, Uint8List? fontBytes) async {
     try {
       // Extract text content from ODT
       final content = await _extractOdtContent(fileData);
@@ -215,7 +247,7 @@ class OfficeConverterService {
       }
 
       // Create PDF with extracted content
-      final pdfData = await _createPdfFromContent(content, fileName);
+      final pdfData = await _createPdfFromContent(content, fileName, fontBytes);
 
       return ConversionResult(
         success: true,
@@ -231,8 +263,8 @@ class OfficeConverterService {
   }
 
   /// Convert RTF to PDF
-  Future<ConversionResult> _convertRtfToPdf(
-      Uint8List fileData, String fileName) async {
+  static Future<ConversionResult> _convertRtfToPdf(
+      Uint8List fileData, String fileName, Uint8List? fontBytes) async {
     try {
       // Extract plain text from RTF
       final content = _extractRtfContent(fileData);
@@ -245,7 +277,7 @@ class OfficeConverterService {
       }
 
       // Create PDF with extracted content
-      final pdfData = await _createPdfFromContent([content], fileName);
+      final pdfData = await _createPdfFromContent([content], fileName, fontBytes);
 
       return ConversionResult(
         success: true,
@@ -261,7 +293,7 @@ class OfficeConverterService {
   }
 
   /// Extract text content from DOCX file
-  Future<List<String>> _extractDocxContent(Uint8List fileData) async {
+  static Future<List<String>> _extractDocxContent(Uint8List fileData) async {
     final List<String> paragraphs = [];
 
     try {
@@ -314,7 +346,7 @@ class OfficeConverterService {
   }
 
   /// Extract text content from ODT file
-  Future<List<String>> _extractOdtContent(Uint8List fileData) async {
+  static Future<List<String>> _extractOdtContent(Uint8List fileData) async {
     final List<String> paragraphs = [];
 
     try {
@@ -347,7 +379,7 @@ class OfficeConverterService {
   }
 
   /// Extract plain text from RTF
-  String _extractRtfContent(Uint8List fileData) {
+  static String _extractRtfContent(Uint8List fileData) {
     try {
       final content = String.fromCharCodes(fileData);
 
@@ -388,8 +420,8 @@ class OfficeConverterService {
   }
 
   /// Create PDF from extracted text content
-  Future<Uint8List> _createPdfFromContent(
-      List<String> paragraphs, String fileName) async {
+  static Future<Uint8List> _createPdfFromContent(
+      List<String> paragraphs, String fileName, Uint8List? fontBytes) async {
     // Create a new PDF document
     final PdfDocument document = PdfDocument();
 
@@ -401,22 +433,18 @@ class OfficeConverterService {
     PdfPage page = document.pages.add();
     final pageSize = page.getClientSize();
 
-    // Try to load custom font, otherwise use standard
+    // Custom font pre-loaded on main isolate, else fall back to standard font
     PdfFont titleFont;
     PdfFont bodyFont;
     bool usingStandardFont = true;
 
-    try {
-      final fontData = await rootBundle.load('fonts/productsans_regular.ttf');
-      final fontBytes = fontData.buffer.asUint8List();
-
+    if (fontBytes != null) {
       titleFont = PdfTrueTypeFont(fontBytes, 14, style: PdfFontStyle.bold);
       bodyFont = PdfTrueTypeFont(fontBytes, 11);
       usingStandardFont = false;
-    } catch (e) {
-      debugPrint('Could not load custom font for PDF: $e');
-      titleFont = PdfStandardFont(PdfFontFamily.helvetica, 14,
-          style: PdfFontStyle.bold);
+    } else {
+      titleFont =
+          PdfStandardFont(PdfFontFamily.helvetica, 14, style: PdfFontStyle.bold);
       bodyFont = PdfStandardFont(PdfFontFamily.helvetica, 11);
     }
 

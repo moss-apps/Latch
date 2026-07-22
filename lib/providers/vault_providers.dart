@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/legacy.dart';
 import '../models/album.dart';
 import '../models/vault_folder.dart';
 import '../models/vaulted_file.dart';
+import '../models/vault_settings.dart';
 import '../services/vault_service.dart';
 import '../services/decoy_service.dart';
 import '../services/encryption_service.dart';

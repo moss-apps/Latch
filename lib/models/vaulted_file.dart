@@ -250,10 +250,10 @@ class VaultedFile {
 
   /// Remove from folder
   VaultedFile removeFromFolder() {
-    return copyWith(
-      folderId: null,
-      dateModified: DateTime.now(),
-    );
+    final map = toJson();
+    map['folderId'] = null;
+    map['dateModified'] = DateTime.now().toIso8601String();
+    return VaultedFile.fromJson(map);
   }
 
   /// Check if file has a specific tag

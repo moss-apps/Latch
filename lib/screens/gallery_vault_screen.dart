@@ -3722,18 +3722,46 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
           (encrypt: s.encrypt, algorithm: s.algorithm);
     }
 
-    setState(() {
-      _isImporting = true;
-      _importProgress = 0;
-      _importTotal = selectedDocuments.length;
-    });
+    final progressState = ValueNotifier<OperationProgressState>(
+      OperationProgressState(
+        totalFiles: selectedDocuments.length,
+        currentFile: 0,
+        currentFileName: 'Preparing...',
+        totalSizeBytes: 0,
+        processedSizeBytes: 0,
+        statusMessage: 'Starting...',
+        isProcessing: true,
+      ),
+    );
+
+    if (!mounted) return;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isDismissible: false,
+      enableDrag: false,
+      builder: (context) => ValueListenableBuilder<OperationProgressState>(
+        valueListenable: progressState,
+        builder: (context, state, _) => OperationProgressSheet(
+          operationType: OperationType.hide,
+          totalFiles: state.totalFiles,
+          currentFile: state.currentFile,
+          currentFileName: state.currentFileName,
+          totalSizeBytes: state.totalSizeBytes,
+          processedSizeBytes: state.processedSizeBytes,
+          statusMessage: state.statusMessage,
+          isProcessing: state.isProcessing,
+          isComplete: state.isComplete,
+          isEncrypting: state.isEncrypting,
+        ),
+      ),
+    );
 
     final result = await _importService.importFromDocumentFilesWithConversion(
       filePaths: selectedDocuments.map((d) => d.path).toList(),
       deleteOriginals: true,
       perFileEncryption: perFileEncryption,
       onConversionConfirmation: (officeFiles) async {
-        if (!mounted) return false;
         final confirmed = await showDialog<bool>(
           context: context,
           barrierDismissible: false,
@@ -3746,18 +3774,34 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
         return confirmed ?? false;
       },
       onProgress: (current, total) {
-        if (!mounted) return;
-        setState(() {
-          _importProgress = current;
-          _importTotal = total;
-        });
+        progressState.value = progressState.value.copyWith(
+          totalFiles: total,
+          currentFile: current,
+          statusMessage: current == 0
+              ? 'Preparing files...'
+              : 'Processing file $current of $total...',
+        );
+      },
+      onFileProgress: (fileInfo) {
+        progressState.value = progressState.value.copyWith(
+          totalFiles: fileInfo.total,
+          currentFile: fileInfo.current,
+          currentFileName: fileInfo.fileName,
+          statusMessage: fileInfo.status,
+          isEncrypting: fileInfo.isEncrypting,
+          processedSizeBytes:
+              fileInfo.isEncrypting ? fileInfo.encryptedBytes : null,
+          totalSizeBytes: fileInfo.isEncrypting ? fileInfo.totalBytes : null,
+        );
       },
       onStatusUpdate: (message) {
-        debugPrint('[Import] $message');
+        progressState.value = progressState.value.copyWith(
+          statusMessage: message,
+        );
       },
     );
 
-    if (mounted) setState(() => _isImporting = false);
+    if (!mounted) return;
 
     if (result.success && result.importedCount > 0) {
       final msgBuilder =
@@ -3775,6 +3819,8 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
     } else {
       ToastUtils.showInfo('No documents imported');
     }
+
+    Navigator.pop(context);
   }
 
   Future<void> _importSongs() async {

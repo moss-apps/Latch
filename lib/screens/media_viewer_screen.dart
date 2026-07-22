@@ -11,6 +11,7 @@ import 'package:video_player/video_player.dart';
 import '../models/vaulted_file.dart';
 import '../providers/vault_providers.dart';
 import '../services/auto_kill_service.dart';
+import '../services/vault_service.dart';
 import '../themes/app_colors.dart';
 import '../utils/toast_utils.dart';
 import '../widgets/file_info_sheet.dart';
@@ -106,7 +107,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   /// Clean up temporary decrypted files to prevent disk space leaks
   void _cleanupTempFiles() {
     try {
-      ref.read(vaultServiceProvider).cleanupTemp();
+      VaultService.instance.cleanupTemp();
     } catch (e) {
       debugPrint('Error cleaning up temp files: $e');
     }

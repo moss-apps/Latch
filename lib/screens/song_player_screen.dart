@@ -11,6 +11,7 @@ import '../models/vaulted_file.dart';
 import '../services/flick_integration_service.dart';
 import '../providers/vault_providers.dart';
 import '../services/auto_kill_service.dart';
+import '../services/vault_service.dart';
 import '../themes/app_colors.dart';
 import '../utils/toast_utils.dart';
 
@@ -64,7 +65,7 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
 
   void _cleanupTempFiles() {
     try {
-      ref.read(vaultServiceProvider).cleanupTemp();
+      VaultService.instance.cleanupTemp();
     } catch (e) {
       debugPrint('Error cleaning up temp files: $e');
     }
