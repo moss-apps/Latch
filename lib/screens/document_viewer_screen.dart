@@ -581,6 +581,13 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
                 blurRadius: 10,
                 offset: const Offset(0, 2),
               ),
+              viewerOverlayBuilder: (context, size, handleLinkTap) => [
+                PdfViewerScrollThumb(
+                  controller: _pdfController!,
+                  thumbBuilder: (context, thumbSize, pageNumber, controller) =>
+                      _buildScrollThumb(thumbSize, pageNumber),
+                ),
+              ],
               onViewerReady: (document, controller) {
                 setState(() {
                   _totalPages = document.pages.length;
@@ -620,6 +627,13 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
           blurRadius: 10,
           offset: const Offset(0, 2),
         ),
+        viewerOverlayBuilder: (context, size, handleLinkTap) => [
+          PdfViewerScrollThumb(
+            controller: _pdfController!,
+            thumbBuilder: (context, thumbSize, pageNumber, controller) =>
+                _buildScrollThumb(thumbSize, pageNumber),
+          ),
+        ],
         onViewerReady: (document, controller) {
           setState(() {
             _totalPages = document.pages.length;
@@ -735,6 +749,35 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildScrollThumb(Size thumbSize, int? pageNumber) {
+    return Container(
+      width: thumbSize.width,
+      height: thumbSize.height,
+      decoration: BoxDecoration(
+        color: context.backgroundColor,
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: context.dividerColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Text(
+          pageNumber?.toString() ?? '',
+          style: TextStyle(
+            fontSize: 12,
+            color: context.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
     );
   }
