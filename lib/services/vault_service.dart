@@ -1,504 +1,99 @@
-import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:crypto/crypto.dart';
-import '../models/vaulted_file.dart';
+
 import '../models/album.dart';
-import '../models/vault_folder.dart';
 import '../models/encryption_algorithm.dart';
-import 'encryption_service.dart';
-import 'compression_service.dart';
+import '../models/file_to_vault.dart';
+import '../models/vault_folder.dart';
+import '../models/vault_settings.dart';
+import '../models/vaulted_file.dart';
+import 'album_service.dart';
 import 'crypto_isolate_pool.dart';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
-import 'package:video_compress/video_compress.dart';
+import 'encryption_service.dart';
+import 'file_service.dart';
+import 'folder_service.dart';
+import 'search_service.dart';
+import 'settings_service.dart';
+import 'stats_service.dart';
+import 'tag_service.dart';
+import 'thumbnail_service.dart';
+import 'vault_store.dart';
 
-class FileProgressInfo {
-  final int current;
-  final int total;
-  final String fileName;
-  final int fileSize;
-  final String status;
-  final bool isEncrypting;
-  final int encryptedBytes;
-  final int totalBytes;
+export 'file_service.dart' show FileProgressInfo;
 
-  const FileProgressInfo({
-    required this.current,
-    required this.total,
-    required this.fileName,
-    required this.fileSize,
-    required this.status,
-    this.isEncrypting = false,
-    this.encryptedBytes = 0,
-    this.totalBytes = 0,
-  });
-}
-
-class _PreparedVaultAddition {
-  final VaultedFile vaultedFile;
-
-  const _PreparedVaultAddition({required this.vaultedFile});
-}
-
-class _BatchPreparationResult {
-  final int index;
-  final FileToVault file;
-  final int fileSize;
-  final _PreparedVaultAddition? prepared;
-
-  const _BatchPreparationResult({
-    required this.index,
-    required this.file,
-    required this.fileSize,
-    required this.prepared,
-  });
-}
-
-class _StoredThumb {
-  final String path;
-  final String iv;
-  const _StoredThumb(this.path, this.iv);
-}
-
-/// Service for managing vaulted files storage
+/// Facade over the split vault services. Preserves the original `VaultService`
+/// API surface so the 11 direct `VaultService.instance` callers + Riverpod
+/// providers keep working. Phase 4 (Riverpod) removes this facade in favor of
+/// per-service providers.
+///
+/// ponytail: facade + forwarding. The real logic now lives in the split
+/// services (FileService, AlbumService, FolderService, TagService,
+/// ThumbnailService, SearchService, StatsService, SettingsService). This
+/// class solely composes them + forwards ~100 public methods. No behavioral
+/// changes from pre-split — same delegate order, same cache (now in VaultStore).
 class VaultService {
-  VaultService._();
-  static final VaultService instance = VaultService._();
+  @visibleForTesting
+  VaultService();
+  static final VaultService instance = VaultService();
 
-  static const int _maxConcurrentBatchAdds = 3;
+  late final VaultStore _store = VaultStore();
+  late final EncryptionService _encryptionService = EncryptionService.instance;
 
-  static const _storage = FlutterSecureStorage(
-    aOptions: AndroidOptions(),
-    iOptions: IOSOptions(accessibility: KeychainAccessibility.unlocked_this_device),
-  );
+  // ponytail: File↔Thumbnail form a construction cycle (each calls the other
+  // at runtime, never at construction). Break it with a late non-final
+  // back-reference on ThumbnailService that's wired after both exist.
+  late final ThumbnailService _thumbnails =
+      ThumbnailService(_store, _encryptionService);
+  late final FileService _files =
+      FileService(_store, _encryptionService, _thumbnails);
+  late final AlbumService _albums = AlbumService(_store, _files);
+  late final FolderService _folders = FolderService(_store, _files);
+  late final TagService _tags = TagService(_store, _albums, _files);
+  late final SearchService _search = SearchService(_store);
+  late final StatsService _stats = StatsService(_store);
+  late final SettingsService _settings = SettingsService(_store);
 
-  static const String _vaultIndexKey = 'vault_file_index';
-  static const String _decoyIndexKey = 'vault_decoy_index';
-  static const String _albumsKey = 'vault_albums';
-  static const String _tagsKey = 'vault_tags';
-  static const String _settingsKey = 'vault_settings';
-  static const String _vaultFolderName = '.locker_vault';
-  static const String _decoyFolderName = '.locker_decoy';
-  static const String _foldersKey = 'vault_folders';
+  // Wire late back-edges once everything's constructed. Tests hit this via
+  // the implicit first call to any forwarded method.
+  bool _wired = false;
+  void _wire() {
+    if (_wired) return;
+    _thumbnails.fileService = _files;
+    _files.updateTagUsage = _tags.updateTagUsage;
+    _files.removeFileFromAlbumFn = _albums.removeFileFromAlbum;
+    _wired = true;
+  }
 
-  final EncryptionService _encryptionService = EncryptionService.instance;
+  // ---- Lifecycle ----
 
-  Directory? _vaultDirectory;
-  Directory? _decoyDirectory;
-  List<VaultedFile>? _cachedFiles;
-  List<VaultedFile>? _cachedDecoyFiles;
-  List<Album>? _cachedAlbums;
-  List<VaultFolder>? _cachedFolders;
-  List<TagInfo>? _cachedTags;
-  VaultSettings? _cachedSettings;
-
-  // ponytail: in-memory encrypted-thumb cache + in-flight dedupe. Mirrors the
-  // accepted security model (plaintext persists like _decryptedFileCache /
-  // master key until process death); cleared in clearVault.
-  final Map<String, Uint8List> _thumbnailCache = {};
-  final Map<String, Future<Uint8List?>> _thumbnailInFlight = {};
-  static const int _thumbnailCacheLimit = 200;
-  // ponytail: single-flight lock over thumbnail generation — only one full-file
-  // decrypt + image decode runs at a time so a grid of N encrypted files can't
-  // OOM/ANR the app. Fan out (small semaphore) only if first-load latency bites.
-  Future<void> _thumbGenLock = Future.value();
-
-  /// Initialize the vault service
   Future<void> initialize() async {
     await _encryptionService.initialize();
-    await _ensureVaultDirectory();
-    await _loadFileIndex();
-    await _loadAlbums();
-    await _loadFolders();
-    await _loadTags();
-    await _loadSettings();
+    await _store.ensureVaultDirectory();
+    await _store.loadFileIndex();
+    await _store.loadAlbums();
+    await _store.loadFolders();
+    await _store.loadTags();
+    await _store.loadSettings();
+    _wire();
   }
 
-  /// Get the vault directory
-  Future<Directory> _ensureVaultDirectory() async {
-    if (_vaultDirectory != null && await _vaultDirectory!.exists()) {
-      await _ensureNoMediaFile(_vaultDirectory!.path);
-      return _vaultDirectory!;
-    }
-
-    final appDir = await getApplicationDocumentsDirectory();
-    _vaultDirectory = Directory('${appDir.path}/$_vaultFolderName');
-
-    if (!await _vaultDirectory!.exists()) {
-      await _vaultDirectory!.create(recursive: true);
-    }
-
-    // Create subdirectories for different file types
-    await Directory('${_vaultDirectory!.path}/images').create(recursive: true);
-    await Directory('${_vaultDirectory!.path}/videos').create(recursive: true);
-    await Directory('${_vaultDirectory!.path}/songs').create(recursive: true);
-    await Directory('${_vaultDirectory!.path}/documents')
-        .create(recursive: true);
-    await Directory('${_vaultDirectory!.path}/thumbnails')
-        .create(recursive: true);
-    await Directory('${_vaultDirectory!.path}/temp').create(recursive: true);
-
-    // Prevent system gallery/media scanner from indexing vault contents
-    await _ensureNoMediaFile(_vaultDirectory!.path);
-
-    return _vaultDirectory!;
+  /// Loads indexes without initializing encryption (test-only).
+  @visibleForTesting
+  Future<void> loadIndexesForTesting() async {
+    _wire();
+    await _store.ensureVaultDirectory();
+    _store.cachedFiles = await _store.loadFileIndex(forceReload: true);
+    _store.cachedDecoyFiles =
+        await _store.loadFileIndex(isDecoy: true, forceReload: true);
+    _store.cachedAlbums = await _store.loadAlbums(forceReload: true);
+    _store.cachedFolders = await _store.loadFolders(forceReload: true);
+    _store.cachedTags = await _store.loadTags(forceReload: true);
+    _store.cachedSettings = await _store.loadSettings();
   }
 
-  /// Get the decoy directory
-  Future<Directory> _ensureDecoyDirectory() async {
-    if (_decoyDirectory != null && await _decoyDirectory!.exists()) {
-      await _ensureNoMediaFile(_decoyDirectory!.path);
-      return _decoyDirectory!;
-    }
+  // ---- Files ----
 
-    final appDir = await getApplicationDocumentsDirectory();
-    _decoyDirectory = Directory('${appDir.path}/$_decoyFolderName');
-
-    if (!await _decoyDirectory!.exists()) {
-      await _decoyDirectory!.create(recursive: true);
-    }
-
-    await Directory('${_decoyDirectory!.path}/images').create(recursive: true);
-    await Directory('${_decoyDirectory!.path}/videos').create(recursive: true);
-    await Directory('${_decoyDirectory!.path}/songs').create(recursive: true);
-    await Directory('${_decoyDirectory!.path}/documents')
-        .create(recursive: true);
-
-    // Prevent media scanner from indexing decoy vault
-    await _ensureNoMediaFile(_decoyDirectory!.path);
-
-    return _decoyDirectory!;
-  }
-
-  /// Ensure a .nomedia marker exists to hide from gallery/media scanners
-  Future<void> _ensureNoMediaFile(String directoryPath) async {
-    final noMediaFile = File('$directoryPath/.nomedia');
-    if (!await noMediaFile.exists()) {
-      await noMediaFile.create();
-    }
-  }
-
-  /// Get subdirectory path for file type
-  String _getSubdirectory(VaultedFileType type) {
-    switch (type) {
-      case VaultedFileType.image:
-        return 'images';
-      case VaultedFileType.video:
-        return 'videos';
-      case VaultedFileType.song:
-        return 'songs';
-      case VaultedFileType.document:
-      case VaultedFileType.other:
-        return 'documents';
-    }
-  }
-
-  /// Load file index from secure storage
-  Future<List<VaultedFile>> _loadFileIndex({
-    bool isDecoy = false,
-    bool forceReload = false,
-  }) async {
-    if (!forceReload && !isDecoy && _cachedFiles != null) {
-      return _cachedFiles!;
-    }
-    if (!forceReload && isDecoy && _cachedDecoyFiles != null) {
-      return _cachedDecoyFiles!;
-    }
-
-    try {
-      final key = isDecoy ? _decoyIndexKey : _vaultIndexKey;
-      final indexJson = await _storage.read(key: key);
-      if (indexJson == null || indexJson.isEmpty) {
-        if (isDecoy) {
-          _cachedDecoyFiles = [];
-          return _cachedDecoyFiles!;
-        }
-        _cachedFiles = [];
-        return _cachedFiles!;
-      }
-
-      final List<dynamic> jsonList = jsonDecode(indexJson);
-      final files = <VaultedFile>[];
-      for (int i = 0; i < jsonList.length; i++) {
-        try {
-          files.add(
-            VaultedFile.fromJson(jsonList[i] as Map<String, dynamic>),
-          );
-        } catch (e) {
-          debugPrint('Error parsing vault entry $i: $e');
-        }
-      }
-
-      if (files.length < jsonList.length) {
-        debugPrint(
-          'Vault index: recovered ${files.length}/${jsonList.length} entries',
-        );
-        await _storage.write(
-          key: key,
-          value: jsonEncode(files.map((f) => f.toJson()).toList()),
-        );
-      }
-
-      if (isDecoy) {
-        _cachedDecoyFiles = files;
-        return _cachedDecoyFiles!;
-      }
-      _cachedFiles = files;
-      return _cachedFiles!;
-    } catch (e) {
-      debugPrint('Error loading vault index: $e');
-      if (isDecoy) {
-        _cachedDecoyFiles = [];
-        return _cachedDecoyFiles!;
-      }
-      _cachedFiles = [];
-      return _cachedFiles!;
-    }
-  }
-
-  /// Save file index to secure storage
-  Future<void> _saveFileIndex({bool isDecoy = false}) async {
-    try {
-      final files = isDecoy ? _cachedDecoyFiles : _cachedFiles;
-      final key = isDecoy ? _decoyIndexKey : _vaultIndexKey;
-      final jsonList = files?.map((file) => file.toJson()).toList() ?? [];
-
-      if (jsonList.isEmpty) {
-        final existing = await _storage.read(key: key);
-        if (existing != null && existing.isNotEmpty) {
-          final existingCount =
-              (jsonDecode(existing) as List<dynamic>).length;
-          if (existingCount > 0) {
-            debugPrint(
-              'WARNING: Attempted to save empty index over $existingCount existing entries. Aborting save.',
-            );
-            return;
-          }
-        }
-      }
-
-      await _storage.write(key: key, value: jsonEncode(jsonList));
-    } catch (e) {
-      debugPrint('Error saving vault index: $e');
-    }
-  }
-
-  /// Load albums from secure storage
-  Future<List<Album>> _loadAlbums({bool forceReload = false}) async {
-    if (!forceReload && _cachedAlbums != null) return _cachedAlbums!;
-
-    try {
-      final albumsJson = await _storage.read(key: _albumsKey);
-      if (albumsJson == null || albumsJson.isEmpty) {
-        _cachedAlbums = _createDefaultAlbums();
-        await _saveAlbums();
-        return _cachedAlbums!;
-      }
-
-      final List<dynamic> jsonList = jsonDecode(albumsJson);
-      _cachedAlbums = jsonList
-          .map((json) => Album.fromJson(json as Map<String, dynamic>))
-          .toList();
-
-      return _cachedAlbums!;
-    } catch (e) {
-      debugPrint('Error loading albums: $e');
-      _cachedAlbums = _createDefaultAlbums();
-      return _cachedAlbums!;
-    }
-  }
-
-  /// Create default albums
-  List<Album> _createDefaultAlbums() {
-    final now = DateTime.now();
-    return [
-      Album(
-        id: 'favorites',
-        name: 'Favorites',
-        createdAt: now,
-        updatedAt: now,
-        isDefault: true,
-        type: AlbumType.favorites,
-        sortOrder: 0,
-      ),
-      Album(
-        id: 'recent',
-        name: 'Recent',
-        createdAt: now,
-        updatedAt: now,
-        isDefault: true,
-        type: AlbumType.recent,
-        sortOrder: 1,
-      ),
-    ];
-  }
-
-  /// Save albums to secure storage
-  Future<void> _saveAlbums() async {
-    try {
-      final jsonList = _cachedAlbums?.map((a) => a.toJson()).toList() ?? [];
-      await _storage.write(key: _albumsKey, value: jsonEncode(jsonList));
-    } catch (e) {
-      debugPrint('Error saving albums: $e');
-    }
-  }
-
-  /// Load folders from secure storage
-  Future<List<VaultFolder>> _loadFolders({bool forceReload = false}) async {
-    if (!forceReload && _cachedFolders != null) return _cachedFolders!;
-
-    try {
-      final foldersJson = await _storage.read(key: _foldersKey);
-      if (foldersJson == null || foldersJson.isEmpty) {
-        _cachedFolders = [];
-        return _cachedFolders!;
-      }
-
-      final List<dynamic> jsonList = jsonDecode(foldersJson);
-      _cachedFolders = jsonList
-          .map((json) => VaultFolder.fromJson(json as Map<String, dynamic>))
-          .toList();
-
-      return _cachedFolders!;
-    } catch (e) {
-      debugPrint('Error loading folders: $e');
-      _cachedFolders = [];
-      return _cachedFolders!;
-    }
-  }
-
-  /// Save folders to secure storage
-  Future<void> _saveFolders() async {
-    try {
-      final jsonList = _cachedFolders?.map((f) => f.toJson()).toList() ?? [];
-      await _storage.write(key: _foldersKey, value: jsonEncode(jsonList));
-    } catch (e) {
-      debugPrint('Error saving folders: $e');
-    }
-  }
-
-  /// Load tags from secure storage
-  Future<List<TagInfo>> _loadTags({bool forceReload = false}) async {
-    if (!forceReload && _cachedTags != null) return _cachedTags!;
-
-    try {
-      final tagsJson = await _storage.read(key: _tagsKey);
-      if (tagsJson == null || tagsJson.isEmpty) {
-        _cachedTags = [];
-        return _cachedTags!;
-      }
-
-      final List<dynamic> jsonList = jsonDecode(tagsJson);
-      _cachedTags = jsonList
-          .map((json) => TagInfo.fromJson(json as Map<String, dynamic>))
-          .toList();
-
-      return _cachedTags!;
-    } catch (e) {
-      debugPrint('Error loading tags: $e');
-      _cachedTags = [];
-      return _cachedTags!;
-    }
-  }
-
-  /// Save tags to secure storage
-  Future<void> _saveTags() async {
-    try {
-      final jsonList = _cachedTags?.map((t) => t.toJson()).toList() ?? [];
-      await _storage.write(key: _tagsKey, value: jsonEncode(jsonList));
-    } catch (e) {
-      debugPrint('Error saving tags: $e');
-    }
-  }
-
-  /// Load settings from secure storage
-  Future<VaultSettings> _loadSettings() async {
-    if (_cachedSettings != null) return _cachedSettings!;
-
-    try {
-      final settingsJson = await _storage.read(key: _settingsKey);
-      if (settingsJson == null || settingsJson.isEmpty) {
-        _cachedSettings = const VaultSettings();
-        return _cachedSettings!;
-      }
-
-      _cachedSettings = VaultSettings.fromJson(
-        jsonDecode(settingsJson) as Map<String, dynamic>,
-      );
-      return _cachedSettings!;
-    } catch (e) {
-      debugPrint('Error loading settings: $e');
-      _cachedSettings = const VaultSettings();
-      return _cachedSettings!;
-    }
-  }
-
-  /// Save settings to secure storage
-  Future<void> _saveSettings() async {
-    try {
-      await _storage.write(
-        key: _settingsKey,
-        value: jsonEncode(_cachedSettings?.toJson() ?? {}),
-      );
-    } catch (e) {
-      debugPrint('Error saving settings: $e');
-    }
-  }
-
-  /// Stream copy a file in chunks (memory-efficient for large files)
-  Future<void> _streamCopyFile(
-    File source,
-    File destination, {
-    Function(int processed, int total)? onProgress,
-  }) async {
-    final totalBytes = await source.length();
-    var processedBytes = 0;
-    final sink = destination.openWrite();
-
-    onProgress?.call(0, totalBytes);
-
-    await for (final chunk in source.openRead()) {
-      sink.add(chunk);
-      processedBytes += chunk.length;
-      onProgress?.call(processedBytes, totalBytes);
-    }
-
-    await sink.flush();
-    await sink.close();
-  }
-
-  Future<void> _deleteFileIfExists(String path) async {
-    try {
-      final file = File(path);
-      if (await file.exists()) {
-        await file.delete();
-      }
-    } catch (_) {}
-  }
-
-  Future<int> _getFileSizeIfExists(String path) async {
-    try {
-      return await File(path).length();
-    } catch (_) {
-      return 0;
-    }
-  }
-
-  /// Generate a unique encrypted filename
-  String _generateVaultFilename(String originalName) {
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final randomBytes = utf8.encode('$originalName$timestamp${DateTime.now()}');
-    final hash = sha256.convert(randomBytes).toString().substring(0, 16);
-
-    final extension =
-        originalName.contains('.') ? originalName.split('.').last : '';
-
-    return extension.isNotEmpty ? '$hash.$extension' : hash;
-  }
-
-  /// Add a file to the vault
   Future<VaultedFile?> addFile({
     required String sourcePath,
     required String originalName,
@@ -511,33 +106,21 @@ class VaultService {
     List<String>? albumIds,
     EncryptionAlgorithm? encryptionAlgorithm,
     int? kdfIterations,
-  }) async {
-    final prepared = await _prepareVaultAddition(
-      sourcePath: sourcePath,
-      originalName: originalName,
-      type: type,
-      mimeType: mimeType,
-      encrypt: encrypt,
-      isDecoy: isDecoy,
-      tags: tags,
-      albumIds: albumIds,
-      encryptionAlgorithm: encryptionAlgorithm,
-      kdfIterations: kdfIterations,
-    );
+  }) =>
+      _files.addFile(
+        sourcePath: sourcePath,
+        originalName: originalName,
+        type: type,
+        mimeType: mimeType,
+        deleteOriginal: deleteOriginal,
+        encrypt: encrypt,
+        isDecoy: isDecoy,
+        tags: tags,
+        albumIds: albumIds,
+        encryptionAlgorithm: encryptionAlgorithm,
+        kdfIterations: kdfIterations,
+      );
 
-    if (prepared == null) {
-      return null;
-    }
-
-    await _storePreparedVaultAddition(
-      prepared,
-      deleteOriginal: deleteOriginal,
-    );
-
-    return prepared.vaultedFile;
-  }
-
-  /// Add multiple files to the vault (batch import)
   Future<List<VaultedFile>> addFiles({
     required List<FileToVault> files,
     bool deleteOriginals = false,
@@ -545,1394 +128,251 @@ class VaultService {
     bool isDecoy = false,
     Function(int current, int total)? onProgress,
     Function(FileProgressInfo)? onFileProgress,
-  }) async {
-    // Load settings once before processing the batch
-    _cachedSettings ??= await _loadSettings();
-    final results = <VaultedFile>[];
-
-    int completed = 0;
-
-    for (int start = 0;
-        start < files.length;
-        start += _maxConcurrentBatchAdds) {
-      final chunk = files
-          .sublist(
-            start,
-            start + _maxConcurrentBatchAdds > files.length
-                ? files.length
-                : start + _maxConcurrentBatchAdds,
-          )
-          .asMap()
-          .entries
-          .map((entry) => (index: start + entry.key, file: entry.value))
-          .toList();
-
-      final preparedChunk = await Future.wait(
-        chunk.map((entry) async {
-          final fileSize = await _getFileSizeIfExists(entry.file.sourcePath);
-          final fileEncrypt = entry.file.encrypt ?? encrypt;
-          final fileShouldEncrypt = fileEncrypt || _cachedSettings?.encryptionEnabled == true;
-
-          onFileProgress?.call(FileProgressInfo(
-            current: entry.index + 1,
-            total: files.length,
-            fileName: entry.file.originalName,
-            fileSize: fileSize,
-            status: fileShouldEncrypt ? 'Encrypting 0%...' : 'Processing...',
-            isEncrypting: fileShouldEncrypt,
-            totalBytes: fileShouldEncrypt ? fileSize : 0,
-          ));
-
-          final prepared = await _prepareVaultAddition(
-            sourcePath: entry.file.sourcePath,
-            originalName: entry.file.originalName,
-            type: entry.file.type,
-            mimeType: entry.file.mimeType,
-            encrypt: fileEncrypt,
-            isDecoy: isDecoy,
-            encryptionAlgorithm: entry.file.encryptionAlgorithm,
-            kdfIterations: entry.file.kdfIterations,
-            onEncryptionProgress: fileShouldEncrypt
-                ? (processed, total) {
-                    final pct = total > 0
-                        ? (processed / total * 100).toStringAsFixed(0)
-                        : '0';
-                    onFileProgress?.call(FileProgressInfo(
-                      current: entry.index + 1,
-                      total: files.length,
-                      fileName: entry.file.originalName,
-                      fileSize: fileSize,
-                      status: 'Encrypting $pct%...',
-                      isEncrypting: true,
-                      encryptedBytes: processed,
-                      totalBytes: total,
-                    ));
-                  }
-                : null,
-          );
-
-          return _BatchPreparationResult(
-            index: entry.index,
-            file: entry.file,
-            fileSize: fileSize,
-            prepared: prepared,
-          );
-        }),
+  }) =>
+      _files.addFiles(
+        files: files,
+        deleteOriginals: deleteOriginals,
+        encrypt: encrypt,
+        isDecoy: isDecoy,
+        onProgress: onProgress,
+        onFileProgress: onFileProgress,
       );
 
-      for (final preparedResult in preparedChunk) {
-        if (preparedResult.prepared != null) {
-          await _storePreparedVaultAddition(
-            preparedResult.prepared!,
-            deleteOriginal: deleteOriginals,
-          );
-          results.add(preparedResult.prepared!.vaultedFile);
-        }
+  Future<VaultedFile?> updateFile(VaultedFile updatedFile) =>
+      _files.updateFile(updatedFile);
 
-        completed++;
-        onProgress?.call(completed, files.length);
+  Future<bool> removeFile(String fileId, {bool isDecoy = false}) =>
+      _files.removeFile(fileId, isDecoy: isDecoy);
 
-        onFileProgress?.call(FileProgressInfo(
-          current: preparedResult.index + 1,
-          total: files.length,
-          fileName: preparedResult.file.originalName,
-          fileSize: preparedResult.fileSize,
-          status: preparedResult.prepared != null ? 'Complete' : 'Failed',
-          isEncrypting: false,
-        ));
-      }
-    }
-
-    return results;
-  }
-
-  Future<_PreparedVaultAddition?> _prepareVaultAddition({
-    required String sourcePath,
-    required String originalName,
-    required VaultedFileType type,
-    required String mimeType,
-    required bool encrypt,
-    required bool isDecoy,
-    Function(int processed, int total)? onEncryptionProgress,
-    List<String>? tags,
-    List<String>? albumIds,
-    EncryptionAlgorithm? encryptionAlgorithm,
-    int? kdfIterations,
-  }) async {
-    String? sourcePathToUse;
-    String? vaultPath;
-    Uint8List? compressedImageBytes;
-
-    try {
-      final sourceFile = File(sourcePath);
-      if (!await sourceFile.exists()) {
-        debugPrint('Source file does not exist: $sourcePath');
-        return null;
-      }
-
-      sourcePathToUse = sourcePath;
-      _cachedSettings ??= await _loadSettings();
-
-      if (_cachedSettings?.compressionEnabled == true) {
-        if (type == VaultedFileType.image) {
-          final bytes = await CompressionService.instance
-              .compressImageToBytes(sourcePath);
-          if (bytes != null) {
-            compressedImageBytes = bytes;
-            debugPrint(
-                '[Vault] Using compressed image bytes (${bytes.length} bytes)');
-          }
-        } else if (type == VaultedFileType.video) {
-          final compressedPath =
-              await CompressionService.instance.compressVideo(sourcePath);
-          if (compressedPath != null) {
-            sourcePathToUse = compressedPath;
-            debugPrint('[Vault] Using compressed video: $compressedPath');
-          }
-        }
-      }
-
-      final directory = isDecoy
-          ? await _ensureDecoyDirectory()
-          : await _ensureVaultDirectory();
-
-      final vaultFilename = _generateVaultFilename(originalName);
-      final subdirectory = _getSubdirectory(type);
-      vaultPath = '${directory.path}/$subdirectory/$vaultFilename';
-
-      final shouldEncrypt =
-          encrypt || _cachedSettings?.encryptionEnabled == true;
-      String? encryptionIv;
-      int fileSize;
-      EncryptionAlgorithm? usedAlgorithm;
-      String? usedSalt;
-      int? usedKdfIterations;
-
-      Uint8List? derivedKey;
-      if (shouldEncrypt) {
-        final algorithm = encryptionAlgorithm ??
-            _cachedSettings?.encryptionAlgorithm ??
-            EncryptionAlgorithm.aes256Ctr;
-        final iterations = kdfIterations ??
-            _cachedSettings?.kdfIterations ??
-            100000;
-        final salt = _encryptionService.generateFileSalt();
-        final masterKey = await _encryptionService.getMasterKey(isDecoy: isDecoy);
-        derivedKey = await _encryptionService.deriveFileKeyAsync(masterKey, salt, iterations);
-        usedAlgorithm = algorithm;
-        usedSalt = base64Encode(salt);
-        usedKdfIterations = iterations;
-      }
-
-      if (compressedImageBytes != null) {
-        fileSize = compressedImageBytes.length;
-
-        if (shouldEncrypt) {
-          onEncryptionProgress?.call(0, fileSize);
-          final useGcm = usedAlgorithm == EncryptionAlgorithm.aes256Gcm;
-
-          // ponytail: write to temp file so we can use the isolate pool.
-          // In-memory bytes path runs GCM on the main isolate, which crashes
-          // under batch concurrency. Pool needs a path; cheap write pays for itself.
-          final tempDir = await getTemporaryDirectory();
-          final tempPath =
-              '${tempDir.path}/lkr_enc_${DateTime.now().microsecondsSinceEpoch}';
-          await File(tempPath).writeAsBytes(compressedImageBytes);
-
-          try {
-            final encResult = await _encryptionService.encryptFileInIsolate(
-              tempPath,
-              vaultPath,
-              isDecoy: isDecoy,
-              useGcm: useGcm,
-              derivedKey: derivedKey,
-              onProgress: (processed, total) {
-                onEncryptionProgress?.call(processed, total);
-              },
-            );
-            onEncryptionProgress?.call(fileSize, fileSize);
-
-            if (!encResult.success) {
-              debugPrint('Encryption failed: ${encResult.error}');
-              await _deleteFileIfExists(vaultPath);
-              return null;
-            }
-
-            encryptionIv = encResult.iv;
-            fileSize = encResult.originalSize ?? fileSize;
-          } finally {
-            await _deleteFileIfExists(tempPath);
-          }
-        } else {
-          await File(vaultPath).writeAsBytes(compressedImageBytes);
-        }
-      } else {
-        final sourceFileForProcessing = File(sourcePathToUse);
-        if (!await sourceFileForProcessing.exists()) {
-          debugPrint('Processed file does not exist: $sourcePathToUse');
-          return null;
-        }
-
-        fileSize = await sourceFileForProcessing.length();
-
-        if (shouldEncrypt) {
-          onEncryptionProgress?.call(0, fileSize);
-          final useGcm = usedAlgorithm == EncryptionAlgorithm.aes256Gcm;
-          // ponytail: always isolate. The <2MB threshold used to keep small
-          // files on the main isolate; with batch concurrency that still froze
-          // UI on import. Pool dispatch is cheap, no reason to special-case.
-          final encResult = await _encryptionService.encryptFileInIsolate(
-            sourcePathToUse,
-            vaultPath,
-            isDecoy: isDecoy,
-            useGcm: useGcm,
-            derivedKey: derivedKey,
-            onProgress: (processed, total) {
-              onEncryptionProgress?.call(processed, total);
-            },
-          );
-          onEncryptionProgress?.call(fileSize, fileSize);
-
-          if (!encResult.success) {
-            debugPrint('Encryption failed: ${encResult.error}');
-            await _deleteFileIfExists(vaultPath);
-            return null;
-          }
-
-          encryptionIv = encResult.iv;
-          fileSize = encResult.originalSize ?? fileSize;
-        } else {
-          await _streamCopyFile(sourceFileForProcessing, File(vaultPath));
-        }
-      }
-
-      final normalizedTags = (tags ?? [])
-          .map((tag) => tag.toLowerCase().trim())
-          .where((tag) => tag.isNotEmpty)
-          .toSet()
-          .toList();
-      final normalizedAlbumIds = (albumIds ?? []).toSet().toList();
-      final now = DateTime.now();
-      final fileId = sha256
-          .convert(utf8.encode('$vaultPath${now.millisecondsSinceEpoch}'))
-          .toString()
-          .substring(0, 24);
-
-      // Generate an encrypted thumbnail at import (images + videos). Failure is
-      // non-fatal — the grid falls back to lazy regen via getThumbnailBytes.
-      String? thumbPath;
-      String? thumbIv;
-      if (shouldEncrypt &&
-          derivedKey != null &&
-          (type == VaultedFileType.image ||
-              type == VaultedFileType.video)) {
-        String? reconstructedTemp;
-        try {
-          File? plainFile;
-          if (await File(sourcePathToUse).exists()) {
-            plainFile = File(sourcePathToUse);
-          } else if (compressedImageBytes != null) {
-            final tmp = await getTemporaryDirectory();
-            reconstructedTemp =
-                '${tmp.path}/lkr_thumb_src_${DateTime.now().microsecondsSinceEpoch}';
-            plainFile = File(reconstructedTemp);
-            await plainFile.writeAsBytes(compressedImageBytes);
-          }
-          if (plainFile != null) {
-            final thumbBytes = await _generateThumbBytes(plainFile, type);
-            if (thumbBytes != null) {
-              final stored = await _encryptAndStoreThumbnail(
-                thumbBytes,
-                fileId: fileId,
-                derivedKey: derivedKey,
-                isDecoy: isDecoy,
-              );
-              thumbPath = stored?.path;
-              thumbIv = stored?.iv;
-            }
-          }
-        } catch (e) {
-          debugPrint('[Vault] import-time thumbnail generation failed: $e');
-        } finally {
-          if (reconstructedTemp != null) {
-            await _deleteFileIfExists(reconstructedTemp);
-          }
-        }
-      }
-
-      return _PreparedVaultAddition(
-        vaultedFile: VaultedFile(
-          id: fileId,
-          originalName: originalName,
-          vaultPath: vaultPath,
-          originalPath: sourcePath,
-          type: type,
-          mimeType: mimeType,
-          fileSize: fileSize,
-          dateAdded: now,
-          isFavorite: normalizedAlbumIds.contains('favorites'),
-          isEncrypted: shouldEncrypt,
-          encryptionIv: encryptionIv,
-          encryptionAlgorithm: usedAlgorithm,
-          keyDerivationSalt: usedSalt,
-          kdfIterations: usedKdfIterations,
-          isDecoy: isDecoy,
-          tags: normalizedTags,
-          albumIds: normalizedAlbumIds,
-          thumbnailPath: thumbPath,
-          thumbnailIv: thumbIv,
-        ),
-      );
-    } catch (e) {
-      if (vaultPath != null) {
-        await _deleteFileIfExists(vaultPath);
-      }
-      debugPrint('Error adding file to vault: $e');
-      return null;
-    } finally {
-      if (sourcePathToUse != null && sourcePathToUse != sourcePath) {
-        try {
-          await File(sourcePathToUse).delete();
-          debugPrint(
-              '[Vault] Cleaned up compressed temp file: $sourcePathToUse');
-        } catch (e) {
-          debugPrint('[Vault] Could not delete temp compressed file: $e');
-        }
-      }
-    }
-  }
-
-  Future<void> _storePreparedVaultAddition(
-    _PreparedVaultAddition prepared, {
-    required bool deleteOriginal,
-  }) async {
-    final vaultedFile = prepared.vaultedFile;
-
-    if (vaultedFile.isDecoy) {
-      _cachedDecoyFiles ??= await _loadFileIndex(isDecoy: true);
-      _cachedDecoyFiles!.add(vaultedFile);
-      await _saveFileIndex(isDecoy: true);
-    } else {
-      _cachedFiles ??= await _loadFileIndex();
-      _cachedFiles!.add(vaultedFile);
-      await _saveFileIndex();
-
-      if (vaultedFile.albumIds.isNotEmpty) {
-        _cachedAlbums ??= await _loadAlbums();
-
-        for (final albumId in vaultedFile.albumIds) {
-          final albumIndex =
-              _cachedAlbums!.indexWhere((album) => album.id == albumId);
-          if (albumIndex != -1) {
-            _cachedAlbums![albumIndex] =
-                _cachedAlbums![albumIndex].addFile(vaultedFile.id);
-          }
-        }
-
-        await _saveAlbums();
-      }
-
-      if (vaultedFile.tags.isNotEmpty) {
-        await _updateTagUsage(vaultedFile.tags);
-      }
-    }
-
-    if (!deleteOriginal || vaultedFile.originalPath == null) {
-      return;
-    }
-
-    final originalFile = File(vaultedFile.originalPath!);
-    bool deleted = false;
-
-    try {
-      if (await originalFile.exists()) {
-        await originalFile.delete();
-        deleted = true;
-      } else {
-        deleted = true; // already gone, nothing to do
-      }
-    } catch (e) {
-      debugPrint('Could not delete original file: $e');
-    }
-
-    // Verify the original was actually removed from storage
-    if (!deleted) {
-      try {
-        if (await originalFile.exists()) {
-          debugPrint(
-              'Original file still exists, attempting secure delete: ${vaultedFile.originalPath}');
-          if (_cachedSettings?.secureDelete == true) {
-            await _encryptionService.secureDelete(vaultedFile.originalPath!);
-          } else {
-            await originalFile.delete();
-          }
-        }
-      } catch (_) {}
-    }
-
-    // Final check — the file must be gone for the hide to be effective
-    try {
-      if (await originalFile.exists()) {
-        debugPrint(
-            'WARNING: Could not delete original file from device storage: ${vaultedFile.originalPath}');
-      }
-    } catch (_) {}
-  }
-
-  /// Update a file's metadata
-  Future<VaultedFile?> updateFile(VaultedFile updatedFile) async {
-    try {
-      final files = await _loadFileIndex(isDecoy: updatedFile.isDecoy);
-      final index = files.indexWhere((f) => f.id == updatedFile.id);
-
-      if (index == -1) return null;
-
-      if (updatedFile.isDecoy) {
-        _cachedDecoyFiles![index] = updatedFile;
-        await _saveFileIndex(isDecoy: true);
-      } else {
-        _cachedFiles![index] = updatedFile;
-        await _saveFileIndex();
-      }
-
-      return updatedFile;
-    } catch (e) {
-      debugPrint('Error updating file: $e');
-      return null;
-    }
-  }
-
-  /// Remove a file from the vault
-  Future<bool> removeFile(String fileId, {bool isDecoy = false}) async {
-    try {
-      final files = await _loadFileIndex(isDecoy: isDecoy);
-      final fileIndex = files.indexWhere((f) => f.id == fileId);
-
-      if (fileIndex == -1) return false;
-
-      final file = files[fileIndex];
-
-      // Delete the actual file
-      final vaultFile = File(file.vaultPath);
-      if (await vaultFile.exists()) {
-        if (_cachedSettings?.secureDelete == true) {
-          await _encryptionService.secureDelete(file.vaultPath);
-        } else {
-          await vaultFile.delete();
-        }
-      }
-
-      // Delete thumbnail if exists
-      if (file.thumbnailPath != null) {
-        final thumbFile = File(file.thumbnailPath!);
-        if (await thumbFile.exists()) {
-          await thumbFile.delete();
-        }
-      }
-
-      // Remove from albums
-      if (!isDecoy && file.albumIds.isNotEmpty) {
-        for (final albumId in file.albumIds) {
-          await removeFileFromAlbum(fileId, albumId);
-        }
-      }
-
-      // Remove from folder
-      if (!isDecoy && file.folderId != null) {
-        _cachedFolders ??= await _loadFolders();
-        final folderIndex =
-            _cachedFolders!.indexWhere((f) => f.id == file.folderId);
-        if (folderIndex != -1) {
-          _cachedFolders![folderIndex] =
-              _cachedFolders![folderIndex].removeFile(fileId);
-          await _saveFolders();
-        }
-      }
-
-      // Remove from index
-      if (isDecoy) {
-        _cachedDecoyFiles!.removeAt(fileIndex);
-        await _saveFileIndex(isDecoy: true);
-      } else {
-        _cachedFiles!.removeAt(fileIndex);
-        await _saveFileIndex();
-      }
-
-      return true;
-    } catch (e) {
-      debugPrint('Error removing file from vault: $e');
-      return false;
-    }
-  }
-
-  /// Remove multiple files from the vault (batch optimized: single index save)
   Future<int> removeFiles(
     List<String> fileIds, {
     bool isDecoy = false,
     void Function(int current, int total, {int currentSize, int totalSize})?
         onProgress,
-  }) async {
-    final fileIndex = await _loadFileIndex(isDecoy: isDecoy);
-    final idSet = fileIds.toSet();
-    final filesToDelete = fileIndex.where((f) => idSet.contains(f.id)).toList();
-    final totalSize = filesToDelete.fold<int>(0, (s, f) => s + f.fileSize);
+  }) =>
+      _files.removeFiles(
+        fileIds,
+        isDecoy: isDecoy,
+        onProgress: onProgress,
+      );
 
-    final albumUpdates = <String, Set<String>>{};
-    final folderUpdates = <String, Set<String>>{};
-    int removed = 0;
-    int currentSize = 0;
+  Future<List<VaultedFile>> getAllFiles({bool isDecoy = false}) =>
+      _files.getAllFiles(isDecoy: isDecoy);
 
-    for (final file in filesToDelete) {
-      try {
-        final vaultFile = File(file.vaultPath);
-        if (await vaultFile.exists()) {
-          if (_cachedSettings?.secureDelete == true) {
-            await _encryptionService.secureDelete(file.vaultPath);
-          } else {
-            await vaultFile.delete();
-          }
-        }
+  Future<List<VaultedFile>> getFilesByType(VaultedFileType type,
+          {bool isDecoy = false}) =>
+      _files.getFilesByType(type, isDecoy: isDecoy);
 
-        if (file.thumbnailPath != null) {
-          final thumbFile = File(file.thumbnailPath!);
-          if (await thumbFile.exists()) {
-            await thumbFile.delete();
-          }
-        }
+  Future<VaultedFile?> getFileById(String fileId, {bool isDecoy = false}) =>
+      _files.getFileById(fileId, isDecoy: isDecoy);
 
-        if (!isDecoy && file.albumIds.isNotEmpty) {
-          for (final albumId in file.albumIds) {
-            albumUpdates.putIfAbsent(albumId, () => {}).add(file.id);
-          }
-        }
-
-        if (!isDecoy && file.folderId != null) {
-          folderUpdates.putIfAbsent(file.folderId!, () => {}).add(file.id);
-        }
-
-        removed++;
-        currentSize += file.fileSize;
-        onProgress?.call(removed, fileIds.length,
-            currentSize: currentSize, totalSize: totalSize);
-      } catch (e) {
-        debugPrint('Error deleting file ${file.id}: $e');
-      }
-    }
-
-    if (!isDecoy && albumUpdates.isNotEmpty) {
-      final albums = await _loadAlbums();
-      bool albumsChanged = false;
-      for (final entry in albumUpdates.entries) {
-        final albumIdx = albums.indexWhere((a) => a.id == entry.key);
-        if (albumIdx != -1) {
-          var album = albums[albumIdx];
-          for (final fid in entry.value) {
-            album = album.removeFile(fid);
-          }
-          albums[albumIdx] = album;
-          albumsChanged = true;
-        }
-      }
-      if (albumsChanged) await _saveAlbums();
-    }
-
-    if (!isDecoy && folderUpdates.isNotEmpty) {
-      _cachedFolders ??= await _loadFolders();
-      bool foldersChanged = false;
-      for (final entry in folderUpdates.entries) {
-        final folderIdx =
-            _cachedFolders!.indexWhere((f) => f.id == entry.key);
-        if (folderIdx != -1) {
-          var folder = _cachedFolders![folderIdx];
-          for (final fid in entry.value) {
-            folder = folder.removeFile(fid);
-          }
-          _cachedFolders![folderIdx] = folder;
-          foldersChanged = true;
-        }
-      }
-      if (foldersChanged) await _saveFolders();
-    }
-
-    final deleteIdSet = filesToDelete.map((f) => f.id).toSet();
-    if (isDecoy) {
-      _cachedDecoyFiles!.removeWhere((f) => deleteIdSet.contains(f.id));
-      await _saveFileIndex(isDecoy: true);
-    } else {
-      _cachedFiles!.removeWhere((f) => deleteIdSet.contains(f.id));
-      await _saveFileIndex();
-    }
-
-    return removed;
-  }
-
-  /// Get all vaulted files
-  Future<List<VaultedFile>> getAllFiles({bool isDecoy = false}) async {
-    return await _loadFileIndex(isDecoy: isDecoy);
-  }
-
-  /// Get files by type
-  Future<List<VaultedFile>> getFilesByType(
-    VaultedFileType type, {
-    bool isDecoy = false,
-  }) async {
-    final files = await _loadFileIndex(isDecoy: isDecoy);
-    return files.where((f) => f.type == type).toList();
-  }
-
-  /// Get file by ID
-  Future<VaultedFile?> getFileById(String fileId,
-      {bool isDecoy = false}) async {
-    final files = await _loadFileIndex(isDecoy: isDecoy);
-    try {
-      return files.firstWhere((f) => f.id == fileId);
-    } catch (e) {
-      return null;
-    }
-  }
-
-  Future<Uint8List?> _deriveKeyForFile(VaultedFile file, {bool isDecoy = false}) async {
-    if (file.keyDerivationSalt == null || file.kdfIterations == null) return null;
-    final masterKey = await _encryptionService.getMasterKey(isDecoy: isDecoy || file.isDecoy);
-    final salt = base64Decode(file.keyDerivationSalt!);
-    // ponytail: async (compute isolate). Sync PBKDF2 @ 100k iterations on the
-    // main isolate was the 5-7s UI freeze when opening encrypted files.
-    return _encryptionService.deriveFileKeyAsync(masterKey, salt, file.kdfIterations!);
-  }
-
-  /// Get the actual file from vault (decrypts if needed).
-  ///
-  /// [cancelToken] makes the operation cooperative: it is checked after the
-  /// (un-killable) key derivation and bound to the decrypt isolate's kill
-  /// handle, so cancellation during either stage unblocks promptly. A
-  /// cancelled call returns null and writes no final file.
   Future<File?> getVaultedFile(
     String fileId, {
     bool isDecoy = false,
     Function(int processed, int total)? onProgress,
     CancelToken? cancelToken,
-  }) async {
-    final vaultedFile = await getFileById(fileId, isDecoy: isDecoy);
-    if (vaultedFile == null) return null;
-
-    final file = File(vaultedFile.vaultPath);
-    if (!await file.exists()) return null;
-
-    // If encrypted, decrypt to temp file
-    if (vaultedFile.isEncrypted && vaultedFile.encryptionIv != null) {
-      final tempDir = await _ensureVaultDirectory();
-      final tempPath =
-          '${tempDir.path}/temp/${vaultedFile.id}_${vaultedFile.originalName}';
-
-      final format = _encryptionService.detectFileFormat(vaultedFile.vaultPath);
-      final isLegacyCbc = (format == 0 || format == 3);
-      final derivedKey = await _deriveKeyForFile(vaultedFile, isDecoy: isDecoy);
-
-      // Derive runs on `compute` and can't be killed; abort here if the user
-      // cancelled during that window so we never dispatch the decrypt job.
-      if (cancelToken?.isCancelled == true) return null;
-
-      FileDecryptionResult result;
-      if (isLegacyCbc) {
-        result = await _encryptionService.decryptFile(
-          vaultedFile.vaultPath,
-          tempPath,
-          vaultedFile.encryptionIv!,
-          isDecoy: isDecoy,
-          derivedKey: derivedKey,
-          onProgress: onProgress == null
-              ? null
-              : (current, total) {
-                  final estimatedProcessed = total > 0
-                      ? (current / total * vaultedFile.fileSize).round()
-                      : 0;
-                  onProgress(estimatedProcessed, vaultedFile.fileSize);
-                },
-        );
-      } else {
-        result = await _encryptionService.decryptFileInIsolate(
-          vaultedFile.vaultPath,
-          tempPath,
-          vaultedFile.encryptionIv!,
-          isDecoy: isDecoy,
-          derivedKey: derivedKey,
-          onProgress: onProgress,
-          cancelToken: cancelToken,
-        );
-      }
-
-      if (cancelToken?.isCancelled == true) return null;
-
-      if (result.success && result.decryptedPath != null) {
-        return File(result.decryptedPath!);
-      }
-      return null;
-    }
-
-    return file;
-  }
-
-  // ---- Encrypted thumbnails ----
-  // Thumbs are GCM-encrypted with the file's per-file derived key + a fresh IV
-  // (stored in thumbnailIv), independent of the file's own algorithm. GCM auth
-  // lets us detect a stale thumb (e.g. after re-encrypt changed the key) and
-  // transparently regenerate. No plaintext thumb is ever at rest.
-
-  /// Decrypt (or lazily generate) the encrypted thumbnail bytes for [file].
-  /// Returns null for unencrypted files (callers render vaultPath directly) or
-  /// when no thumb can be produced.
-  Future<Uint8List?> getThumbnailBytes(VaultedFile file) async {
-    if (!file.isEncrypted) return null;
-    final cached = _thumbnailCache[file.id];
-    if (cached != null) return cached;
-    // ponytail: dedupe concurrent fetches so a fast scroll doesn't kick off
-    // N parallel full-decrypts for the same file.
-    final inFlight = _thumbnailInFlight[file.id];
-    if (inFlight != null) return inFlight;
-    final fut = _loadOrRegenerateThumbnail(file);
-    _thumbnailInFlight[file.id] = fut;
-    try {
-      final bytes = await fut;
-      if (bytes != null) _cacheThumbnail(file.id, bytes);
-      return bytes;
-    } finally {
-      _thumbnailInFlight.remove(file.id);
-    }
-  }
-
-  void _cacheThumbnail(String id, Uint8List bytes) {
-    _thumbnailCache[id] = bytes;
-    // ponytail: naive FIFO eviction — Map preserves insertion order, so
-    // dropping the first entry bounds the cache. Real LRU if hit-rate matters.
-    if (_thumbnailCache.length > _thumbnailCacheLimit) {
-      _thumbnailCache.remove(_thumbnailCache.keys.first);
-    }
-  }
-
-  Future<Uint8List?> _loadOrRegenerateThumbnail(VaultedFile file) {
-    // ponytail: serialize to one-at-a-time (see _thumbGenLock). Prevents a grid
-    // of N encrypted files from decrypting N full images concurrently (OOM/ANR).
-    final prev = _thumbGenLock;
-    final result = prev.then((_) => _loadOrRegenerateThumbnailLocked(file));
-    _thumbGenLock = result.then((_) {}, onError: (_) {});
-    return result;
-  }
-
-  Future<Uint8List?> _loadOrRegenerateThumbnailLocked(VaultedFile file) async {
-    if (file.thumbnailPath != null && file.thumbnailIv != null) {
-      final thumbFile = File(file.thumbnailPath!);
-      if (await thumbFile.exists()) {
-        final derivedKey = await _deriveKeyForFile(file);
-        final res = await _encryptionService.decryptStreamedFileToMemoryGcm(
-          file.thumbnailPath!,
-          file.thumbnailIv!,
-          isDecoy: file.isDecoy,
-          derivedKey: derivedKey,
-        );
-        if (res.success && res.data != null) return res.data;
-        // Auth failure / stale key (e.g. post re-encrypt): fall through to regen.
-      }
-    }
-    return _regenerateThumbnail(file);
-  }
-
-  Future<Uint8List?> _regenerateThumbnail(VaultedFile file) async {
-    final plaintext = await getVaultedFile(file.id, isDecoy: file.isDecoy);
-    if (plaintext == null) return null;
-    try {
-      final thumbBytes = await _generateThumbBytes(plaintext, file.type);
-      if (thumbBytes == null) return null;
-      final derivedKey = await _deriveKeyForFile(file);
-      if (derivedKey != null) {
-        final stored = await _encryptAndStoreThumbnail(
-          thumbBytes,
-          fileId: file.id,
-          derivedKey: derivedKey,
-          isDecoy: file.isDecoy,
-        );
-        if (stored != null) {
-          await _persistThumbnailRecord(
-            file.id,
-            stored.path,
-            stored.iv,
-            isDecoy: file.isDecoy,
-          );
-        }
-      }
-      return thumbBytes;
-    } finally {
-      try {
-        if (await plaintext.exists()) await plaintext.delete();
-      } catch (_) {}
-    }
-  }
-
-  /// Produce small JPEG bytes for an image or the first frame of a video.
-  /// Both plugins are platform-channel backed -> only callable on a device.
-  Future<Uint8List?> _generateThumbBytes(
-    File plaintext,
-    VaultedFileType type,
-  ) async {
-    try {
-      if (type == VaultedFileType.video) {
-        return await VideoCompress.getByteThumbnail(plaintext.path, quality: 70);
-      }
-      return await FlutterImageCompress.compressWithFile(
-        plaintext.path,
-        minWidth: 300,
-        minHeight: 300,
-        quality: 70,
-      );
-    } catch (e) {
-      debugPrint('[Vault] thumbnail generation failed: $e');
-      return null;
-    }
-  }
-
-  /// Encrypt [thumbBytes] to `thumbnails/<fileId>.thumb.enc` with a fresh IV.
-  /// Reuses the isolate encrypt path so the on-disk format matches the GCM
-  /// decrypt-to-memory reader. Returns null on failure.
-  Future<_StoredThumb?> _encryptAndStoreThumbnail(
-    Uint8List thumbBytes, {
-    required String fileId,
-    required Uint8List derivedKey,
-    required bool isDecoy,
-  }) async {
-    final dir = isDecoy
-        ? await _ensureDecoyDirectory()
-        : await _ensureVaultDirectory();
-    final thumbPath = '${dir.path}/thumbnails/$fileId.thumb.enc';
-    final tempDir = await getTemporaryDirectory();
-    final tempPath =
-        '${tempDir.path}/lkr_thumb_${DateTime.now().microsecondsSinceEpoch}';
-    await File(tempPath).writeAsBytes(thumbBytes);
-    try {
-      final res = await _encryptionService.encryptFileInIsolate(
-        tempPath,
-        thumbPath,
+  }) =>
+      _files.getVaultedFile(
+        fileId,
         isDecoy: isDecoy,
-        useGcm: true,
-        derivedKey: derivedKey,
+        onProgress: onProgress,
+        cancelToken: cancelToken,
       );
-      if (!res.success || res.iv == null) return null;
-      return _StoredThumb(thumbPath, res.iv!);
-    } catch (e) {
-      debugPrint('[Vault] thumbnail encrypt failed: $e');
-      return null;
-    } finally {
-      await _deleteFileIfExists(tempPath);
-    }
-  }
 
-  Future<void> _persistThumbnailRecord(
+  Future<Uint8List?> getDecryptedFileData(String fileId, {bool isDecoy = false}) =>
+      _files.getDecryptedFileData(fileId, isDecoy: isDecoy);
+
+  Future<File?> exportFile(
     String fileId,
-    String path,
-    String iv, {
-    required bool isDecoy,
-  }) async {
-    final files = await _loadFileIndex(isDecoy: isDecoy);
-    final idx = files.indexWhere((f) => f.id == fileId);
-    if (idx == -1) return;
-    files[idx] = files[idx].copyWith(thumbnailPath: path, thumbnailIv: iv);
-    await _saveFileIndex(isDecoy: isDecoy);
-  }
-
-  /// Drop the in-memory thumbnail cache. Called on vault clear / logout flows.
-  void clearThumbnailCache() {
-    _thumbnailCache.clear();
-    _thumbnailInFlight.clear();
-  }
-
-  /// Get decrypted file data in memory (for viewing)
-  Future<Uint8List?> getDecryptedFileData(
-    String fileId, {
+    String destinationPath, {
     bool isDecoy = false,
-  }) async {
-    final vaultedFile = await getFileById(fileId, isDecoy: isDecoy);
-    if (vaultedFile == null) return null;
-
-    if (vaultedFile.isEncrypted && vaultedFile.encryptionIv != null) {
-      final derivedKey = await _deriveKeyForFile(vaultedFile, isDecoy: isDecoy);
-      final result = await _encryptionService.decryptStreamedFileToMemory(
-        vaultedFile.vaultPath,
-        vaultedFile.encryptionIv!,
+    Function(int processed, int total)? onProgress,
+  }) =>
+      _files.exportFile(
+        fileId,
+        destinationPath,
         isDecoy: isDecoy,
-        derivedKey: derivedKey,
+        onProgress: onProgress,
       );
 
-      if (result.success && result.data != null) {
-        // Mark as viewed
-        await updateFile(vaultedFile.markViewed());
-        return result.data;
-      }
-      return null;
-    }
+  Future<int> reEncryptVault(
+    EncryptionAlgorithm targetAlgorithm, {
+    bool isDecoy = false,
+    Function(int current, int total, String currentFileName, int processedBytes,
+            int totalBytes)?
+        onProgress,
+    Set<String>? fileFilter,
+  }) =>
+      _files.reEncryptVault(
+        targetAlgorithm,
+        isDecoy: isDecoy,
+        onProgress: onProgress,
+        fileFilter: fileFilter,
+      );
 
-    final file = File(vaultedFile.vaultPath);
-    if (!await file.exists()) return null;
+  Future<int> encryptVaultFiles(
+    EncryptionAlgorithm algorithm, {
+    bool isDecoy = false,
+    Function(int current, int total, String currentFileName, int processedBytes,
+            int totalBytes)?
+        onProgress,
+    Set<String>? fileFilter,
+  }) =>
+      _files.encryptVaultFiles(
+        algorithm,
+        isDecoy: isDecoy,
+        onProgress: onProgress,
+        fileFilter: fileFilter,
+      );
 
-    // Mark as viewed
-    await updateFile(vaultedFile.markViewed());
-    return await file.readAsBytes();
-  }
+  Future<int> removeEncryption({
+    bool isDecoy = false,
+    Function(int current, int total, String currentFileName, int processedBytes,
+            int totalBytes)?
+        onProgress,
+    Set<String>? fileFilter,
+  }) =>
+      _files.removeEncryption(
+        isDecoy: isDecoy,
+        onProgress: onProgress,
+        fileFilter: fileFilter,
+      );
 
-  // ========== ALBUM OPERATIONS ==========
+  Future<void> cleanupTemp() => _files.cleanupTemp();
 
-  /// Get all albums
-  Future<List<Album>> getAllAlbums() async {
-    return await _loadAlbums();
-  }
+  Future<void> registerNoteEntry({
+    required String noteId,
+    required String title,
+    required String encryptedContentPath,
+    String fileExtension = 'txt',
+    bool isEncrypted = false,
+    EncryptionAlgorithm encryptionAlgorithm = EncryptionAlgorithm.aes256Gcm,
+    int kdfIterations = 0,
+    String? folderId,
+    bool isDecoy = false,
+  }) =>
+      _files.registerNoteEntry(
+        noteId: noteId,
+        title: title,
+        encryptedContentPath: encryptedContentPath,
+        fileExtension: fileExtension,
+        isEncrypted: isEncrypted,
+        encryptionAlgorithm: encryptionAlgorithm,
+        kdfIterations: kdfIterations,
+        folderId: folderId,
+        isDecoy: isDecoy,
+      );
 
-  /// Get album by ID
-  Future<Album?> getAlbumById(String albumId) async {
-    final albums = await _loadAlbums();
-    try {
-      return albums.firstWhere((a) => a.id == albumId);
-    } catch (e) {
-      return null;
-    }
-  }
+  Future<void> removeNoteEntry(String noteId, {bool isDecoy = false}) =>
+      _files.removeNoteEntry(noteId, isDecoy: isDecoy);
 
-  /// Create a new album
+  Future<void> registerPasswordEntry({
+    required String passwordId,
+    required String title,
+    required String encryptedContentPath,
+    List<String> tags = const [],
+    bool isEncrypted = false,
+    EncryptionAlgorithm encryptionAlgorithm = EncryptionAlgorithm.aes256Gcm,
+    int kdfIterations = 0,
+    bool isDecoy = false,
+  }) =>
+      _files.registerPasswordEntry(
+        passwordId: passwordId,
+        title: title,
+        encryptedContentPath: encryptedContentPath,
+        tags: tags,
+        isEncrypted: isEncrypted,
+        encryptionAlgorithm: encryptionAlgorithm,
+        kdfIterations: kdfIterations,
+        isDecoy: isDecoy,
+      );
+
+  Future<void> removePasswordEntry(String passwordId, {bool isDecoy = false}) =>
+      _files.removePasswordEntry(passwordId, isDecoy: isDecoy);
+
+  // ---- Thumbnails ----
+
+  Future<Uint8List?> getThumbnailBytes(VaultedFile file) =>
+      _thumbnails.getThumbnailBytes(file);
+
+  void clearThumbnailCache() => _thumbnails.clearCache();
+
+  // ---- Albums ----
+
+  Future<List<Album>> getAllAlbums() => _albums.getAllAlbums();
+
+  Future<Album?> getAlbumById(String albumId) =>
+      _albums.getAlbumById(albumId);
+
   Future<Album?> createAlbum({
     required String name,
     String? description,
     String? coverImageId,
-  }) async {
-    try {
-      final now = DateTime.now();
-      final id = sha256
-          .convert(utf8.encode('$name${now.millisecondsSinceEpoch}'))
-          .toString()
-          .substring(0, 16);
-
-      final album = Album(
-        id: id,
+  }) =>
+      _albums.createAlbum(
         name: name,
         description: description,
         coverImageId: coverImageId,
-        createdAt: now,
-        updatedAt: now,
-        sortOrder: (_cachedAlbums?.length ?? 0) + 1,
       );
 
-      _cachedAlbums ??= [];
-      _cachedAlbums!.add(album);
-      await _saveAlbums();
+  Future<Album?> updateAlbum(Album updatedAlbum) =>
+      _albums.updateAlbum(updatedAlbum);
 
-      return album;
-    } catch (e) {
-      debugPrint('Error creating album: $e');
-      return null;
-    }
-  }
+  Future<bool> deleteAlbum(String albumId) => _albums.deleteAlbum(albumId);
 
-  /// Update an album
-  Future<Album?> updateAlbum(Album updatedAlbum) async {
-    try {
-      final albums = await _loadAlbums();
-      final index = albums.indexWhere((a) => a.id == updatedAlbum.id);
+  Future<bool> addFileToAlbum(String fileId, String albumId) =>
+      _albums.addFileToAlbum(fileId, albumId);
 
-      if (index == -1) return null;
+  Future<bool> addFilesToAlbum(List<String> fileIds, String albumId) =>
+      _albums.addFilesToAlbum(fileIds, albumId);
 
-      _cachedAlbums![index] = updatedAlbum.copyWith(updatedAt: DateTime.now());
-      await _saveAlbums();
+  Future<bool> removeFilesFromAlbum(List<String> fileIds, String albumId) =>
+      _albums.removeFilesFromAlbum(fileIds, albumId);
 
-      return _cachedAlbums![index];
-    } catch (e) {
-      debugPrint('Error updating album: $e');
-      return null;
-    }
-  }
+  Future<bool> removeFileFromAlbum(String fileId, String albumId) =>
+      _albums.removeFileFromAlbum(fileId, albumId);
 
-  /// Delete an album
-  Future<bool> deleteAlbum(String albumId) async {
-    try {
-      final albums = await _loadAlbums();
-      final album = albums.firstWhere(
-        (a) => a.id == albumId,
-        orElse: () => throw Exception('Album not found'),
-      );
+  Future<List<VaultedFile>> getFilesInAlbum(String albumId) =>
+      _albums.getFilesInAlbum(albumId);
 
-      // Don't delete default albums
-      if (album.isDefault) {
-        debugPrint('Cannot delete default album');
-        return false;
-      }
+  // ---- Folders ----
 
-      // Remove album reference from files
-      for (final fileId in album.fileIds) {
-        final file = await getFileById(fileId);
-        if (file != null) {
-          await updateFile(file.removeFromAlbum(albumId));
-        }
-      }
+  Future<List<VaultFolder>> getAllFolders() => _folders.getAllFolders();
 
-      _cachedAlbums!.removeWhere((a) => a.id == albumId);
-      await _saveAlbums();
+  Future<VaultFolder?> getFolderById(String folderId) =>
+      _folders.getFolderById(folderId);
 
-      return true;
-    } catch (e) {
-      debugPrint('Error deleting album: $e');
-      return false;
-    }
-  }
+  Future<List<VaultFolder>> getRootFolders() => _folders.getRootFolders();
 
-  /// Add file to album
-  Future<bool> addFileToAlbum(String fileId, String albumId) async {
-    try {
-      final file = await getFileById(fileId);
-      if (file == null) return false;
+  Future<List<VaultFolder>> getSubfolders(String parentId) =>
+      _folders.getSubfolders(parentId);
 
-      final albums = await _loadAlbums();
-      final albumIndex = albums.indexWhere((a) => a.id == albumId);
-      if (albumIndex == -1) return false;
-
-      // Update album
-      _cachedAlbums![albumIndex] = _cachedAlbums![albumIndex].addFile(fileId);
-      await _saveAlbums();
-
-      // Update file - also set isFavorite if adding to favorites album
-      VaultedFile updatedFile = file.addToAlbum(albumId);
-      if (albumId == 'favorites') {
-        updatedFile = updatedFile.copyWith(isFavorite: true);
-      }
-      await updateFile(updatedFile);
-
-      return true;
-    } catch (e) {
-      debugPrint('Error adding file to album: $e');
-      return false;
-    }
-  }
-
-  Future<bool> addFilesToAlbum(List<String> fileIds, String albumId) async {
-    try {
-      final albums = await _loadAlbums();
-      final albumIndex = albums.indexWhere((a) => a.id == albumId);
-      if (albumIndex == -1) return false;
-
-      final files = await _loadFileIndex();
-      bool changed = false;
-
-      for (final fileId in fileIds) {
-        final fileIdx = files.indexWhere((f) => f.id == fileId);
-        if (fileIdx == -1) continue;
-
-        _cachedAlbums![albumIndex] =
-            _cachedAlbums![albumIndex].addFile(fileId);
-
-        VaultedFile updatedFile = files[fileIdx].addToAlbum(albumId);
-        if (albumId == 'favorites') {
-          updatedFile = updatedFile.copyWith(isFavorite: true);
-        }
-        _cachedFiles![fileIdx] = updatedFile;
-        changed = true;
-      }
-
-      if (changed) {
-        await _saveAlbums();
-        await _saveFileIndex();
-      }
-      return true;
-    } catch (e) {
-      debugPrint('Error adding files to album: $e');
-      return false;
-    }
-  }
-
-  Future<bool> removeFilesFromAlbum(
-      List<String> fileIds, String albumId) async {
-    try {
-      final albums = await _loadAlbums();
-      final albumIndex = albums.indexWhere((a) => a.id == albumId);
-      if (albumIndex == -1) return false;
-
-      final files = await _loadFileIndex();
-      bool changed = false;
-
-      for (final fileId in fileIds) {
-        _cachedAlbums![albumIndex] =
-            _cachedAlbums![albumIndex].removeFile(fileId);
-
-        final fileIdx = files.indexWhere((f) => f.id == fileId);
-        if (fileIdx != -1) {
-          VaultedFile updatedFile = files[fileIdx].removeFromAlbum(albumId);
-          if (albumId == 'favorites') {
-            updatedFile = updatedFile.copyWith(isFavorite: false);
-          }
-          _cachedFiles![fileIdx] = updatedFile;
-        }
-        changed = true;
-      }
-
-      if (changed) {
-        await _saveAlbums();
-        await _saveFileIndex();
-      }
-      return true;
-    } catch (e) {
-      debugPrint('Error removing files from album: $e');
-      return false;
-    }
-  }
-
-  /// Remove file from album
-  Future<bool> removeFileFromAlbum(String fileId, String albumId) async {
-    try {
-      final albums = await _loadAlbums();
-      final albumIndex = albums.indexWhere((a) => a.id == albumId);
-      if (albumIndex == -1) return false;
-
-      // Update album
-      _cachedAlbums![albumIndex] =
-          _cachedAlbums![albumIndex].removeFile(fileId);
-      await _saveAlbums();
-
-      // Update file - also unset isFavorite if removing from favorites album
-      final file = await getFileById(fileId);
-      if (file != null) {
-        VaultedFile updatedFile = file.removeFromAlbum(albumId);
-        if (albumId == 'favorites') {
-          updatedFile = updatedFile.copyWith(isFavorite: false);
-        }
-        await updateFile(updatedFile);
-      }
-
-      return true;
-    } catch (e) {
-      debugPrint('Error removing file from album: $e');
-      return false;
-    }
-  }
-
-  /// Get files in album
-  Future<List<VaultedFile>> getFilesInAlbum(String albumId) async {
-    final album = await getAlbumById(albumId);
-    if (album == null) return [];
-
-    final files = await getAllFiles();
-    return files.where((f) => album.fileIds.contains(f.id)).toList();
-  }
-
-  // ========== FOLDER OPERATIONS ==========
-
-  /// Get all folders
-  Future<List<VaultFolder>> getAllFolders() async {
-    return await _loadFolders();
-  }
-
-  /// Get folder by ID
-  Future<VaultFolder?> getFolderById(String folderId) async {
-    final folders = await _loadFolders();
-    try {
-      return folders.firstWhere((f) => f.id == folderId);
-    } catch (e) {
-      return null;
-    }
-  }
-
-  /// Get root folders (no parent)
-  Future<List<VaultFolder>> getRootFolders() async {
-    final folders = await _loadFolders();
-    return folders.where((f) => f.isRoot).toList();
-  }
-
-  /// Get subfolders of a folder
-  Future<List<VaultFolder>> getSubfolders(String parentId) async {
-    final folders = await _loadFolders();
-    return folders.where((f) => f.parentId == parentId).toList();
-  }
-
-  /// Create a new folder
   Future<VaultFolder?> createFolder({
     required String name,
     String? parentId,
     String? description,
-  }) async {
-    try {
-      final now = DateTime.now();
-      final id = sha256
-          .convert(utf8.encode('$name${now.millisecondsSinceEpoch}'))
-          .toString()
-          .substring(0, 16);
-
-      final folder = VaultFolder(
-        id: id,
+  }) =>
+      _folders.createFolder(
         name: name,
         parentId: parentId,
         description: description,
-        createdAt: now,
-        updatedAt: now,
       );
 
-      _cachedFolders ??= [];
-      _cachedFolders!.add(folder);
+  Future<VaultFolder?> updateFolder(VaultFolder updatedFolder) =>
+      _folders.updateFolder(updatedFolder);
 
-      if (parentId != null) {
-        final parentIndex =
-            _cachedFolders!.indexWhere((f) => f.id == parentId);
-        if (parentIndex != -1) {
-          _cachedFolders![parentIndex] =
-              _cachedFolders![parentIndex].addSubfolder(id);
-        }
-      }
+  Future<bool> deleteFolder(String folderId, {bool deleteContents = false}) =>
+      _folders.deleteFolder(folderId, deleteContents: deleteContents);
 
-      await _saveFolders();
+  Future<bool> addFileToFolder(String fileId, String folderId) =>
+      _folders.addFileToFolder(fileId, folderId);
 
-      return folder;
-    } catch (e) {
-      debugPrint('Error creating folder: $e');
-      return null;
-    }
-  }
+  Future<bool> removeFileFromFolder(String fileId, String folderId) =>
+      _folders.removeFileFromFolder(fileId, folderId);
 
-  /// Update a folder
-  Future<VaultFolder?> updateFolder(VaultFolder updatedFolder) async {
-    try {
-      final folders = await _loadFolders();
-      final index = folders.indexWhere((f) => f.id == updatedFolder.id);
+  Future<List<VaultedFile>> getFilesInFolder(String folderId) =>
+      _folders.getFilesInFolder(folderId);
 
-      if (index == -1) return null;
-
-      _cachedFolders![index] =
-          updatedFolder.copyWith(updatedAt: DateTime.now());
-      await _saveFolders();
-
-      return _cachedFolders![index];
-    } catch (e) {
-      debugPrint('Error updating folder: $e');
-      return null;
-    }
-  }
-
-  /// Delete a folder and optionally its subfolders
-  Future<bool> deleteFolder(String folderId, {bool deleteContents = false}) async {
-    try {
-      final folders = await _loadFolders();
-      final folder = folders.firstWhere(
-        (f) => f.id == folderId,
-        orElse: () => throw Exception('Folder not found'),
-      );
-
-      if (deleteContents) {
-        for (final subfolderId in folder.subfolderIds) {
-          await deleteFolder(subfolderId, deleteContents: true);
-        }
-
-        for (final fileId in folder.fileIds) {
-          await removeFile(fileId);
-        }
-      } else {
-        for (final fileId in folder.fileIds) {
-          final file = await getFileById(fileId);
-          if (file != null) {
-            await updateFile(file.removeFromFolder());
-          }
-        }
-
-        for (final subfolderId in folder.subfolderIds) {
-          final subfolder = await getFolderById(subfolderId);
-          if (subfolder != null) {
-            await updateFolder(subfolder.copyWith(parentId: folder.parentId));
-            if (folder.parentId != null) {
-              final parentIndex =
-                  _cachedFolders!.indexWhere((f) => f.id == folder.parentId);
-              if (parentIndex != -1) {
-                _cachedFolders![parentIndex] =
-                    _cachedFolders![parentIndex].addSubfolder(subfolderId);
-              }
-            }
-          }
-        }
-      }
-
-      if (folder.parentId != null) {
-        final parentIndex =
-            _cachedFolders!.indexWhere((f) => f.id == folder.parentId);
-        if (parentIndex != -1) {
-          _cachedFolders![parentIndex] =
-              _cachedFolders![parentIndex].removeSubfolder(folderId);
-        }
-      }
-
-      _cachedFolders!.removeWhere((f) => f.id == folderId);
-      await _saveFolders();
-
-      return true;
-    } catch (e) {
-      debugPrint('Error deleting folder: $e');
-      return false;
-    }
-  }
-
-  /// Add file to folder
-  Future<bool> addFileToFolder(String fileId, String folderId) async {
-    try {
-      final file = await getFileById(fileId);
-      if (file == null) return false;
-
-      final folders = await _loadFolders();
-      final folderIndex = folders.indexWhere((f) => f.id == folderId);
-      if (folderIndex == -1) return false;
-
-      if (file.folderId != null && file.folderId != folderId) {
-        final oldFolderIndex =
-            _cachedFolders!.indexWhere((f) => f.id == file.folderId);
-        if (oldFolderIndex != -1) {
-          _cachedFolders![oldFolderIndex] =
-              _cachedFolders![oldFolderIndex].removeFile(fileId);
-        }
-      }
-
-      _cachedFolders![folderIndex] =
-          _cachedFolders![folderIndex].addFile(fileId);
-      await _saveFolders();
-
-      final updatedFile = file.addToFolder(folderId);
-      await updateFile(updatedFile);
-
-      return true;
-    } catch (e) {
-      debugPrint('Error adding file to folder: $e');
-      return false;
-    }
-  }
-
-  /// Remove file from folder
-  Future<bool> removeFileFromFolder(String fileId, String folderId) async {
-    try {
-      final folders = await _loadFolders();
-      final folderIndex = folders.indexWhere((f) => f.id == folderId);
-      if (folderIndex == -1) return false;
-
-      _cachedFolders![folderIndex] =
-          _cachedFolders![folderIndex].removeFile(fileId);
-      await _saveFolders();
-
-      final file = await getFileById(fileId);
-      if (file != null && file.folderId == folderId) {
-        await updateFile(file.removeFromFolder());
-      }
-
-      return true;
-    } catch (e) {
-      debugPrint('Error removing file from folder: $e');
-      return false;
-    }
-  }
-
-  /// Get files in folder
-  Future<List<VaultedFile>> getFilesInFolder(String folderId) async {
-    final folder = await getFolderById(folderId);
-    if (folder == null) return [];
-
-    final files = await getAllFiles();
-    return files.where((f) => folder.fileIds.contains(f.id)).toList();
-  }
-
-  /// Import a device folder: create a VaultFolder from a filesystem path
-  /// and import all files within it
   Future<FolderImportResult> importDeviceFolder(
     String deviceFolderPath, {
     String? parentFolderId,
@@ -1942,275 +382,48 @@ class VaultService {
     bool isDecoy = false,
     Function(int current, int total)? onProgress,
     Function(String fileName, int fileNumber, int total)? onFileProgress,
-  }) async {
-    final deviceDir = Directory(deviceFolderPath);
-    if (!await deviceDir.exists()) {
-      return FolderImportResult(foldersCreated: 0, filesImported: 0, errors: ['Directory does not exist: $deviceFolderPath']);
-    }
-
-    final folderName = deviceDir.path.split('/').last;
-    final folder = await createFolder(
-      name: folderName,
-      parentId: parentFolderId,
-    );
-    if (folder == null) {
-      return FolderImportResult(foldersCreated: 0, filesImported: 0, errors: ['Failed to create folder']);
-    }
-
-    int foldersCreated = 1;
-    int filesImported = 0;
-    final errors = <String>[];
-
-    final allFiles = <FileToVault>[];
-    final subfolderPaths = <String>[];
-
-    await _collectFilesFromDirectory(
-      deviceDir,
-      allFiles: allFiles,
-      subfolderPaths: subfolderPaths,
-      recursive: recursive,
-    );
-
-    final totalFiles = allFiles.length;
-    if (totalFiles > 0) {
-      final importedFiles = await addFiles(
-        files: allFiles,
+  }) =>
+      _folders.importDeviceFolder(
+        deviceFolderPath,
+        parentFolderId: parentFolderId,
+        recursive: recursive,
         deleteOriginals: deleteOriginals,
         encrypt: encrypt,
         isDecoy: isDecoy,
         onProgress: onProgress,
-        onFileProgress: onFileProgress != null
-            ? (info) => onFileProgress(info.fileName, info.current, info.total)
-            : null,
+        onFileProgress: onFileProgress,
       );
 
-      for (final importedFile in importedFiles) {
-        await addFileToFolder(importedFile.id, folder.id);
-        filesImported++;
-      }
-    }
+  // ---- Tags ----
 
-    if (recursive) {
-      for (final subPath in subfolderPaths) {
-        final subResult = await importDeviceFolder(
-          subPath,
-          parentFolderId: folder.id,
-          recursive: true,
-          deleteOriginals: deleteOriginals,
-          encrypt: encrypt,
-          isDecoy: isDecoy,
-        );
-        foldersCreated += subResult.foldersCreated;
-        filesImported += subResult.filesImported;
-        errors.addAll(subResult.errors);
-      }
-    }
+  Future<List<TagInfo>> getAllTags() => _tags.getAllTags();
 
-    return FolderImportResult(
-      foldersCreated: foldersCreated,
-      filesImported: filesImported,
-      errors: errors,
-      rootFolder: folder,
-    );
-  }
+  Future<List<VaultedFile>> getFilesByTag(String tag) =>
+      _tags.getFilesByTag(tag);
 
-  Future<void> _collectFilesFromDirectory(
-    Directory dir, {
-    required List<FileToVault> allFiles,
-    required List<String> subfolderPaths,
-    required bool recursive,
-  }) async {
-    try {
-      await for (final entity in dir.list()) {
-        if (entity is File) {
-          final file = entity;
-          final fileName = file.path.split('/').last;
-          if (fileName.startsWith('.')) continue;
+  Future<VaultedFile?> addTagToFile(String fileId, String tag) =>
+      _tags.addTagToFile(fileId, tag);
 
-          final extension = fileName.contains('.')
-              ? fileName.split('.').last.toLowerCase()
-              : '';
-          final mimeType = _getMimeTypeFromExtension(extension);
-          final fileType = getFileTypeFromExtension(extension);
+  Future<VaultedFile?> removeTagFromFile(String fileId, String tag) =>
+      _tags.removeTagFromFile(fileId, tag);
 
-          allFiles.add(FileToVault(
-            sourcePath: file.path,
-            originalName: fileName,
-            type: fileType,
-            mimeType: mimeType,
-          ));
-        } else if (entity is Directory && recursive) {
-          final dirName = entity.path.split('/').last;
-          if (dirName.startsWith('.')) continue;
-          subfolderPaths.add(entity.path);
-        }
-      }
-    } catch (e) {
-      debugPrint('Error collecting files from directory: $e');
-    }
-  }
+  Future<TagInfo> createTag(String name, [int? colorValue]) =>
+      _tags.createTag(name, colorValue);
 
-  String _getMimeTypeFromExtension(String extension) {
-    const mimeMap = {
-      'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png',
-      'gif': 'image/gif', 'webp': 'image/webp', 'bmp': 'image/bmp',
-      'heic': 'image/heic', 'heif': 'image/heif',
-      'mp4': 'video/mp4', 'mov': 'video/quicktime', 'avi': 'video/x-msvideo',
-      'mkv': 'video/x-matroska', 'webm': 'video/webm',
-      'mp3': 'audio/mpeg', 'wav': 'audio/wav', 'flac': 'audio/flac',
-      'aac': 'audio/aac', 'ogg': 'audio/ogg', 'm4a': 'audio/mp4',
-      'pdf': 'application/pdf', 'doc': 'application/msword',
-      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'txt': 'text/plain', 'rtf': 'application/rtf',
-      'zip': 'application/zip', 'rar': 'application/x-rar-compressed',
-      '7z': 'application/x-7z-compressed',
-      'json': 'application/json', 'xml': 'application/xml',
-      'csv': 'text/csv', 'html': 'text/html', 'htm': 'text/html',
-    };
-    return mimeMap[extension.toLowerCase()] ?? 'application/octet-stream';
-  }
+  Future<bool> updateTagColor(String tagName, int colorValue) =>
+      _tags.updateTagColor(tagName, colorValue);
 
-  // ========== TAG OPERATIONS ==========
+  Future<bool> deleteTag(String tagName) => _tags.deleteTag(tagName);
 
-  /// Get all unique tags
-  Future<List<TagInfo>> getAllTags() async {
-    return await _loadTags();
-  }
+  // ---- Favorites ----
 
-  /// Get files by tag
-  Future<List<VaultedFile>> getFilesByTag(String tag) async {
-    final files = await getAllFiles();
-    return files.where((f) => f.hasTag(tag)).toList();
-  }
+  Future<VaultedFile?> toggleFavorite(String fileId) =>
+      _tags.toggleFavorite(fileId);
 
-  /// Add tag to file
-  Future<VaultedFile?> addTagToFile(String fileId, String tag) async {
-    final file = await getFileById(fileId);
-    if (file == null) return null;
+  Future<List<VaultedFile>> getFavoriteFiles() => _tags.getFavoriteFiles();
 
-    final updatedFile = file.addTag(tag);
-    await updateFile(updatedFile);
-    await _updateTagUsage([tag]);
+  // ---- Sorting ----
 
-    return updatedFile;
-  }
-
-  /// Remove tag from file
-  Future<VaultedFile?> removeTagFromFile(String fileId, String tag) async {
-    final file = await getFileById(fileId);
-    if (file == null) return null;
-
-    final updatedFile = file.removeTag(tag);
-    await updateFile(updatedFile);
-
-    return updatedFile;
-  }
-
-  /// Update tag usage counts
-  Future<void> _updateTagUsage(List<String> tags) async {
-    _cachedTags ??= [];
-
-    for (final tag in tags) {
-      final normalizedTag = tag.toLowerCase().trim();
-      if (normalizedTag.isEmpty) continue;
-
-      final existingIndex =
-          _cachedTags!.indexWhere((t) => t.name == normalizedTag);
-
-      if (existingIndex == -1) {
-        _cachedTags!.add(TagInfo(name: normalizedTag, usageCount: 1));
-      } else {
-        _cachedTags![existingIndex] = TagInfo(
-          name: normalizedTag,
-          colorValue: _cachedTags![existingIndex].colorValue,
-          usageCount: _cachedTags![existingIndex].usageCount + 1,
-        );
-      }
-    }
-
-    await _saveTags();
-  }
-
-  /// Create a new tag with optional color
-  Future<TagInfo> createTag(String name, [int? colorValue]) async {
-    _cachedTags ??= await _loadTags();
-
-    final normalizedName = name.toLowerCase().trim();
-    final existingIndex =
-        _cachedTags!.indexWhere((t) => t.name == normalizedName);
-
-    if (existingIndex != -1) {
-      // Tag already exists, just update color if provided
-      if (colorValue != null) {
-        _cachedTags![existingIndex] = TagInfo(
-          name: normalizedName,
-          colorValue: colorValue,
-          usageCount: _cachedTags![existingIndex].usageCount,
-        );
-        await _saveTags();
-      }
-      return _cachedTags![existingIndex];
-    }
-
-    // Create new tag
-    final newTag = TagInfo(
-      name: normalizedName,
-      colorValue: colorValue ?? 0xFF1976D2,
-      usageCount: 0,
-    );
-    _cachedTags!.add(newTag);
-    await _saveTags();
-
-    return newTag;
-  }
-
-  /// Update a tag's color
-  Future<bool> updateTagColor(String tagName, int colorValue) async {
-    _cachedTags ??= await _loadTags();
-
-    final normalizedName = tagName.toLowerCase().trim();
-    final index = _cachedTags!.indexWhere((t) => t.name == normalizedName);
-
-    if (index == -1) return false;
-
-    _cachedTags![index] = TagInfo(
-      name: normalizedName,
-      colorValue: colorValue,
-      usageCount: _cachedTags![index].usageCount,
-    );
-    await _saveTags();
-
-    return true;
-  }
-
-  /// Delete a tag and remove it from all files
-  Future<bool> deleteTag(String tagName) async {
-    try {
-      final normalizedName = tagName.toLowerCase().trim();
-
-      // Remove tag from all files
-      final files = await getAllFiles();
-      for (final file in files) {
-        if (file.hasTag(normalizedName)) {
-          await removeTagFromFile(file.id, normalizedName);
-        }
-      }
-
-      // Remove from cached tags
-      _cachedTags ??= await _loadTags();
-      _cachedTags!.removeWhere((t) => t.name == normalizedName);
-      await _saveTags();
-
-      return true;
-    } catch (e) {
-      debugPrint('Error deleting tag: $e');
-      return false;
-    }
-  }
-
-  // ========== SORTING ==========
-
-  /// Sort files
   List<VaultedFile> sortFiles(List<VaultedFile> files, SortOption sortOption) {
     final sorted = List<VaultedFile>.from(files);
 
@@ -2256,52 +469,11 @@ class VaultService {
     return sorted;
   }
 
-  // ========== FAVORITES ==========
+  // ---- Search ----
 
-  /// Toggle favorite status
-  Future<VaultedFile?> toggleFavorite(String fileId) async {
-    final file = await getFileById(fileId);
-    if (file == null) return null;
+  Future<List<VaultedFile>> searchFiles(String query) =>
+      _search.searchFiles(query);
 
-    // Update favorites album - this will also update the isFavorite flag
-    final favoritesAlbum = await getAlbumById('favorites');
-    if (favoritesAlbum != null) {
-      if (file.isFavorite) {
-        // Currently favorite, so remove from favorites
-        await removeFileFromAlbum(fileId, 'favorites');
-      } else {
-        // Not favorite, so add to favorites
-        await addFileToAlbum(fileId, 'favorites');
-      }
-    } else {
-      // No favorites album exists, just toggle the flag directly
-      final updatedFile = file.toggleFavorite();
-      await updateFile(updatedFile);
-      return updatedFile;
-    }
-
-    // Return the updated file
-    return await getFileById(fileId);
-  }
-
-  /// Get favorite files
-  Future<List<VaultedFile>> getFavoriteFiles() async {
-    final files = await getAllFiles();
-    return files.where((f) => f.isFavorite).toList();
-  }
-
-  // ========== SEARCH ==========
-
-  /// Search files by name
-  Future<List<VaultedFile>> searchFiles(String query) async {
-    final files = await _loadFileIndex();
-    final lowerQuery = query.toLowerCase();
-    return files
-        .where((f) => f.originalName.toLowerCase().contains(lowerQuery))
-        .toList();
-  }
-
-  /// Search files by name and tags
   Future<List<VaultedFile>> searchFilesAdvanced({
     String? query,
     List<String>? tags,
@@ -2310,900 +482,55 @@ class VaultService {
     DateTime? dateTo,
     bool? isFavorite,
     String? albumId,
-  }) async {
-    var files = await getAllFiles();
-
-    // Filter by query
-    if (query != null && query.isNotEmpty) {
-      final lowerQuery = query.toLowerCase();
-      files = files
-          .where((f) => f.originalName.toLowerCase().contains(lowerQuery))
-          .toList();
-    }
-
-    // Filter by tags
-    if (tags != null && tags.isNotEmpty) {
-      files = files.where((f) => tags.every((tag) => f.hasTag(tag))).toList();
-    }
-
-    // Filter by type
-    if (type != null) {
-      files = files.where((f) => f.type == type).toList();
-    }
-
-    // Filter by date range
-    if (dateFrom != null) {
-      files = files.where((f) => f.dateAdded.isAfter(dateFrom)).toList();
-    }
-    if (dateTo != null) {
-      files = files.where((f) => f.dateAdded.isBefore(dateTo)).toList();
-    }
-
-    // Filter by favorite
-    if (isFavorite != null) {
-      files = files.where((f) => f.isFavorite == isFavorite).toList();
-    }
-
-    // Filter by album
-    if (albumId != null) {
-      files = files.where((f) => f.isInAlbum(albumId)).toList();
-    }
-
-    return files;
-  }
-
-  // ========== SETTINGS ==========
-
-  /// Get vault settings
-  Future<VaultSettings> getSettings() async {
-    return await _loadSettings();
-  }
-
-  /// Update vault settings
-  Future<void> updateSettings(VaultSettings settings) async {
-    _cachedSettings = settings;
-    await _saveSettings();
-  }
-
-  // ========== STATISTICS ==========
-
-  /// Get file counts by type
-  Future<Map<VaultedFileType, int>> getFileCounts() async {
-    final files = await _loadFileIndex();
-    final counts = <VaultedFileType, int>{};
-
-    for (final type in VaultedFileType.values) {
-      counts[type] = files.where((f) => f.type == type).length;
-    }
-
-    return counts;
-  }
-
-  /// Get total storage used
-  Future<int> getTotalStorageUsed() async {
-    final files = await _loadFileIndex();
-    return files.fold<int>(0, (sum, file) => sum + file.fileSize);
-  }
-
-  Future<File?> exportFile(
-    String fileId,
-    String destinationPath, {
-    bool isDecoy = false,
-    Function(int processed, int total)? onProgress,
-  }) async {
-    try {
-      final vaultedFile = await getFileById(fileId, isDecoy: isDecoy);
-      if (vaultedFile == null) return null;
-
-      final sourceFile = File(vaultedFile.vaultPath);
-      if (!await sourceFile.exists()) return null;
-
-      if (vaultedFile.isEncrypted && vaultedFile.encryptionIv != null) {
-        final format = _encryptionService.detectFileFormat(vaultedFile.vaultPath);
-        final isLegacyCbc = (format == 0 || format == 3);
-        final derivedKey = await _deriveKeyForFile(vaultedFile, isDecoy: isDecoy);
-
-        FileDecryptionResult result;
-        if (isLegacyCbc) {
-          result = await _encryptionService.decryptFile(
-            vaultedFile.vaultPath,
-            destinationPath,
-            vaultedFile.encryptionIv!,
-            derivedKey: derivedKey,
-            onProgress: onProgress == null
-                ? null
-                : (current, total) {
-                    final estimatedProcessed = total > 0
-                        ? (current / total * vaultedFile.fileSize).round()
-                        : 0;
-                    onProgress(estimatedProcessed, vaultedFile.fileSize);
-                  },
-          );
-        } else {
-          result = await _encryptionService.decryptFileInIsolate(
-            vaultedFile.vaultPath,
-            destinationPath,
-            vaultedFile.encryptionIv!,
-            isDecoy: isDecoy,
-            derivedKey: derivedKey,
-            onProgress: onProgress == null
-                ? null
-                : (bytesProcessed, totalBytes) {
-                    onProgress(bytesProcessed, totalBytes);
-                  },
-          );
-        }
-
-        if (result.success && result.decryptedPath != null) {
-          return File(result.decryptedPath!);
-        }
-        return null;
-      }
-
-      await _streamCopyFile(
-        sourceFile,
-        File(destinationPath),
-        onProgress: onProgress,
+  }) =>
+      _search.searchFilesAdvanced(
+        query: query,
+        tags: tags,
+        type: type,
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+        isFavorite: isFavorite,
+        albumId: albumId,
       );
-      return File(destinationPath);
-    } catch (e) {
-      debugPrint('Error exporting file: $e');
-      return null;
-    }
-  }
 
-  static const String _reEncryptJournalKey = 'reencrypt_journal';
+  // ---- Settings ----
 
-  Future<int> reEncryptVault(
-    EncryptionAlgorithm targetAlgorithm, {
-    bool isDecoy = false,
-    Function(int current, int total, String currentFileName, int processedBytes,
-            int totalBytes)?
-        onProgress,
-    Set<String>? fileFilter,
-  }) async {
-    try {
-      final files = isDecoy
-          ? (await getAllFiles(isDecoy: true))
-          : (await getAllFiles(isDecoy: false));
-      var encryptedFiles = files.where((f) => f.isEncrypted).toList();
+  Future<VaultSettings> getSettings() => _settings.getSettings();
 
-      if (fileFilter != null && fileFilter.isNotEmpty) {
-        encryptedFiles = encryptedFiles.where((f) => fileFilter.contains(f.id)).toList();
-      }
+  Future<void> updateSettings(VaultSettings settings) =>
+      _settings.updateSettings(settings);
 
-      if (encryptedFiles.isEmpty) return 0;
+  // ---- Stats ----
 
-      final journalIvs = <String, String>{};
-      String? priorInProgress;
+  Future<Map<VaultedFileType, int>> getFileCounts() => _stats.getFileCounts();
 
-      final journalStr = await _storage.read(key: _reEncryptJournalKey);
-      if (journalStr != null) {
-        try {
-          final journal = jsonDecode(journalStr) as Map<String, dynamic>;
-          final savedIvs = (journal['ivs'] as Map<String, dynamic>?)?.cast<String, String>() ?? {};
-          journalIvs.addAll(savedIvs);
-          priorInProgress = journal['inProgress'] as String?;
+  Future<int> getTotalStorageUsed() => _stats.getTotalStorageUsed();
 
-          for (final entry in journalIvs.entries) {
-            final idx = files.indexWhere((f) => f.vaultPath == entry.key);
-            if (idx >= 0) {
-              files[idx] = files[idx].copyWith(encryptionIv: entry.value);
-            }
-          }
+  // ---- Misc ----
 
-          if (priorInProgress != null) {
-            try { await File('$priorInProgress.tmp').delete(); } catch (_) {}
-          }
-
-          encryptedFiles = files.where((f) => f.isEncrypted).toList();
-          // ponytail: journal recovery rebuilds from the full list (to restore
-          // IVs from vaultPath matches), so re-apply the selection here —
-          // without this a leftover journal makes reEncryptVault ignore
-          // fileFilter and process every encrypted file.
-          if (fileFilter != null && fileFilter.isNotEmpty) {
-            encryptedFiles =
-                encryptedFiles.where((f) => fileFilter.contains(f.id)).toList();
-          }
-
-          if (isDecoy) { _cachedDecoyFiles = files; } else { _cachedFiles = files; }
-          await _saveFileIndex(isDecoy: isDecoy);
-        } catch (_) {}
-      }
-
-      final totalBytes = encryptedFiles.fold<int>(0, (s, f) => s + f.fileSize);
-      var processedBytes = 0;
-      int reEncryptedCount = 0;
-
-      for (int i = 0; i < encryptedFiles.length; i++) {
-        final file = encryptedFiles[i];
-        onProgress?.call(i, encryptedFiles.length, file.originalName,
-            processedBytes, totalBytes);
-
-        if (!await File(file.vaultPath).exists()) {
-          processedBytes += file.fileSize;
-          onProgress?.call(i + 1, encryptedFiles.length, file.originalName,
-              processedBytes, totalBytes);
-          continue;
-        }
-        // ponytail: an encrypted file with no stored IV is undecryptable on any
-        // path (the IV is never embedded in the file — pool encrypt returns it
-        // for the index to store). Skip it instead of throwing "IV must be at
-        // least 1 byte" and aborting the whole batch; matches removeEncryption's
-        // guard. These are legacy/orphaned entries, not normal imports.
-        if (file.encryptionIv == null || file.encryptionIv!.isEmpty) {
-          debugPrint(
-              'reEncryptVault: skipping ${file.originalName} (missing IV)');
-          processedBytes += file.fileSize;
-          onProgress?.call(i + 1, encryptedFiles.length, file.originalName,
-              processedBytes, totalBytes);
-          continue;
-        }
-
-        final currentFormat = _encryptionService.detectFileFormat(file.vaultPath);
-        final targetIsGcm = targetAlgorithm == EncryptionAlgorithm.aes256Gcm;
-        final currentIsGcm = (currentFormat == 1 || currentFormat == 4);
-
-        if (currentIsGcm == targetIsGcm && currentFormat != 0 && currentFormat != 3) {
-          processedBytes += file.fileSize;
-          onProgress?.call(i + 1, encryptedFiles.length, file.originalName,
-              processedBytes, totalBytes);
-          continue;
-        }
-
-        await _storage.write(
-          key: _reEncryptJournalKey,
-          value: jsonEncode({
-            'ivs': journalIvs,
-            'inProgress': file.vaultPath,
-          }),
-        );
-
-        final oldDerivedKey = await _deriveKeyForFile(file, isDecoy: isDecoy);
-        final newSalt = _encryptionService.generateFileSalt();
-        final newIterations = _cachedSettings?.kdfIterations ?? 100000;
-        final masterKey = await _encryptionService.getMasterKey(isDecoy: isDecoy || file.isDecoy);
-        // ponytail: async (Compute isolate). Sync deriveFileKey @ 100k iterations
-        // per file on the main isolate was the re-encrypt hang; encrypt (line ~702)
-        // and the old-key derivation above both already use the async path.
-        final newDerivedKey = await _encryptionService.deriveFileKeyAsync(masterKey, newSalt, newIterations);
-
-        final baseBytes = processedBytes;
-        final halfBytes = file.fileSize ~/ 2;
-        final newIv = await _encryptionService.reEncryptFile(
-          file.vaultPath,
-          file.encryptionIv ?? '',
-          targetAlgorithm: targetAlgorithm,
-          isDecoy: isDecoy,
-          oldDerivedKey: oldDerivedKey,
-          newDerivedKey: newDerivedKey,
-          onProgress: onProgress == null
-              ? null
-              // ponytail: fold decrypt(0..half) then encrypt(half..full) into one
-              // monotonic budget so the bar advances across both pool stages.
-              : (processed, _, isEnc) => onProgress(
-                    i,
-                    encryptedFiles.length,
-                    file.originalName,
-                    baseBytes +
-                        (isEnc
-                            ? halfBytes + (processed ~/ 2)
-                            : processed ~/ 2),
-                    totalBytes),
-        );
-
-        journalIvs[file.vaultPath] = newIv;
-        await _storage.write(
-          key: _reEncryptJournalKey,
-          value: jsonEncode({
-            'ivs': journalIvs,
-          }),
-        );
-
-        final fileIndex = files.indexWhere((f) => f.id == file.id);
-        if (fileIndex >= 0) {
-          // ponytail: per-file key changed → the stored thumb ciphertext is
-          // undecryptable. Delete it; getThumbnailBytes lazily regenerates with
-          // the new key. In-memory cache (still the correct image) is left as-is.
-          if (file.thumbnailPath != null) {
-            try {
-              await File(file.thumbnailPath!).delete();
-            } catch (_) {}
-          }
-          files[fileIndex] = file.copyWith(
-            encryptionIv: newIv,
-            encryptionAlgorithm: targetAlgorithm,
-            keyDerivationSalt: base64Encode(newSalt),
-            kdfIterations: newIterations,
-          );
-          reEncryptedCount++;
-        }
-        processedBytes += file.fileSize;
-        onProgress?.call(i + 1, encryptedFiles.length, file.originalName,
-            processedBytes, totalBytes);
-      }
-
-      if (isDecoy) {
-        _cachedDecoyFiles = files;
-      } else {
-        _cachedFiles = files;
-      }
-
-      await _saveFileIndex(isDecoy: isDecoy);
-      await _storage.delete(key: _reEncryptJournalKey);
-      return reEncryptedCount;
-    } catch (e) {
-      debugPrint('Re-encryption error: $e');
-      return -1;
-    }
-  }
-
-  /// Add encryption to currently-unencrypted vault files, in place.
-  /// Same reliability profile as reEncryptVault: isolate pool + async key
-  /// derivation + atomic temp/rename. [algorithm] picks CTR vs GCM.
-  /// ponytail: index saved ONCE at the end (not per file). A per-file save
-  /// jsonEncodes + re-writes the whole index N times through secure storage,
-  /// which froze the UI on batches — reEncryptVault saves once for the same
-  /// reason. Each file is still atomic (temp + rename), so a crash can only
-  /// ever leave a completed file's bytes consistent; the index is reconciled
-  /// by re-running the op against the still-eligible files.
-  Future<int> encryptVaultFiles(
-    EncryptionAlgorithm algorithm, {
-    bool isDecoy = false,
-    Function(int current, int total, String currentFileName, int processedBytes,
-            int totalBytes)?
-        onProgress,
-    Set<String>? fileFilter,
-  }) async {
-    try {
-      final files = await getAllFiles(isDecoy: isDecoy);
-      var targets = files.where((f) => !f.isEncrypted).toList();
-      if (fileFilter != null && fileFilter.isNotEmpty) {
-        targets = targets.where((f) => fileFilter.contains(f.id)).toList();
-      }
-      if (targets.isEmpty) return 0;
-
-      final iterations = _cachedSettings?.kdfIterations ?? 100000;
-      final totalBytes = targets.fold<int>(0, (s, f) => s + f.fileSize);
-      var processedBytes = 0;
-      var count = 0;
-
-      for (int i = 0; i < targets.length; i++) {
-        final file = targets[i];
-        onProgress?.call(i, targets.length, file.originalName, processedBytes,
-            totalBytes);
-        if (!await File(file.vaultPath).exists()) {
-          processedBytes += file.fileSize;
-          continue;
-        }
-
-        final salt = _encryptionService.generateFileSalt();
-        final masterKey = await _encryptionService.getMasterKey(isDecoy: isDecoy || file.isDecoy);
-        final derivedKey = await _encryptionService.deriveFileKeyAsync(masterKey, salt, iterations);
-
-        final baseBytes = processedBytes;
-        final newIv = await _encryptionService.encryptFileInPlace(
-          file.vaultPath,
-          useGcm: algorithm == EncryptionAlgorithm.aes256Gcm,
-          isDecoy: isDecoy,
-          derivedKey: derivedKey,
-          onProgress: onProgress == null
-              ? null
-              : (processed, _) => onProgress(
-                    i, targets.length, file.originalName,
-                    baseBytes + processed, totalBytes),
-        );
-
-        final idx = files.indexWhere((f) => f.id == file.id);
-        if (idx >= 0) {
-          files[idx] = file.copyWith(
-            isEncrypted: true,
-            encryptionIv: newIv,
-            encryptionAlgorithm: algorithm,
-            keyDerivationSalt: base64Encode(salt),
-            kdfIterations: iterations,
-          );
-          count++;
-        }
-        processedBytes += file.fileSize;
-        onProgress?.call(i + 1, targets.length, file.originalName,
-            processedBytes, totalBytes);
-      }
-
-      await _saveFileIndex(isDecoy: isDecoy);
-      return count;
-    } catch (e) {
-      // Persist whatever completed before the failure so the index matches disk.
-      try { await _saveFileIndex(isDecoy: isDecoy); } catch (_) {}
-      debugPrint('Encrypt-in-place error: $e');
-      return -1;
-    }
-  }
-
-  /// Remove encryption from encrypted vault files, decrypting them in place
-  /// so they are stored as plaintext. Same reliability profile as reEncryptVault.
-  Future<int> removeEncryption({
-    bool isDecoy = false,
-    Function(int current, int total, String currentFileName, int processedBytes,
-            int totalBytes)?
-        onProgress,
-    Set<String>? fileFilter,
-  }) async {
-    try {
-      final files = await getAllFiles(isDecoy: isDecoy);
-      var targets = files.where((f) => f.isEncrypted).toList();
-      if (fileFilter != null && fileFilter.isNotEmpty) {
-        targets = targets.where((f) => fileFilter.contains(f.id)).toList();
-      }
-      if (targets.isEmpty) return 0;
-
-      final totalBytes = targets.fold<int>(0, (s, f) => s + f.fileSize);
-      var processedBytes = 0;
-      var count = 0;
-
-      for (int i = 0; i < targets.length; i++) {
-        final file = targets[i];
-        onProgress?.call(i, targets.length, file.originalName, processedBytes,
-            totalBytes);
-        if (!await File(file.vaultPath).exists()) {
-          processedBytes += file.fileSize;
-          continue;
-        }
-        if (file.encryptionIv == null) {
-          processedBytes += file.fileSize;
-          continue;
-        }
-
-        final derivedKey = await _deriveKeyForFile(file, isDecoy: isDecoy);
-
-        final baseBytes = processedBytes;
-        await _encryptionService.decryptFileInPlace(
-          file.vaultPath,
-          file.encryptionIv!,
-          isDecoy: isDecoy,
-          derivedKey: derivedKey,
-          onProgress: onProgress == null
-              ? null
-              : (processed, _) => onProgress(
-                    i, targets.length, file.originalName,
-                    baseBytes + processed, totalBytes),
-        );
-
-        final idx = files.indexWhere((f) => f.id == file.id);
-        if (idx >= 0) {
-          // copyWith can't null out fields, so rebuild clearing the crypto ones.
-          // ponytail: file is now plaintext, grids render vaultPath directly and
-          // getThumbnailBytes returns null for unencrypted files — so drop the
-          // thumb field and delete the now-orphaned ciphertext thumb.
-          if (file.thumbnailPath != null) {
-            try {
-              await File(file.thumbnailPath!).delete();
-            } catch (_) {}
-          }
-          files[idx] = VaultedFile(
-            id: file.id,
-            originalName: file.originalName,
-            vaultPath: file.vaultPath,
-            originalPath: file.originalPath,
-            type: file.type,
-            mimeType: file.mimeType,
-            fileSize: file.fileSize,
-            dateAdded: file.dateAdded,
-            dateModified: DateTime.now(),
-            metadata: file.metadata,
-            tags: file.tags,
-            isFavorite: file.isFavorite,
-            isEncrypted: false,
-            isDecoy: file.isDecoy,
-            lastViewed: file.lastViewed,
-            viewCount: file.viewCount,
-            notes: file.notes,
-            albumIds: file.albumIds,
-            folderId: file.folderId,
-          );
-          count++;
-        }
-        processedBytes += file.fileSize;
-        onProgress?.call(i + 1, targets.length, file.originalName,
-            processedBytes, totalBytes);
-      }
-
-      await _saveFileIndex(isDecoy: isDecoy);
-      return count;
-    } catch (e) {
-      try { await _saveFileIndex(isDecoy: isDecoy); } catch (_) {}
-      debugPrint('Remove-encryption error: $e');
-      return -1;
-    }
-  }
-
-  /// Clear all vault data (use with caution!)
   Future<void> clearVault({bool isDecoy = false}) async {
     try {
-      final appDir = await getApplicationDocumentsDirectory();
-      final directory = Directory(
-        '${appDir.path}/${isDecoy ? _decoyFolderName : _vaultFolderName}',
-      );
-
-      if (await directory.exists()) {
-        await directory.delete(recursive: true);
-      }
-
-      if (isDecoy) {
-        _cachedDecoyFiles = [];
-        await _storage.delete(key: _decoyIndexKey);
-        _decoyDirectory = null;
-      } else {
-        _cachedFiles = [];
-        _cachedAlbums = null;
-        _cachedFolders = null;
-        _cachedTags = null;
-        await _storage.delete(key: _vaultIndexKey);
-        await _storage.delete(key: _albumsKey);
-        await _storage.delete(key: _foldersKey);
-        await _storage.delete(key: _tagsKey);
-        _vaultDirectory = null;
-      }
+      await _store.wipe(isDecoy: isDecoy);
       clearThumbnailCache();
     } catch (e) {
       debugPrint('Error clearing vault: $e');
     }
   }
 
-  /// Refresh the cache
   Future<void> refresh() async {
-    // ponytail: atomic swap — read storage into locals before replacing caches,
-    // so a concurrent mutation never observes a null cache (was the NPE vector
-    // flagged in Tier 4). Full mutation serialization (repositories + a
-    // re-entrant lock) is deferred; a naive lock deadlocks because mutating
-    // methods call each other (addFileToAlbum → updateFile, etc.).
-    final files = await _loadFileIndex(forceReload: true);
-    final decoyFiles = await _loadFileIndex(isDecoy: true, forceReload: true);
-    final albums = await _loadAlbums(forceReload: true);
-    final folders = await _loadFolders(forceReload: true);
-    final tags = await _loadTags(forceReload: true);
-    _cachedFiles = files;
-    _cachedDecoyFiles = decoyFiles;
-    _cachedAlbums = albums;
-    _cachedFolders = folders;
-    _cachedTags = tags;
-  }
-
-  /// Clean up temp files
-  Future<void> cleanupTemp() async {
-    try {
-      final vaultDir = await _ensureVaultDirectory();
-      final tempDir = Directory('${vaultDir.path}/temp');
-
-      if (await tempDir.exists()) {
-        await tempDir.delete(recursive: true);
-        await tempDir.create();
-      }
-    } catch (e) {
-      debugPrint('Error cleaning temp: $e');
-    }
-  }
-
-  Future<void> registerNoteEntry({
-    required String noteId,
-    required String title,
-    required String encryptedContentPath,
-    String fileExtension = 'txt',
-    bool isEncrypted = false,
-    EncryptionAlgorithm encryptionAlgorithm = EncryptionAlgorithm.aes256Gcm,
-    int kdfIterations = 0,
-    String? folderId,
-    bool isDecoy = false,
-  }) async {
-    final files = isDecoy
-        ? (_cachedDecoyFiles ??= await _loadFileIndex(isDecoy: true))
-        : (_cachedFiles ??= await _loadFileIndex());
-
-    final existingIndex =
-        files.indexWhere((f) => f.metadata?['noteId'] == noteId);
-
-    final mimeType = switch (fileExtension) {
-      'md' => 'text/markdown',
-      'html' => 'text/html',
-      _ => 'text/plain',
-    };
-
-    final entry = VaultedFile(
-      id: existingIndex != -1 ? files[existingIndex].id : noteId,
-      originalName: '$title.$fileExtension',
-      vaultPath: encryptedContentPath,
-      type: VaultedFileType.document,
-      mimeType: mimeType,
-      fileSize: 0,
-      dateAdded: existingIndex != -1
-          ? files[existingIndex].dateAdded
-          : DateTime.now(),
-      dateModified: DateTime.now(),
-      tags: ['note'],
-      isEncrypted: isEncrypted,
-      encryptionAlgorithm: encryptionAlgorithm,
-      kdfIterations: kdfIterations,
-      folderId: folderId,
-      metadata: {'noteId': noteId},
-    );
-
-    if (existingIndex != -1) {
-      files[existingIndex] = entry;
-    } else {
-      files.insert(0, entry);
-    }
-
-    if (isDecoy) {
-      await _saveFileIndex(isDecoy: true);
-    } else {
-      await _saveFileIndex();
-    }
-  }
-
-  Future<void> removeNoteEntry(String noteId, {bool isDecoy = false}) async {
-    final files = isDecoy
-        ? (_cachedDecoyFiles ??= await _loadFileIndex(isDecoy: true))
-        : (_cachedFiles ??= await _loadFileIndex());
-
-    files.removeWhere((f) => f.metadata?['noteId'] == noteId);
-
-    if (isDecoy) {
-      await _saveFileIndex(isDecoy: true);
-    } else {
-      await _saveFileIndex();
-    }
-  }
-
-  Future<void> registerPasswordEntry({
-    required String passwordId,
-    required String title,
-    required String encryptedContentPath,
-    List<String> tags = const [],
-    bool isEncrypted = false,
-    EncryptionAlgorithm encryptionAlgorithm = EncryptionAlgorithm.aes256Gcm,
-    int kdfIterations = 0,
-    bool isDecoy = false,
-  }) async {
-    final files = isDecoy
-        ? (_cachedDecoyFiles ??= await _loadFileIndex(isDecoy: true))
-        : (_cachedFiles ??= await _loadFileIndex());
-
-    final existingIndex =
-        files.indexWhere((f) => f.metadata?['passwordId'] == passwordId);
-
-    final entry = VaultedFile(
-      id: existingIndex != -1 ? files[existingIndex].id : passwordId,
-      originalName: '$title.pwd',
-      vaultPath: encryptedContentPath,
-      type: VaultedFileType.document,
-      mimeType: 'application/octet-stream',
-      fileSize: 0,
-      dateAdded: existingIndex != -1
-          ? files[existingIndex].dateAdded
-          : DateTime.now(),
-      dateModified: DateTime.now(),
-      tags: ['password', ...tags],
-      isEncrypted: isEncrypted,
-      encryptionAlgorithm: encryptionAlgorithm,
-      kdfIterations: kdfIterations,
-      metadata: {'passwordId': passwordId},
-    );
-
-    if (existingIndex != -1) {
-      files[existingIndex] = entry;
-    } else {
-      files.insert(0, entry);
-    }
-
-    if (isDecoy) {
-      await _saveFileIndex(isDecoy: true);
-    } else {
-      await _saveFileIndex();
-    }
-  }
-
-  Future<void> removePasswordEntry(String passwordId,
-      {bool isDecoy = false}) async {
-    final files = isDecoy
-        ? (_cachedDecoyFiles ??= await _loadFileIndex(isDecoy: true))
-        : (_cachedFiles ??= await _loadFileIndex());
-
-    files.removeWhere((f) => f.metadata?['passwordId'] == passwordId);
-
-    if (isDecoy) {
-      await _saveFileIndex(isDecoy: true);
-    } else {
-      await _saveFileIndex();
-    }
-  }
-}
-
-/// Helper class for batch file import
-class FileToVault {
-  final String sourcePath;
-  final String originalName;
-  final VaultedFileType type;
-  final String mimeType;
-  final bool? encrypt;
-  final EncryptionAlgorithm? encryptionAlgorithm;
-  final int? kdfIterations;
-
-  const FileToVault({
-    required this.sourcePath,
-    required this.originalName,
-    required this.type,
-    required this.mimeType,
-    this.encrypt,
-    this.encryptionAlgorithm,
-    this.kdfIterations,
-  });
-}
-
-/// Result of importing a device folder
-class FolderImportResult {
-  final int foldersCreated;
-  final int filesImported;
-  final List<String> errors;
-  final VaultFolder? rootFolder;
-
-  const FolderImportResult({
-    required this.foldersCreated,
-    required this.filesImported,
-    this.errors = const [],
-    this.rootFolder,
-  });
-}
-
-/// Vault settings
-class VaultSettings {
-  final bool encryptionEnabled;
-  final EncryptionAlgorithm encryptionAlgorithm;
-  final int kdfIterations;
-  final bool secureDelete;
-  final bool screenshotProtectionEnabled;
-  final int autoKillDelaySeconds;
-  final SortOption defaultSort;
-  final bool showHiddenFiles;
-  final bool autoBackup;
-  final int? maxStorageMB;
-  final bool decoyModeEnabled;
-  final String? decoyPin;
-  final bool compressionEnabled;
-  final bool failedUnlockProtectionEnabled;
-  final int maxFailedAttemptsBeforeLockout;
-  final int lockoutDurationSeconds;
-  final bool wipeVaultOnMaxFailedAttempts;
-  final int maxFailedAttemptsBeforeWipe;
-  final bool showPermissionWarning;
-
-  const VaultSettings({
-    this.encryptionEnabled = false,
-    this.encryptionAlgorithm = EncryptionAlgorithm.aes256Gcm,
-    this.kdfIterations = 600000,
-    this.secureDelete = true,
-    this.screenshotProtectionEnabled = false,
-    this.autoKillDelaySeconds = 0,
-    this.defaultSort = SortOption.dateAddedNewest,
-    this.showHiddenFiles = false,
-    this.autoBackup = false,
-    this.maxStorageMB,
-    this.decoyModeEnabled = false,
-    this.decoyPin,
-    this.compressionEnabled = false,
-    this.failedUnlockProtectionEnabled = false,
-    this.maxFailedAttemptsBeforeLockout = 5,
-    this.lockoutDurationSeconds = 30,
-    this.wipeVaultOnMaxFailedAttempts = false,
-    this.maxFailedAttemptsBeforeWipe = 12,
-    this.showPermissionWarning = true,
-  });
-
-  VaultSettings copyWith({
-    bool? encryptionEnabled,
-    EncryptionAlgorithm? encryptionAlgorithm,
-    int? kdfIterations,
-    bool? secureDelete,
-    bool? screenshotProtectionEnabled,
-    int? autoKillDelaySeconds,
-    SortOption? defaultSort,
-    bool? showHiddenFiles,
-    bool? autoBackup,
-    int? maxStorageMB,
-    bool? decoyModeEnabled,
-    String? decoyPin,
-    bool? compressionEnabled,
-    bool? failedUnlockProtectionEnabled,
-    int? maxFailedAttemptsBeforeLockout,
-    int? lockoutDurationSeconds,
-    bool? wipeVaultOnMaxFailedAttempts,
-    int? maxFailedAttemptsBeforeWipe,
-    bool? showPermissionWarning,
-  }) {
-    return VaultSettings(
-      encryptionEnabled: encryptionEnabled ?? this.encryptionEnabled,
-      encryptionAlgorithm: encryptionAlgorithm ?? this.encryptionAlgorithm,
-      kdfIterations: kdfIterations ?? this.kdfIterations,
-      secureDelete: secureDelete ?? this.secureDelete,
-      screenshotProtectionEnabled:
-          screenshotProtectionEnabled ?? this.screenshotProtectionEnabled,
-      autoKillDelaySeconds: autoKillDelaySeconds ?? this.autoKillDelaySeconds,
-      defaultSort: defaultSort ?? this.defaultSort,
-      showHiddenFiles: showHiddenFiles ?? this.showHiddenFiles,
-      autoBackup: autoBackup ?? this.autoBackup,
-      maxStorageMB: maxStorageMB ?? this.maxStorageMB,
-      decoyModeEnabled: decoyModeEnabled ?? this.decoyModeEnabled,
-      decoyPin: decoyPin ?? this.decoyPin,
-      compressionEnabled: compressionEnabled ?? this.compressionEnabled,
-      failedUnlockProtectionEnabled:
-          failedUnlockProtectionEnabled ?? this.failedUnlockProtectionEnabled,
-      maxFailedAttemptsBeforeLockout:
-          maxFailedAttemptsBeforeLockout ?? this.maxFailedAttemptsBeforeLockout,
-      lockoutDurationSeconds:
-          lockoutDurationSeconds ?? this.lockoutDurationSeconds,
-      wipeVaultOnMaxFailedAttempts:
-          wipeVaultOnMaxFailedAttempts ?? this.wipeVaultOnMaxFailedAttempts,
-      maxFailedAttemptsBeforeWipe:
-          maxFailedAttemptsBeforeWipe ?? this.maxFailedAttemptsBeforeWipe,
-      showPermissionWarning:
-          showPermissionWarning ?? this.showPermissionWarning,
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-        'encryptionEnabled': encryptionEnabled,
-        'encryptionAlgorithm': encryptionAlgorithm.name,
-        'kdfIterations': kdfIterations,
-        'secureDelete': secureDelete,
-        'screenshotProtectionEnabled': screenshotProtectionEnabled,
-        'autoKillDelaySeconds': autoKillDelaySeconds,
-        'defaultSort': defaultSort.name,
-        'showHiddenFiles': showHiddenFiles,
-        'autoBackup': autoBackup,
-        'maxStorageMB': maxStorageMB,
-        'decoyModeEnabled': decoyModeEnabled,
-        'decoyPin': decoyPin,
-        'compressionEnabled': compressionEnabled,
-        'failedUnlockProtectionEnabled': failedUnlockProtectionEnabled,
-        'maxFailedAttemptsBeforeLockout': maxFailedAttemptsBeforeLockout,
-        'lockoutDurationSeconds': lockoutDurationSeconds,
-        'wipeVaultOnMaxFailedAttempts': wipeVaultOnMaxFailedAttempts,
-        'maxFailedAttemptsBeforeWipe': maxFailedAttemptsBeforeWipe,
-        'showPermissionWarning': showPermissionWarning,
-      };
-
-  factory VaultSettings.fromJson(Map<String, dynamic> json) {
-    return VaultSettings(
-      encryptionEnabled: json['encryptionEnabled'] as bool? ?? false,
-      encryptionAlgorithm: EncryptionAlgorithm.values.firstWhere(
-        (a) => a.name == (json['encryptionAlgorithm'] as String? ?? 'aes256Gcm'),
-        orElse: () => EncryptionAlgorithm.aes256Gcm,
-      ),
-      kdfIterations: json['kdfIterations'] as int? ?? 600000,
-      secureDelete: json['secureDelete'] as bool? ?? true,
-      screenshotProtectionEnabled:
-          json['screenshotProtectionEnabled'] as bool? ?? false,
-      autoKillDelaySeconds: json['autoKillDelaySeconds'] as int? ?? 0,
-      defaultSort: SortOption.values.firstWhere(
-        (s) => s.name == (json['defaultSort'] as String? ?? 'dateAddedNewest'),
-        orElse: () => SortOption.dateAddedNewest,
-      ),
-      showHiddenFiles: json['showHiddenFiles'] as bool? ?? false,
-      autoBackup: json['autoBackup'] as bool? ?? false,
-      maxStorageMB: json['maxStorageMB'] as int?,
-      decoyModeEnabled: json['decoyModeEnabled'] as bool? ?? false,
-      decoyPin: json['decoyPin'] as String?,
-      compressionEnabled: json['compressionEnabled'] as bool? ?? false,
-      failedUnlockProtectionEnabled:
-          json['failedUnlockProtectionEnabled'] as bool? ?? false,
-      maxFailedAttemptsBeforeLockout:
-          json['maxFailedAttemptsBeforeLockout'] as int? ?? 5,
-      lockoutDurationSeconds: json['lockoutDurationSeconds'] as int? ?? 30,
-      wipeVaultOnMaxFailedAttempts:
-          json['wipeVaultOnMaxFailedAttempts'] as bool? ?? false,
-      maxFailedAttemptsBeforeWipe:
-          json['maxFailedAttemptsBeforeWipe'] as int? ?? 12,
-      showPermissionWarning:
-          json['showPermissionWarning'] as bool? ?? true,
-    );
+    // ponytail: atomic swap — reload all caches before replacing them, so a
+    // concurrent mutation never observes a null cache (was the NPE vector
+    // flagged in Tier 4). Full mutation serialization deferred.
+    final files = await _store.loadFileIndex(forceReload: true);
+    final decoyFiles =
+        await _store.loadFileIndex(isDecoy: true, forceReload: true);
+    final albums = await _store.loadAlbums(forceReload: true);
+    final folders = await _store.loadFolders(forceReload: true);
+    final tags = await _store.loadTags(forceReload: true);
+    _store.cachedFiles = files;
+    _store.cachedDecoyFiles = decoyFiles;
+    _store.cachedAlbums = albums;
+    _store.cachedFolders = folders;
+    _store.cachedTags = tags;
   }
 }
