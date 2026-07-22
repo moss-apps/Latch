@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/encryption_algorithm.dart';
+import '../models/vault_settings.dart';
 import '../providers/vault_providers.dart';
-import '../services/vault_service.dart';
 import '../themes/app_colors.dart';
 import 'encryption_manage_screen.dart';
 import 're_encrypt_file_picker_screen.dart';
