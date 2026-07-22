@@ -1004,6 +1004,7 @@ class FileImportService {
         onConversionConfirmation,
     bool deleteOriginals = true,
     Function(int current, int total)? onProgress,
+    Function(FileProgressInfo)? onFileProgress,
     Function(String message)? onStatusUpdate,
     Map<String, ({bool encrypt, EncryptionAlgorithm algorithm})>? perFileEncryption,
   }) async {
@@ -1091,6 +1092,13 @@ class FileImportService {
           pathsToDelete.add(path);
           processed++;
           onProgress?.call(processed, totalFiles);
+          onFileProgress?.call(FileProgressInfo(
+            current: processed,
+            total: totalFiles,
+            fileName: fileName,
+            fileSize: 0,
+            status: 'Preparing...',
+          ));
 
           debugPrint(
               '[FileImport] Prepared regular document for import: $fileName');
@@ -1125,6 +1133,13 @@ class FileImportService {
             pathsToDelete.add(officeFile.path);
             processed++;
             onProgress?.call(processed, totalFiles);
+            onFileProgress?.call(FileProgressInfo(
+              current: processed,
+              total: totalFiles,
+              fileName: officeFile.fileName,
+              fileSize: 0,
+              status: 'Preparing...',
+            ));
             continue;
           }
 
@@ -1137,6 +1152,13 @@ class FileImportService {
             skippedFiles.add(officeFile.fileName);
             processed++;
             onProgress?.call(processed, totalFiles);
+            onFileProgress?.call(FileProgressInfo(
+              current: processed,
+              total: totalFiles,
+              fileName: officeFile.fileName,
+              fileSize: 0,
+              status: 'File not found, skipping...',
+            ));
             continue;
           }
 
@@ -1196,6 +1218,13 @@ class FileImportService {
 
           processed++;
           onProgress?.call(processed, totalFiles);
+          onFileProgress?.call(FileProgressInfo(
+            current: processed,
+            total: totalFiles,
+            fileName: officeFile.fileName,
+            fileSize: 0,
+            status: result.success ? 'Converted' : 'Conversion failed, using original',
+          ));
         } catch (e) {
           debugPrint(
               '[FileImport] Error converting/importing ${officeFile.fileName}: $e');
@@ -1215,6 +1244,13 @@ class FileImportService {
           }
           processed++;
           onProgress?.call(processed, totalFiles);
+          onFileProgress?.call(FileProgressInfo(
+            current: processed,
+            total: totalFiles,
+            fileName: officeFile.fileName,
+            fileSize: 0,
+            status: 'Importing original...',
+          ));
         }
       }
 
@@ -1244,6 +1280,7 @@ class FileImportService {
         deleteOriginals: false,
         isDecoy: _decoyService.isDecoyModeActive,
         onProgress: onProgress,
+        onFileProgress: onFileProgress,
       );
 
       debugPrint('[FileImport] Imported ${imported.length} documents to vault');
