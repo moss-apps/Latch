@@ -581,6 +581,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
                 blurRadius: 10,
                 offset: const Offset(0, 2),
               ),
+              scrollPhysics: const ClampingScrollPhysics(),
               viewerOverlayBuilder: (context, size, handleLinkTap) => [
                 PdfViewerScrollThumb(
                   controller: _pdfController!,
@@ -627,6 +628,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
           blurRadius: 10,
           offset: const Offset(0, 2),
         ),
+        scrollPhysics: const ClampingScrollPhysics(),
         viewerOverlayBuilder: (context, size, handleLinkTap) => [
           PdfViewerScrollThumb(
             controller: _pdfController!,
