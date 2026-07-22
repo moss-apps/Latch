@@ -12,7 +12,7 @@ import '../services/auth_service.dart';
 import '../services/auto_kill_service.dart';
 import '../services/screenshot_protection_service.dart';
 import '../services/update_service.dart';
-import '../services/vault_service.dart';
+import '../models/vault_settings.dart';
 import '../services/whats_new_service.dart';
 import '../themes/app_colors.dart';
 import '../widgets/whats_new_bottom_sheet.dart';
