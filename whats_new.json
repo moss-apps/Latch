@@ -1,4 +1,41 @@
 {
+  "0.16.2-beta.3": [
+    {
+      "title": "Architecture",
+      "items": [
+        {
+          "icon": "build_outlined",
+          "title": "Modular vault services",
+          "description": "VaultService split into focused domain services — File, Folder, Album, Tag, Search, Stats, Settings, and VaultStore — each with its own responsibility."
+        },
+        {
+          "icon": "speed",
+          "title": "Faster import flow",
+          "description": "Batch imports now show per-file progress with a bottom sheet modal instead of inline setState."
+        }
+      ]
+    },
+    {
+      "title": "Viewer Improvements",
+      "items": [
+        {
+          "icon": "photo_library_outlined",
+          "title": "Better PDF navigation",
+          "description": "ClampingScrollPhysics and a scroll thumb overlay make large documents easier to browse."
+        },
+        {
+          "icon": "lock_outlined",
+          "title": "Isolate office conversion",
+          "description": "Office document conversion now runs off the UI thread with font caching for faster repeats."
+        },
+        {
+          "icon": "auto_awesome_outlined",
+          "title": "Orientation lock",
+          "description": "Video player now has a button to lock the playback orientation."
+        }
+      ]
+    }
+  ],
   "0.16.1-beta.2": [
     {
       "title": "Encrypted Thumbnails",
