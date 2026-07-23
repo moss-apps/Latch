@@ -2,6 +2,46 @@
 
 Notable changes to Latch.
 
+## 0.16.2-beta.3
+
+### Vault Service Refactoring
+- **VaultService** refactored into a **facade** over split domain services:
+  - `FileService` — full vault file operations
+  - `FolderService` — CRUD and device import for folders
+  - `AlbumService` — CRUD and file-album management
+  - `TagService` — tag CRUD and favorite toggling
+  - `SearchService` — basic and advanced file querying
+  - `StatsService` — read-only file analytics
+  - `SettingsService` — vault settings get/update
+  - `VaultStore` — centralized state and persistence layer
+  - `EncryptedThumbnailService` — caching and lazy thumbnail regeneration
+
+### Import Flow Improvements
+- **Per-file progress callback** for the import service
+- Batch file import helper classes
+- Progress sheet bottom modal replaces `setState` for import flow
+
+### PDF Viewer
+- **ClampingScrollPhysics** to prevent overscroll bounce
+- **Scroll thumb overlay** for better document navigation
+
+### Office Document Conversion
+- Conversion moved to **isolate** to keep UI responsive
+- **Font caching** added for repeated conversions
+
+### Video Player
+- **Orientation lock button** for video playback
+
+### Bug Fixes & Build
+- Added missing imports and improved async image compression
+- Refactored cleanupTemp to use VaultService singleton
+- Refactored encryption settings to use vault settings provider
+- Fixed `removeFromFolder` to use `toJson`/`fromJson`
+- Comprehensive unit tests for VaultService
+- Merged subproject configurations in `build.gradle`
+
+---
+
 ## 0.16.1-beta.2
 
 ### Encrypted Thumbnails
