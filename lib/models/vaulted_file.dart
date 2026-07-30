@@ -86,6 +86,14 @@ class VaultedFile {
   final String? folderId; // Folder this file belongs to
   final bool needsMigration; // Legacy GCM v1 files need re-encryption to v2
 
+  // Sync bookkeeping (encrypted-at-rest sync, see docs/local_server_sync.md).
+  // ponytail: modifiedAt is a dedicated LWW timestamp, kept separate from
+  // dateModified so sync never clobbers existing mutation semantics.
+  // remoteHash is the sha256-hex of the uploaded ciphertext blob.
+  final DateTime? modifiedAt;
+  final String? remoteHash;
+  final bool syncedDeleted;
+
   const VaultedFile({
     required this.id,
     required this.originalName,
@@ -113,6 +121,9 @@ class VaultedFile {
     this.albumIds = const [],
     this.folderId,
     this.needsMigration = false,
+    this.modifiedAt,
+    this.remoteHash,
+    this.syncedDeleted = false,
   });
 
   /// Create a copy with updated fields
@@ -143,6 +154,9 @@ class VaultedFile {
     List<String>? albumIds,
     String? folderId,
     bool? needsMigration,
+    DateTime? modifiedAt,
+    String? remoteHash,
+    bool? syncedDeleted,
   }) {
     return VaultedFile(
       id: id ?? this.id,
@@ -171,6 +185,9 @@ class VaultedFile {
       albumIds: albumIds ?? List.from(this.albumIds),
       folderId: folderId ?? this.folderId,
       needsMigration: needsMigration ?? this.needsMigration,
+      modifiedAt: modifiedAt ?? this.modifiedAt,
+      remoteHash: remoteHash ?? this.remoteHash,
+      syncedDeleted: syncedDeleted ?? this.syncedDeleted,
     );
   }
 
@@ -291,6 +308,9 @@ class VaultedFile {
       'albumIds': albumIds,
       'folderId': folderId,
       'needsMigration': needsMigration,
+      'modifiedAt': modifiedAt?.toIso8601String(),
+      'remoteHash': remoteHash,
+      'syncedDeleted': syncedDeleted,
     };
   }
 
@@ -337,6 +357,11 @@ class VaultedFile {
           [],
       folderId: json['folderId'] as String?,
       needsMigration: json['needsMigration'] as bool? ?? false,
+      modifiedAt: json['modifiedAt'] != null
+          ? DateTime.parse(json['modifiedAt'] as String)
+          : null,
+      remoteHash: json['remoteHash'] as String?,
+      syncedDeleted: json['syncedDeleted'] as bool? ?? false,
     );
   }
 
