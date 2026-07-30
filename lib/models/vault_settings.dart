@@ -23,6 +23,10 @@ class VaultSettings {
   final int maxFailedAttemptsBeforeWipe;
   final bool showPermissionWarning;
 
+  // Encrypted-at-rest sync (see docs/local_server_sync.md)
+  final bool syncEnabled;
+  final String? syncProfileId;
+
   const VaultSettings({
     this.encryptionEnabled = false,
     this.encryptionAlgorithm = EncryptionAlgorithm.aes256Gcm,
@@ -43,6 +47,8 @@ class VaultSettings {
     this.wipeVaultOnMaxFailedAttempts = false,
     this.maxFailedAttemptsBeforeWipe = 12,
     this.showPermissionWarning = true,
+    this.syncEnabled = false,
+    this.syncProfileId,
   });
 
   VaultSettings copyWith({
@@ -65,6 +71,8 @@ class VaultSettings {
     bool? wipeVaultOnMaxFailedAttempts,
     int? maxFailedAttemptsBeforeWipe,
     bool? showPermissionWarning,
+    bool? syncEnabled,
+    String? syncProfileId,
   }) {
     return VaultSettings(
       encryptionEnabled: encryptionEnabled ?? this.encryptionEnabled,
@@ -93,6 +101,8 @@ class VaultSettings {
           maxFailedAttemptsBeforeWipe ?? this.maxFailedAttemptsBeforeWipe,
       showPermissionWarning:
           showPermissionWarning ?? this.showPermissionWarning,
+      syncEnabled: syncEnabled ?? this.syncEnabled,
+      syncProfileId: syncProfileId ?? this.syncProfileId,
     );
   }
 
@@ -116,6 +126,8 @@ class VaultSettings {
         'wipeVaultOnMaxFailedAttempts': wipeVaultOnMaxFailedAttempts,
         'maxFailedAttemptsBeforeWipe': maxFailedAttemptsBeforeWipe,
         'showPermissionWarning': showPermissionWarning,
+        'syncEnabled': syncEnabled,
+        'syncProfileId': syncProfileId,
       };
 
   factory VaultSettings.fromJson(Map<String, dynamic> json) {
@@ -151,6 +163,8 @@ class VaultSettings {
           json['maxFailedAttemptsBeforeWipe'] as int? ?? 12,
       showPermissionWarning:
           json['showPermissionWarning'] as bool? ?? true,
+      syncEnabled: json['syncEnabled'] as bool? ?? false,
+      syncProfileId: json['syncProfileId'] as String?,
     );
   }
 }
