@@ -5,8 +5,11 @@ self-hosted cloud) to Latch. Today the vault is device-local with a manual
 *decrypted* ZIP backup (`BackupService`). This plan defines an
 **encrypted-at-rest** sync to a server on the LAN or internet.
 
-Status: **PLANNING** — no code yet. Locked decisions are marked **[LOCKED]**;
-open ones are marked **[OPEN]** and listed again at the bottom.
+Status: **IN PROGRESS** — S0 (transport + creds), S1 (manifest crypto), and the
+S2.1 reconcile engine are implemented and unit-tested (90 tests green).
+Pending: S0.4 connection UI, S1.4/S2.2 sync execution (`runSync`), S2.3–S2.5
+provider/guard/UI. Locked decisions are marked **[LOCKED]**; open ones are
+marked **[OPEN]** and listed again at the bottom.
 
 ---
 
@@ -53,6 +56,11 @@ open ones are marked **[OPEN]** and listed again at the bottom.
    alongside) Phase 4 so we don't add a 13th singleton we then have to remove.
    It takes `VaultStore` + `EncryptionService` via constructor, like the
    Phase 2 services.
+
+   Current state: `SyncService` exists but holds only **pure static logic**
+   (`blobNameFor`, `reconcile`, `buildManifest`, manifest encrypt/decrypt). It
+   is not registered anywhere — no singleton, no provider — so the locked
+   decision stands for the stateful `runSync` orchestration.
 
 ---
 
@@ -118,7 +126,7 @@ Hard rules:
 │ local index  │      │ putManifest /      │
 │              │      │ getBlob / putBlob /│
 │              │      │ deleteBlob /       │
-│              │      │ listRemote         │
+│              │      │ listBlobs         │
 └──────────────┘      └─────────┬──────────┘
                                 │ HTTP
                          ┌──────▼──────┐
@@ -134,12 +142,11 @@ added later behind the same `SyncService` — but only one impl ships now.
 ### Server layout (what the user's NAS holds)
 
 ```
-/latch/
-  manifest.enc            # encrypted index + metadata + tombstones
-  blobs/
-    ab/cd/abcd1234…enc    # content-addressed encrypted media (sha256 of ciphertext)
-    ef/01/ef019876…enc
-  manifest.enc.sig        # [OPEN] GCM tag already authenticates; separate sig = YAGNI for v1
+<basePath>/                     # SyncProfile.basePath, default /locker
+  manifest.enc                  # encrypted index + metadata + tombstones
+  ab/cd/abcd1234…enc            # content-addressed encrypted media (sha256 of ciphertext)
+  ef/01/ef019876…enc
+  manifest.enc.sig              # [OPEN] GCM tag already authenticates; separate sig = YAGNI for v1
 ```
 
 Content-addressing the blobs by hash of the **ciphertext** gives us:
@@ -194,15 +201,17 @@ Direction control (setting):
 
 - **New model:** `SyncProfile` (URL, username, base path, lastSyncAt,
   syncDirection, wifiOnly) — stored in `flutter_secure_storage` as JSON.
-  Not in `VaultSettings` (keeps settings free of secrets).
+  Not in `VaultSettings` (keeps settings free of secrets). **DONE** — plus
+  `SyncProfileService` CRUD with per-profile password keys
+  (`sync_profile_pw_<id>`); passwords never live in the profile JSON.
 - **`VaultSettings` additions:** `bool syncEnabled = false`,
-  `String? syncProfileId`. (Small additions to the existing
-  `toJson`/`fromJson`/`copyWith` — follows the existing field pattern.)
+  `String? syncProfileId`. **DONE** (`toJson`/`fromJson`/`copyWith`).
 - **`VaultedFile` additions:** `DateTime? modifiedAt`, `String? remoteHash`,
-  `bool syncedDeleted = false` (tombstone flag). Migration on load: missing
-  `modifiedAt` → default to file mtime.
-- **New:** `RemoteManifest` model (the decrypted manifest schema: version,
-  device id, files map, tombstones, generatedAt).
+  `bool syncedDeleted = false` (tombstone flag). **DONE**. Migration on load
+  (missing `modifiedAt` → file mtime) **PENDING** — lands with the VaultStore
+  manifest helpers.
+- **New:** `RemoteManifest` model (`version`, `deviceId`, `generatedAt`,
+  `entries: [{id, contentHash, modifiedAt, deleted}]`). **DONE**.
 
 ---
 
@@ -214,11 +223,11 @@ Phases are ordered by dependency. Each is independently shippable.
 
 | # | Task | Location |
 |---|---|---|
-| S0.1 | Add `webdav_client` dep | `pubspec.yaml` |
-| S0.2 | `RemoteStore` interface + WebDAV impl: `ping`, `getManifest`, `putManifest`, `getBlob`, `putBlob`, `deleteBlob`, `listBlobs` | `lib/services/remote/` (new) |
-| S0.3 | `SyncProfile` model + secure-storage CRUD | `lib/models/sync_profile.dart`, new `SyncProfileService` |
-| S0.4 | Connection settings UI: URL/user/password, "Test connection" button, TLS warning for plain HTTP | `lib/screens/sync_settings_screen.dart` (new) |
-| S0.5 | One runnable self-check: connect to a WebDAV URL, put/get a tiny blob, assert roundtrip | test or `__main__`-style check |
+| [x] S0.1 | Add `webdav_client` dep (1.2.2) | `pubspec.yaml` |
+| [x] S0.2 | `RemoteStore` interface + WebDAV impl: `ping`, `getManifest`, `putManifest`, `getBlob`, `putBlob`, `deleteBlob`, `listBlobs` | `lib/services/remote/` |
+| [x] S0.3 | `SyncProfile` model + secure-storage CRUD | `lib/models/sync_profile.dart`, `lib/services/sync_profile_service.dart` |
+| [ ] S0.4 | Connection settings UI: URL/user/password, "Test connection" button, TLS warning for plain HTTP | `lib/screens/sync_settings_screen.dart` (new) |
+| [~] S0.5 | One runnable self-check: connect to a WebDAV URL, put/get a tiny blob, assert roundtrip — so far only path/URL-logic unit tests (`test/webdav_store_test.dart`); live-server roundtrip pending | test or `__main__`-style check |
 
 **Verify:** connect to a real WebDAV server (Nextcloud demo or local
 `rclone serve webdav`), roundtrip a blob. Credentials persist across restart.
@@ -227,10 +236,10 @@ Phases are ordered by dependency. Each is independently shippable.
 
 | # | Task | Location |
 |---|---|---|
-| S1.1 | `RemoteManifest` model + JSON (de)serialize | `lib/models/remote_manifest.dart` |
-| S1.2 | Build manifest from `VaultStore` index; encrypt with master key; decrypt on read | `SyncService.buildManifest` / `readManifest` |
-| S1.3 | Content-address blob naming (sha256 of ciphertext, sharded `ab/cd/`) | `SyncService.blobNameFor` |
-| S1.4 | Push/pull manifest only (no blobs yet) — proves the crypto + transport glue | extends S0 |
+| [x] S1.1 | `RemoteManifest` model + JSON (de)serialize | `lib/models/remote_manifest.dart` |
+| [~] S1.2 | Build manifest from `VaultStore` index; encrypt with master key; decrypt on read — `buildManifest` + `encryptManifest`/`decryptManifest` done (pure, tested); VaultStore index wiring pending | `SyncService.buildManifest` / `readManifest` |
+| [x] S1.3 | Content-address blob naming (sha256 of ciphertext, sharded `ab/cd/`) | `SyncService.blobNameFor` |
+| [ ] S1.4 | Push/pull manifest only (no blobs yet) — proves the crypto + transport glue | extends S0 |
 
 **Verify:** upload encrypted manifest, wipe local, pull manifest back,
 decrypt, assert it equals the original index. Plaintext never leaves device
@@ -240,12 +249,12 @@ decrypt, assert it equals the original index. Plaintext never leaves device
 
 | # | Task | Location |
 |---|---|---|
-| S2.1 | `reconcile()` diff engine (local vs remote manifest) → plan (push/pull/delete lists) | `SyncService.reconcile` |
-| S2.2 | Execute push plan: upload new/changed blobs, then commit manifest | `SyncService.runSync` |
-| S2.3 | `SyncProvider` (Riverpod Notifier): status enum, progress, `syncNow()` | `lib/providers/sync_provider.dart` |
-| S2.4 | `connectivity_plus` guard: respect wifiOnly / connected; resubscribe like `update_service.dart:74` | `SyncService` / provider |
-| S2.5 | UI: status chip + "Sync now" in settings; progress reporting | sync settings screen + a drawer entry |
-| S2.6 | One behavioral test: seed vault, sync, assert every local file has a remote blob + manifest lists it | `test/sync_service_test.dart` |
+| [x] S2.1 | `reconcile()` diff engine (local vs remote manifest) → plan (push/pull/delete lists) — covers tombstone deletion and two-way pull cases | `SyncService.reconcile` |
+| [ ] S2.2 | Execute push plan: upload new/changed blobs, then commit manifest | `SyncService.runSync` |
+| [ ] S2.3 | `SyncProvider` (Riverpod Notifier): status enum, progress, `syncNow()` | `lib/providers/sync_provider.dart` |
+| [ ] S2.4 | `connectivity_plus` guard: respect wifiOnly / connected; resubscribe like `update_service.dart:74` | `SyncService` / provider |
+| [ ] S2.5 | UI: status chip + "Sync now" in settings; progress reporting | sync settings screen + a drawer entry |
+| [~] S2.6 | One behavioral test: seed vault, sync, assert every local file has a remote blob + manifest lists it — reconcile/crypto tests in place; seed-vault behavioral test pending | `test/sync_service_test.dart` |
 
 **Verify:** fill vault, push to server, inspect server (all opaque `.enc`),
 wipe app data, reinstall → pull restores the vault intact (decrypt +
@@ -274,33 +283,34 @@ if the feature gets used.
 ## New files
 
 ```
-lib/models/sync_profile.dart            sync profile (creds live in secure storage)
-lib/models/remote_manifest.dart         encrypted manifest schema
-lib/services/remote/remote_store.dart   transport interface
-lib/services/remote/webdav_store.dart   WebDAV impl
-lib/services/sync_profile_service.dart  secure-storage CRUD for profiles
-lib/services/sync_service.dart          reconcile + runSync
-lib/providers/sync_provider.dart        Riverpod status Notifier
-lib/screens/sync_settings_screen.dart   connection + sync UI
-test/sync_service_test.dart             behavioral net (one happy path per phase)
+lib/models/sync_profile.dart            sync profile (creds live in secure storage)           [x]
+lib/models/remote_manifest.dart         encrypted manifest schema                             [x]
+lib/services/remote/remote_store.dart   transport interface                                   [x]
+lib/services/remote/webdav_store.dart   WebDAV impl                                           [x]
+lib/services/sync_profile_service.dart  secure-storage CRUD for profiles                      [x]
+lib/services/sync_service.dart          reconcile + runSync (pure logic done, runSync pending)[~]
+lib/providers/sync_provider.dart        Riverpod status Notifier                             [ ]
+lib/screens/sync_settings_screen.dart   connection + sync UI                                 [ ]
+test/sync_service_test.dart             behavioral net (reconcile + manifest crypto now)      [x]
+test/webdav_store_test.dart             transport path-logic self-check (S0.5, partial)       [x]
 ```
 
 ## Files changed
 
 ```
-pubspec.yaml                              + webdav_client
-lib/models/vault_settings.dart            + syncEnabled, syncProfileId
-lib/models/vaulted_file.dart              + modifiedAt, remoteHash, syncedDeleted
-lib/services/vault_store.dart             manifest build/read helpers, blob hashing
-lib/providers/vault_providers.dart        wire SyncProvider after Phase 4 lands
-main.dart / drawer                        entry point to sync settings
+pubspec.yaml                              + webdav_client (1.2.2)              [x]
+lib/models/vault_settings.dart            + syncEnabled, syncProfileId         [x]
+lib/models/vaulted_file.dart              + modifiedAt, remoteHash, syncedDeleted [x]
+lib/services/vault_store.dart             manifest build/read helpers, blob hashing [ ]
+lib/providers/vault_providers.dart        wire SyncProvider after Phase 4 lands [ ]
+main.dart / drawer                        entry point to sync settings          [ ]
 ```
 
 ---
 
 ## Dependencies
 
-- **Add:** `webdav_client` (one package).
+- **Add:** `webdav_client` (one package) — **done**, v1.2.2.
 - **Reuse:** `connectivity_plus` (already present), `flutter_secure_storage`
   (already present), existing `lib/crypto/` (no new crypto code).
 
