@@ -65,6 +65,7 @@ dependencies:
   in_app_update: ^4.2.5
   connectivity_plus: ^6.0.0
   flutter_markdown: ^0.7.7+1
+  webdav_client: ^1.2.2
 
 dev_dependencies:
   flutter_lints: ^6.0.0

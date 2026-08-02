@@ -26,7 +26,10 @@ class SyncProfile {
   final DateTime? lastSyncedAt;
 
   /// Secure-storage key for this profile's password.
-  String get passwordStorageKey => 'sync_profile_pw_$id';
+  String get passwordStorageKey => passwordStorageKeyFor(id);
+
+  /// Secure-storage key for a profile's password by profile id.
+  static String passwordStorageKeyFor(String id) => 'sync_profile_pw_$id';
 
   const SyncProfile({
     required this.id,

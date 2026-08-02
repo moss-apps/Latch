@@ -8,6 +8,7 @@ import '../crypto/aes_gcm_cipher.dart';
 import '../crypto/key_derivation.dart';
 import '../models/remote_manifest.dart';
 import '../models/vaulted_file.dart';
+import 'remote/remote_store.dart';
 
 /// The result of diffing local vault state against a remote manifest.
 class SyncPlan {
@@ -39,7 +40,7 @@ class SyncService {
   SyncService._();
 
   /// Encrypted manifest blob name on the remote store.
-  static const String manifestName = 'manifest.enc';
+  static const String manifestName = RemoteStore.manifestName;
 
   /// sha256 of [data] as a lowercase hex string.
   static String sha256Hex(Uint8List data) => sha256.convert(data).toString();

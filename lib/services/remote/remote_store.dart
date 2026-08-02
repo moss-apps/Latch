@@ -8,6 +8,9 @@ import 'dart:typed_data';
 /// Phase S0.2 impl along with its dependency. Until then this pins the contract
 /// the pure SyncService logic and tests build against.
 abstract class RemoteStore {
+  /// Encrypted manifest blob name on the remote store.
+  static const String manifestName = 'manifest.enc';
+
   /// Auth + reachability probe (Phase S0.5 self-check).
   Future<void> testConnection();
 
