@@ -23,6 +23,7 @@ import 'encryption_settings_screen.dart';
 import 'local_backup_screen.dart';
 import 'performance_settings_screen.dart';
 import 'privacy_policy_screen.dart';
+import 'sync_settings_screen.dart';
 
 class VaultSettingsScreen extends ConsumerStatefulWidget {
   const VaultSettingsScreen({super.key});
@@ -329,6 +330,31 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (context) => const LocalBackupScreen(),
+                    ),
+                  );
+                },
+                contentPadding: EdgeInsets.zero,
+              ),
+              ListTile(
+                leading: Icon(Icons.cloud_sync_outlined,
+                    color: context.accentColor),
+                title: const Text(
+                  'Server Sync',
+                  style: TextStyle(fontFamily: 'ProductSans'),
+                ),
+                subtitle: Text(
+                  'Encrypted backup to a WebDAV server (NAS/cloud)',
+                  style: TextStyle(
+                    fontFamily: 'ProductSans',
+                    fontSize: 12,
+                    color: context.textTertiary,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SyncSettingsScreen(),
                     ),
                   );
                 },
