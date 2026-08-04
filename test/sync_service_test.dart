@@ -1,9 +1,11 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:locker/models/remote_manifest.dart';
 import 'package:locker/models/sync_profile.dart';
 import 'package:locker/models/vaulted_file.dart';
+import 'package:locker/services/remote/remote_store.dart';
 import 'package:locker/services/sync_service.dart';
 import 'package:pointycastle/export.dart';
 
@@ -262,4 +264,174 @@ void main() {
       expect(rt.entries.single.deleted, isFalse);
     });
   });
+
+  group('runSync', () {
+    test('push-only: every local file gets a remote blob + manifest lists it, '
+        'and re-running is idempotent', () async {
+      final dir = await Directory.systemTemp.createTemp('locker_sync_');
+      final payloads = [
+        Uint8List.fromList([1, 2, 3, 4]),
+        Uint8List.fromList([5, 6, 7, 8, 9]),
+      ];
+      final paths = <String>[];
+      for (var i = 0; i < payloads.length; i++) {
+        final f = File('${dir.path}/blob$i.enc');
+        await f.writeAsBytes(payloads[i]);
+        paths.add(f.path);
+      }
+
+      final local = [
+        VaultedFile(
+          id: 'a',
+          originalName: 'a.jpg',
+          vaultPath: paths[0],
+          type: VaultedFileType.image,
+          mimeType: 'image/jpeg',
+          fileSize: 4,
+          dateAdded: DateTime(2024, 1, 1),
+          modifiedAt: DateTime(2024, 1, 1),
+        ),
+        VaultedFile(
+          id: 'b',
+          originalName: 'b.mp4',
+          vaultPath: paths[1],
+          type: VaultedFileType.video,
+          mimeType: 'video/mp4',
+          fileSize: 5,
+          dateAdded: DateTime(2024, 1, 2),
+          modifiedAt: DateTime(2024, 1, 2),
+        ),
+      ];
+      final masterKey = Uint8List.fromList(List<int>.generate(32, (i) => i));
+      final remote = _MemStore();
+
+      final result = await SyncService.runSync(
+        local: local,
+        masterKey: masterKey,
+        remote: remote,
+        deviceId: 'dev1',
+        now: DateTime.utc(2024, 6, 1),
+      );
+
+      expect(result.blobsPushed, 2);
+      expect(result.blobsDeleted, 0);
+      expect(result.blobsPulled, 0);
+
+      final listed = await remote.listBlobs();
+      expect(listed.length, 2);
+
+      final manifest = SyncService.decryptManifest(
+        (await remote.getManifest())!,
+        masterKey,
+      );
+      expect(manifest.deviceId, 'dev1');
+      expect(manifest.entries.map((e) => e.id).toSet(), {'a', 'b'});
+      expect(manifest.entries.every((e) => e.contentHash != null), isTrue);
+
+      // Each manifest entry resolves to a real, matching blob.
+      for (final entry in manifest.entries) {
+        final blob =
+            await remote.getBlob(SyncService.blobNameFor(entry.contentHash!));
+        expect(blob, isNotNull);
+        expect(SyncService.sha256Hex(blob!), entry.contentHash);
+      }
+
+      // Refreshed local carries the new remoteHashes.
+      expect(
+        result.refreshedLocal.every((f) => f.remoteHash != null),
+        isTrue,
+      );
+
+      // Re-running with the refreshed index pushes nothing (in-sync).
+      final result2 = await SyncService.runSync(
+        local: result.refreshedLocal,
+        masterKey: masterKey,
+        remote: remote,
+        deviceId: 'dev1',
+        now: DateTime.utc(2024, 6, 2),
+      );
+      expect(result2.blobsPushed, 0);
+      expect((await remote.listBlobs()).length, 2);
+
+      await dir.delete(recursive: true);
+    });
+
+    test('tombstone: reaps the remote blob and records a deleted entry',
+        () async {
+      final dir = await Directory.systemTemp.createTemp('locker_sync_tomb_');
+      final f = File('${dir.path}/blob.enc');
+      await f.writeAsBytes(Uint8List.fromList([10, 20, 30]));
+      final masterKey = Uint8List(32);
+
+      // First sync: push one live file.
+      final remote = _MemStore();
+      final live = VaultedFile(
+        id: 'a',
+        originalName: 'a',
+        vaultPath: f.path,
+        type: VaultedFileType.image,
+        mimeType: 'image/jpeg',
+        fileSize: 3,
+        dateAdded: DateTime(2024, 1, 1),
+        modifiedAt: DateTime(2024, 1, 1),
+      );
+      final r1 = await SyncService.runSync(
+        local: [live],
+        masterKey: masterKey,
+        remote: remote,
+        deviceId: 'dev1',
+        now: DateTime.utc(2024, 6, 1),
+      );
+      expect((await remote.listBlobs()).length, 1);
+
+      // Second sync: the file is now a tombstone locally.
+      final tombstoned = r1.refreshedLocal.first
+          .copyWith(syncedDeleted: true, modifiedAt: DateTime(2024, 6, 2));
+      final r2 = await SyncService.runSync(
+        local: [tombstoned],
+        masterKey: masterKey,
+        remote: remote,
+        deviceId: 'dev1',
+        now: DateTime.utc(2024, 6, 3),
+      );
+      expect(r2.blobsDeleted, 1);
+      expect((await remote.listBlobs()).length, 0);
+
+      final manifest = SyncService.decryptManifest(
+        (await remote.getManifest())!,
+        masterKey,
+      );
+      expect(manifest.entries.single.deleted, isTrue);
+
+      await dir.delete(recursive: true);
+    });
+  });
+}
+
+/// In-memory RemoteStore for runSync tests — no network.
+class _MemStore implements RemoteStore {
+  final Map<String, Uint8List> _blobs = {};
+  Uint8List? _manifest;
+
+  @override
+  Future<void> testConnection() async {}
+
+  @override
+  Future<Uint8List?> getManifest() async => _manifest;
+
+  @override
+  Future<void> putManifest(Uint8List bytes) async => _manifest = bytes;
+
+  @override
+  Future<void> putBlob(String name, Uint8List bytes) async =>
+      _blobs[name] = bytes;
+
+  @override
+  Future<Uint8List?> getBlob(String name) async => _blobs[name];
+
+  @override
+  Future<void> deleteBlob(String name) async => _blobs.remove(name);
+
+  @override
+  Future<List<String>> listBlobs() async => _blobs.keys.toList();
 }
