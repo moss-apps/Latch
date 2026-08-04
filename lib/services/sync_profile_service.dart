@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:uuid/uuid.dart';
 
 import '../models/sync_profile.dart';
 
@@ -16,6 +17,7 @@ class SyncProfileService {
   final FlutterSecureStorage _storage;
 
   static const String profilesKey = 'sync_profiles';
+  static const String deviceIdKey = 'sync_device_id';
 
   Future<List<SyncProfile>> listProfiles() async {
     final raw = await _storage.read(key: profilesKey);
@@ -66,4 +68,15 @@ class SyncProfileService {
 
   Future<void> deletePassword(String id) =>
       _storage.delete(key: SyncProfile.passwordStorageKeyFor(id));
+
+  /// Stable per-device id, generated once + cached in secure storage. Used as
+  /// the manifest author so reconcile can tell devices apart later.
+  Future<String> getDeviceId() async {
+    var id = await _storage.read(key: deviceIdKey);
+    if (id == null || id.isEmpty) {
+      id = const Uuid().v4();
+      await _storage.write(key: deviceIdKey, value: id);
+    }
+    return id;
+  }
 }
