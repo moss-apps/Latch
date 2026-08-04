@@ -40,6 +40,10 @@ class VaultService {
   late final VaultStore _store = VaultStore();
   late final EncryptionService _encryptionService = EncryptionService.instance;
 
+  /// The shared vault state holder. Exposed so Riverpod-constructed services
+  /// (e.g. SyncService) can share the same caches without a new singleton.
+  VaultStore get store => _store;
+
   // ponytail: File↔Thumbnail form a construction cycle (each calls the other
   // at runtime, never at construction). Break it with a late non-final
   // back-reference on ThumbnailService that's wired after both exist.
