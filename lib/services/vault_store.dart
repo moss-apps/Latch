@@ -114,8 +114,10 @@ class VaultStore {
     }
   }
 
-  /// Get subdirectory path for file type.
-  String getSubdirectory(VaultedFileType type) {
+  /// Subdirectory name for a file type. Static so the sync pull path (which
+  /// computes a destination before a VaultedFile exists) can reuse it without
+  /// an instance — `getSubdirectory` delegates here.
+  static String subdirFor(VaultedFileType type) {
     switch (type) {
       case VaultedFileType.image:
         return 'images';
@@ -128,6 +130,9 @@ class VaultStore {
         return 'documents';
     }
   }
+
+  /// Get subdirectory path for file type.
+  String getSubdirectory(VaultedFileType type) => subdirFor(type);
 
   // ---- Load / save primitive indexes ----
 

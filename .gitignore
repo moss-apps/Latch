@@ -47,3 +47,4 @@ android/app/google-services.json
 
 # graphify knowledge graph (regenerated locally)
 graphify-out/
+docs/local_server_testing.md
