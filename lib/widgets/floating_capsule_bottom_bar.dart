@@ -283,11 +283,7 @@ class FloatingCapsuleBottomBar extends StatelessWidget {
             width: size,
             height: size,
             decoration: ShapeDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [accent, accent.withValues(alpha: 0.82)],
-              ),
+              color: accent,
               shadows: [
                 BoxShadow(
                   color: accent.withValues(alpha: 0.45),

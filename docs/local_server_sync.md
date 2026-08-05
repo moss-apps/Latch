@@ -7,12 +7,18 @@ The vault is device-local, with a manual *decrypted* ZIP backup
 user-chosen server (NAS, home server, or self-hosted cloud), push and pull.
 The server never sees plaintext: it is dumb encrypted blob storage.
 
-Status: **In progress**. S0 (transport + credentials), S1 (manifest
-crypto), S2 (push-only backup: reconcile, `runSync`, provider,
-connectivity guard, UI), and S3 (two-way pull/restore: manifest v2, pull
-path, conflict flagging, tombstone propagation) are implemented and
-unit-tested (100 tests pass). Pending: S0.5 live-server roundtrip and
-S3.4 two-device roundtrip (both manual — need real WebDAV infra).
+Status: **Complete (S0–S3)**. S0 (transport + credentials), S1 (manifest
+crypto), S2 (push-only backup: reconcile, `runSync`, provider, connectivity
+guard, UI), and S3 (two-way pull/restore: manifest v2, pull path, conflict
+flagging, tombstone propagation) are implemented and unit-tested. S0.5
+(live-server roundtrip) and S3.4 (two-device two-way roundtrip) are covered
+by the env-gated `test/live_webdav_test.dart` (run against a real server via
+`LOCKER_LIVE_WEBDAV_URL`; skipped otherwise). 102 tests pass in the default
+hermetic `flutter test` run; the gated live suite adds 3 (S0.5 + S3.4)
+against a real server. S0.5 surfaced and fixed a real bug: spec-strict servers
+(rclone, plain mod_dav) return **409 Conflict** on a nested PUT whose parent
+collection doesn't exist — `WebDAVStore` now `MKCOL`s parents idempotently
+before every write (`_ensureParent`); Nextcloud masked the need.
 
 ## Goals
 
@@ -165,11 +171,12 @@ Direction is a setting: **push-only** (backup, recommended default) or
 | S0.2 | `RemoteStore` interface + WebDAV impl: `ping`, `getManifest`, `putManifest`, `getBlob`, `putBlob`, `deleteBlob`, `listBlobs` | `lib/services/remote/` | Done |
 | S0.3 | `SyncProfile` model + secure-storage CRUD | `lib/models/sync_profile.dart`, `lib/services/sync_profile_service.dart` | Done |
 | S0.4 | Connection settings UI: URL/user/password, "Test connection", TLS warning for plain HTTP | `lib/screens/sync_settings_screen.dart` | Done |
-| S0.5 | Live-server roundtrip: connect to a real WebDAV URL, put/get a tiny blob, assert roundtrip | test / self-check | Pending (path-logic unit tests in `test/webdav_store_test.dart` pass) |
+| S0.5 | Live-server roundtrip: connect to a real WebDAV URL, put/get a tiny blob, assert roundtrip | `test/live_webdav_test.dart` (env-gated) | Done — also surfaced+fixed the nested-PUT 409 bug |
 
 **Verify:** connect to a real WebDAV server (Nextcloud demo or
 `rclone serve webdav`), roundtrip a blob; credentials persist across
-restart.
+restart. — Covered by `test/live_webdav_test.dart` (env-gated; see
+"Running the live tests" below).
 
 ### S1 — Encrypted manifest (1–2 days)
 
@@ -206,12 +213,14 @@ auth-tag verify per file).
 | S3.1 | Pull path: download missing/changed blobs, verify GCM auth tag, import into `VaultStore` | `SyncService` pull branch | Done |
 | S3.2 | Last-write-wins resolution + conflict UI note when both sides changed | `reconcile` | Done |
 | S3.3 | Tombstone propagation (delete on one device → delete on other, with confirmation) | `reconcile` + UI | Done |
-| S3.4 | Two-device roundtrip test | manual + scripted | Pending |
+| S3.4 | Two-device roundtrip test | `test/live_webdav_test.dart` (env-gated, two-way) | Done |
 
 **Verify:** device A adds files → sync → device B pulls them; device B
 edits → sync → device A sees the edit; delete on A propagates to B.
-(Covered by simulated two-device tests in `test/sync_service_test.dart`
-using an in-memory `RemoteStore`; the live two-device run is S3.4.)
+Covered by simulated two-device tests in `test/sync_service_test.dart`
+(in-memory `RemoteStore`) **and** the live two-device run in
+`test/live_webdav_test.dart` (env-gated, real server). The live suite
+also asserts pull rejects a tampered blob (sha256 mismatch → `StateError`).
 
 **S3 ceilings (deliberate simplifications):**
 
@@ -231,12 +240,45 @@ using an in-memory `RemoteStore`; the live two-device run is S3.4.)
 - **Albums/folders** collection definitions are not synced (S4); file-
   level `albumIds`/`folderId` are carried, and the UI already tolerates
   dangling references.
+- **Orphan blob GC** is deferred. When a file's content changes, the new
+  blob is uploaded and the manifest points at it, but the *old* blob is
+  left on the server (the manifest no longer references it, so nothing
+  reaps it). `runSync` never calls `listBlobs`; there is no GC pass yet.
+  Add one (reconcile server blobs vs manifest hashes) only if storage
+  growth from superseded blobs becomes a real complaint.
 
 ### S4 — Polish / scheduling (optional, deferred)
 
 Background sync via WorkManager, conflict-resolution UX, per-album sync
 filters, restore-from-server onboarding. Ship S3 first; build S4 only if
 the feature gets used.
+
+## Running the live tests
+
+`test/live_webdav_test.dart` covers S0.5 (raw transport: ping, manifest,
+nested sharded blob roundtrip, delete, list) and S3.4 (full two-device
+two-way `runSync` against the real server, plus tampered-blob rejection).
+It is **skipped by default** — it only runs when `LOCKER_LIVE_WEBDAV_URL`
+is set, so the normal `flutter test` suite stays hermetic.
+
+To set up a local server (rclone, on all interfaces for physical-device
+testing) and the full expected-output reference, see
+[`docs/local_server_testing.md`](local_server_testing.md). Quick run against
+its canonical `:8080` server:
+
+```sh
+LOCKER_LIVE_WEBDAV_URL=http://127.0.0.1:8080 \
+LOCKER_LIVE_WEBDAV_USER=locker \
+LOCKER_LIVE_WEBDAV_PASS=locker \
+flutter test test/live_webdav_test.dart
+```
+
+Each run uses a unique `basePath` (`/locker-live-<micros>`) for isolation
+and best-effort deletes its blobs after. The `Not Found` debug lines during
+the run are expected (absent-blob → null, and the first-sync "no remote
+manifest yet" path). A plain `flutter test` (no env) reports the suite
+skipped. Expected green run + full per-test breakdown live in
+`local_server_testing.md` → *Automated two-way verification (S3.4)*.
 
 ## Files
 
@@ -246,14 +288,16 @@ New:
 lib/models/sync_profile.dart            sync profile (creds in secure storage)    [done]
 lib/models/remote_manifest.dart         encrypted manifest schema                 [done]
 lib/services/remote/remote_store.dart   transport interface                       [done]
-lib/services/remote/webdav_store.dart   WebDAV impl                               [done]
+lib/services/remote/webdav_store.dart   WebDAV impl (MKCOLs parent dirs on write) [done]
 lib/services/sync_profile_service.dart  secure-storage CRUD for profiles          [done]
-lib/services/sync_service.dart          reconcile + runSync (push-only done; pull = S3) [done]
+lib/services/sync_service.dart          reconcile + runSync (push + two-way pull) [done]
 lib/providers/sync_provider.dart        Riverpod status Notifier                  [done]
 lib/screens/sync_settings_screen.dart   connection + sync UI                      [done]
-test/sync_service_test.dart             behavioral net (reconcile + manifest crypto) [done]
-test/webdav_store_test.dart             transport path-logic self-check (S0.5 partial) [done]
+test/sync_service_test.dart             behavioral net (reconcile + manifest crypto, 29 tests) [done]
+test/webdav_store_test.dart             transport path-logic self-check           [done]
+test/live_webdav_test.dart              env-gated live roundtrip: S0.5 + S3.4     [done]
 ```
+
 
 Changed:
 
@@ -277,15 +321,18 @@ lib/screens/vault_settings_screen.dart    + "Server Sync" entry in Storage secti
 Per the refactor roadmap's test rules: no per-method suites, one happy-path
 test per phase, one failure path for anything security-touching. Each
 phase leaves one runnable check (assert-based self-check or a `test_*.dart`)
-that fails if the phase's logic breaks. Manual two-device roundtrip is the
-acceptance test for S3.
+that fails if the phase's logic breaks. The two-device roundtrip acceptance
+test for S3 is `test/live_webdav_test.dart` (env-gated, see above) —
+previously a manual step, now scripted; a human spot-check against the real
+target NAS is still the final sign-off.
 
 ## Open decisions
 
 1. **Protocol scope:** WebDAV only for v1, or SFTP too? WebDAV covers
    ~all NAS/cloud cases; SFTP roughly doubles the transport work.
-2. **Staging:** push-only (S2) before two-way (S3), or two-way as the
-   first deliverable?
+2. ~~**Staging:** push-only (S2) before two-way (S3), or two-way as the
+   first deliverable?~~ **Resolved:** push-only shipped first, two-way
+   (S3) layered on top — both now live.
 3. **Decoy vault sync:** excluded in v1; confirm the decoy stays
    device-local.
 4. **Public WebDAV providers** (e.g. paid WebDAV hosts) allowed, or
@@ -294,3 +341,6 @@ acceptance test for S3.
 5. **Timing vs. refactor Phase 4:** sync lands Riverpod-native after
    Phase 4. If needed sooner it ships as a singleton and is migrated in
    Phase 4 — slightly more churn.
+6. **Orphan blob GC** (new): superseded content blobs linger on the
+   server; add a manifest-vs-`listBlobs` reap pass if storage growth
+   becomes a complaint (see S3 ceilings).
