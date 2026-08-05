@@ -8,9 +8,11 @@ user-chosen server (NAS, home server, or self-hosted cloud), push and pull.
 The server never sees plaintext: it is dumb encrypted blob storage.
 
 Status: **In progress**. S0 (transport + credentials), S1 (manifest
-crypto), and S2 (push-only backup: reconcile, `runSync`, provider,
-connectivity guard, UI) are implemented and unit-tested (92 tests pass).
-Pending: S0.5 live-server roundtrip, S3 (two-way pull/restore).
+crypto), S2 (push-only backup: reconcile, `runSync`, provider,
+connectivity guard, UI), and S3 (two-way pull/restore: manifest v2, pull
+path, conflict flagging, tombstone propagation) are implemented and
+unit-tested (100 tests pass). Pending: S0.5 live-server roundtrip and
+S3.4 two-device roundtrip (both manual — need real WebDAV infra).
 
 ## Goals
 
@@ -148,8 +150,10 @@ Direction is a setting: **push-only** (backup, recommended default) or
   `SyncService(VaultStore, EncryptionService)` via `syncServiceProvider`
   (no singleton). Pure diff/manifest logic is static; `runSync` is static
   and param-driven (testable with a fake `RemoteStore`); `syncNow` is the
-  thin instance glue. Two-way restore is deferred to S3, so the manifest
-  schema stays lean; full-metadata restore needs a version bump then.
+  thin instance glue. S3 bumped the manifest to **v2**: `ManifestEntry`
+  now carries the full per-file metadata (name, type, mime, size, dates,
+  encryption fields, tags, favorite, album/folder ids) so a fresh device
+  can restore files. v1 manifests still deserialize (missing keys default).
 
 ## Phased plan
 
@@ -199,13 +203,34 @@ auth-tag verify per file).
 
 | # | Task | Location | Status |
 |---|---|---|---|
-| S3.1 | Pull path: download missing/changed blobs, verify GCM auth tag, import into `VaultStore` | `SyncService` pull branch | Pending |
-| S3.2 | Last-write-wins resolution + conflict UI note when both sides changed | `reconcile` | Pending |
-| S3.3 | Tombstone propagation (delete on one device → delete on other, with confirmation) | `reconcile` + UI | Pending |
+| S3.1 | Pull path: download missing/changed blobs, verify GCM auth tag, import into `VaultStore` | `SyncService` pull branch | Done |
+| S3.2 | Last-write-wins resolution + conflict UI note when both sides changed | `reconcile` | Done |
+| S3.3 | Tombstone propagation (delete on one device → delete on other, with confirmation) | `reconcile` + UI | Done |
 | S3.4 | Two-device roundtrip test | manual + scripted | Pending |
 
 **Verify:** device A adds files → sync → device B pulls them; device B
 edits → sync → device A sees the edit; delete on A propagates to B.
+(Covered by simulated two-device tests in `test/sync_service_test.dart`
+using an in-memory `RemoteStore`; the live two-device run is S3.4.)
+
+**S3 ceilings (deliberate simplifications):**
+
+- **Pull integrity** is satisfied transitively: the manifest is
+  GCM-authenticated (root of trust) and each pulled blob's sha256 must
+  equal the manifest's `contentHash`. A tampered/swapped blob breaks the
+  hash. A full decrypt-to-verify-the-tag is redundant (pushed files are
+  always decryptable); add it only if a non-vault blob could enter the
+  store.
+- **Conflict detection** flags only the local-newer-and-remote-diverged
+  case. The remote-newer direction can't be detected without hashing
+  local content, so a stale local edit overwritten by a pull is silent.
+  LWW still resolves both; three-way merge is an explicit non-goal.
+- **Tombstones** propagate automatically under LWW (no blocking
+  confirmation dialog); the reaped/deleted count is surfaced in the sync
+  summary. A pre-delete confirmation prompt is S4 polish.
+- **Albums/folders** collection definitions are not synced (S4); file-
+  level `albumIds`/`folderId` are carried, and the UI already tolerates
+  dangling references.
 
 ### S4 — Polish / scheduling (optional, deferred)
 
