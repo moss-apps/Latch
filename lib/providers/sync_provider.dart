@@ -16,12 +16,20 @@ class SyncState {
   final DateTime? lastSync;
   final String? error;
   final SyncProgress? progress;
+  /// Human summary of the last completed run (e.g. "2 pushed · 1 pulled"),
+  /// including a conflict count if both sides changed. Cleared on the next run.
+  final String? message;
+
+  /// Wall-clock time the last successful run took.
+  final Duration? duration;
 
   const SyncState({
     this.status = SyncStatus.idle,
     this.lastSync,
     this.error,
     this.progress,
+    this.message,
+    this.duration,
   });
 
   bool get isSyncing => status == SyncStatus.syncing;
@@ -31,12 +39,16 @@ class SyncState {
     DateTime? lastSync,
     String? error,
     SyncProgress? progress,
+    String? message,
+    Duration? duration,
   }) =>
       SyncState(
         status: status ?? this.status,
         lastSync: lastSync ?? this.lastSync,
         error: error,
         progress: progress ?? this.progress,
+        message: message ?? this.message,
+        duration: duration ?? this.duration,
       );
 }
 
@@ -96,15 +108,13 @@ class SyncNotifier extends Notifier<SyncState> {
 
     try {
       final service = ref.read(syncServiceProvider);
+      final sw = Stopwatch()..start();
       final result = await service.syncNow(
         profile: profile,
         password: password,
         deviceId: deviceId,
-        onProgress: (p) => state = state.copyWith(
-          status: SyncStatus.syncing,
-          progress: p,
-        ),
       );
+      sw.stop();
 
       // Persist refreshed remoteHash/modifiedAt so the next run dedups.
       final vault = ref.read(vaultServiceProvider);
@@ -116,6 +126,8 @@ class SyncNotifier extends Notifier<SyncState> {
       state = SyncState(
         status: SyncStatus.success,
         lastSync: result.completedAt,
+        message: _summarize(result),
+        duration: sw.elapsed,
       );
     } catch (e) {
       state = SyncState(status: SyncStatus.error, error: e.toString());
@@ -124,6 +136,21 @@ class SyncNotifier extends Notifier<SyncState> {
 
   void clearError() {
     state = const SyncState();
+  }
+
+  /// One-line summary of a completed run for the status card. Conflicts are
+  /// surfaced here (S3.2) since LWW still resolves them silently.
+  static String _summarize(SyncResult r) {
+    final parts = <String>[];
+    if (r.blobsPushed > 0) parts.add('${r.blobsPushed} pushed');
+    if (r.blobsPulled > 0) parts.add('${r.blobsPulled} pulled');
+    if (r.blobsDeleted > 0) parts.add('${r.blobsDeleted} reaped');
+    if (r.blobsSkipped > 0) parts.add('${r.blobsSkipped} skipped');
+    if (r.plan.conflicts.isNotEmpty) {
+      parts.add('${r.plan.conflicts.length} conflict'
+          '${r.plan.conflicts.length == 1 ? '' : 's'}');
+    }
+    return parts.isEmpty ? 'Up to date' : parts.join(' · ');
   }
 }
 
