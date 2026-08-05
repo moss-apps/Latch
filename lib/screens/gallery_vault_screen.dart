@@ -21,6 +21,7 @@ import '../themes/app_colors.dart';
 import '../utils/toast_utils.dart';
 import '../utils/responsive_utils.dart';
 import '../widgets/encrypted_thumbnail.dart';
+import '../widgets/floating_capsule_bottom_bar.dart';
 import '../widgets/file_info_sheet.dart';
 import '../widgets/office_conversion_confirm_dialog.dart';
 import '../widgets/per_file_encryption_sheet.dart';
@@ -86,6 +87,7 @@ class GalleryVaultScreen extends ConsumerStatefulWidget {
 class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
   VaultCategory _selectedCategory = VaultCategory.all;
   List<VaultCategory> _enabledCategories = VaultCategory.values;
+  FeatureSide _importSide = FeatureSide.right;
   late final PageController _pageController;
   final FileImportService _importService = FileImportService.instance;
   final Map<String, GlobalKey> _selectionTileKeys = {};
@@ -159,6 +161,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      extendBody: true,
       appBar: _buildAppBar(isSelectionMode, selectedFiles),
       body: Column(
         children: [
@@ -412,112 +415,44 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
   }
 
   Widget _buildBottomBar(bool isSelectionMode) {
-    return Container(
-      decoration: BoxDecoration(
-        color: context.backgroundColor,
-        border: Border(
-          top: BorderSide(color: context.dividerColor, width: 1),
-        ),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.only(top: 10),
-          child: SizedBox(
-            height: 64,
-            child: Row(
-              children: [
-                if (!isSelectionMode) _buildImportBarItem(),
-                ..._enabledCategories.map(_buildCategoryItem),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+    final tabs = _enabledCategories
+        .map((c) => NavTab(
+              icon: c.icon,
+              label: c.label,
+              selected: c == _selectedCategory,
+              onTap: () {
+                final index = _enabledCategories.indexOf(c);
+                _pageController.animateToPage(
+                  index,
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                );
+              },
+            ))
+        .toList();
 
-  Widget _buildImportBarItem() {
-    return Expanded(
-      child: Tooltip(
-        message: 'Import files',
-        child: InkWell(
-          onTap: _showImportDialog,
-          customBorder: const CircleBorder(),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [
-                      context.accentColor,
-                      context.accentColor.withValues(alpha: 0.8),
-                    ],
-                  ),
-                ),
-                child: const Icon(Icons.add, color: Colors.white, size: 22),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'Import',
-                style: TextStyle(
-                  fontFamily: 'ProductSans',
-                  fontSize: 11,
-                  color: context.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
+    return FloatingCapsuleBottomBar(
+      tabs: tabs,
+      feature: NavTab(
+        icon: Icons.add,
+        label: 'Import',
+        selected: false,
+        onTap: _showImportDialog,
       ),
-    );
-  }
-
-  Widget _buildCategoryItem(VaultCategory category) {
-    final selected = category == _selectedCategory;
-    final color = selected ? context.accentColor : AppColors.lightTextTertiary;
-    return Expanded(
-      child: Tooltip(
-        message: category.label,
-        child: InkWell(
-          onTap: () {
-            final index = _enabledCategories.indexOf(category);
-            _pageController.animateToPage(
-              index,
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
-            );
-          },
-          customBorder: const CircleBorder(),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(category.icon, size: 24, color: color),
-              const SizedBox(height: 2),
-              Text(
-                category.label,
-                style: TextStyle(
-                  fontFamily: 'ProductSans',
-                  fontSize: 11,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-                  color: color,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      featureSide: _importSide,
+      showFeature: !isSelectionMode,
     );
   }
 
   static const _enabledCategoriesKey = 'gallery_bottom_bar_categories';
+  static const _importSideKey = 'gallery_bottom_bar_import_side';
 
   Future<void> _loadEnabledCategories() async {
     final prefs = await SharedPreferences.getInstance();
+    final sideRaw = prefs.getString(_importSideKey);
+    if (sideRaw == 'left' || sideRaw == 'right') {
+      _importSide = sideRaw == 'left' ? FeatureSide.left : FeatureSide.right;
+    }
     final raw = prefs.getStringList(_enabledCategoriesKey);
     if (raw == null || raw.isEmpty) return;
     final parsed = <VaultCategory>[];
@@ -549,6 +484,14 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
     await prefs.setStringList(
       _enabledCategoriesKey,
       _enabledCategories.map((c) => c.name).toList(),
+    );
+  }
+
+  Future<void> _persistImportSide() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _importSideKey,
+      _importSide == FeatureSide.left ? 'left' : 'right',
     );
   }
 
@@ -683,6 +626,32 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                       );
                     },
                   ),
+                ),
+                SwitchListTile(
+                  value: _importSide == FeatureSide.left,
+                  onChanged: (onLeft) {
+                    setState(() =>
+                        _importSide = onLeft ? FeatureSide.left : FeatureSide.right);
+                    _persistImportSide();
+                  },
+                  activeThumbColor: context.accentColor,
+                  secondary: Icon(
+                    Icons.add_circle_outline,
+                    color: context.accentColor,
+                  ),
+                  title: const Text(
+                    'Import button on left',
+                    style: TextStyle(fontFamily: 'ProductSans'),
+                  ),
+                  subtitle: Text(
+                    'Only applies when the bar has an even total (not centered)',
+                    style: TextStyle(
+                      fontFamily: 'ProductSans',
+                      fontSize: 12,
+                      color: context.textTertiary,
+                    ),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
