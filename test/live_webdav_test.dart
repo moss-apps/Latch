@@ -5,13 +5,13 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:locker/models/encryption_algorithm.dart';
+// import 'package:locker/models/encryption_algorithm.dart';
 import 'package:locker/models/sync_profile.dart';
 import 'package:locker/models/vaulted_file.dart';
-import 'package:locker/services/remote/remote_store.dart';
+// import 'package:locker/services/remote/remote_store.dart';
 import 'package:locker/services/remote/webdav_store.dart';
 import 'package:locker/services/sync_service.dart';
-import 'package:pointycastle/export.dart';
+// import 'package:pointycastle/export.dart';
 
 Map<String, String> get _env => Platform.environment;
 
@@ -25,8 +25,7 @@ WebDAVStore _store(String basePath) => WebDAVStore(
     );
 
 // Isolates each run from prior runs.
-String get _basePath =>
-    '/locker-live-${DateTime.now().microsecondsSinceEpoch}';
+String get _basePath => '/locker-live-${DateTime.now().microsecondsSinceEpoch}';
 
 Future<void> _cleanup(WebDAVStore store) async {
   // listBlobs gives absolute paths; deleteBlob wants names relative to basePath.
@@ -130,7 +129,9 @@ void main() {
       final blobA = [10, 20, 30, 40];
       final pathA = await _seedBlob(dirA, blobA, 'a.jpg');
       final rA = await SyncService.runSync(
-        local: [_file(id: 'a', vaultPath: pathA, modifiedAt: DateTime(2024, 1, 1))],
+        local: [
+          _file(id: 'a', vaultPath: pathA, modifiedAt: DateTime(2024, 1, 1))
+        ],
         masterKey: masterKey,
         remote: remote,
         deviceId: 'A',
@@ -162,7 +163,8 @@ void main() {
       expect(rB.blobsPulled, 1);
       final onB = rB.refreshedLocal.single;
       expect(onB.id, 'a');
-      expect(await File(onB.vaultPath).readAsBytes(), Uint8List.fromList(blobA));
+      expect(
+          await File(onB.vaultPath).readAsBytes(), Uint8List.fromList(blobA));
 
       // --- B edits, pushes. ---
       final edited = [99, 98, 97, 96, 95];
@@ -199,7 +201,8 @@ void main() {
       expect(rA2.blobsPulled, 1);
       // Pull writes a content-addressed stem path and deletes the old seed path.
       final onA = rA2.refreshedLocal.first;
-      expect(await File(onA.vaultPath).readAsBytes(), Uint8List.fromList(edited));
+      expect(
+          await File(onA.vaultPath).readAsBytes(), Uint8List.fromList(edited));
 
       // --- A tombstones + pushes; blob reaped server-side. ---
       final tomb = rA2.refreshedLocal.first.copyWith(syncedDeleted: true);
@@ -255,7 +258,9 @@ void main() {
 
       final pathA = await _seedBlob(dirA, [1, 2, 3], 'a.jpg');
       await SyncService.runSync(
-        local: [_file(id: 'a', vaultPath: pathA, modifiedAt: DateTime(2024, 1, 1))],
+        local: [
+          _file(id: 'a', vaultPath: pathA, modifiedAt: DateTime(2024, 1, 1))
+        ],
         masterKey: masterKey,
         remote: remote,
         deviceId: 'A',
@@ -265,7 +270,8 @@ void main() {
       );
 
       // Swap ciphertext bytes; the blob sha256 no longer matches the manifest.
-      final m = SyncService.decryptManifest((await remote.getManifest())!, masterKey);
+      final m =
+          SyncService.decryptManifest((await remote.getManifest())!, masterKey);
       final name = SyncService.blobNameFor(m.entries.single.contentHash!);
       final good = (await remote.getBlob(name))!;
       good[0] ^= 0xFF;
