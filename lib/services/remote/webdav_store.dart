@@ -51,15 +51,27 @@ class WebDAVStore implements RemoteStore {
   Future<Uint8List?> getManifest() => _readOrNull(RemoteStore.manifestName);
 
   @override
-  Future<void> putManifest(Uint8List bytes) =>
-      _c.write(_path(RemoteStore.manifestName), bytes);
+  Future<void> putManifest(Uint8List bytes) async {
+    await _ensureParent(_path(RemoteStore.manifestName));
+    await _c.write(_path(RemoteStore.manifestName), bytes);
+  }
 
   @override
   Future<Uint8List?> getBlob(String name) => _readOrNull(name);
 
   @override
-  Future<void> putBlob(String name, Uint8List bytes) =>
-      _c.write(_path(name), bytes);
+  Future<void> putBlob(String name, Uint8List bytes) async {
+    await _ensureParent(_path(name));
+    await _c.write(_path(name), bytes);
+  }
+
+  // Spec-strict servers (rclone, mod_dav) 409 a nested PUT whose parent
+  // collection doesn't exist; Nextcloud auto-creates and masks it. Idempotent.
+  Future<void> _ensureParent(String fullPath) async {
+    final slash = fullPath.lastIndexOf('/');
+    if (slash <= 0) return;
+    await _c.mkdirAll(fullPath.substring(0, slash));
+  }
 
   @override
   Future<void> deleteBlob(String name) => _c.remove(_path(name));
