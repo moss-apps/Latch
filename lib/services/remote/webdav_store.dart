@@ -24,8 +24,16 @@ class WebDAVStore implements RemoteStore {
 
   webdav.Client? _client;
 
-  webdav.Client get _c =>
-      _client ??= webdav.newClient(baseUrl, user: username, password: password);
+  webdav.Client get _c {
+    if (_client != null) return _client!;
+    final c = webdav.newClient(baseUrl, user: username, password: password);
+    // ponytail: generous timeouts; .local NAS hosts + cold servers need room.
+    c.setConnectTimeout(15000);
+    c.setSendTimeout(30000);
+    c.setReceiveTimeout(30000);
+    _client = c;
+    return c;
+  }
 
   /// Join [base] and [name] with exactly one `/`.
   static String joinPath(String base, String name) {
