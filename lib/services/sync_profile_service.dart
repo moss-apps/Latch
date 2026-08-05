@@ -21,7 +21,7 @@ class SyncProfileService {
 
   Future<List<SyncProfile>> listProfiles() async {
     final raw = await _storage.read(key: profilesKey);
-    if (raw == null) return const [];
+    if (raw == null) return <SyncProfile>[];
     return (jsonDecode(raw) as List<dynamic>)
         .map((e) => SyncProfile.fromJson(e as Map<String, dynamic>))
         .toList();
