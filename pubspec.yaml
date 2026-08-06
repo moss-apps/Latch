@@ -39,6 +39,7 @@ dependencies:
   flutter_riverpod: ^3.0.3
   flutter_secure_storage: ^10.0.0
   flutter_svg: ^2.0.10
+  http: ^1.2.2
   image: ^4.8.0
   image_picker: ^1.2.1
   just_audio: ^0.10.5
