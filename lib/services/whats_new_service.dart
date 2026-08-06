@@ -97,6 +97,8 @@ class WhatsNewService {
         return Icons.mic_outlined;
       case 'filter_list':
         return Icons.filter_list;
+      case 'sync':
+        return Icons.sync;
       case 'info_outlined':
         return Icons.info_outlined;
       default:
@@ -160,8 +162,7 @@ class WhatsNewService {
   }
 
   /// Strips build and pre-release suffixes, leaving `major.minor.patch`.
-  static String _coreVersion(String v) =>
-      v.split('+').first.split('-').first;
+  static String _coreVersion(String v) => v.split('+').first.split('-').first;
 
   static Version? _tryParse(String v) {
     try {

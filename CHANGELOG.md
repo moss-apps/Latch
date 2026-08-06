@@ -2,6 +2,38 @@
 
 Notable changes to Latch.
 
+## 0.17.0-beta.1
+
+### Local Server Sync
+- **Two-way sync with conflict detection** — keep your vault in sync across devices via WebDAV
+- `WebDAVStore` remote blob transport with `RemoteStore` abstract interface
+- **SyncService** with encrypted sync and manifest (`AES-256-GCM` wrapped manifest)
+- **SyncProfile** model with `SyncDirection` enum, per-device ID, and secure profile CRUD
+- Manifest schema bumped to **v2** with full restore metadata
+- Push, pull, and tombstone sync scenarios with conflict detection
+- **Multi-profile support** in the sync settings screen
+- Sync result summary with duration in `SyncState`
+- Server Sync option added to vault settings
+- Sync fields added to `VaultedFile` and `VaultSettings` models
+- Cleartext traffic allowed in network security config for NAS/local servers
+- Generous WebDAV timeouts for NAS and cold server connections
+
+### Sync Testing & Docs
+- Comprehensive unit tests for sync reconcile, crypto, model serialization, and WebDAV store
+- **Live WebDAV roundtrip integration tests** (env-gated)
+- Updated `local_server_sync.md` plan — S0–S3 marked complete
+- Embedded PocketBase local store design doc
+
+### UI
+- **FloatingCapsuleBottomBar** widget with curved diamond border, replacing the custom bottom bar
+- Configurable import button side and gallery grid padding for the new bottom bar
+
+### Vault Internals
+- `VaultStore.getSubdirectory` refactored into static `subdirFor`
+- `VaultStore` getter exposed on `VaultService` for shared access
+
+---
+
 ## 0.16.2-beta.3
 
 ### Vault Service Refactoring
