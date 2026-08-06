@@ -758,8 +758,15 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
             await ref.read(vaultNotifierProvider.notifier).refresh();
           },
           color: context.accentColor,
-          child: GridView.builder(
-            padding: const EdgeInsets.all(8),
+          child:           GridView.builder(
+            padding: EdgeInsets.fromLTRB(
+              8,
+              8,
+              8,
+              MediaQuery.of(context).padding.bottom +
+                  FloatingCapsuleBottomBar.bottomFootprint +
+                  24,
+            ),
             gridDelegate: ResponsiveGridDelegate.responsive(
               context,
               compact: 3,

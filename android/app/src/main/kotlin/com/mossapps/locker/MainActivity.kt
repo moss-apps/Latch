@@ -32,6 +32,7 @@ class MainActivity: FlutterFragmentActivity() {
     private val RECORDER_CHANNEL = "com.mossapps.locker/audio_recorder"
     private val AMPLITUDE_CHANNEL = "com.mossapps.locker/audio_amplitude"
     private val INSTALL_SOURCE_CHANNEL = "com.mossapps.locker/install_source"
+    private val PB_CHANNEL = "com.mossapps.locker/pb"
     private val autoKillPreferences by lazy {
         getSharedPreferences(AUTO_KILL_PREFS, MODE_PRIVATE)
     }
@@ -175,6 +176,16 @@ class MainActivity: FlutterFragmentActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, INSTALL_SOURCE_CHANNEL).setMethodCallHandler { call, result ->
             if (call.method == "getInstallerPackageName") {
                 result.success(getInstallerPackageName())
+            } else {
+                result.notImplemented()
+            }
+        }
+
+        // Exposes applicationInfo.nativeLibraryDir so Dart can locate and spawn
+        // the bundled PocketBase .so. P0 spike wiring — see pb_spike_screen.dart.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PB_CHANNEL).setMethodCallHandler { call, result ->
+            if (call.method == "getNativeLibraryDir") {
+                result.success(applicationInfo.nativeLibraryDir)
             } else {
                 result.notImplemented()
             }

@@ -1,4 +1,41 @@
 {
+  "0.17.0-beta.1": [
+    {
+      "title": "Local Server Sync",
+      "items": [
+        {
+          "icon": "sync",
+          "title": "Two-way sync",
+          "description": "Keep your vault in sync across devices over WebDAV — push, pull, and automatic conflict detection."
+        },
+        {
+          "icon": "lock_outlined",
+          "title": "Encrypted sync",
+          "description": "Every synced file and the sync manifest stays encrypted, so servers never see your data."
+        },
+        {
+          "icon": "build_outlined",
+          "title": "Multi-profile support",
+          "description": "Configure separate sync profiles, each with its own server, direction, and credentials."
+        }
+      ]
+    },
+    {
+      "title": "UI & Behavior",
+      "items": [
+        {
+          "icon": "auto_awesome_outlined",
+          "title": "Floating capsule bar",
+          "description": "A redesigned floating bottom bar with a curved diamond border sits cleaner over your vault."
+        },
+        {
+          "icon": "speed",
+          "title": "NAS-friendly timeouts",
+          "description": "Generous timeouts keep sync reliable on slow NAS and cold servers."
+        }
+      ]
+    }
+  ],
   "0.16.2-beta.3": [
     {
       "title": "Architecture",

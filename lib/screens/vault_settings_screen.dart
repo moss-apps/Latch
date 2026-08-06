@@ -1,6 +1,7 @@
 import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_update/in_app_update.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -23,6 +24,7 @@ import 'encryption_settings_screen.dart';
 import 'local_backup_screen.dart';
 import 'performance_settings_screen.dart';
 import 'privacy_policy_screen.dart';
+import 'pb_spike_screen.dart';
 import 'sync_settings_screen.dart';
 
 class VaultSettingsScreen extends ConsumerStatefulWidget {
@@ -336,8 +338,8 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                 contentPadding: EdgeInsets.zero,
               ),
               ListTile(
-                leading: Icon(Icons.cloud_sync_outlined,
-                    color: context.accentColor),
+                leading:
+                    Icon(Icons.cloud_sync_outlined, color: context.accentColor),
                 title: const Text(
                   'Server Sync',
                   style: TextStyle(fontFamily: 'ProductSans'),
@@ -730,6 +732,28 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                         },
                         contentPadding: EdgeInsets.zero,
                       ),
+                      if (kDebugMode)
+                        ListTile(
+                          leading: Icon(Icons.science_outlined,
+                              color: context.accentColor),
+                          title: const Text('PocketBase Spike',
+                              style: TextStyle(fontFamily: 'ProductSans')),
+                          subtitle: Text(
+                            'P0 feasibility check (debug only)',
+                            style: TextStyle(
+                              fontFamily: 'ProductSans',
+                              fontSize: 12,
+                              color: context.textTertiary,
+                            ),
+                          ),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const PbSpikeScreen(),
+                            ),
+                          ),
+                          contentPadding: EdgeInsets.zero,
+                        ),
                     ],
                   );
                 },
@@ -933,8 +957,7 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
   }
 
   bool get _isPlayStoreInstall =>
-      ref.read(updateServiceProvider).installSource ==
-      InstallSource.playStore;
+      ref.read(updateServiceProvider).installSource == InstallSource.playStore;
 
   Widget _buildSecurityOptionDropdown({
     required BuildContext context,
