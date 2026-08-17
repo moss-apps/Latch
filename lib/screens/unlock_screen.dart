@@ -5,6 +5,7 @@ import '../themes/app_colors.dart';
 import '../services/auth_service.dart';
 import '../services/decoy_service.dart';
 import '../services/encryption_service.dart';
+import '../services/pb/pocketbase_runtime.dart';
 import '../widgets/adaptive_logo.dart';
 import '../widgets/pin_input_widget.dart';
 import 'gallery_vault_screen.dart';
@@ -93,6 +94,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
       await _decoyService.activateDecoyMode();
     } else {
       await _decoyService.deactivateDecoyMode();
+      unawaited(_startPocketBase());
     }
     await _authService.resetUnlockAttempts();
 
@@ -103,6 +105,16 @@ class _UnlockScreenState extends State<UnlockScreen> {
         builder: (context) => const GalleryVaultScreen(),
       ),
     );
+  }
+
+  // PB holds only ciphertext, so it can't be used until the key exists — but
+  // starting it must never block or fail the unlock. Recovery UI is P5.
+  Future<void> _startPocketBase() async {
+    try {
+      await PocketBaseRuntime.instance.start();
+    } catch (e) {
+      debugPrint('[PB] sidecar failed to start: $e');
+    }
   }
 
   Future<void> _handleFailedUnlock(String defaultMessage) async {
