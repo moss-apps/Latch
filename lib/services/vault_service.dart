@@ -13,6 +13,9 @@ import 'crypto_isolate_pool.dart';
 import 'encryption_service.dart';
 import 'file_service.dart';
 import 'folder_service.dart';
+import 'pb/migrate_legacy_index.dart';
+import 'pb/pocketbase_runtime.dart';
+import 'pb/pocketbase_store.dart';
 import 'search_service.dart';
 import 'settings_service.dart';
 import 'stats_service.dart';
@@ -80,6 +83,21 @@ class VaultService {
     await _store.loadTags();
     await _store.loadSettings();
     _wire();
+  }
+
+  /// P4.2: route the non-decoy index through the PocketBase sidecar (PB
+  /// preferred, legacy fallback — the routing lives in `VaultStore`).
+  /// Runs the one-time legacy migration, then reloads every cache from PB.
+  /// No-op when the sidecar isn't running. Call only after the vault is
+  /// unlocked (the DAOs need the master key).
+  Future<void> activatePocketBase() async {
+    final client = PocketBaseRuntime.instance.client;
+    if (client == null) return;
+    final masterKey = await _encryptionService.getMasterKey();
+    final pb = PocketBaseStore(client: client, masterKey: masterKey);
+    await migrateLegacyIndex(pb);
+    _store.pbStore = pb;
+    await refresh();
   }
 
   /// Loads indexes without initializing encryption (test-only).
