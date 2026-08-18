@@ -3,10 +3,7 @@ import 'vault_store.dart';
 
 /// Settings load/save. Splits out of `VaultService`.
 ///
-/// ponytail: tiny — just delegating the load/save to the store. Exists as a
-/// separate service so Phase 4 Riverpod wiring has a clean injection point
-/// and so callers don't depend on the whole VaultService for a single
-/// getSettings call.
+/// tiny — just store delegation; exists as a clean injection point.
 class SettingsService {
   final VaultStore _store;
   SettingsService(this._store);

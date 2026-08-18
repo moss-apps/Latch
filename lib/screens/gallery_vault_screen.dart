@@ -1253,8 +1253,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
 
     return Container(
       color: color.withValues(alpha: 0.1),
-      // ponytail: filename is drawn once by the tile's bottom overlay bar;
-      // placeholder is icon-only like image/video thumbnails.
+      // placeholder is icon-only; filename is drawn by the tile overlay.
       child: Center(
         child: Icon(icon, size: 36, color: color),
       ),
@@ -1393,8 +1392,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
 
   Future<void> _openNoteFromVault(String noteId) async {
     var notesAsync = ref.read(notesNotifierProvider);
-    // ponytail: first read of a cold provider returns loading; reload + re-read
-    // only in that case so the hot path stays a single cached read.
+    // reload only when cold (isLoading); hot path stays one cached read.
     if (notesAsync.isLoading) {
       await ref.read(notesNotifierProvider.notifier).loadNotes();
       notesAsync = ref.read(notesNotifierProvider);

@@ -40,8 +40,7 @@ class _LocalBackupScreenState extends ConsumerState<LocalBackupScreen> {
   List<VaultedFile> _allFiles = const [];
   bool _allFilesLoaded = false;
 
-  // ponytail: ValueNotifier drives the progress dialog across the route
-  // boundary (setState here won't rebuild a separately-pushed dialog route).
+  // ValueNotifier crosses the route boundary where setState can't.
   final ValueNotifier<({int current, int total})?> _progress =
       ValueNotifier(null);
 
@@ -492,9 +491,7 @@ class _SaveLocationTile extends StatelessWidget {
   }
 }
 
-// ponytail: standard 1024-base size formatter. Known outputs:
-// _humanSize(0)=="0 B", _humanSize(1023)=="1023 B", _humanSize(1024)=="1.0 KB",
-// _humanSize(1048576)=="1.0 MB".
+// standard 1024-base size formatter.
 String _humanSize(int bytes) {
   if (bytes < 1024) return '$bytes B';
   const units = ['KB', 'MB', 'GB', 'TB'];

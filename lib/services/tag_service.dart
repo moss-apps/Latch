@@ -7,11 +7,7 @@ import 'vault_store.dart';
 
 /// Tag CRUD + favorites toggle. Splits out of `VaultService`.
 ///
-/// ponytail: favorites live here (not in AlbumService) because toggling a
-/// favorite is a tag-like single-file op that delegates to the favorites
-/// album — keeping it here avoids a circular dep (AlbumService → FileService →
-/// AlbumService). FileService depends on TagService (for `addTagToFile`),
-/// so favorites-as-tag keeps the graph one-directional.
+/// favorites-as-tag keeps the service dep graph one-directional.
 class TagService {
   final VaultStore _store;
   final AlbumService _albumService;

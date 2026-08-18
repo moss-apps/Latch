@@ -60,9 +60,7 @@ class OfficeConverterService {
     'docx', 'odt', 'rtf', // Currently supported for on-device conversion
   ];
 
-  // ponytail: font loaded once on the main isolate (rootBundle is platform-
-  // channel-backed, unavailable in a spawned isolate) then passed into the
-  // conversion worker.
+  // load font on the main isolate (rootBundle dies in workers), pass it in.
   static Uint8List? _cachedFontBytes;
   static bool _fontLoaded = false;
 
@@ -177,9 +175,7 @@ class OfficeConverterService {
 
     try {
       final fontBytes = await _loadFontBytes();
-      // ponytail: ZIP decode + XML parse + PDF layout are pure Dart, so they
-      // run in an isolate to keep the UI thread free during docx/odt/rtf
-      // import. Static methods => no `this` capture sent across.
+      // pure-Dart conversion in an isolate, off the UI thread; statics avoid `this` capture.
       return await Isolate.run(() async {
         switch (fileType) {
           case OfficeFileType.docx:

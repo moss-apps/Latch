@@ -123,8 +123,7 @@ class FloatingCapsuleBottomBar extends StatelessWidget {
   static const double _protrusion = 20;
   static const double _squircleN = 4.5;
 
-  // ponytail: callers pad content above the floating bar; this is the vertical
-  // footprint excluding the OS safe-area inset (callers add that via MediaQuery).
+  // footprint excluding safe-area inset; callers pad + add it themselves.
   static const double bottomFootprint = _capsuleHeight + 10;
 
   const FloatingCapsuleBottomBar({
@@ -137,7 +136,7 @@ class FloatingCapsuleBottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ponytail: hard cap at 5 total slots (feature + up to 4 tabs).
+    // hard cap at 5 total slots (feature + up to 4 tabs).
     final visibleTabs = (tabs.length >= _maxSlots)
         ? tabs.sublist(0, _maxSlots - 1)
         : tabs;

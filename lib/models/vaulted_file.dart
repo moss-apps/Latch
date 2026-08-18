@@ -87,8 +87,7 @@ class VaultedFile {
   final bool needsMigration; // Legacy GCM v1 files need re-encryption to v2
 
   // Sync bookkeeping (encrypted-at-rest sync, see docs/local_server_sync.md).
-  // ponytail: modifiedAt is a dedicated LWW timestamp, kept separate from
-  // dateModified so sync never clobbers existing mutation semantics.
+  // dedicated LWW timestamp, separate from dateModified so sync never clobbers.
   // remoteHash is the sha256-hex of the uploaded ciphertext blob.
   final DateTime? modifiedAt;
   final String? remoteHash;

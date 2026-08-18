@@ -1,7 +1,6 @@
 /// Constant-time equality for secret-derived hash strings.
 ///
-/// ponytail: lengths are still observable (unavoidable for variable-length
-/// strings), but per-character comparison never short-circuits on mismatch.
+/// lengths still leak; comparison itself never short-circuits.
 bool constantTimeEquals(String a, String b) {
   final aLen = a.length;
   final bLen = b.length;

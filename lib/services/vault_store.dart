@@ -16,9 +16,7 @@ import 'local_store.dart';
 /// `_cached*` maps and all `_load*`/`_save*` methods. Domain services depend
 /// on this + `EncryptionService` via constructor.
 ///
-/// ponytail: single shared-state holder. The original VaultService had every
-/// cache read inline across all seams — no service could be extracted
-/// cleanly without centralizing state first. This is that centralization.
+/// single shared-state holder, centralization that made service extraction possible.
 ///
 /// P4: when a PB delegate is attached (post-unlock, sidecar healthy), all
 /// non-decoy loads/saves/wipes route through it first, falling back to the

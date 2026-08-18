@@ -30,11 +30,7 @@ export 'file_service.dart' show FileProgressInfo;
 /// providers keep working. Phase 4 (Riverpod) removes this facade in favor of
 /// per-service providers.
 ///
-/// ponytail: facade + forwarding. The real logic now lives in the split
-/// services (FileService, AlbumService, FolderService, TagService,
-/// ThumbnailService, SearchService, StatsService, SettingsService). This
-/// class solely composes them + forwards ~100 public methods. No behavioral
-/// changes from pre-split — same delegate order, same cache (now in VaultStore).
+/// pure facade — logic lives in the split services; this forwards.
 class VaultService {
   @visibleForTesting
   VaultService();
@@ -47,9 +43,7 @@ class VaultService {
   /// (e.g. SyncService) can share the same caches without a new singleton.
   VaultStore get store => _store;
 
-  // ponytail: File↔Thumbnail form a construction cycle (each calls the other
-  // at runtime, never at construction). Break it with a late non-final
-  // back-reference on ThumbnailService that's wired after both exist.
+  // late back-ref breaks the File↔Thumbnail construction cycle (runtime-only calls).
   late final ThumbnailService _thumbnails =
       ThumbnailService(_store, _encryptionService);
   late final FileService _files =
@@ -540,9 +534,7 @@ class VaultService {
   }
 
   Future<void> refresh() async {
-    // ponytail: atomic swap — reload all caches before replacing them, so a
-    // concurrent mutation never observes a null cache (was the NPE vector
-    // flagged in Tier 4). Full mutation serialization deferred.
+    // atomic swap — reload before replace, so caches are never observably null.
     final files = await _store.loadFileIndex(forceReload: true);
     final decoyFiles =
         await _store.loadFileIndex(isDecoy: true, forceReload: true);

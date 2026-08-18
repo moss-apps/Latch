@@ -19,10 +19,7 @@ class StoredThumb {
 /// Encrypted-thumbnail generation, caching, lazy regen. Splits out of
 /// `VaultService`.
 ///
-/// ponytail: depends on FileService for `getVaultedFile` (decrypt-to-temp for
-/// regen) and `deriveKeyForFile`. The File↔Thumbnail cycle is broken by a
-/// late non-final `fileService` field set after both are constructed —
-/// neither reads the other during construction, only at runtime.
+/// late `fileService` back-ref breaks the File↔Thumbnail cycle.
 class ThumbnailService {
   final VaultStore _store;
   final EncryptionService _encryptionService;

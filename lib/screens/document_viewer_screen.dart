@@ -44,10 +44,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
   int _currentPage = 1;
   int _totalPages = 1;
   bool _isOfficeDocument = false;
-  // ponytail: pdfrx parses PdfViewer.data on the main isolate, which ANRs on
-  // large PDFs. We resolve a file path and hand it to PdfViewer.file so pdfrx
-  // does its own background load. _convertedPdfPath is a temp file we own and
-  // must delete on dispose.
+  // PdfViewer.file so pdfrx loads off the main isolate (PdfViewer.data ANRs on big PDFs).
   String? _pdfPath;
   String? _convertedPdfPath;
 

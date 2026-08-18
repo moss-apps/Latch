@@ -58,11 +58,7 @@ class _BatchPreparationResult {
 /// File CRUD, import, export, re-encrypt, notes/password registration.
 /// Splits out of `VaultService`.
 ///
-/// ponytail: the big one. Holds a back-reference to TagService (late-set,
-/// breaks the File↔Tag cycle) for tag-usage updates during import, and to
-/// AlbumService for `removeFile`'s album cleanup. The ThumbnailService is a
-/// constructor dep because thumbnail generation needs file decrypt (which
-/// lives here) so the cycle is broken by passing `this` into ThumbnailService.
+/// late back-refs to TagService/AlbumService break cycles; ThumbnailService gets `this`.
 class FileService {
   static const int _maxConcurrentBatchAdds = 3;
 

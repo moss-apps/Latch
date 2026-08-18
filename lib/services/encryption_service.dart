@@ -61,9 +61,7 @@ class EncryptionService {
   String? _pendingCredential;
   String? _pendingDecoyCredential;
 
-  // ponytail: derived-key memo keyed by salt:iterations (re-encrypt mints a
-  // new salt, so entries self-invalidate). Clear if per-file derivation ever
-  // needs to account for a rotating master key with stable salts.
+  // memo keyed by salt:iterations — re-encrypt mints a new salt, so entries self-invalidate.
   final Map<String, Uint8List> _fileKeyCache = {};
   static const int _fileKeyCacheLimit = 100;
 
@@ -1505,8 +1503,7 @@ class EncryptionService {
   }
 
   /// App-private temp dir for plaintext intermediates (never system temp).
-  /// ponytail: keeps decrypted rotation/re-encryption scratch off the shared
-  /// system temp; callers still secureDelete the plaintext file on cleanup.
+  /// keeps decrypted scratch out of shared system temp.
   Future<Directory> _createAppPrivateTemp(String prefix) async {
     final docs = await getApplicationDocumentsDirectory();
     final root = Directory('${docs.path}/.locker_temp');
@@ -1659,9 +1656,7 @@ class EncryptionService {
   /// Returns: 0=unknown/legacy CBC, 1=GCM, 2=CTR, 3=CBC with header
   int detectFileFormat(String filePath) => HeaderCodec.detectFormatFromFile(filePath);
 
-  // ponytail: direct magic-byte check for re-encryption routing. detectFileFormat
-  // now returns the real format, but this keeps a single read + no format-int
-  // indirection on the hot re-encrypt path.
+  // direct magic-byte check; single read, no format-int indirection on the hot path.
   bool _isLegacyCbcFile(String path) {
     try {
       final f = File(path).openSync(mode: FileMode.read);

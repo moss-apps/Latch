@@ -10,9 +10,7 @@ import 'vault_store.dart';
 
 /// Album CRUD + file↔album cross-mutation. Splits out of `VaultService`.
 ///
-/// ponytail: depends on FileService for `getFileById`/`updateFile`. The
-/// reverse direction (FileService.removeFile → removeFileFromAlbum) is wired
-/// via a late setter to avoid a constructor cycle.
+/// reverse direction wired via late setter to avoid a constructor cycle.
 class AlbumService {
   final VaultStore _store;
   final FileService _fileService;
