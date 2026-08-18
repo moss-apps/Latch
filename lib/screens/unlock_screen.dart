@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../themes/app_colors.dart';
 import '../services/auth_service.dart';
@@ -34,6 +33,8 @@ class _UnlockScreenState extends State<UnlockScreen> {
   final PinInputController _pinController = PinInputController();
   UnlockSecurityState _unlockSecurityState = const UnlockSecurityState();
   Timer? _lockoutTimer;
+
+  static const _fast = Duration(milliseconds: 200);
 
   @override
   void initState() {
@@ -302,6 +303,9 @@ class _UnlockScreenState extends State<UnlockScreen> {
     }
   }
 
+  bool get _inputEnabled =>
+      !_unlockSecurityState.isLockedOut && !_isAuthenticating;
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading || _authMethod == null) {
@@ -317,57 +321,41 @@ class _UnlockScreenState extends State<UnlockScreen> {
 
     return Scaffold(
       backgroundColor: context.backgroundColor,
-      body: Stack(
-        children: [
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Spacer(),
-                  _buildLogo(),
-                  const SizedBox(height: 32),
-                  _buildAppName(),
-                  const SizedBox(height: 12),
-                  _buildInstruction(),
-                  if (_unlockSecurityState.protectionEnabled ||
-                      _unlockSecurityState.isLockedOut) ...[
-                    const SizedBox(height: 16),
-                    _buildProtectionStatus(),
-                  ],
-                  const SizedBox(height: 64),
-                  _buildAuthWidget(),
-                  const Spacer(),
-                ],
-              ),
-            ),
-          ),
-          if (_isAuthenticating) _buildAuthenticatingOverlay(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAuthenticatingOverlay() {
-    return IgnorePointer(
-      child: Container(
-        color: Colors.black.withValues(alpha: 0.4),
+      body: SafeArea(
         child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(color: context.accentColor),
-              const SizedBox(height: 16),
-              Text(
-                'Unlocking\u2026',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontFamily: 'ProductSans',
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
+              builder: (context, value, child) => Opacity(
+                opacity: value,
+                child: Transform.translate(
+                  offset: Offset(0, (1 - value) * 12),
+                  child: child,
                 ),
               ),
-            ],
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildLogo(),
+                    const SizedBox(height: 24),
+                    _buildAppName(),
+                    const SizedBox(height: 8),
+                    _buildInstruction(),
+                    const SizedBox(height: 32),
+                    _buildAuthWidget(),
+                    const SizedBox(height: 16),
+                    _buildErrorSlot(),
+                    _buildSecuritySlot(),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -377,36 +365,16 @@ class _UnlockScreenState extends State<UnlockScreen> {
   Widget _buildLogo() {
     return Center(
       child: Container(
-        width: 140,
-        height: 140,
+        width: 88,
+        height: 88,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: context.isDarkMode
-              ? Colors.white.withValues(alpha: 0.08)
-              : Colors.white.withValues(alpha: 0.15),
-          border: Border.all(
-            color: context.isDarkMode
-                ? Colors.white.withValues(alpha: 0.15)
-                : Colors.white.withValues(alpha: 0.2),
-            width: 2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: context.accentColor.withValues(alpha: 0.2),
-              blurRadius: 30,
-              offset: const Offset(0, 10),
-            ),
-          ],
+          color: context.surfaceColor,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: context.borderColor),
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-            child: const Padding(
-              padding: EdgeInsets.all(32),
-              child: AdaptiveLogo(size: 76),
-            ),
-          ),
+        child: const Padding(
+          padding: EdgeInsets.all(20),
+          child: AdaptiveLogo(size: 48),
         ),
       ),
     );
@@ -416,7 +384,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
     return Text(
       'Latch',
       style: TextStyle(
-        fontSize: 36,
+        fontSize: 32,
         fontWeight: FontWeight.w700,
         color: context.textPrimary,
         fontFamily: 'ProductSans',
@@ -427,20 +395,27 @@ class _UnlockScreenState extends State<UnlockScreen> {
   }
 
   Widget _buildInstruction() {
-    final label = _showingBackupAuth && _backupAuthMethod != null
-        ? (_backupAuthMethod == 'pin'
-            ? 'Enter your backup PIN to unlock'
-            : 'Enter your backup password to unlock')
-        : (_authMethod == 'pin'
-            ? 'Enter your PIN to unlock'
-            : _authMethod == 'password'
-                ? 'Enter your password to unlock'
-                : 'Use biometrics to unlock');
+    final lockedOut = _unlockSecurityState.isLockedOut;
+    final String label;
+
+    if (lockedOut) {
+      label = 'Vault is temporarily locked';
+    } else if (_showingBackupAuth && _backupAuthMethod != null) {
+      label = _backupAuthMethod == 'pin'
+          ? 'Enter your backup PIN to unlock'
+          : 'Enter your backup password to unlock';
+    } else {
+      label = switch (_authMethod) {
+        'pin' => 'Enter your PIN to unlock',
+        'password' => 'Enter your password to unlock',
+        _ => 'Use biometrics to unlock',
+      };
+    }
 
     return Text(
       label,
       style: TextStyle(
-        fontSize: 16,
+        fontSize: 15,
         color: context.textSecondary,
         fontFamily: 'ProductSans',
       ),
@@ -468,172 +443,176 @@ class _UnlockScreenState extends State<UnlockScreen> {
   }
 
   Widget _buildPinAuth() {
+    return PinInputWidget(
+      onPinComplete: _handlePinComplete,
+      onPinChanged: _handlePinChanged,
+      errorMessage: _errorMessage,
+      controller: _pinController,
+      enabled: _inputEnabled,
+      autofillEnabled: _autofillEnabled,
+    );
+  }
+
+  Widget _buildPasswordAuth() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        PinInputWidget(
-          onPinComplete: _handlePinComplete,
-          onPinChanged: _handlePinChanged,
-          errorMessage: _errorMessage,
-          controller: _pinController,
-          enabled: !_unlockSecurityState.isLockedOut,
-          autofillEnabled: _autofillEnabled,
+        TextField(
+          controller: _passwordController,
+          autofocus: true,
+          enabled: _inputEnabled,
+          obscureText: _obscurePassword,
+          autofillHints: _autofillEnabled
+              ? const [AutofillHints.password]
+              : null,
+          style: TextStyle(
+            fontFamily: 'ProductSans',
+            fontSize: 16,
+            color: context.textPrimary,
+          ),
+          decoration: InputDecoration(
+            labelText: 'Password',
+            hintText: 'Enter your password',
+            labelStyle: TextStyle(
+              fontFamily: 'ProductSans',
+              color: context.textSecondary,
+            ),
+            hintStyle: TextStyle(
+              fontFamily: 'ProductSans',
+              color: context.textTertiary,
+            ),
+            suffixIcon: IconButton(
+              icon: Icon(
+                _obscurePassword
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+                color: context.textTertiary,
+              ),
+              onPressed: () {
+                setState(() {
+                  _obscurePassword = !_obscurePassword;
+                });
+              },
+            ),
+            filled: true,
+            fillColor: context.backgroundSecondary,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: context.borderColor),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: context.borderColor),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: context.accentColor, width: 1.6),
+            ),
+          ),
+          onChanged: (_) {
+            if (_errorMessage != null) {
+              setState(() => _errorMessage = null);
+            }
+          },
+          onSubmitted: (_) => _handlePasswordAuth(),
         ),
-        if (_errorMessage != null) ...[
-          const SizedBox(height: 16),
-          _buildError(),
+        const SizedBox(height: 16),
+        _buildUnlockButton(),
+      ],
+    );
+  }
+
+  Widget _buildBiometricAuth() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Center(child: _buildFingerprintButton()),
+        if (_backupAuthMethod != null) ...[
+          const SizedBox(height: 20),
+          Center(
+            child: TextButton(
+              onPressed: () {
+                setState(() {
+                  _showingBackupAuth = true;
+                  _errorMessage = null;
+                });
+              },
+              child: Text(
+                _backupAuthMethod == 'pin'
+                    ? 'Use Backup PIN'
+                    : 'Use Backup Password',
+                style: TextStyle(
+                  color: context.textSecondary,
+                  fontFamily: 'ProductSans',
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ),
         ],
       ],
     );
   }
 
-  Widget _buildPasswordAuth() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: context.isDarkMode
-                ? Colors.white.withValues(alpha: 0.05)
-                : Colors.white.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: context.isDarkMode
-                  ? Colors.white.withValues(alpha: 0.1)
-                  : Colors.white.withValues(alpha: 0.2),
-              width: 1,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextField(
-                controller: _passwordController,
-                enabled: !_unlockSecurityState.isLockedOut &&
-                    !_isLoading &&
-                    !_isAuthenticating,
-                obscureText: _obscurePassword,
-                autofillHints: _autofillEnabled
-                    ? const [AutofillHints.password]
-                    : null,
-                style: TextStyle(
-                  fontFamily: 'ProductSans',
-                  fontSize: 16,
-                  color: context.textPrimary,
-                ),
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  hintText: 'Enter your password',
-                  labelStyle: TextStyle(
-                    fontFamily: 'ProductSans',
-                    color: context.textSecondary,
-                  ),
-                  hintStyle: TextStyle(
-                    fontFamily: 'ProductSans',
-                    color: context.textTertiary,
-                  ),
-                  filled: true,
-                  fillColor: context.isDarkMode
-                      ? Colors.white.withValues(alpha: 0.05)
-                      : Colors.black.withValues(alpha: 0.03),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscurePassword
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
-                      color: context.textTertiary,
+  Widget _buildFingerprintButton() {
+    return Semantics(
+      button: true,
+      label: 'Unlock with biometrics',
+      child: Material(
+        color: context.accentColor
+            .withValues(alpha: _inputEnabled ? 0.12 : 0.06),
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: _inputEnabled ? () => _handleBiometricAuth() : null,
+          child: SizedBox(
+            width: 88,
+            height: 88,
+            child: Center(
+              child: _isAuthenticating
+                  ? SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.4,
+                        color: context.accentColor,
+                      ),
+                    )
+                  : Icon(
+                      Icons.fingerprint,
+                      size: 44,
+                      color: _inputEnabled
+                          ? context.accentColor
+                          : context.textTertiary,
                     ),
-                    onPressed: () {
-                      setState(() {
-                        _obscurePassword = !_obscurePassword;
-                      });
-                    },
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide:
-                        BorderSide(color: context.accentColor, width: 2),
-                  ),
-                ),
-                onChanged: (_) {
-                  if (_errorMessage != null) {
-                    setState(() => _errorMessage = null);
-                  }
-                },
-                onSubmitted: (_) => _handlePasswordAuth(),
-              ),
-              if (_errorMessage != null) ...[
-                const SizedBox(height: 16),
-                _buildError(),
-              ],
-              const SizedBox(height: 24),
-              _buildUnlockButton(),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildBiometricAuth() {
+  Widget _buildBackupAuthWidget() {
+    final isPin = _backupAuthMethod == 'pin';
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          width: 120,
-          height: 120,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            color: context.isDarkMode
-                ? Colors.white.withValues(alpha: 0.08)
-                : Colors.white.withValues(alpha: 0.15),
-            border: Border.all(
-              color: context.isDarkMode
-                  ? Colors.white.withValues(alpha: 0.15)
-                  : Colors.white.withValues(alpha: 0.2),
-              width: 2,
-            ),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-              child: Icon(
-                Icons.fingerprint,
-                size: 64,
-                color:
-                    context.isDarkMode ? const Color(0xFFF5F5F5) : Colors.black,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 32),
-        if (_errorMessage != null) ...[
-          _buildError(),
-          const SizedBox(height: 24),
-        ],
-        _buildUnlockButton(isBiometric: true),
-        if (_backupAuthMethod != null) ...[
-          const SizedBox(height: 16),
-          TextButton(
+        if (isPin) _buildPinAuth() else _buildPasswordAuth(),
+        const SizedBox(height: 8),
+        Center(
+          child: TextButton(
             onPressed: () {
               setState(() {
-                _showingBackupAuth = true;
+                _showingBackupAuth = false;
                 _errorMessage = null;
+                _passwordController.clear();
+                _pinController.clear();
               });
             },
             child: Text(
-              _backupAuthMethod == 'pin'
-                  ? 'Use Backup PIN'
-                  : 'Use Backup Password',
+              'Use biometric instead',
               style: TextStyle(
                 color: context.textSecondary,
                 fontFamily: 'ProductSans',
@@ -641,149 +620,137 @@ class _UnlockScreenState extends State<UnlockScreen> {
               ),
             ),
           ),
-        ],
+        ),
       ],
     );
   }
 
-  Widget _buildBackupAuthWidget() {
-    final isPin = _backupAuthMethod == 'pin';
-    return Column(
-      children: [
-        TextButton(
-          onPressed: () {
-            setState(() {
-              _showingBackupAuth = false;
-              _errorMessage = null;
-              _passwordController.clear();
-              _pinController.clear();
-            });
-          },
-          child: Text(
-            'Use biometric instead',
-            style: TextStyle(
-              color: context.textSecondary,
-              fontFamily: 'ProductSans',
-              fontSize: 14,
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        isPin ? _buildPinAuth() : _buildPasswordAuth(),
-      ],
-    );
-  }
+  Widget _buildUnlockButton() {
+    final onColor = Theme.of(context).colorScheme.onPrimary;
 
-  Widget _buildError() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: AppColors.error.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: AppColors.error.withValues(alpha: 0.2),
-              width: 1,
-            ),
-          ),
-          child: Text(
-            _errorMessage!,
-            style: TextStyle(
-              color: AppColors.error,
-              fontSize: 14,
-              fontFamily: 'ProductSans',
-            ),
-            textAlign: TextAlign.center,
-          ),
+    return FilledButton(
+      onPressed: _inputEnabled ? _handlePasswordAuth : null,
+      style: FilledButton.styleFrom(
+        backgroundColor: context.accentColor,
+        foregroundColor: onColor,
+        disabledBackgroundColor:
+            context.accentColor.withValues(alpha: 0.35),
+        minimumSize: const Size.fromHeight(52),
+        textStyle: const TextStyle(
+          fontFamily: 'ProductSans',
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
         ),
       ),
+      child: _isAuthenticating
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: onColor,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text('Unlocking\u2026'),
+              ],
+            )
+          : const Text('Unlock'),
     );
   }
 
-  Widget _buildProtectionStatus() {
-    final message = _unlockSecurityState.isLockedOut
-        ? 'Unlock available again in ${_formatDuration(_unlockSecurityState.remainingLockout)}.'
-        : 'Failed-attempt protection is enabled.';
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: context.isDarkMode
-                ? Colors.white.withValues(alpha: 0.06)
-                : Colors.white.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: _unlockSecurityState.isLockedOut
-                  ? AppColors.error.withValues(alpha: 0.25)
-                  : context.borderColor,
+  Widget _buildErrorSlot() {
+    return AnimatedSize(
+      duration: _fast,
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.topCenter,
+      child: _errorMessage == null
+          ? const SizedBox(width: double.infinity)
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.error_outline, size: 18, color: AppColors.error),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    _errorMessage!,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppColors.error,
+                      fontSize: 14,
+                      height: 1.3,
+                      fontFamily: 'ProductSans',
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-          child: Text(
-            message,
-            style: TextStyle(
-              color: _unlockSecurityState.isLockedOut
-                  ? AppColors.error
-                  : context.textSecondary,
-              fontSize: 13,
-              fontFamily: 'ProductSans',
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ),
     );
   }
 
-  Widget _buildUnlockButton({bool isBiometric = false}) {
-    final isEnabled =
-        !_unlockSecurityState.isLockedOut && !_isLoading && !_isAuthenticating;
+  // Lockout countdown / attempts-remaining notice. Only takes space when
+  // there is something at stake to tell the user.
+  Widget _buildSecuritySlot() {
+    final state = _unlockSecurityState;
+    final Color color;
+    final IconData icon;
+    final String message;
 
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          colors: [
-            context.accentColor.withValues(alpha: isEnabled ? 1 : 0.45),
-            context.accentColor.withValues(alpha: isEnabled ? 0.8 : 0.35),
+    if (state.isLockedOut) {
+      color = AppColors.error;
+      icon = Icons.lock_clock;
+      message =
+          'Too many failed attempts. Try again in ${_formatDuration(state.remainingLockout)}.';
+    } else if (state.protectionEnabled && state.failedAttempts > 0) {
+      final beforeWipe = state.attemptsRemainingBeforeWipe;
+      if (beforeWipe != null) {
+        color = AppColors.error;
+        icon = Icons.warning_amber_rounded;
+        message =
+            '$beforeWipe attempts remaining before your vault is permanently erased.';
+      } else {
+        color = context.isDarkMode ? AppColors.darkWarning : AppColors.warning;
+        icon = Icons.warning_amber_rounded;
+        message =
+            '${state.attemptsRemainingBeforeLockout} attempts remaining before temporary lockout.';
+      }
+    } else {
+      return const SizedBox(width: double.infinity);
+    }
+
+    return AnimatedSize(
+      duration: _fast,
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.topCenter,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                message,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 13,
+                  height: 1.3,
+                  fontFamily: 'ProductSans',
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+              ),
+            ),
           ],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color:
-                context.accentColor.withValues(alpha: isEnabled ? 0.4 : 0.12),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ElevatedButton(
-        onPressed: isEnabled
-            ? (isBiometric ? _handleBiometricAuth : _handlePasswordAuth)
-            : null,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 30),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-        child: Text(
-          isBiometric ? 'Unlock with Biometric' : 'Unlock',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            fontFamily: 'ProductSans',
-            color: Colors.white,
-          ),
         ),
       ),
     );
