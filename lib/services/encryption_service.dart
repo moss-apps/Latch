@@ -61,6 +61,12 @@ class EncryptionService {
   String? _pendingCredential;
   String? _pendingDecoyCredential;
 
+  // ponytail: derived-key memo keyed by salt:iterations (re-encrypt mints a
+  // new salt, so entries self-invalidate). Clear if per-file derivation ever
+  // needs to account for a rotating master key with stable salts.
+  final Map<String, Uint8List> _fileKeyCache = {};
+  static const int _fileKeyCacheLimit = 100;
+
   CryptoIsolatePool? _pool;
 
   Future<void> initialize() async {
@@ -336,8 +342,18 @@ class EncryptionService {
       KeyDerivation.deriveFileKey(masterKey, salt, iterations);
 
   Future<Uint8List> deriveFileKeyAsync(
-          Uint8List masterKey, Uint8List salt, int iterations) =>
-      KeyDerivation.deriveFileKeyAsync(masterKey, salt, iterations);
+      Uint8List masterKey, Uint8List salt, int iterations) async {
+    final cacheKey = '${base64Encode(salt)}:$iterations';
+    final cached = _fileKeyCache[cacheKey];
+    if (cached != null) return cached;
+    final key =
+        await KeyDerivation.deriveFileKeyAsync(masterKey, salt, iterations);
+    if (_fileKeyCache.length >= _fileKeyCacheLimit) {
+      _fileKeyCache.remove(_fileKeyCache.keys.first);
+    }
+    _fileKeyCache[cacheKey] = key;
+    return key;
+  }
 
   /// Derive key from password using PBKDF2
   Uint8List deriveKeyFromPassword(String password,
@@ -1875,6 +1891,7 @@ class EncryptionService {
   Future<void> resetKeys() async {
     _cachedMasterKey = null;
     _cachedDecoyKey = null;
+    _fileKeyCache.clear();
     _pendingCredential = null;
     _pendingDecoyCredential = null;
 
