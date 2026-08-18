@@ -15,8 +15,13 @@ pure-Go build cross-compiles for android/arm64 with `CGO_ENABLED=0`, serves
 loopback HTTP, and the token gate + collection CRUD were exercised on a
 linux host). P1 is complete. P2 is complete in code (runtime + client +
 lifecycle wiring; the P0 spike screen is deleted — its on-device job now
-rides on the `[PB] …` debug logs from `PocketBaseRuntime`). Outstanding
-before P3 is exercised on real hardware: unlock a debug build (with
+rides on the `[PB] …` debug logs from `PocketBaseRuntime`). P3 is complete
+in code (cipher codec, 4 DAOs on a shared base, `PocketBaseStore` with the
+`VaultStore` surface, one-time legacy migration, encrypted-column tests;
+row shapes re-verified against a real host sidecar). P4 is complete in code
+(`LocalStore` interface, VaultStore PB-first routing with legacy fallback,
+`pbEnabled` flag, scripted e2e). Outstanding
+before P3/P4 are exercised on real hardware: unlock a debug build (with
 `make pb` run first) and confirm `[PB] sidecar up: pid=… port=…` in
 logcat. If the sidecar proves broken on device, fall back to `sqflite`.
 Per-task status lives in the phase tables below.
@@ -235,20 +240,20 @@ sidecar. One happy-path test per phase lives in `test/pb_runtime_test.dart`
 
 | # | Task | Location | Status |
 |---|---|---|---|
-| P3.1 | `cipher_codec`: envelope/unwrap via `AesGcmCipher` + master key | `lib/services/pb/cipher_codec.dart` | pending |
-| P3.2 | DAOs: `VaultFileDao`, `AlbumDao`, `TagDao`, `FolderDao` (CRUD against PB collections, encrypting secret fields) | `lib/services/pb/daos/*.dart` | pending |
-| P3.3 | `PocketBaseStore implements LocalStore` (same surface `VaultStore` exposes) | `lib/services/pb/pocketbase_store.dart` | pending |
-| P3.4 | One-time legacy → PB migration, guarded by settings flag | `lib/services/pb/migrate_legacy_index.dart` | pending |
-| P3.5 | Behavioral test: round-trip a `VaultedFile` through the DAO; assert `cipher_meta` is ciphertext in the row and plaintext after read | `test/pb_store_test.dart` | pending |
+| P3.1 | `cipher_codec`: envelope/unwrap via `AesGcmCipher` + master key | `lib/services/pb/cipher_codec.dart` | done — `CipherCodec` (`[16-byte IV][ct+tag]`, base64, GCM tag failure on wrong key/tamper) + `pbRecordId` (sha256→15-char hex, PB's autogen id shape, since app ids like `recent` or dashed UUIDs are not legal PB ids) |
+| P3.2 | DAOs: `VaultFileDao`, `AlbumDao`, `TagDao`, `FolderDao` (CRUD against PB collections, encrypting secret fields) | `lib/services/pb/daos/*.dart` | done — shared `PbDao<T>` base (paginated list, POST→PATCH upsert, idempotent delete, `reconcile` = upsert-all + ghost-row removal). `cipher_meta`/`cipher_name` hold the whole model JSON encrypted (envelope authoritative on read; `blob_ref`/`modified_at`/`deleted` are derived plaintext columns) |
+| P3.3 | `PocketBaseStore implements LocalStore` (same surface `VaultStore` exposes) | `lib/services/pb/pocketbase_store.dart` | done in code — same load/save + cached-map surface as `VaultStore` (files/albums/folders/tags, non-decoy; settings stay in secure storage). Formal `implements` lands with the P4.1 interface extraction; empty-index data-loss guard mirrors legacy |
+| P3.4 | One-time legacy → PB migration, guarded by settings flag | `lib/services/pb/migrate_legacy_index.dart` | done — guarded by a `pb_legacy_index_migrated` FlutterSecureStorage flag; reads all four legacy indexes, upserts via DAOs (never reconciles, so a reset flag can't wipe PB), seeds the caches, keeps the legacy store untouched |
+| P3.5 | Behavioral test: round-trip a `VaultedFile` through the DAO; assert `cipher_meta` is ciphertext in the row and plaintext after read | `test/pb_store_test.dart` | done — 3 tests: codec hides plaintext + rejects wrong key/tamper (security failure path), DAO round-trip against an in-process fake PB server (token gate, CRUD, pagination), store reconcile/ghosts/tag/album-defaults. Real-binary spot-check below |
 
 ### P4 — Wire-in + sync integration (3–4 days)
 
 | # | Task | Location | Status |
 |---|---|---|---|
-| P4.1 | Introduce `LocalStore` interface; `VaultStore` and `PocketBaseStore` both implement it | `lib/services/local_store.dart` | pending |
-| P4.2 | `VaultService` reads/writes through `LocalStore` (PB preferred, legacy fallback) | `lib/services/vault_service.dart` | pending |
-| P4.3 | `SyncService.buildManifest` reads from the active `LocalStore` instead of `cachedFiles`; `runSync` unchanged | `lib/services/sync_service.dart` | pending |
-| P4.4 | End-to-end: seed vault → PB rows appear → `runSync` pushes blobs + encrypted manifest (WebDAV path unchanged) | manual + scripted | pending |
+| P4.1 | Introduce `LocalStore` interface; `VaultStore` and `PocketBaseStore` both implement it | `lib/services/local_store.dart` | done — interface covers the shared surface (4 cached maps, load/save ×4, `reloadAll`, `wipe`); PB throws on `isDecoy: true` (decoy never starts the sidecar); `PocketBaseStore` gained `wipe` (reconcile-empty on all 4 DAOs) so `clearVault` can't resurrect a wiped vault from PB rows |
+| P4.2 | `VaultService` reads/writes through `LocalStore` (PB preferred, legacy fallback) | `lib/services/vault_service.dart` | done — delegate, not a swap: `VaultStore` (the store every domain service already holds) routes non-decoy loads/saves/wipes through an optional `pbStore: LocalStore?` and falls back to its legacy JSON path on any PB failure. `VaultService.activatePocketBase()` (called from `UnlockScreen` post-unlock, gated by the new `VaultSettings.pbEnabled`, default on) builds the store, runs the one-time migration, attaches the delegate, refreshes caches. Failure at any step logs and stays on legacy |
+| P4.3 | `SyncService.buildManifest` reads from the active `LocalStore` instead of `cachedFiles`; `runSync` unchanged | `lib/services/sync_service.dart` | done with zero sync-service edits — `syncNow` already read `_store.loadFileIndex()` (not the cache) and the provider persists via `cachedFiles = refreshedLocal; saveFileIndex()`; both calls now route PB-first via the P4.2 delegate. Typing the ctor field `LocalStore` was rejected: it would break `ensureVaultDirectory` for no behavioral gain |
+| P4.4 | End-to-end: seed vault → PB rows appear → `runSync` pushes blobs + encrypted manifest (WebDAV path unchanged) | manual + scripted | scripted done — `test/pb_wire_test.dart`: seed via VaultStore cache+save → PB row exists with `cipher_meta` ciphertext → `runSync` (in-memory RemoteStore) pushes 1 blob + decryptable manifest → cache-free reload round-trips through PB; plus the PB-dead fallback path (load falls back to legacy, never throws). Manual on-device run still pending with the P0/P2 hardware check |
 
 ### P5 — Polish (deferred)
 
@@ -291,20 +296,40 @@ lib/screens/unlock_screen.dart              + fire-and-forget PB start on real
 lib/screens/vault_settings_screen.dart      spike tile removed again in P2
 ```
 
-New — **planned (P3–P4)**:
+New — **built (P4)**:
 
 ```
-lib/services/local_store.dart              LocalStore interface
-lib/services/pb/cipher_codec.dart          column envelope/unwrap (reuse AesGcm)
-lib/services/pb/daos/*.dart                per-entity DAOs
-lib/services/pb/pocketbase_store.dart      LocalStore impl over PB
+lib/services/local_store.dart              LocalStore interface (shared
+                                           load/save/cache/wipe surface)
+test/pb_wire_test.dart                     P4.4 scripted e2e + PB-dead
+                                           fallback
+```
+
+New — **built (P3)**:
+
+```
+lib/services/pb/cipher_codec.dart          column envelope/unwrap + pbRecordId
+lib/services/pb/daos/pb_dao.dart           shared CRUD base (list/upsert/
+                                           delete/reconcile)
+lib/services/pb/daos/vault_file_dao.dart   vault_files DAO
+lib/services/pb/daos/album_dao.dart        albums DAO
+lib/services/pb/daos/tag_dao.dart          tags DAO (cipher_name)
+lib/services/pb/daos/folder_dao.dart       folders DAO
+lib/services/pb/pocketbase_store.dart      VaultStore-surface impl over PB
 lib/services/pb/migrate_legacy_index.dart  one-time FlutterSecureStorage → PB
 test/pb_store_test.dart                    encrypted-column round-trip
 ```
 
-Changed — **planned**: `lib/services/vault_service.dart`,
-`lib/services/sync_service.dart`, `lib/models/vault_settings.dart` (+pbEnabled
-flag) in P4.
+Changed — **built (P3)**: `lib/services/vault_store.dart`
+(`createDefaultAlbums` made static so both stores share the defaults).
+
+Changed — **built (P4)**: `lib/services/vault_store.dart` (`implements
+LocalStore`, `pbStore` delegate + PB-first routing with legacy fallback for
+files/albums/folders/tags + wipe), `lib/services/vault_service.dart`
+(`activatePocketBase`), `lib/models/vault_settings.dart` (`pbEnabled`,
+default true), `lib/screens/unlock_screen.dart` (gate + activate after
+sidecar start), `lib/services/pb/pocketbase_store.dart` (formal `implements
+LocalStore`, `isDecoy` guards, `wipe`).
 
 Build artifacts (gitignored, regenerated): `jniLibs/<abi>/libpocketbase.so`,
 `pocketbase/pb_data/`.
@@ -343,10 +368,21 @@ migrated, record CRUD round-trip, `cipher_meta` opaque at rest; `go vet`,
 `go build`, and `flutter analyze` clean. **P2 checked** —
 `test/pb_runtime_test.dart` covers the stdout-handshake parser (happy path
 plus junk-line and garbage-port failure paths); `flutter analyze` and the
-full `flutter test` suite pass. Outstanding: on-device run
-(P0.2/P0.3/P2.3 hardware confirmation — unlock a debug apk built after
-`make pb` and look for `[PB] sidecar up` in logcat) before P3 relies on
-the sidecar.
+full `flutter test` suite pass. **P3 checked** —
+`test/pb_store_test.dart` covers the codec (plaintext hidden at rest, GCM
+tag rejects wrong key + tamper), the DAO round-trip and store reconcile
+against an in-process fake PB server, and the exact row shapes were
+re-verified against a real `make pb-linux` sidecar (client-supplied 15-hex
+ids accepted, duplicate id → 400 so POST→PATCH upsert holds, json-object
+`cipher_meta` round-trips verbatim, `fields`/pagination honored,
+`cipher_name` text column round-trips). `flutter analyze` and the full
+`flutter test` suite pass. **P4 checked** — `test/pb_wire_test.dart`
+covers the scripted e2e (seed → PB rows with ciphertext `cipher_meta` →
+`runSync` pushes blob + decryptable manifest → cache-free reload through
+PB) and the PB-dead fallback failure path; `flutter analyze` and the full
+`flutter test` suite pass. Outstanding: on-device run
+(P0.2/P0.3/P2.3/P4.4-manual hardware confirmation — unlock a debug apk
+built after `make pb` and look for `[PB] sidecar up` in logcat).
 
 ## Open decisions
 
