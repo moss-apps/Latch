@@ -42,7 +42,7 @@ class UpdateService {
   static const _installSourceChannel =
       MethodChannel('com.mossapps.locker/install_source');
 
-  // ponytail: hardcoded repo slug — single distribution channel, no config needed
+  // hardcoded repo slug — single distribution channel, no config needed
   static const _releasesUrl =
       'https://api.github.com/repos/moss-apps/Latch/releases/latest';
   static const _releasePageUrl =

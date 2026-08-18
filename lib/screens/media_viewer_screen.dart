@@ -43,7 +43,7 @@ class MediaViewerScreen extends ConsumerStatefulWidget {
 class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   late PageController _pageController;
   late int _currentIndex;
-  // ponytail: local copy so on-delete remove() mutates ours, not the caller's list
+  // local copy so on-delete remove() mutates ours, not the caller's list
   late final List<VaultedFile> _files;
   bool _showControls = true;
   bool _isSlideshow = false;
@@ -62,11 +62,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   // Cancel token for in-flight video loads
   Completer<void>? _videoLoadCancel;
 
-  // ponytail: cache the decrypted File path per file id. Reading bytes into
-  // Uint8List and using Image.memory forced the whole file through the Dart
-  // heap and triggered main-isolate decode stalls on large images. Letting
-  // Image.file stream from disk keeps the Dart heap small and decoding on
-  // Flutter's background rasterizer.
+  // Image.file streams from disk; Image.memory stalled main-isolate decode on large images.
   final Map<String, File> _decryptedFileCache = {};
 
   // Debounce timer for video player updates (reduces setState calls)
@@ -325,8 +321,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
     await _videoController?.setLooping(_isLooping);
   }
 
-  // ponytail: locks the device to portrait or landscape so a video can be
-  // watched in either orientation. Pure global side effect, no per-axis work.
+  // orientation lock for video viewing; pure global side effect.
   void _toggleOrientation() {
     setState(() => _forceLandscape = !_forceLandscape);
     if (_forceLandscape) {

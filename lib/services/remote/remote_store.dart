@@ -4,9 +4,7 @@ import 'dart:typed_data';
 /// types cross this boundary. SyncService owns manifest encrypt/decrypt and
 /// content-addressed naming; this interface just moves bytes by name.
 ///
-/// ponytail: abstract only — the WebDAV implementation (webdav_client) lands in
-/// Phase S0.2 impl along with its dependency. Until then this pins the contract
-/// the pure SyncService logic and tests build against.
+/// interface-only contract for pure SyncService logic + tests.
 abstract class RemoteStore {
   /// Encrypted manifest blob name on the remote store.
   static const String manifestName = 'manifest.enc';

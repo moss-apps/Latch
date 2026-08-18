@@ -27,6 +27,10 @@ class VaultSettings {
   final bool syncEnabled;
   final String? syncProfileId;
 
+  /// PocketBase local store preferred over the legacy JSON index when the
+  /// sidecar is available (docs/embedded_pocketbase.md P4).
+  final bool pbEnabled;
+
   const VaultSettings({
     this.encryptionEnabled = false,
     this.encryptionAlgorithm = EncryptionAlgorithm.aes256Gcm,
@@ -49,6 +53,7 @@ class VaultSettings {
     this.showPermissionWarning = true,
     this.syncEnabled = false,
     this.syncProfileId,
+    this.pbEnabled = true,
   });
 
   VaultSettings copyWith({
@@ -73,6 +78,7 @@ class VaultSettings {
     bool? showPermissionWarning,
     bool? syncEnabled,
     String? syncProfileId,
+    bool? pbEnabled,
   }) {
     return VaultSettings(
       encryptionEnabled: encryptionEnabled ?? this.encryptionEnabled,
@@ -103,6 +109,7 @@ class VaultSettings {
           showPermissionWarning ?? this.showPermissionWarning,
       syncEnabled: syncEnabled ?? this.syncEnabled,
       syncProfileId: syncProfileId ?? this.syncProfileId,
+      pbEnabled: pbEnabled ?? this.pbEnabled,
     );
   }
 
@@ -128,6 +135,7 @@ class VaultSettings {
         'showPermissionWarning': showPermissionWarning,
         'syncEnabled': syncEnabled,
         'syncProfileId': syncProfileId,
+        'pbEnabled': pbEnabled,
       };
 
   factory VaultSettings.fromJson(Map<String, dynamic> json) {
@@ -165,6 +173,7 @@ class VaultSettings {
           json['showPermissionWarning'] as bool? ?? true,
       syncEnabled: json['syncEnabled'] as bool? ?? false,
       syncProfileId: json['syncProfileId'] as String?,
+      pbEnabled: json['pbEnabled'] as bool? ?? true,
     );
   }
 }

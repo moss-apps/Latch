@@ -27,7 +27,7 @@ class WebDAVStore implements RemoteStore {
   webdav.Client get _c {
     if (_client != null) return _client!;
     final c = webdav.newClient(baseUrl, user: username, password: password);
-    // ponytail: generous timeouts; .local NAS hosts + cold servers need room.
+    // generous timeouts; .local NAS hosts + cold servers need room.
     c.setConnectTimeout(15000);
     c.setSendTimeout(30000);
     c.setReceiveTimeout(30000);
@@ -95,8 +95,7 @@ class WebDAVStore implements RemoteStore {
   }
 
   /// Absent file (404) and reachability errors both come back null.
-  /// ponytail: conflates the two; v1 treats them the same, and the caller's
-  /// testConnection gate separates "server down" from "nothing synced yet".
+  /// 404 and unreachable are conflated; testConnection separates them upstream.
   Future<Uint8List?> _readOrNull(String name) async {
     try {
       return Uint8List.fromList(await _c.read(_path(name)));

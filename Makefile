@@ -38,7 +38,7 @@ pb:
 
 ## Local native build for quick desktop verification of the wrapper/migrations.
 pb-linux:
-	cd $(PB_MODULE) && CGO_ENABLED=0 go build -o ../../locker-pb $(PB_PKG)
+	cd $(PB_MODULE) && CGO_ENABLED=0 go build -o $(CURDIR)/locker-pb $(PB_PKG)
 
 ## Vendor the canonical JS editor types so the `/// <reference>` in each
 ## migration resolves. Regenerable, gitignored — run after a PB version bump.

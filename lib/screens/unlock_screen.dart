@@ -5,6 +5,8 @@ import '../themes/app_colors.dart';
 import '../services/auth_service.dart';
 import '../services/decoy_service.dart';
 import '../services/encryption_service.dart';
+import '../services/pb/pocketbase_runtime.dart';
+import '../services/vault_service.dart';
 import '../widgets/adaptive_logo.dart';
 import '../widgets/pin_input_widget.dart';
 import 'gallery_vault_screen.dart';
@@ -93,6 +95,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
       await _decoyService.activateDecoyMode();
     } else {
       await _decoyService.deactivateDecoyMode();
+      unawaited(_startPocketBase());
     }
     await _authService.resetUnlockAttempts();
 
@@ -103,6 +106,19 @@ class _UnlockScreenState extends State<UnlockScreen> {
         builder: (context) => const GalleryVaultScreen(),
       ),
     );
+  }
+
+  // PB holds only ciphertext, so it can't be used until the key exists — but
+  // starting it must never block or fail the unlock. Recovery UI is P5.
+  Future<void> _startPocketBase() async {
+    try {
+      final settings = await VaultService.instance.getSettings();
+      if (!settings.pbEnabled) return;
+      await PocketBaseRuntime.instance.start();
+      await VaultService.instance.activatePocketBase();
+    } catch (e) {
+      debugPrint('[PB] activation failed, staying on legacy store: $e');
+    }
   }
 
   Future<void> _handleFailedUnlock(String defaultMessage) async {

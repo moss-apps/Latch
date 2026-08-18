@@ -61,6 +61,11 @@ func main() {
 	// hand apis.Serve our own already-bound listener so we can read the real port.
 	app.OnServe().Bind(&hook.Handler[*core.ServeEvent]{
 		Func: func(e *core.ServeEvent) error {
+			// No superuser UI in the embedded role: replace PB's first-run
+			// installer (which prints a superuser-creation JWT to stdout and
+			// tries to launch a browser) with a no-op.
+			e.InstallerFunc = func(core.App, *core.Record, string) error { return nil }
+
 			e.Router.BindFunc(func(re *core.RequestEvent) error {
 				if re.Request.Header.Get(tokenHeader) != authToken {
 					return apis.NewUnauthorizedError("invalid token", nil)

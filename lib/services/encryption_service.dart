@@ -61,6 +61,10 @@ class EncryptionService {
   String? _pendingCredential;
   String? _pendingDecoyCredential;
 
+  // memo keyed by salt:iterations — re-encrypt mints a new salt, so entries self-invalidate.
+  final Map<String, Uint8List> _fileKeyCache = {};
+  static const int _fileKeyCacheLimit = 100;
+
   CryptoIsolatePool? _pool;
 
   Future<void> initialize() async {
@@ -336,8 +340,18 @@ class EncryptionService {
       KeyDerivation.deriveFileKey(masterKey, salt, iterations);
 
   Future<Uint8List> deriveFileKeyAsync(
-          Uint8List masterKey, Uint8List salt, int iterations) =>
-      KeyDerivation.deriveFileKeyAsync(masterKey, salt, iterations);
+      Uint8List masterKey, Uint8List salt, int iterations) async {
+    final cacheKey = '${base64Encode(salt)}:$iterations';
+    final cached = _fileKeyCache[cacheKey];
+    if (cached != null) return cached;
+    final key =
+        await KeyDerivation.deriveFileKeyAsync(masterKey, salt, iterations);
+    if (_fileKeyCache.length >= _fileKeyCacheLimit) {
+      _fileKeyCache.remove(_fileKeyCache.keys.first);
+    }
+    _fileKeyCache[cacheKey] = key;
+    return key;
+  }
 
   /// Derive key from password using PBKDF2
   Uint8List deriveKeyFromPassword(String password,
@@ -1489,8 +1503,7 @@ class EncryptionService {
   }
 
   /// App-private temp dir for plaintext intermediates (never system temp).
-  /// ponytail: keeps decrypted rotation/re-encryption scratch off the shared
-  /// system temp; callers still secureDelete the plaintext file on cleanup.
+  /// keeps decrypted scratch out of shared system temp.
   Future<Directory> _createAppPrivateTemp(String prefix) async {
     final docs = await getApplicationDocumentsDirectory();
     final root = Directory('${docs.path}/.locker_temp');
@@ -1643,9 +1656,7 @@ class EncryptionService {
   /// Returns: 0=unknown/legacy CBC, 1=GCM, 2=CTR, 3=CBC with header
   int detectFileFormat(String filePath) => HeaderCodec.detectFormatFromFile(filePath);
 
-  // ponytail: direct magic-byte check for re-encryption routing. detectFileFormat
-  // now returns the real format, but this keeps a single read + no format-int
-  // indirection on the hot re-encrypt path.
+  // direct magic-byte check; single read, no format-int indirection on the hot path.
   bool _isLegacyCbcFile(String path) {
     try {
       final f = File(path).openSync(mode: FileMode.read);
@@ -1875,6 +1886,7 @@ class EncryptionService {
   Future<void> resetKeys() async {
     _cachedMasterKey = null;
     _cachedDecoyKey = null;
+    _fileKeyCache.clear();
     _pendingCredential = null;
     _pendingDecoyCredential = null;
 

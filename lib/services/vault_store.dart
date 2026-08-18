@@ -10,15 +10,19 @@ import '../models/album.dart';
 import '../models/vault_folder.dart';
 import '../models/vault_settings.dart';
 import '../models/vaulted_file.dart';
+import 'local_store.dart';
 
 /// Centralized vault state + persistence. Owns `_storage`, directories, the
 /// `_cached*` maps and all `_load*`/`_save*` methods. Domain services depend
 /// on this + `EncryptionService` via constructor.
 ///
-/// ponytail: single shared-state holder. The original VaultService had every
-/// cache read inline across all seams — no service could be extracted
-/// cleanly without centralizing state first. This is that centralization.
-class VaultStore {
+/// single shared-state holder, centralization that made service extraction possible.
+///
+/// P4: when a PB delegate is attached (post-unlock, sidecar healthy), all
+/// non-decoy loads/saves/wipes route through it first, falling back to the
+/// legacy secure-storage JSON path on any PB failure. VaultStore's own
+/// caches stay the single in-memory truth either way.
+class VaultStore implements LocalStore {
   static const _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(),
     iOptions:
@@ -38,12 +42,20 @@ class VaultStore {
   Directory? vaultDirectory;
   Directory? decoyDirectory;
 
+  @override
   List<VaultedFile>? cachedFiles;
   List<VaultedFile>? cachedDecoyFiles;
+  @override
   List<Album>? cachedAlbums;
+  @override
   List<VaultFolder>? cachedFolders;
+  @override
   List<TagInfo>? cachedTags;
   VaultSettings? cachedSettings;
+
+  /// PB persistence backend when active (P4.2). Null = legacy-only. Set by
+  /// `VaultService.activatePocketBase` after the sidecar is up + unlocked.
+  LocalStore? pbStore;
 
   /// Read-only secure-storage handle (used by services for the re-encrypt
   /// journal, which lives outside the cached maps).
@@ -136,6 +148,7 @@ class VaultStore {
 
   // ---- Load / save primitive indexes ----
 
+  @override
   Future<List<VaultedFile>> loadFileIndex({
     bool isDecoy = false,
     bool forceReload = false,
@@ -145,6 +158,15 @@ class VaultStore {
     }
     if (!forceReload && isDecoy && cachedDecoyFiles != null) {
       return cachedDecoyFiles!;
+    }
+
+    if (!isDecoy && pbStore != null) {
+      try {
+        cachedFiles = await pbStore!.loadFileIndex(forceReload: forceReload);
+        return cachedFiles!;
+      } catch (e) {
+        debugPrint('[PB] loadFileIndex failed, falling back to legacy: $e');
+      }
     }
 
     try {
@@ -198,7 +220,17 @@ class VaultStore {
     }
   }
 
+  @override
   Future<void> saveFileIndex({bool isDecoy = false}) async {
+    if (!isDecoy && pbStore != null) {
+      pbStore!.cachedFiles = cachedFiles ?? const [];
+      try {
+        await pbStore!.saveFileIndex();
+        return;
+      } catch (e) {
+        debugPrint('[PB] saveFileIndex failed, falling back to legacy: $e');
+      }
+    }
     try {
       final files = isDecoy ? cachedDecoyFiles : cachedFiles;
       final key = isDecoy ? decoyIndexKey : vaultIndexKey;
@@ -224,8 +256,18 @@ class VaultStore {
     }
   }
 
+  @override
   Future<List<Album>> loadAlbums({bool forceReload = false}) async {
     if (!forceReload && cachedAlbums != null) return cachedAlbums!;
+
+    if (pbStore != null) {
+      try {
+        cachedAlbums = await pbStore!.loadAlbums(forceReload: forceReload);
+        return cachedAlbums!;
+      } catch (e) {
+        debugPrint('[PB] loadAlbums failed, falling back to legacy: $e');
+      }
+    }
 
     try {
       final albumsJson = await _storage.read(key: albumsKey);
@@ -248,7 +290,9 @@ class VaultStore {
     }
   }
 
-  List<Album> createDefaultAlbums() {
+  /// Static so PocketBaseStore (which is not a VaultStore) can reuse the
+  /// same defaults.
+  static List<Album> createDefaultAlbums() {
     final now = DateTime.now();
     return [
       Album(
@@ -272,7 +316,17 @@ class VaultStore {
     ];
   }
 
+  @override
   Future<void> saveAlbums() async {
+    if (pbStore != null) {
+      pbStore!.cachedAlbums = cachedAlbums ?? const [];
+      try {
+        await pbStore!.saveAlbums();
+        return;
+      } catch (e) {
+        debugPrint('[PB] saveAlbums failed, falling back to legacy: $e');
+      }
+    }
     try {
       final jsonList = cachedAlbums?.map((a) => a.toJson()).toList() ?? [];
       await _storage.write(key: albumsKey, value: jsonEncode(jsonList));
@@ -281,8 +335,18 @@ class VaultStore {
     }
   }
 
+  @override
   Future<List<VaultFolder>> loadFolders({bool forceReload = false}) async {
     if (!forceReload && cachedFolders != null) return cachedFolders!;
+
+    if (pbStore != null) {
+      try {
+        cachedFolders = await pbStore!.loadFolders(forceReload: forceReload);
+        return cachedFolders!;
+      } catch (e) {
+        debugPrint('[PB] loadFolders failed, falling back to legacy: $e');
+      }
+    }
 
     try {
       final foldersJson = await _storage.read(key: foldersKey);
@@ -304,7 +368,17 @@ class VaultStore {
     }
   }
 
+  @override
   Future<void> saveFolders() async {
+    if (pbStore != null) {
+      pbStore!.cachedFolders = cachedFolders ?? const [];
+      try {
+        await pbStore!.saveFolders();
+        return;
+      } catch (e) {
+        debugPrint('[PB] saveFolders failed, falling back to legacy: $e');
+      }
+    }
     try {
       final jsonList = cachedFolders?.map((f) => f.toJson()).toList() ?? [];
       await _storage.write(key: foldersKey, value: jsonEncode(jsonList));
@@ -313,8 +387,18 @@ class VaultStore {
     }
   }
 
+  @override
   Future<List<TagInfo>> loadTags({bool forceReload = false}) async {
     if (!forceReload && cachedTags != null) return cachedTags!;
+
+    if (pbStore != null) {
+      try {
+        cachedTags = await pbStore!.loadTags(forceReload: forceReload);
+        return cachedTags!;
+      } catch (e) {
+        debugPrint('[PB] loadTags failed, falling back to legacy: $e');
+      }
+    }
 
     try {
       final tagsJson = await _storage.read(key: tagsKey);
@@ -336,7 +420,17 @@ class VaultStore {
     }
   }
 
+  @override
   Future<void> saveTags() async {
+    if (pbStore != null) {
+      pbStore!.cachedTags = cachedTags ?? const [];
+      try {
+        await pbStore!.saveTags();
+        return;
+      } catch (e) {
+        debugPrint('[PB] saveTags failed, falling back to legacy: $e');
+      }
+    }
     try {
       final jsonList = cachedTags?.map((t) => t.toJson()).toList() ?? [];
       await _storage.write(key: tagsKey, value: jsonEncode(jsonList));
@@ -431,6 +525,7 @@ class VaultStore {
   }
 
   /// Reload every cache atomically (used by `refresh()` in VaultService).
+  @override
   Future<void> reloadAll() async {
     final files = await loadFileIndex(forceReload: true);
     final decoyFiles = await loadFileIndex(isDecoy: true, forceReload: true);
@@ -445,7 +540,17 @@ class VaultStore {
   }
 
   /// Wipe caches + storage for a vault (used by `clearVault()` in VaultService).
+  /// PB rows are wiped too when active — else a cleared vault would
+  /// resurrect from PB on the next load.
+  @override
   Future<void> wipe({bool isDecoy = false}) async {
+    if (!isDecoy && pbStore != null) {
+      try {
+        await pbStore!.wipe();
+      } catch (e) {
+        debugPrint('[PB] wipe failed: $e');
+      }
+    }
     final appDir = await getApplicationDocumentsDirectory();
     final directory = Directory(
       '${appDir.path}/${isDecoy ? decoyFolderName : vaultFolderName}',

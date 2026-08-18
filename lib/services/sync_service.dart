@@ -74,10 +74,7 @@ class SyncPlan {
 
   /// Live local ids where both sides changed since the last sync. Last-write-
   /// wins still resolves the outcome; this is surfaced as a UI note only.
-  /// ponytail: detects only the local-newer-and-remote-diverged case — the
-  /// remote-newer direction can't be detected without hashing local content,
-  /// so a stale local edit overwritten by a pull is silent. Three-way merge
-  /// is an explicit non-goal (docs/local_server_sync.md).
+  /// only local-newer conflicts; remote-newer needs local hashing — three-way merge is a non-goal.
   final List<String> conflicts;
 
   /// Live local ids a remote tombstone should delete (two-way only, LWW: the
@@ -103,9 +100,7 @@ class SyncPlan {
 /// Vault sync. Pure diff/manifest logic lives as statics (tested directly);
 /// [syncNow] is the Riverpod-constructed entrypoint that wires real I/O.
 ///
-/// ponytail: NOT a singleton — constructed by `syncServiceProvider` with
-/// [VaultStore] + [EncryptionService], matching the Phase 2 service style.
-/// Per locked decision #5 this avoids a 13th `instance` singleton.
+/// not a singleton — provider-constructed (locked decision #5).
 class SyncService {
   SyncService(this._store, this._crypto);
 
@@ -130,12 +125,7 @@ class SyncService {
     // Ensure the vault dir + subdirs exist before a two-way pull writes into it.
     final dir = await _store.ensureVaultDirectory();
     final masterKey = await _crypto.getMasterKey();
-    // ponytail: run the engine off the UI isolate. runSync reads whole files
-    // into memory and hashes them synchronously (sha256.convert), which freezes
-    // the UI for any non-trivial file. Isolate.run moves all file + network
-    // I/O to a worker so the app stays responsive. Ceiling: per-file progress
-    // is dropped (phase-level status remains) — wire a SendPort through if a
-    // live x/y counter is needed.
+    // Isolate.run keeps file+hash I/O off the UI thread; per-file progress dropped (SendPort if needed).
     return Isolate.run(() => runSync(
       local: local,
       masterKey: masterKey,
@@ -214,11 +204,7 @@ class SyncService {
             ),
           );
         } else {
-          // ponytail: referenced blob missing on disk (e.g. a deleted
-          // password's shadow VaultedFile). Skip — can't push bytes that
-          // aren't there; keep the index entry as-is so sync never silently
-          // mutates local state. Root cause is stale shadow cleanup, tracked
-          // separately.
+          // skip missing on-disk blobs; never silently mutate the index. Root cause tracked separately.
           skipped++;
           refreshed.add(f);
         }
@@ -241,13 +227,7 @@ class SyncService {
     var pulled = 0;
 
     // ---- PULL phase (two-way only) ----
-    // ponytail: GCM auth on pull is satisfied transitively. The manifest is
-    // GCM-authenticated (root of trust) and each blob's sha256 must equal the
-    // manifest's contentHash — a tampered or swapped blob breaks the hash. A
-    // full decrypt-to-verify-the-tag is redundant: pushed files were created
-    // by our own encrypt path, so a hash-matching blob is always decryptable.
-    // Add explicit tag verification only if a non-vault blob could ever enter
-    // the store (it can't today).
+    // manifest GCM + sha256 match makes decrypt-to-verify redundant; blobs are always our own.
     if (twoWay && vaultRoot != null && plan.toPull.isNotEmpty) {
       final totalPull = plan.toPull.length;
       var done = 0;

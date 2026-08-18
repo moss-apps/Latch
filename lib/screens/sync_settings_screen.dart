@@ -212,7 +212,7 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
 
   /// Map a WebDAV/Dio failure to something actionable. A connect timeout on a
   /// LAN IP is always "server unreachable", never "timeout too short".
-  // ponytail: string-match on toString(); avoids importing transitive dio.
+  // string-match on toString(); avoids importing transitive dio.
   String _describeConnError(Object e) {
     final s = e.toString().toLowerCase();
     if (s.contains('connection timeout') || s.contains('connecttimeout')) {
