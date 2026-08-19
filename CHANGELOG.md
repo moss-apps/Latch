@@ -2,6 +2,36 @@
 
 Notable changes to Latch.
 
+## 0.17.1-beta.2
+
+### Embedded PocketBase Sidecar
+- **Native PocketBase runtime embedded** in the Android app for local metadata persistence
+- Sidecar process lifecycle management with `PbHandshakeParser` handshake protocol
+- Sidecar **HTTP client** for collection CRUD
+- **Native library extraction** on Android with a PB channel exposing `nativeLibraryDir`
+- Sidecar starts automatically after successful vault unlock
+- Startup gated by vault settings; **enabled by default**
+- P0 spike screen removed — sidecar now fully integrated
+
+### PocketBase Persistence Backend
+- `PocketBaseStore` for remote metadata persistence behind a `LocalStore` interface
+- **Encrypted DAOs** for vault files, tags, folders, and albums (`PbDao` base class)
+- `CipherCodec` for PB secret column encryption
+- **Legacy migration** from secure storage to PocketBase with fallback
+- File key cache for performance
+
+### UI
+- **Redesigned unlock screen** with cleaner layout and animation
+- Simplified PIN input widget styling
+- **Updated launcher icon** with adaptive + monochrome Android support
+
+### Testing & Build
+- Tests for PocketBase store, cipher codec, sync integration, and `PbHandshakeParser` runtime
+- Embedded PocketBase docs updated (P0–P4 complete); `make pb-types` target for vendored JS editor types
+- PocketBase binaries gitignored; `http` dependency added
+
+---
+
 ## 0.17.0-beta.1
 
 ### Local Server Sync

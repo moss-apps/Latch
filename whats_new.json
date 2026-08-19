@@ -1,4 +1,36 @@
 {
+  "0.17.1-beta.2": [
+    {
+      "title": "PocketBase Backend",
+      "items": [
+        {
+          "icon": "system_update_outlined",
+          "title": "Embedded PocketBase",
+          "description": "A native PocketBase runtime is now embedded in the app, giving your vault a fast local metadata store."
+        },
+        {
+          "icon": "lock_outlined",
+          "title": "Encrypted storage",
+          "description": "Vault files, tags, folders, and albums are stored encrypted through PocketBase with automatic migration from legacy storage."
+        }
+      ]
+    },
+    {
+      "title": "UI & Polish",
+      "items": [
+        {
+          "icon": "auto_awesome_outlined",
+          "title": "Redesigned unlock screen",
+          "description": "A cleaner, animated unlock screen with a simplified PIN input."
+        },
+        {
+          "icon": "palette_outlined",
+          "title": "New adaptive icon",
+          "description": "Updated launcher icon with adaptive and monochrome Android support."
+        }
+      ]
+    }
+  ],
   "0.17.0-beta.1": [
     {
       "title": "Local Server Sync",
