@@ -21,11 +21,13 @@ class NoteService {
 
   static const String _notesIndexKey = 'locker_notes_index';
   static const String _noteFoldersKey = 'locker_note_folders';
+  static const String _notesIndexDecoyKey = 'locker_notes_index_decoy';
+  static const String _noteFoldersDecoyKey = 'locker_note_folders_decoy';
   static const String _notesDirName = 'notes';
   static const int _defaultKdfIterations = 100000;
 
-  List<Note>? _cachedNotes;
-  List<NoteFolder>? _cachedFolders;
+  final Map<bool, List<Note>> _notesCache = {};
+  final Map<bool, List<NoteFolder>> _foldersCache = {};
 
   Future<String> _getNotesDir({bool isDecoy = false}) async {
     final appDir = await getApplicationDocumentsDirectory();
@@ -41,51 +43,104 @@ class NoteService {
   }
 
   Future<List<Note>> loadNotes({bool isDecoy = false}) async {
-    if (_cachedNotes != null) return _cachedNotes!;
+    final cached = _notesCache[isDecoy];
+    if (cached != null) return cached;
+    if (!isDecoy) await _migrateLegacyNotes();
+    final json = await _secureStorage.read(
+      key: isDecoy ? _notesIndexDecoyKey : _notesIndexKey,
+    );
+    final notes = <Note>[];
+    if (json != null && json.isNotEmpty) {
+      try {
+        final List<dynamic> decoded = jsonDecode(json) as List<dynamic>;
+        for (final e in decoded) {
+          try {
+            notes.add(Note.fromJson(e as Map<String, dynamic>));
+          } catch (_) {
+            // skip malformed entry, keep the rest
+          }
+        }
+      } catch (_) {
+        // index unreadable; keep loaded list empty
+      }
+    }
+    _notesCache[isDecoy] = notes;
+    return notes;
+  }
+
+  // ponytail: one-time split of the pre-decoy-fix shared index; remove later
+  Future<void> _migrateLegacyNotes() async {
+    if (await _secureStorage.read(key: _notesIndexDecoyKey) != null) return;
     final json = await _secureStorage.read(key: _notesIndexKey);
-    if (json == null || json.isEmpty) {
-      _cachedNotes = [];
-      return _cachedNotes!;
-    }
+    if (json == null || json.isEmpty) return;
+    List<dynamic> decoded;
     try {
-      final List<dynamic> decoded = jsonDecode(json) as List<dynamic>;
-      _cachedNotes = decoded
-          .map((e) => Note.fromJson(e as Map<String, dynamic>))
-          .toList();
+      decoded = jsonDecode(json) as List<dynamic>;
     } catch (_) {
-      _cachedNotes = [];
+      return;
     }
-    return _cachedNotes!;
+    final real = <Map<String, dynamic>>[];
+    final decoy = <Map<String, dynamic>>[];
+    for (final e in decoded) {
+      if (e is! Map<String, dynamic>) continue;
+      final path = e['encryptedContentPath'] as String?;
+      if (path != null && path.contains('/.locker_decoy/')) {
+        decoy.add(e);
+      } else {
+        real.add(e);
+      }
+    }
+    if (decoy.isEmpty) return;
+    await _secureStorage.write(key: _notesIndexKey, value: jsonEncode(real));
+    await _secureStorage.write(
+      key: _notesIndexDecoyKey,
+      value: jsonEncode(decoy),
+    );
   }
 
   Future<void> _saveNotes({bool isDecoy = false}) async {
-    if (_cachedNotes == null) return;
-    final json = jsonEncode(_cachedNotes!.map((n) => n.toJson()).toList());
-    await _secureStorage.write(key: _notesIndexKey, value: json);
+    final notes = _notesCache[isDecoy];
+    if (notes == null) return;
+    final json = jsonEncode(notes.map((n) => n.toJson()).toList());
+    await _secureStorage.write(
+      key: isDecoy ? _notesIndexDecoyKey : _notesIndexKey,
+      value: json,
+    );
   }
 
   Future<List<NoteFolder>> loadFolders({bool isDecoy = false}) async {
-    if (_cachedFolders != null) return _cachedFolders!;
-    final json = await _secureStorage.read(key: _noteFoldersKey);
-    if (json == null || json.isEmpty) {
-      _cachedFolders = [];
-      return _cachedFolders!;
+    final cached = _foldersCache[isDecoy];
+    if (cached != null) return cached;
+    final json = await _secureStorage.read(
+      key: isDecoy ? _noteFoldersDecoyKey : _noteFoldersKey,
+    );
+    final folders = <NoteFolder>[];
+    if (json != null && json.isNotEmpty) {
+      try {
+        final List<dynamic> decoded = jsonDecode(json) as List<dynamic>;
+        for (final e in decoded) {
+          try {
+            folders.add(NoteFolder.fromJson(e as Map<String, dynamic>));
+          } catch (_) {
+            // skip malformed entry, keep the rest
+          }
+        }
+      } catch (_) {
+        // index unreadable; keep loaded list empty
+      }
     }
-    try {
-      final List<dynamic> decoded = jsonDecode(json) as List<dynamic>;
-      _cachedFolders = decoded
-          .map((e) => NoteFolder.fromJson(e as Map<String, dynamic>))
-          .toList();
-    } catch (_) {
-      _cachedFolders = [];
-    }
-    return _cachedFolders!;
+    _foldersCache[isDecoy] = folders;
+    return folders;
   }
 
-  Future<void> _saveFolders() async {
-    if (_cachedFolders == null) return;
-    final json = jsonEncode(_cachedFolders!.map((f) => f.toJson()).toList());
-    await _secureStorage.write(key: _noteFoldersKey, value: json);
+  Future<void> _saveFolders({bool isDecoy = false}) async {
+    final folders = _foldersCache[isDecoy];
+    if (folders == null) return;
+    final json = jsonEncode(folders.map((f) => f.toJson()).toList());
+    await _secureStorage.write(
+      key: isDecoy ? _noteFoldersDecoyKey : _noteFoldersKey,
+      value: json,
+    );
   }
 
   Future<Uint8List> _deriveKey(Note note, {bool isDecoy = false}) async {
@@ -108,7 +163,7 @@ class NoteService {
   }) async {
     onProgress?.call('Preparing...', isEncrypting: false);
     await _ensureNotesDir(isDecoy: isDecoy);
-    await loadNotes(isDecoy: isDecoy);
+    final notes = await loadNotes(isDecoy: isDecoy);
 
     final id = const Uuid().v4();
     final now = DateTime.now();
@@ -180,7 +235,7 @@ class NoteService {
       updatedAt: now,
     );
 
-    _cachedNotes!.insert(0, note);
+    notes.insert(0, note);
     await _saveNotes(isDecoy: isDecoy);
 
     await VaultService.instance.registerNoteEntry(
@@ -239,11 +294,13 @@ class NoteService {
     bool? isMarkdown,
     String fileExtension = 'txt',
     bool encrypt = false,
-    EncryptionAlgorithm encryptionAlgorithm = EncryptionAlgorithm.aes256Gcm,
-    int kdfIterations = _defaultKdfIterations,
+    EncryptionAlgorithm? encryptionAlgorithm,
+    int? kdfIterations,
     bool isDecoy = false,
   }) async {
-    await loadNotes(isDecoy: isDecoy);
+    final notes = await loadNotes(isDecoy: isDecoy);
+    final algorithm = encryptionAlgorithm ?? note.encryptionAlgorithm;
+    final kdf = kdfIterations ?? note.kdfIterations;
 
     var updated = note.copyWith(
       title: title,
@@ -251,7 +308,7 @@ class NoteService {
       clearFolder: clearFolder,
       isMarkdown: isMarkdown,
       isEncrypted: encrypt || note.isEncrypted,
-      encryptionAlgorithm: encryptionAlgorithm,
+      encryptionAlgorithm: algorithm,
       updatedAt: DateTime.now(),
     );
 
@@ -262,33 +319,37 @@ class NoteService {
         final derivedKey = await _encryptionService.deriveFileKeyAsync(
           masterKey,
           salt,
-          kdfIterations,
+          kdf,
         );
 
         final data = Uint8List.fromList(utf8.encode(content));
-        final result = updated.encryptionAlgorithm == EncryptionAlgorithm.aes256Gcm
+        // write to temp then rename so a failed re-encrypt can't destroy the only copy
+        final tmpPath = '${note.encryptedContentPath}.tmp';
+        final result = algorithm == EncryptionAlgorithm.aes256Gcm
             ? await _encryptionService.encryptBytesStreamedGcm(
                 data,
-                note.encryptedContentPath,
+                tmpPath,
                 isDecoy: isDecoy,
                 derivedKey: derivedKey,
               )
             : await _encryptionService.encryptBytesStreamed(
                 data,
-                note.encryptedContentPath,
+                tmpPath,
                 isDecoy: isDecoy,
                 derivedKey: derivedKey,
               );
 
         if (!result.success) {
+          final tmp = File(tmpPath);
+          if (await tmp.exists()) await tmp.delete();
           throw Exception('Failed to re-encrypt note content');
         }
 
+        await File(tmpPath).rename(note.encryptedContentPath);
         updated = updated.copyWith(
-          encryptedContentPath: result.encryptedPath,
           iv: result.iv,
           keyDerivationSalt: base64Encode(salt),
-          kdfIterations: kdfIterations,
+          kdfIterations: kdf,
         );
       } else {
         final file = File(note.encryptedContentPath);
@@ -296,9 +357,9 @@ class NoteService {
       }
     }
 
-    final index = _cachedNotes!.indexWhere((n) => n.id == note.id);
+    final index = notes.indexWhere((n) => n.id == note.id);
     if (index != -1) {
-      _cachedNotes![index] = updated;
+      notes[index] = updated;
       await _saveNotes(isDecoy: isDecoy);
 
       await VaultService.instance.registerNoteEntry(
@@ -318,21 +379,21 @@ class NoteService {
   }
 
   Future<void> deleteNote(Note note, {bool isDecoy = false}) async {
-    await loadNotes(isDecoy: isDecoy);
+    final notes = await loadNotes(isDecoy: isDecoy);
     if (note.isEncrypted) {
       await _encryptionService.secureDelete(note.encryptedContentPath);
     } else {
       final file = File(note.encryptedContentPath);
       if (await file.exists()) await file.delete();
     }
-    _cachedNotes!.removeWhere((n) => n.id == note.id);
+    notes.removeWhere((n) => n.id == note.id);
     await _saveNotes(isDecoy: isDecoy);
 
     await VaultService.instance.removeNoteEntry(note.id, isDecoy: isDecoy);
   }
 
   Future<void> deleteNotes(List<Note> notes, {bool isDecoy = false}) async {
-    await loadNotes(isDecoy: isDecoy);
+    final cached = await loadNotes(isDecoy: isDecoy);
     for (final note in notes) {
       if (note.isEncrypted) {
         await _encryptionService.secureDelete(note.encryptedContentPath);
@@ -342,7 +403,7 @@ class NoteService {
       }
     }
     final ids = notes.map((n) => n.id).toSet();
-    _cachedNotes!.removeWhere((n) => ids.contains(n.id));
+    cached.removeWhere((n) => ids.contains(n.id));
     await _saveNotes(isDecoy: isDecoy);
 
     for (final note in notes) {
@@ -351,18 +412,18 @@ class NoteService {
   }
 
   Future<Note> togglePin(Note note, {bool isDecoy = false}) async {
-    await loadNotes(isDecoy: isDecoy);
+    final notes = await loadNotes(isDecoy: isDecoy);
     final toggled = note.togglePin();
-    final index = _cachedNotes!.indexWhere((n) => n.id == note.id);
+    final index = notes.indexWhere((n) => n.id == note.id);
     if (index != -1) {
-      _cachedNotes![index] = toggled;
+      notes[index] = toggled;
       await _saveNotes(isDecoy: isDecoy);
     }
     return toggled;
   }
 
   Future<NoteFolder> createFolder(String name, {bool isDecoy = false}) async {
-    await loadFolders(isDecoy: isDecoy);
+    final folders = await loadFolders(isDecoy: isDecoy);
     final now = DateTime.now();
     final folder = NoteFolder(
       id: const Uuid().v4(),
@@ -370,8 +431,8 @@ class NoteService {
       createdAt: now,
       updatedAt: now,
     );
-    _cachedFolders!.add(folder);
-    await _saveFolders();
+    folders.add(folder);
+    await _saveFolders(isDecoy: isDecoy);
     return folder;
   }
 
@@ -380,23 +441,23 @@ class NoteService {
     String newName, {
     bool isDecoy = false,
   }) async {
-    await loadFolders(isDecoy: isDecoy);
+    final folders = await loadFolders(isDecoy: isDecoy);
     final renamed = folder.copyWith(name: newName, updatedAt: DateTime.now());
-    final index = _cachedFolders!.indexWhere((f) => f.id == folder.id);
+    final index = folders.indexWhere((f) => f.id == folder.id);
     if (index != -1) {
-      _cachedFolders![index] = renamed;
-      await _saveFolders();
+      folders[index] = renamed;
+      await _saveFolders(isDecoy: isDecoy);
     }
     return renamed;
   }
 
   Future<void> deleteFolder(NoteFolder folder, {bool isDecoy = false}) async {
-    await loadFolders(isDecoy: isDecoy);
-    await loadNotes(isDecoy: isDecoy);
+    final folders = await loadFolders(isDecoy: isDecoy);
+    final notes = await loadNotes(isDecoy: isDecoy);
 
-    for (var i = 0; i < _cachedNotes!.length; i++) {
-      if (_cachedNotes![i].folderId == folder.id) {
-        _cachedNotes![i] = _cachedNotes![i].copyWith(
+    for (var i = 0; i < notes.length; i++) {
+      if (notes[i].folderId == folder.id) {
+        notes[i] = notes[i].copyWith(
           clearFolder: true,
           updatedAt: DateTime.now(),
         );
@@ -404,25 +465,28 @@ class NoteService {
     }
     await _saveNotes(isDecoy: isDecoy);
 
-    _cachedFolders!.removeWhere((f) => f.id == folder.id);
-    await _saveFolders();
+    folders.removeWhere((f) => f.id == folder.id);
+    await _saveFolders(isDecoy: isDecoy);
   }
 
   List<Note> getNotesInFolder(String? folderId) {
-    if (_cachedNotes == null) return [];
-    return _cachedNotes!.where((n) => n.folderId == folderId).toList();
+    return _notesCache[false]
+            ?.where((n) => n.folderId == folderId)
+            .toList() ??
+        [];
   }
 
   List<Note> searchNotes(String query) {
-    if (_cachedNotes == null) return [];
+    final notes = _notesCache[false];
+    if (notes == null) return [];
     final lower = query.toLowerCase();
-    return _cachedNotes!
+    return notes
         .where((n) => n.title.toLowerCase().contains(lower))
         .toList();
   }
 
   void clearCache() {
-    _cachedNotes = null;
-    _cachedFolders = null;
+    _notesCache.clear();
+    _foldersCache.clear();
   }
 }
