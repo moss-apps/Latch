@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/sync_profile.dart';
 import '../services/encryption_service.dart';
+import '../services/remote/server_errors.dart';
 import '../services/sync_profile_service.dart';
 import '../services/sync_service.dart';
 import 'vault_providers.dart';
@@ -130,7 +131,7 @@ class SyncNotifier extends Notifier<SyncState> {
         duration: sw.elapsed,
       );
     } catch (e) {
-      state = SyncState(status: SyncStatus.error, error: e.toString());
+      state = SyncState(status: SyncStatus.error, error: describeServerError(e));
     }
   }
 
