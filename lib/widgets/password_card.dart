@@ -8,6 +8,7 @@ class PasswordCard extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final bool isSelected;
+  final bool isSelectionMode;
 
   const PasswordCard({
     super.key,
@@ -15,101 +16,64 @@ class PasswordCard extends StatelessWidget {
     this.onTap,
     this.onLongPress,
     this.isSelected = false,
+    this.isSelectionMode = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    final meta = entry.tags.isEmpty
+        ? _formatDate(entry.updatedAt)
+        : '${entry.tags.join(' · ')} · ${_formatDate(entry.updatedAt)}';
+
+    return ListTile(
       onTap: onTap,
       onLongPress: onLongPress,
-      child: Container(
-        decoration: BoxDecoration(
-          color: isSelected
-              ? context.accentColor.withValues(alpha: 0.15)
-              : context.surfaceColor,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? context.accentColor : context.borderColor,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.lock_outline,
-                    size: 16,
-                    color: context.textTertiary,
-                  ),
-                  const SizedBox(width: 6),
-                  if (entry.isFavorite)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: Icon(
-                        Icons.star,
-                        size: 14,
-                        color: context.accentColor,
-                      ),
-                    ),
-                  Expanded(
-                    child: Text(
-                      entry.title,
-                      style: TextStyle(
-                        fontFamily: 'ProductSans',
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: context.textPrimary,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
+      selected: isSelected,
+      selectedTileColor: context.accentColor.withValues(alpha: 0.10),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+      title: Row(
+        children: [
+          if (entry.isFavorite)
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: Icon(
+                Icons.star,
+                size: 14,
+                color: context.accentColor,
               ),
-              if (entry.tags.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 4,
-                  runSpacing: 4,
-                  children: entry.tags.take(3).map((t) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: context.accentColor.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        t,
-                        style: TextStyle(
-                          fontFamily: 'ProductSans',
-                          fontSize: 10,
-                          color: context.accentColor,
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ],
-              const SizedBox(height: 8),
-              Text(
-                _formatDate(entry.updatedAt),
-                style: TextStyle(
-                  fontFamily: 'ProductSans',
-                  fontSize: 12,
-                  color: context.textTertiary,
-                ),
+            ),
+          Expanded(
+            child: Text(
+              entry.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'ProductSans',
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: context.textPrimary,
               ),
-            ],
+            ),
           ),
+        ],
+      ),
+      subtitle: Text(
+        meta,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontFamily: 'ProductSans',
+          fontSize: 12,
+          color: context.textTertiary,
         ),
       ),
+      trailing: isSelectionMode
+          ? Icon(
+              isSelected ? Icons.check_circle : Icons.circle_outlined,
+              size: 20,
+              color: isSelected ? context.accentColor : context.textTertiary,
+            )
+          : null,
     );
   }
 
