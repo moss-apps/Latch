@@ -1,11 +1,10 @@
-import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
-import 'package:video_player/video_player.dart';
 import '../services/auto_kill_service.dart';
 import '../themes/app_colors.dart';
 import '../utils/responsive_utils.dart';
+import '../widgets/hold_preview_card.dart';
 
 /// A custom media picker that uses PhotoManager to directly access gallery assets.
 /// This allows proper deletion of original files from the gallery.
@@ -47,6 +46,9 @@ class _MediaPickerScreenState extends State<MediaPickerScreen> {
   OverlayEntry? _previewEntry;
   final ValueNotifier<Offset> _previewPosition = ValueNotifier(Offset.zero);
   final ValueNotifier<AssetEntity?> _previewAsset = ValueNotifier(null);
+  // ponytail: global tile rects captured once per hold; the grid cannot
+  // scroll mid-hold, so they stay valid. Recompute if that ever changes.
+  Map<String, Rect> _tileRects = const {};
 
   @override
   void initState() {
@@ -247,7 +249,7 @@ class _MediaPickerScreenState extends State<MediaPickerScreen> {
   void _showPreview(AssetEntity asset, Offset globalPosition) {
     _hidePreview();
     _previewEntry = OverlayEntry(
-      builder: (_) => _HoldPreviewCard(
+      builder: (_) => HoldPreviewCard(
         asset: _previewAsset,
         position: _previewPosition,
       ),
@@ -283,20 +285,32 @@ class _MediaPickerScreenState extends State<MediaPickerScreen> {
   }
 
   String? _assetIdAt(Offset globalPosition) {
+    for (final entry in _tileRects.entries) {
+      if (entry.value.contains(globalPosition)) return entry.key;
+    }
+    return null;
+  }
+
+  void _beginHold(AssetEntity asset, Offset globalPosition) {
+    final rects = <String, Rect>{};
     for (final entry in _tileKeys.entries) {
       final context = entry.value.currentContext;
       if (context == null) continue;
-
       final renderObject = context.findRenderObject();
       if (renderObject is! RenderBox || !renderObject.hasSize) continue;
-
-      final rect = renderObject.localToGlobal(Offset.zero) & renderObject.size;
-      if (rect.contains(globalPosition)) {
-        return entry.key;
-      }
+      rects[entry.key] =
+          renderObject.localToGlobal(Offset.zero) & renderObject.size;
     }
+    _tileRects = rects;
 
-    return null;
+    _startSlidingSelection(asset);
+    _showPreview(asset, globalPosition);
+  }
+
+  void _endHold() {
+    _tileRects = const {};
+    _stopSlidingSelection();
+    _hidePreview();
   }
 
   void _selectAll() {
@@ -478,22 +492,14 @@ class _MediaPickerScreenState extends State<MediaPickerScreen> {
     final selectionIndex = _selectedAssets.toList().indexOf(asset);
 
     return GestureDetector(
-      onLongPressStart: (details) {
-        _startSlidingSelection(asset);
-        _showPreview(asset, details.globalPosition);
-      },
+      onLongPressStart: (details) =>
+          _beginHold(asset, details.globalPosition),
       onLongPressMoveUpdate: (details) {
         _updateSlidingSelection(details.globalPosition);
         _updatePreview(details.globalPosition);
       },
-      onLongPressEnd: (_) {
-        _stopSlidingSelection();
-        _hidePreview();
-      },
-      onLongPressCancel: () {
-        _stopSlidingSelection();
-        _hidePreview();
-      },
+      onLongPressEnd: (_) => _endHold(),
+      onLongPressCancel: _endHold,
       onTap: () => _toggleSelection(asset),
       child: Stack(
         key: _tileKeyFor(asset.id),
@@ -710,211 +716,4 @@ class MediaPickerResult {
   bool get isEmpty => selectedAssets.isEmpty;
   bool get isNotEmpty => selectedAssets.isNotEmpty;
   int get count => selectedAssets.length;
-}
-
-/// Computes a clamped on-screen rect for the hold-to-preview card so it stays
-/// fully visible, preferring a spot above the finger.
-Rect holdPreviewRect(Offset finger, Size screen, Size card) {
-  const margin = 12.0;
-
-  final left = (finger.dx - card.width / 2).clamp(
-    margin,
-    math.max(margin, screen.width - card.width - margin),
-  ).toDouble();
-  var top = finger.dy - card.height - 56;
-  if (top < margin) top = finger.dy + 56;
-  top = top.clamp(
-    margin,
-    math.max(margin, screen.height - card.height - margin),
-  );
-
-  return Rect.fromLTWH(left, top, card.width, card.height);
-}
-
-class _HoldPreviewCard extends StatelessWidget {
-  final ValueListenable<AssetEntity?> asset;
-  final ValueListenable<Offset> position;
-
-  const _HoldPreviewCard({required this.asset, required this.position});
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<Offset>(
-      valueListenable: position,
-      builder: (context, finger, _) {
-        final screen = MediaQuery.of(context).size;
-        final side =
-            (screen.shortestSide * 0.65).clamp(200.0, 340.0).toDouble();
-        final rect = holdPreviewRect(finger, screen, Size(side, side));
-
-        return Positioned.fromRect(
-          rect: rect,
-          child: IgnorePointer(
-            child: ValueListenableBuilder<AssetEntity?>(
-              valueListenable: asset,
-              builder: (context, asset, _) {
-                if (asset == null) return const SizedBox.shrink();
-                return DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.4),
-                        blurRadius: 24,
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    // Keyed so a new hold starts fresh (no stale video frame).
-                    child: KeyedSubtree(
-                      key: ValueKey(asset.id),
-                      child: Container(
-                        color: Colors.black,
-                        child: _AssetPreviewContent(asset: asset),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _AssetPreviewContent extends StatelessWidget {
-  final AssetEntity asset;
-
-  const _AssetPreviewContent({required this.asset});
-
-  @override
-  Widget build(BuildContext context) {
-    if (asset.type == AssetType.video) return _VideoPreview(asset: asset);
-    return _ImagePreview(asset: asset);
-  }
-}
-
-class _ImagePreview extends StatefulWidget {
-  final AssetEntity asset;
-
-  const _ImagePreview({required this.asset});
-
-  @override
-  State<_ImagePreview> createState() => _ImagePreviewState();
-}
-
-class _ImagePreviewState extends State<_ImagePreview> {
-  late final Future<Uint8List?> _future = widget.asset.thumbnailDataWithSize(
-    const ThumbnailSize(1200, 1200),
-    quality: 90,
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<Uint8List?>(
-      future: _future,
-      builder: (context, snapshot) {
-        final bytes = snapshot.data;
-        if (bytes != null && bytes.isNotEmpty) {
-          return Image.memory(bytes, fit: BoxFit.contain);
-        }
-        if (snapshot.hasError) {
-          return const Center(
-            child: Icon(Icons.broken_image, color: Colors.white54),
-          );
-        }
-        return const Center(
-          child: CircularProgressIndicator(color: Colors.white70),
-        );
-      },
-    );
-  }
-}
-
-class _VideoPreview extends StatefulWidget {
-  final AssetEntity asset;
-
-  const _VideoPreview({required this.asset});
-
-  @override
-  State<_VideoPreview> createState() => _VideoPreviewState();
-}
-
-class _VideoPreviewState extends State<_VideoPreview> {
-  VideoPlayerController? _controller;
-  bool _failed = false;
-  late final Future<Uint8List?> _thumb = widget.asset.thumbnailDataWithSize(
-    const ThumbnailSize(1200, 1200),
-    quality: 90,
-  );
-
-  @override
-  void initState() {
-    super.initState();
-    _init();
-  }
-
-  Future<void> _init() async {
-    try {
-      final file = await widget.asset.file;
-      if (file == null || !mounted) return;
-      final controller = VideoPlayerController.file(file);
-      await controller.initialize();
-      if (!mounted) {
-        controller.dispose();
-        return;
-      }
-      setState(() => _controller = controller);
-      await controller.setLooping(true);
-      await controller.setVolume(0);
-      await controller.play();
-    } catch (_) {
-      if (mounted) setState(() => _failed = true);
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller?.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final controller = _controller;
-    if (controller == null) {
-      return FutureBuilder<Uint8List?>(
-        future: _thumb,
-        builder: (context, snapshot) {
-          final bytes = snapshot.data;
-          if (bytes != null && bytes.isNotEmpty && !_failed) {
-            return Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.memory(bytes, fit: BoxFit.contain),
-                const Center(
-                  child: Icon(Icons.play_arrow,
-                      size: 48, color: Colors.white70),
-                ),
-              ],
-            );
-          }
-          return const SizedBox.expand();
-        },
-      );
-    }
-
-    return Center(
-      child: AspectRatio(
-        aspectRatio:
-            controller.value.aspectRatio == 0
-                ? 1
-                : controller.value.aspectRatio,
-        child: VideoPlayer(controller),
-      ),
-    );
-  }
 }
