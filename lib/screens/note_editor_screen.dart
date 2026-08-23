@@ -22,6 +22,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   bool _showPreview = false;
   bool _isSaving = false;
   bool _isLoading = false;
+  bool _encrypt = false;
   String? _folderId;
 
   @override
@@ -111,13 +112,26 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             },
             tooltip: _isMarkdown ? 'Plain text' : 'Markdown',
           ),
+          if (!isEditing)
+            IconButton(
+              icon: Icon(
+                _encrypt ? Icons.lock : Icons.lock_outline,
+                color: _encrypt ? context.accentColor : context.textSecondary,
+              ),
+              onPressed: () {
+                setState(() => _encrypt = !_encrypt);
+              },
+              tooltip: _encrypt ? 'Encrypted' : 'Encrypt note',
+            ),
           IconButton(
             icon: Icon(Icons.folder_outlined, color: context.textSecondary),
             onPressed: _showFolderPicker,
+            tooltip: 'Folder',
           ),
           IconButton(
             icon: Icon(Icons.check, color: context.accentColor),
             onPressed: _isSaving ? null : _saveNote,
+            tooltip: 'Save',
           ),
         ],
       ),
@@ -314,6 +328,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           content: _contentController.text,
           folderId: _folderId,
           isMarkdown: _isMarkdown,
+          encrypt: _encrypt,
         );
         if (mounted) ToastUtils.showSuccess('Note created');
       }
