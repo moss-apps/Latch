@@ -139,7 +139,12 @@ class BackupService {
       }
     } catch (e, st) {
       debugPrint('BackupService createBackup error: $e $st');
-      return BackupResult(success: false, error: e.toString());
+      return BackupResult(
+        success: false,
+        error: e.toString().toLowerCase().contains('no space')
+            ? 'Not enough free space to create the backup'
+            : 'Backup failed — check the destination and try again',
+      );
     }
   }
 }
