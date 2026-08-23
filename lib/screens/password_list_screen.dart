@@ -54,7 +54,6 @@ class _PasswordListScreenState extends ConsumerState<PasswordListScreen> {
   @override
   Widget build(BuildContext context) {
     final searchQuery = ref.watch(passwordSearchQueryProvider);
-    final selectedTag = ref.watch(selectedPasswordTagProvider);
     final entriesAsync = ref.watch(passwordsNotifierProvider);
 
     return Scaffold(
@@ -77,7 +76,7 @@ class _PasswordListScreenState extends ConsumerState<PasswordListScreen> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: TextField(
               controller: _searchController,
               onChanged: (value) {
@@ -88,21 +87,23 @@ class _PasswordListScreenState extends ConsumerState<PasswordListScreen> {
                 color: context.textPrimary,
               ),
               decoration: InputDecoration(
-                hintText: 'Search passwords...',
+                hintText: 'Search passwords',
                 hintStyle: TextStyle(
                   fontFamily: 'ProductSans',
                   color: context.textTertiary,
                 ),
-                prefixIcon: Icon(Icons.search, color: context.textTertiary),
+                prefixIcon:
+                    Icon(Icons.search, size: 20, color: context.textTertiary),
+                isDense: true,
                 filled: true,
                 fillColor: context.surfaceColor,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: context.borderColor),
+                  borderSide: BorderSide.none,
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: context.borderColor),
+                  borderSide: BorderSide.none,
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -115,81 +116,79 @@ class _PasswordListScreenState extends ConsumerState<PasswordListScreen> {
           Expanded(
             child: entriesAsync.when(
               data: (entries) {
-                final allTags = _collectTags(entries);
-                final filtered =
-                    _filterPasswords(entries, searchQuery, selectedTag);
-                return Column(
-                  children: [
-                    if (allTags.isNotEmpty)
-                      SizedBox(
-                        height: 40,
-                        child: ListView(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          children: [
-                            _buildTagChip(
-                              null,
-                              selectedTag == null,
-                              'All',
-                            ),
-                            ...allTags.map((tag) =>
-                                _buildTagChip(tag, selectedTag == tag, tag)),
-                          ],
+                final filtered = _filterPasswords(entries, searchQuery);
+                if (filtered.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.lock_outline,
+                          size: 48,
+                          color: context.textTertiary,
                         ),
-                      ),
-                    Expanded(
-                      child: filtered.isEmpty
-                          ? _buildEmptyState(searchQuery)
-                          : ListView.builder(
-                              padding: const EdgeInsets.all(16),
-                              itemCount: filtered.length,
-                              itemBuilder: (context, index) {
-                                final entry = filtered[index];
-                                final isSelected =
-                                    _selectedIds.contains(entry.id);
-                                return Padding(
-                                  padding:
-                                      const EdgeInsets.only(bottom: 10),
-                                  child: PasswordCard(
-                                    entry: entry,
-                                    isSelected: isSelected,
-                                    onTap: () {
-                                      if (_isSelectionMode) {
-                                        setState(() {
-                                          if (isSelected) {
-                                            _selectedIds.remove(entry.id);
-                                            if (_selectedIds.isEmpty) {
-                                              _isSelectionMode = false;
-                                            }
-                                          } else {
-                                            _selectedIds.add(entry.id);
-                                          }
-                                        });
-                                      } else {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) =>
-                                                PasswordEditorScreen(
-                                                    entry: entry),
-                                          ),
-                                        );
-                                      }
-                                    },
-                                    onLongPress: () {
-                                      if (!_isSelectionMode) {
-                                        setState(() {
-                                          _isSelectionMode = true;
-                                          _selectedIds.add(entry.id);
-                                        });
-                                      }
-                                    },
-                                  ),
-                                );
-                              },
-                            ),
+                        const SizedBox(height: 12),
+                        Text(
+                          searchQuery.isNotEmpty
+                              ? 'No passwords found'
+                              : 'No passwords yet',
+                          style: TextStyle(
+                            fontFamily: 'ProductSans',
+                            fontSize: 15,
+                            color: context.textTertiary,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  );
+                }
+                return ListView.separated(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  itemCount: filtered.length,
+                  separatorBuilder: (_, __) => Divider(
+                    height: 1,
+                    indent: 16,
+                    endIndent: 16,
+                    color: context.dividerColor,
+                  ),
+                  itemBuilder: (context, index) {
+                    final entry = filtered[index];
+                    return PasswordCard(
+                      entry: entry,
+                      isSelected: _selectedIds.contains(entry.id),
+                      isSelectionMode: _isSelectionMode,
+                      onTap: () {
+                        if (_isSelectionMode) {
+                          setState(() {
+                            if (_selectedIds.contains(entry.id)) {
+                              _selectedIds.remove(entry.id);
+                              if (_selectedIds.isEmpty) {
+                                _isSelectionMode = false;
+                              }
+                            } else {
+                              _selectedIds.add(entry.id);
+                            }
+                          });
+                        } else {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  PasswordEditorScreen(entry: entry),
+                            ),
+                          );
+                        }
+                      },
+                      onLongPress: () {
+                        if (!_isSelectionMode) {
+                          setState(() {
+                            _isSelectionMode = true;
+                            _selectedIds.add(entry.id);
+                          });
+                        }
+                      },
+                    );
+                  },
                 );
               },
               loading: () =>
@@ -225,7 +224,7 @@ class _PasswordListScreenState extends ConsumerState<PasswordListScreen> {
 
   Widget _buildAutofillInfoCard() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: context.accentColor.withValues(alpha: 0.08),
@@ -310,77 +309,11 @@ class _PasswordListScreenState extends ConsumerState<PasswordListScreen> {
     );
   }
 
-  Widget _buildTagChip(String? tag, bool isSelected, String label) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        label: Text(
-          label,
-          style: TextStyle(
-            fontFamily: 'ProductSans',
-            fontSize: 12,
-            color: isSelected
-                ? Colors.white
-                : context.textSecondary,
-          ),
-        ),
-        selected: isSelected,
-        onSelected: (_) {
-          ref.read(selectedPasswordTagProvider.notifier).state = tag;
-        },
-        selectedColor: context.accentColor,
-        backgroundColor: context.surfaceColor,
-        side: BorderSide(
-          color: isSelected ? context.accentColor : context.borderColor,
-        ),
-        visualDensity: VisualDensity.compact,
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(String searchQuery) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.lock_outline,
-            size: 64,
-            color: context.textTertiary,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            searchQuery.isNotEmpty
-                ? 'No passwords found'
-                : 'No passwords yet',
-            style: TextStyle(
-              fontFamily: 'ProductSans',
-              fontSize: 16,
-              color: context.textTertiary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  List<String> _collectTags(List<PasswordEntry> entries) {
-    final tags = <String>{};
-    for (final entry in entries) {
-      tags.addAll(entry.tags);
-    }
-    return tags.toList()..sort();
-  }
-
   List<PasswordEntry> _filterPasswords(
     List<PasswordEntry> entries,
     String searchQuery,
-    String? selectedTag,
   ) {
     var filtered = entries;
-    if (selectedTag != null) {
-      filtered = filtered.where((e) => e.hasTag(selectedTag)).toList();
-    }
     if (searchQuery.isNotEmpty) {
       final query = searchQuery.toLowerCase();
       filtered = filtered
