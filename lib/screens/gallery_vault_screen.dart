@@ -630,8 +630,8 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                 SwitchListTile(
                   value: _importSide == FeatureSide.left,
                   onChanged: (onLeft) {
-                    setState(() =>
-                        _importSide = onLeft ? FeatureSide.left : FeatureSide.right);
+                    setState(() => _importSide =
+                        onLeft ? FeatureSide.left : FeatureSide.right);
                     _persistImportSide();
                   },
                   activeThumbColor: context.accentColor,
@@ -758,7 +758,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
             await ref.read(vaultNotifierProvider.notifier).refresh();
           },
           color: context.accentColor,
-          child:           GridView.builder(
+          child: GridView.builder(
             padding: EdgeInsets.fromLTRB(
               8,
               8,
@@ -1938,143 +1938,115 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
 
   Widget _buildDrawer() {
     return Drawer(
-      backgroundColor: Colors.transparent,
-      child: ClipRRect(
-        borderRadius: const BorderRadius.only(
-          topRight: Radius.circular(0),
-          bottomRight: Radius.circular(0),
-        ),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: Container(
-            decoration: BoxDecoration(
-              color: context.isDarkMode
-                  ? Colors.black
-                  : Colors.white,
-              border: Border(
-                right: BorderSide(
-                  color: context.isDarkMode
-                      ? Colors.white.withValues(alpha: 0.1)
-                      : Colors.black.withValues(alpha: 0.1),
-                  width: 1,
-                ),
-              ),
-            ),
-            child: Column(
+      backgroundColor: context.isDarkMode ? Colors.black : Colors.white,
+      child: Column(
+        children: [
+          _buildDrawerHeader(),
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
               children: [
-                _buildDrawerHeader(),
-                Expanded(
-                  child: ListView(
-                    padding: EdgeInsets.zero,
-                    children: [
-                      _buildDrawerSection('Library'),
-                      _buildCountedDrawerItem(
-                        icon: Icons.folder_outlined,
-                        title: 'Albums',
-                        countOf: (ref) => ref
-                            .watch(albumsProvider)
-                            .maybeWhen(data: (l) => l.length, orElse: () => null),
-                        onTap: () {
-                          Navigator.pop(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => const AlbumsScreen()),
-                          );
-                        },
+                _buildDrawerSection('Library'),
+                _buildCountedDrawerItem(
+                  icon: Icons.folder_outlined,
+                  title: 'Albums',
+                  countOf: (ref) => ref
+                      .watch(albumsProvider)
+                      .maybeWhen(data: (l) => l.length, orElse: () => null),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const AlbumsScreen()),
+                    );
+                  },
+                ),
+                _buildCountedDrawerItem(
+                  icon: Icons.folder_copy_outlined,
+                  title: 'Folders',
+                  countOf: (ref) => ref
+                      .watch(foldersProvider)
+                      .maybeWhen(data: (l) => l.length, orElse: () => null),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const FoldersScreen()),
+                    );
+                  },
+                ),
+                _buildCountedDrawerItem(
+                  icon: Icons.explore_outlined,
+                  title: 'File Explorer',
+                  countOf: (ref) => ref.watch(fileCountsProvider).maybeWhen(
+                        data: (m) => m.values.fold<int>(0, (s, c) => s + c),
+                        orElse: () => null,
                       ),
-                      _buildCountedDrawerItem(
-                        icon: Icons.folder_copy_outlined,
-                        title: 'Folders',
-                        countOf: (ref) => ref
-                            .watch(foldersProvider)
-                            .maybeWhen(data: (l) => l.length, orElse: () => null),
-                        onTap: () {
-                          Navigator.pop(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => const FoldersScreen()),
-                          );
-                        },
-                      ),
-                      _buildCountedDrawerItem(
-                        icon: Icons.explore_outlined,
-                        title: 'File Explorer',
-                        countOf: (ref) => ref
-                            .watch(fileCountsProvider)
-                            .maybeWhen(
-                              data: (m) =>
-                                  m.values.fold<int>(0, (s, c) => s + c),
-                              orElse: () => null,
-                            ),
-                        onTap: () {
-                          Navigator.pop(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) =>
-                                    const VaultExplorerScreen()),
-                          );
-                        },
-                      ),
-                      _buildCountedDrawerItem(
-                        icon: Icons.favorite_outline,
-                        title: 'Favorites',
-                        countOf: (ref) => ref
-                            .watch(favoriteFilesProvider)
-                            .maybeWhen(data: (l) => l.length, orElse: () => null),
-                        onTap: () {
-                          Navigator.pop(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => const FavoritesScreen()),
-                          );
-                        },
-                      ),
-                      _buildCountedDrawerItem(
-                        icon: Icons.label_outline,
-                        title: 'Tags',
-                        countOf: (ref) => ref
-                            .watch(tagsProvider)
-                            .maybeWhen(data: (l) => l.length, orElse: () => null),
-                        onTap: () {
-                          Navigator.pop(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => const TagsScreen()),
-                          );
-                        },
-                      ),
-                      _buildDrawerSection('Security'),
-                      _buildDrawerItem(
-                        icon: Icons.security,
-                        title: 'Security Settings',
-                        showChevron: true,
-                        onTap: () {
-                          Navigator.pop(context);
-                          _openSettingsScreen();
-                        },
-                      ),
-                      _buildDrawerItem(
-                        icon: Icons.shield_outlined,
-                        title: 'Decoy Mode',
-                        subtitle: 'Set up fake vault',
-                        showChevron: true,
-                        onTap: () {
-                          Navigator.pop(context);
-                          _showDecoyModeSheet();
-                        },
-                      ),
-                    ],
-                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const VaultExplorerScreen()),
+                    );
+                  },
+                ),
+                _buildCountedDrawerItem(
+                  icon: Icons.favorite_outline,
+                  title: 'Favorites',
+                  countOf: (ref) => ref
+                      .watch(favoriteFilesProvider)
+                      .maybeWhen(data: (l) => l.length, orElse: () => null),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const FavoritesScreen()),
+                    );
+                  },
+                ),
+                _buildCountedDrawerItem(
+                  icon: Icons.label_outline,
+                  title: 'Tags',
+                  countOf: (ref) => ref
+                      .watch(tagsProvider)
+                      .maybeWhen(data: (l) => l.length, orElse: () => null),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const TagsScreen()),
+                    );
+                  },
+                ),
+                _buildDrawerSection('Security'),
+                _buildDrawerItem(
+                  icon: Icons.security,
+                  title: 'Security Settings',
+                  showChevron: true,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _openSettingsScreen();
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.shield_outlined,
+                  title: 'Decoy Mode',
+                  subtitle: 'Set up fake vault',
+                  showChevron: true,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showDecoyModeSheet();
+                  },
                 ),
               ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -2111,18 +2083,12 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                   width: 1.5,
                 ),
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                  child: SvgPicture.asset(
-                    'assets/locker_logo_nobg.svg',
-                    fit: BoxFit.contain,
-                    colorFilter: const ColorFilter.mode(
-                      Colors.white,
-                      BlendMode.srcIn,
-                    ),
-                  ),
+              child: SvgPicture.asset(
+                'assets/locker_logo_nobg.svg',
+                fit: BoxFit.contain,
+                colorFilter: const ColorFilter.mode(
+                  Colors.white,
+                  BlendMode.srcIn,
                 ),
               ),
             ),
@@ -2166,10 +2132,10 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
         title.toUpperCase(),
         style: TextStyle(
           fontFamily: 'ProductSans',
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.2,
-          color: context.textTertiary,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.5,
+          color: context.accentColor,
         ),
       ),
     );
