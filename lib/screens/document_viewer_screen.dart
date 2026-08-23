@@ -192,7 +192,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Failed to convert document: $e';
+        _error = 'Failed to convert document';
         _isLoading = false;
         _isConverting = false;
       });
@@ -259,7 +259,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
       setState(() => _isLoading = false);
     } catch (e) {
       setState(() {
-        _error = 'Failed to load document: $e';
+        _error = 'Failed to load document';
         _isLoading = false;
       });
     }
@@ -351,7 +351,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
     } catch (e) {
       if (mounted) Navigator.pop(context);
       debugPrint('Error exporting file: $e');
-      ToastUtils.showError('Failed to export file: $e');
+      ToastUtils.showError('Failed to export file');
     }
   }
 
@@ -392,7 +392,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
     } catch (e) {
       if (mounted) Navigator.pop(context);
       debugPrint('Error opening file: $e');
-      ToastUtils.showError('Failed to open file: $e');
+      ToastUtils.showError('Failed to open file');
     }
   }
 

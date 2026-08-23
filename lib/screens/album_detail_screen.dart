@@ -670,7 +670,7 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
     } catch (e) {
       if (mounted) Navigator.pop(context);
       debugPrint('Error exporting file: $e');
-      ToastUtils.showError('Failed to export file: $e');
+      ToastUtils.showError('Failed to export file');
     }
   }
 
@@ -711,7 +711,7 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
     } catch (e) {
       if (mounted) Navigator.pop(context);
       debugPrint('Error opening file: $e');
-      ToastUtils.showError('Failed to open file: $e');
+      ToastUtils.showError('Failed to open file');
     }
   }
 

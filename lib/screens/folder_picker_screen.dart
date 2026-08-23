@@ -84,7 +84,8 @@ class _FolderPickerScreenState extends State<FolderPickerScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          debugPrint('Folder browse error: $e');
+          _error = 'Couldn\'t open this folder — check permissions and try again';
           _loading = false;
         });
       }
@@ -121,7 +122,8 @@ class _FolderPickerScreenState extends State<FolderPickerScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          debugPrint('Folder browse error: $e');
+          _error = 'Couldn\'t open this folder — check permissions and try again';
           _loading = false;
         });
       }

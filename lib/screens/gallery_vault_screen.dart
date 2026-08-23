@@ -1681,7 +1681,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
     } catch (e) {
       if (mounted) Navigator.pop(context);
       debugPrint('Error exporting file: $e');
-      ToastUtils.showError('Failed to export file: $e');
+      ToastUtils.showError('Failed to export file');
     }
   }
 
@@ -1729,7 +1729,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
     } catch (e) {
       if (mounted) Navigator.pop(context);
       debugPrint('Error opening file: $e');
-      ToastUtils.showError('Failed to open file: $e');
+      ToastUtils.showError('Failed to open file');
     }
   }
 
@@ -3985,7 +3985,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
       }
     } catch (e) {
       if (mounted) setState(() => _isImporting = false);
-      ToastUtils.showError('Failed to import folder: $e');
+      ToastUtils.showError('Failed to import folder');
     }
   }
 }
@@ -4344,7 +4344,8 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _error = e.toString();
+        debugPrint('Folder browse error: $e');
+        _error = 'Couldn\'t open this folder — check permissions and try again';
       });
     }
   }
@@ -4388,7 +4389,8 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _error = e.toString();
+        debugPrint('Folder browse error: $e');
+        _error = 'Couldn\'t open this folder — check permissions and try again';
       });
     }
   }

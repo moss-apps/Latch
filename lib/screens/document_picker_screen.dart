@@ -286,7 +286,7 @@ class _DocumentPickerScreenState extends State<DocumentPickerScreen> {
       debugPrint('Error scanning for documents: $e');
       setState(() {
         _isLoading = false;
-        _error = 'Failed to scan for documents: $e';
+        _error = 'Failed to scan for documents';
       });
     }
   }

@@ -125,7 +125,7 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen>
       });
     } catch (e) {
       if (mounted) {
-        ToastUtils.showError('Failed to start recording: $e');
+        ToastUtils.showError('Failed to start recording');
       }
     }
   }
@@ -187,7 +187,7 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen>
       }
     } catch (e) {
       if (mounted) {
-        ToastUtils.showError('Failed to stop recording: $e');
+        ToastUtils.showError('Failed to stop recording');
       }
     }
   }
@@ -210,7 +210,7 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen>
       }
     } catch (e) {
       if (mounted) {
-        ToastUtils.showError('Playback failed: $e');
+        ToastUtils.showError('Playback failed');
       }
     }
   }
