@@ -12,8 +12,6 @@ final passwordServiceProvider = Provider<PasswordService>((ref) {
 
 final passwordSearchQueryProvider = StateProvider<String>((ref) => '');
 
-final selectedPasswordTagProvider = StateProvider<String?>((ref) => null);
-
 class PasswordsNotifier extends Notifier<AsyncValue<List<PasswordEntry>>> {
   @override
   AsyncValue<List<PasswordEntry>> build() {
