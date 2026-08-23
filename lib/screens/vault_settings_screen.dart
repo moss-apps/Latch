@@ -692,6 +692,26 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                         contentPadding: EdgeInsets.zero,
                       ),
                       ListTile(
+                        leading: Icon(Icons.code_outlined,
+                            color: context.accentColor),
+                        title: const Text('Open Source Libraries',
+                            style: TextStyle(fontFamily: 'ProductSans')),
+                        subtitle: Text(
+                          'Licenses of packages used',
+                          style: TextStyle(
+                            fontFamily: 'ProductSans',
+                            fontSize: 12,
+                            color: context.textTertiary,
+                          ),
+                        ),
+                        onTap: () => showLicensePage(
+                          context: context,
+                          applicationName: 'Latch',
+                          applicationVersion: version,
+                        ),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      ListTile(
                         leading: Icon(Icons.description_outlined,
                             color: context.accentColor),
                         title: const Text('License',
