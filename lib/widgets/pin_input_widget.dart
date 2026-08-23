@@ -26,6 +26,7 @@ class PinInputWidget extends StatefulWidget {
   final PinInputController? controller;
   final bool enabled;
   final bool autofillEnabled;
+  final bool isLoading;
 
   const PinInputWidget({
     super.key,
@@ -35,6 +36,7 @@ class PinInputWidget extends StatefulWidget {
     this.controller,
     this.enabled = true,
     this.autofillEnabled = false,
+    this.isLoading = false,
   });
 
   @override
@@ -125,45 +127,58 @@ class _PinInputWidgetState extends State<PinInputWidget> {
               ),
             ),
             const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: List.generate(_pinLength, (index) {
-                final isFilled = index < _pin.length;
-                return AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  curve: Curves.easeOut,
-                  width: 40,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: isFilled
-                        ? context.accentColor.withValues(alpha: 0.12)
-                        : context.backgroundSecondary,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isFilled
-                          ? context.accentColor
-                          : context.dividerColor,
-                      width: isFilled ? 1.4 : 1,
-                    ),
+            if (widget.isLoading)
+              const SizedBox(
+                height: 48,
+                width: double.infinity,
+                child: Center(
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2.4),
                   ),
-                  child: Center(
-                    child: AnimatedScale(
-                      scale: isFilled ? 1 : 0,
-                      duration: const Duration(milliseconds: 120),
-                      curve: Curves.easeOut,
-                      child: Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: context.accentColor,
-                          shape: BoxShape.circle,
+                ),
+              )
+            else
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: List.generate(_pinLength, (index) {
+                  final isFilled = index < _pin.length;
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    curve: Curves.easeOut,
+                    width: 40,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: isFilled
+                          ? context.accentColor.withValues(alpha: 0.12)
+                          : context.backgroundSecondary,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isFilled
+                            ? context.accentColor
+                            : context.dividerColor,
+                        width: isFilled ? 1.4 : 1,
+                      ),
+                    ),
+                    child: Center(
+                      child: AnimatedScale(
+                        scale: isFilled ? 1 : 0,
+                        duration: const Duration(milliseconds: 120),
+                        curve: Curves.easeOut,
+                        child: Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: context.accentColor,
+                            shape: BoxShape.circle,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                );
-              }),
-            ),
+                  );
+                }),
+              ),
             SizedBox(
               width: 0,
               height: 0,
