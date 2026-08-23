@@ -49,6 +49,9 @@ class _MediaPickerScreenState extends State<MediaPickerScreen> {
   // ponytail: global tile rects captured once per hold; the grid cannot
   // scroll mid-hold, so they stay valid. Recompute if that ever changes.
   Map<String, Rect> _tileRects = const {};
+  bool _holdPreviewing = false;
+  Offset _holdOrigin = Offset.zero;
+  AssetEntity? _heldAsset;
 
   @override
   void initState() {
@@ -303,12 +306,35 @@ class _MediaPickerScreenState extends State<MediaPickerScreen> {
     }
     _tileRects = rects;
 
-    _startSlidingSelection(asset);
+    _heldAsset = asset;
+    _holdOrigin = globalPosition;
+    _holdPreviewing = true;
     _showPreview(asset, globalPosition);
+  }
+
+  void _updateHold(Offset globalPosition) {
+    if (_holdPreviewing) {
+      // ponytail: 32px slop — hold still to peek, drag to slide-select.
+      if ((globalPosition - _holdOrigin).distance <= 32) {
+        _updatePreview(globalPosition);
+        return;
+      }
+      _holdPreviewing = false;
+      _hidePreview();
+      final held = _heldAsset;
+      if (held != null) _startSlidingSelection(held);
+    }
+    _updateSlidingSelection(globalPosition);
   }
 
   void _endHold() {
     _tileRects = const {};
+    if (_holdPreviewing) {
+      // Pure preview: no selection side effects.
+      _holdPreviewing = false;
+      _hidePreview();
+      return;
+    }
     _stopSlidingSelection();
     _hidePreview();
   }
@@ -494,10 +520,8 @@ class _MediaPickerScreenState extends State<MediaPickerScreen> {
     return GestureDetector(
       onLongPressStart: (details) =>
           _beginHold(asset, details.globalPosition),
-      onLongPressMoveUpdate: (details) {
-        _updateSlidingSelection(details.globalPosition);
-        _updatePreview(details.globalPosition);
-      },
+      onLongPressMoveUpdate: (details) =>
+          _updateHold(details.globalPosition),
       onLongPressEnd: (_) => _endHold(),
       onLongPressCancel: _endHold,
       onTap: () => _toggleSelection(asset),
