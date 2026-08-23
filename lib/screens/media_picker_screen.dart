@@ -1,9 +1,10 @@
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 import '../services/auto_kill_service.dart';
 import '../themes/app_colors.dart';
 import '../utils/responsive_utils.dart';
+import '../widgets/hold_preview_card.dart';
 
 /// A custom media picker that uses PhotoManager to directly access gallery assets.
 /// This allows proper deletion of original files from the gallery.
@@ -42,6 +43,15 @@ class _MediaPickerScreenState extends State<MediaPickerScreen> {
   bool _isSlidingSelection = false;
   bool? _slidingSelectionValue;
   final Set<String> _slidingTouchedAssetIds = {};
+  OverlayEntry? _previewEntry;
+  final ValueNotifier<Offset> _previewPosition = ValueNotifier(Offset.zero);
+  final ValueNotifier<AssetEntity?> _previewAsset = ValueNotifier(null);
+  // ponytail: global tile rects captured once per hold; the grid cannot
+  // scroll mid-hold, so they stay valid. Recompute if that ever changes.
+  Map<String, Rect> _tileRects = const {};
+  bool _holdPreviewing = false;
+  Offset _holdOrigin = Offset.zero;
+  AssetEntity? _heldAsset;
 
   @override
   void initState() {
@@ -52,6 +62,9 @@ class _MediaPickerScreenState extends State<MediaPickerScreen> {
 
   @override
   void dispose() {
+    _hidePreview();
+    _previewPosition.dispose();
+    _previewAsset.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -236,6 +249,37 @@ class _MediaPickerScreenState extends State<MediaPickerScreen> {
     });
   }
 
+  void _showPreview(AssetEntity asset, Offset globalPosition) {
+    _hidePreview();
+    _previewEntry = OverlayEntry(
+      builder: (_) => HoldPreviewCard(
+        asset: _previewAsset,
+        position: _previewPosition,
+      ),
+    );
+    Overlay.of(context).insert(_previewEntry!);
+    _previewAsset.value = asset;
+    _previewPosition.value = globalPosition;
+  }
+
+  void _updatePreview(Offset globalPosition) {
+    if (_previewEntry == null) return;
+    _previewPosition.value = globalPosition;
+
+    final assetId = _assetIdAt(globalPosition);
+    if (assetId == null) return;
+    final asset = _assetById(assetId);
+    if (asset != null && _previewAsset.value?.id != asset.id) {
+      _previewAsset.value = asset;
+    }
+  }
+
+  void _hidePreview() {
+    _previewEntry?.remove();
+    _previewEntry = null;
+    _previewAsset.value = null;
+  }
+
   AssetEntity? _assetById(String assetId) {
     for (final asset in _assets) {
       if (asset.id == assetId) return asset;
@@ -244,20 +288,55 @@ class _MediaPickerScreenState extends State<MediaPickerScreen> {
   }
 
   String? _assetIdAt(Offset globalPosition) {
+    for (final entry in _tileRects.entries) {
+      if (entry.value.contains(globalPosition)) return entry.key;
+    }
+    return null;
+  }
+
+  void _beginHold(AssetEntity asset, Offset globalPosition) {
+    final rects = <String, Rect>{};
     for (final entry in _tileKeys.entries) {
       final context = entry.value.currentContext;
       if (context == null) continue;
-
       final renderObject = context.findRenderObject();
       if (renderObject is! RenderBox || !renderObject.hasSize) continue;
-
-      final rect = renderObject.localToGlobal(Offset.zero) & renderObject.size;
-      if (rect.contains(globalPosition)) {
-        return entry.key;
-      }
+      rects[entry.key] =
+          renderObject.localToGlobal(Offset.zero) & renderObject.size;
     }
+    _tileRects = rects;
 
-    return null;
+    _heldAsset = asset;
+    _holdOrigin = globalPosition;
+    _holdPreviewing = true;
+    _showPreview(asset, globalPosition);
+  }
+
+  void _updateHold(Offset globalPosition) {
+    if (_holdPreviewing) {
+      // ponytail: 32px slop — hold still to peek, drag to slide-select.
+      if ((globalPosition - _holdOrigin).distance <= 32) {
+        _updatePreview(globalPosition);
+        return;
+      }
+      _holdPreviewing = false;
+      _hidePreview();
+      final held = _heldAsset;
+      if (held != null) _startSlidingSelection(held);
+    }
+    _updateSlidingSelection(globalPosition);
+  }
+
+  void _endHold() {
+    _tileRects = const {};
+    if (_holdPreviewing) {
+      // Pure preview: no selection side effects.
+      _holdPreviewing = false;
+      _hidePreview();
+      return;
+    }
+    _stopSlidingSelection();
+    _hidePreview();
   }
 
   void _selectAll() {
@@ -439,11 +518,12 @@ class _MediaPickerScreenState extends State<MediaPickerScreen> {
     final selectionIndex = _selectedAssets.toList().indexOf(asset);
 
     return GestureDetector(
-      onLongPressStart: (_) => _startSlidingSelection(asset),
+      onLongPressStart: (details) =>
+          _beginHold(asset, details.globalPosition),
       onLongPressMoveUpdate: (details) =>
-          _updateSlidingSelection(details.globalPosition),
-      onLongPressEnd: (_) => _stopSlidingSelection(),
-      onLongPressCancel: _stopSlidingSelection,
+          _updateHold(details.globalPosition),
+      onLongPressEnd: (_) => _endHold(),
+      onLongPressCancel: _endHold,
       onTap: () => _toggleSelection(asset),
       child: Stack(
         key: _tileKeyFor(asset.id),

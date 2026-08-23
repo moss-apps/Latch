@@ -99,6 +99,8 @@ final filteredFilesProvider = FutureProvider<List<VaultedFile>>((ref) async {
 final filesByTypeProvider =
     FutureProvider.family<List<VaultedFile>, VaultedFileType>(
         (ref, type) async {
+  // ponytail: depend on the vault list so deletes/imports invalidate this too
+  ref.watch(vaultNotifierProvider);
   final vaultService = ref.watch(vaultServiceProvider);
   final isDecoy = ref.watch(isDecoyModeProvider);
   final sortOption = ref.watch(sortOptionProvider);
@@ -123,6 +125,8 @@ final albumProvider =
 /// Provider for files in album
 final filesInAlbumProvider =
     FutureProvider.family<List<VaultedFile>, String>((ref, albumId) async {
+  // ponytail: depend on the vault list so deletes/imports invalidate this too
+  ref.watch(vaultNotifierProvider);
   final vaultService = ref.watch(vaultServiceProvider);
   final sortOption = ref.watch(sortOptionProvider);
 
@@ -159,6 +163,8 @@ final subfoldersProvider =
 /// Provider for files in folder
 final filesInFolderProvider =
     FutureProvider.family<List<VaultedFile>, String>((ref, folderId) async {
+  // ponytail: depend on the vault list so deletes/imports invalidate this too
+  ref.watch(vaultNotifierProvider);
   final vaultService = ref.watch(vaultServiceProvider);
   final sortOption = ref.watch(sortOptionProvider);
 
@@ -175,6 +181,8 @@ final tagsProvider = FutureProvider<List<TagInfo>>((ref) async {
 /// Provider for files by tag
 final filesByTagProvider =
     FutureProvider.family<List<VaultedFile>, String>((ref, tag) async {
+  // ponytail: depend on the vault list so deletes/imports invalidate this too
+  ref.watch(vaultNotifierProvider);
   final vaultService = ref.watch(vaultServiceProvider);
   final sortOption = ref.watch(sortOptionProvider);
 
@@ -184,6 +192,8 @@ final filesByTagProvider =
 
 /// Provider for favorite files
 final favoriteFilesProvider = FutureProvider<List<VaultedFile>>((ref) async {
+  // ponytail: depend on the vault list so deletes/imports invalidate this too
+  ref.watch(vaultNotifierProvider);
   final vaultService = ref.watch(vaultServiceProvider);
   final sortOption = ref.watch(sortOptionProvider);
 
@@ -206,6 +216,8 @@ final decoySettingsProvider = FutureProvider<DecoySettings>((ref) async {
 /// Provider for file counts by type
 final fileCountsProvider =
     FutureProvider<Map<VaultedFileType, int>>((ref) async {
+  // ponytail: depend on the vault list so deletes/imports invalidate this too
+  ref.watch(vaultNotifierProvider);
   final vaultService = ref.watch(vaultServiceProvider);
   return await vaultService.getFileCounts();
 });

@@ -146,7 +146,8 @@ class _UnlockScreenState extends State<UnlockScreen> {
     if (!result.isDecoy) return false;
 
     try {
-      await EncryptionService.instance.unlockMasterKey(credential, isDecoy: true);
+      await EncryptionService.instance
+          .unlockMasterKey(credential, isDecoy: true);
     } catch (e) {
       debugPrint('Decoy key unlock failed: $e');
       return false;
@@ -279,7 +280,8 @@ class _UnlockScreenState extends State<UnlockScreen> {
       } catch (e) {
         debugPrint('Biometric key unlock failed: $e');
         setState(() {
-          _errorMessage = 'Unable to unlock vault. Please use your backup credential.';
+          _errorMessage =
+              'Unable to unlock vault. Please use your backup credential.';
           _isAuthenticating = false;
         });
       }
@@ -450,6 +452,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
       controller: _pinController,
       enabled: _inputEnabled,
       autofillEnabled: _autofillEnabled,
+      isLoading: _isAuthenticating,
     );
   }
 
@@ -462,9 +465,8 @@ class _UnlockScreenState extends State<UnlockScreen> {
           autofocus: true,
           enabled: _inputEnabled,
           obscureText: _obscurePassword,
-          autofillHints: _autofillEnabled
-              ? const [AutofillHints.password]
-              : null,
+          autofillHints:
+              _autofillEnabled ? const [AutofillHints.password] : null,
           style: TextStyle(
             fontFamily: 'ProductSans',
             fontSize: 16,
@@ -561,8 +563,8 @@ class _UnlockScreenState extends State<UnlockScreen> {
       button: true,
       label: 'Unlock with biometrics',
       child: Material(
-        color: context.accentColor
-            .withValues(alpha: _inputEnabled ? 0.12 : 0.06),
+        color:
+            context.accentColor.withValues(alpha: _inputEnabled ? 0.12 : 0.06),
         shape: const CircleBorder(),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -633,8 +635,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
       style: FilledButton.styleFrom(
         backgroundColor: context.accentColor,
         foregroundColor: onColor,
-        disabledBackgroundColor:
-            context.accentColor.withValues(alpha: 0.35),
+        disabledBackgroundColor: context.accentColor.withValues(alpha: 0.35),
         minimumSize: const Size.fromHeight(52),
         textStyle: const TextStyle(
           fontFamily: 'ProductSans',

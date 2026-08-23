@@ -118,7 +118,7 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Failed to load song: $e';
+        _error = 'Failed to load song';
         _isLoading = false;
       });
     }
@@ -132,7 +132,7 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
         await _player.play();
       }
     } catch (e) {
-      ToastUtils.showError('Playback failed: $e');
+      ToastUtils.showError('Playback failed');
     }
   }
 
@@ -200,7 +200,7 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
       }
     } catch (e) {
       if (mounted) Navigator.pop(context);
-      ToastUtils.showError('Failed to export file: $e');
+      ToastUtils.showError('Failed to export file');
     }
   }
 
@@ -244,7 +244,7 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
       }
     } catch (e) {
       if (mounted) Navigator.pop(context);
-      ToastUtils.showError('Failed to open file: $e');
+      ToastUtils.showError('Failed to open file');
     }
   }
 
@@ -277,7 +277,7 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
     } catch (e) {
       _reenableAutoKillOnResume = false;
       await AutoKillService.setEnabled(true);
-      ToastUtils.showError('Failed to open Flick: $e');
+      ToastUtils.showError('Failed to open Flick');
     }
   }
 

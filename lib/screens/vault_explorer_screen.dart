@@ -239,7 +239,7 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
       }
     } catch (e) {
       debugPrint('Error exporting file: $e');
-      ToastUtils.showError('Failed to export file: $e');
+      ToastUtils.showError('Failed to export file');
     }
   }
 

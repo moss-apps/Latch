@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/note.dart';
-import '../models/encryption_algorithm.dart';
 import '../providers/note_providers.dart';
 import '../themes/app_colors.dart';
 import '../utils/toast_utils.dart';
 import '../widgets/note_card.dart';
-import '../widgets/operation_progress_sheet.dart';
 import 'note_editor_screen.dart';
 import 'note_folders_screen.dart';
 
@@ -42,6 +40,7 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
           : AppBar(
               backgroundColor: context.backgroundColor,
               elevation: 0,
+              automaticallyImplyLeading: false,
               title: Text(
                 'Notes',
                 style: TextStyle(
@@ -53,7 +52,9 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
               ),
               actions: [
                 IconButton(
-                  icon: Icon(Icons.folder_outlined, color: context.textSecondary),
+                  icon: Icon(Icons.folder_outlined,
+                      color: context.textSecondary),
+                  tooltip: 'Folders',
                   onPressed: () => Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -66,7 +67,7 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: TextField(
               controller: _searchController,
               onChanged: (value) {
@@ -77,21 +78,23 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
                 color: context.textPrimary,
               ),
               decoration: InputDecoration(
-                hintText: 'Search notes...',
+                hintText: 'Search notes',
                 hintStyle: TextStyle(
                   fontFamily: 'ProductSans',
                   color: context.textTertiary,
                 ),
-                prefixIcon: Icon(Icons.search, color: context.textTertiary),
+                prefixIcon:
+                    Icon(Icons.search, size: 20, color: context.textTertiary),
+                isDense: true,
                 filled: true,
                 fillColor: context.surfaceColor,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: context.borderColor),
+                  borderSide: BorderSide.none,
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: context.borderColor),
+                  borderSide: BorderSide.none,
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -102,25 +105,21 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
           ),
           if (selectedFolder != null)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
               child: Row(
                 children: [
-                  Icon(Icons.folder, size: 16, color: context.accentColor),
+                  Icon(Icons.folder, size: 14, color: context.accentColor),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      foldersAsync.when(
-                        data: (folders) {
-                          final folder = folders.firstWhere(
-                            (f) => f.id == selectedFolder,
-                            orElse: () =>
-                                NoteFolder(id: '', name: 'Unknown', createdAt: DateTime.now(), updatedAt: DateTime.now()),
-                          );
-                          return folder.name;
-                        },
-                        loading: () => 'Loading...',
-                        error: (_, __) => 'Error',
+                      foldersAsync.maybeWhen(
+                        data: (folders) => folders
+                            .where((f) => f.id == selectedFolder)
+                            .fold('', (prev, f) => f.name),
+                        orElse: () => '',
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontFamily: 'ProductSans',
                         fontSize: 13,
@@ -128,18 +127,14 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
                       ),
                     ),
                   ),
-                  TextButton(
+                  IconButton(
+                    icon: Icon(Icons.close,
+                        size: 16, color: context.textTertiary),
+                    tooltip: 'Clear folder filter',
                     onPressed: () {
-                      ref.read(selectedNoteFolderProvider.notifier).state = null;
+                      ref.read(selectedNoteFolderProvider.notifier).state =
+                          null;
                     },
-                    child: Text(
-                      'Clear',
-                      style: TextStyle(
-                        fontFamily: 'ProductSans',
-                        fontSize: 12,
-                        color: context.accentColor,
-                      ),
-                    ),
                   ),
                 ],
               ),
@@ -147,7 +142,8 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
           Expanded(
             child: notesAsync.when(
               data: (notes) {
-                final filtered = _filterNotes(notes, searchQuery, selectedFolder);
+                final filtered =
+                    _filterNotes(notes, searchQuery, selectedFolder);
                 if (filtered.isEmpty) {
                   return Center(
                     child: Column(
@@ -155,17 +151,17 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
                       children: [
                         Icon(
                           Icons.note_outlined,
-                          size: 64,
+                          size: 48,
                           color: context.textTertiary,
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
                         Text(
                           searchQuery.isNotEmpty
                               ? 'No notes found'
                               : 'No notes yet',
                           style: TextStyle(
                             fontFamily: 'ProductSans',
-                            fontSize: 16,
+                            fontSize: 15,
                             color: context.textTertiary,
                           ),
                         ),
@@ -173,25 +169,25 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
                     ),
                   );
                 }
-                return GridView.builder(
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 1.4,
-                  ),
+                return ListView.separated(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
                   itemCount: filtered.length,
+                  separatorBuilder: (_, __) => Divider(
+                    height: 1,
+                    indent: 16,
+                    endIndent: 16,
+                    color: context.dividerColor,
+                  ),
                   itemBuilder: (context, index) {
                     final note = filtered[index];
-                    final isSelected = _selectedNoteIds.contains(note.id);
                     return NoteCard(
                       note: note,
-                      isSelected: isSelected,
+                      isSelected: _selectedNoteIds.contains(note.id),
+                      isSelectionMode: _isSelectionMode,
                       onTap: () {
                         if (_isSelectionMode) {
                           setState(() {
-                            if (isSelected) {
+                            if (_selectedNoteIds.contains(note.id)) {
                               _selectedNoteIds.remove(note.id);
                               if (_selectedNoteIds.isEmpty) {
                                 _isSelectionMode = false;
@@ -238,7 +234,10 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
       floatingActionButton: _isSelectionMode
           ? null
           : FloatingActionButton(
-              onPressed: _showNewNoteSheet,
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const NoteEditorScreen()),
+              ),
               backgroundColor: context.accentColor,
               elevation: 0,
               child: const Icon(Icons.add, color: Colors.white),
@@ -271,7 +270,7 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
       actions: [
         IconButton(
           icon: Icon(Icons.delete_outline, color: AppColors.error),
-          onPressed: () => _showDeleteConfirmation(),
+          onPressed: _showDeleteConfirmation,
         ),
       ],
     );
@@ -300,424 +299,14 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
     return filtered;
   }
 
-  void _showNewNoteSheet() {
-    final titleController = TextEditingController();
-    final contentController = TextEditingController();
-    bool isSaving = false;
-    String selectedFormat = 'txt';
-    bool encrypt = false;
-    EncryptionAlgorithm selectedAlgorithm = EncryptionAlgorithm.aes256Gcm;
-    int selectedKdfIterations = 100000;
-    const kdfOptions = [100000, 200000, 500000];
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: Container(
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height * 0.85,
-                ),
-                decoration: BoxDecoration(
-                  color: context.surfaceColor,
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(24)),
-                ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        margin: const EdgeInsets.only(top: 12),
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: context.borderColor,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    'New Note',
-                                    style: TextStyle(
-                                      fontFamily: 'ProductSans',
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w600,
-                                      color: context.textPrimary,
-                                    ),
-                                  ),
-                                ),
-                                TextButton(
-                                  onPressed: isSaving
-                                      ? null
-                                      : () async {
-                                          if (titleController.text
-                                              .trim()
-                                              .isEmpty) {
-                                            ToastUtils.showError(
-                                                'Title cannot be empty');
-                                            return;
-                                          }
-                                          setSheetState(
-                                              () => isSaving = true);
-
-                                          Navigator.pop(context);
-
-                                          final progressState =
-                                              ValueNotifier<OperationProgressState>(
-                                            OperationProgressState(
-                                              totalFiles: 1,
-                                              currentFile: 0,
-                                              currentFileName:
-                                                  titleController.text.trim(),
-                                              totalSizeBytes: contentController
-                                                  .text.length,
-                                              processedSizeBytes: 0,
-                                              statusMessage: 'Preparing...',
-                                              isProcessing: true,
-                                              isEncrypting: encrypt,
-                                              isComplete: false,
-                                            ),
-                                          );
-
-                                          if (!mounted) return;
-                                          showModalBottomSheet(
-                                            context: this.context,
-                                            backgroundColor: Colors.transparent,
-                                            isDismissible: false,
-                                            enableDrag: false,
-                                            builder: (ctx) =>
-                                                ValueListenableBuilder<
-                                                    OperationProgressState>(
-                                              valueListenable: progressState,
-                                              builder: (ctx, state, _) =>
-                                                  OperationProgressSheet(
-                                                operationType:
-                                                    OperationType.hide,
-                                                totalFiles: state.totalFiles,
-                                                currentFile: state.currentFile,
-                                                currentFileName:
-                                                    state.currentFileName,
-                                                totalSizeBytes:
-                                                    state.totalSizeBytes,
-                                                processedSizeBytes:
-                                                    state.processedSizeBytes,
-                                                statusMessage:
-                                                    state.statusMessage,
-                                                isProcessing: state.isProcessing,
-                                                isComplete: state.isComplete,
-                                                isEncrypting: state.isEncrypting,
-                                              ),
-                                            ),
-                                          );
-
-                                          try {
-                                            await ref
-                                                .read(notesNotifierProvider
-                                                    .notifier)
-                                                .createNote(
-                                              title: titleController.text.trim(),
-                                              content: contentController.text,
-                                              fileExtension: selectedFormat,
-                                              isMarkdown: selectedFormat == 'md',
-                                              encrypt: encrypt,
-                                              encryptionAlgorithm: encrypt
-                                                  ? selectedAlgorithm
-                                                  : EncryptionAlgorithm
-                                                      .aes256Gcm,
-                                              kdfIterations:
-                                                  selectedKdfIterations,
-                                              onProgress: (status,
-                                                  {isEncrypting = false}) {
-                                                progressState.value =
-                                                    progressState.value.copyWith(
-                                                  statusMessage: status,
-                                                  isEncrypting: isEncrypting,
-                                                  currentFile: 1,
-                                                  processedSizeBytes:
-                                                      isEncrypting
-                                                          ? (progressState
-                                                                  .value
-                                                                  .processedSizeBytes +
-                                                              (contentController
-                                                                      .text
-                                                                      .length ~/
-                                                                      3))
-                                                          : progressState.value
-                                                              .processedSizeBytes,
-                                                );
-                                              },
-                                            );
-                                            progressState.value =
-                                                progressState.value.copyWith(
-                                              isProcessing: false,
-                                              isComplete: true,
-                                              statusMessage: 'Completed',
-                                              processedSizeBytes: progressState
-                                                  .value.totalSizeBytes,
-                                            );
-                                          } catch (e) {
-                                            if (!mounted) return;
-                                            Navigator.pop(this.context);
-                                            ToastUtils.showError(
-                                                'Failed to create note');
-                                          }
-                                        },
-                                  child: Text(
-                                    'Save',
-                                    style: TextStyle(
-                                      fontFamily: 'ProductSans',
-                                      color: context.accentColor,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Text(
-                                  'Format: ',
-                                  style: TextStyle(
-                                    fontFamily: 'ProductSans',
-                                    fontSize: 13,
-                                    color: context.textSecondary,
-                                  ),
-                                ),
-                                ...['txt', 'md', 'html'].map((fmt) {
-                                  final isSelected = fmt == selectedFormat;
-                                  return Padding(
-                                    padding: const EdgeInsets.only(right: 8),
-                                    child: ChoiceChip(
-                                      label: Text(
-                                        '.$fmt',
-                                        style: TextStyle(
-                                          fontFamily: 'ProductSans',
-                                          fontSize: 12,
-                                          color: isSelected
-                                              ? Colors.white
-                                              : context.textSecondary,
-                                        ),
-                                      ),
-                                      selected: isSelected,
-                                      onSelected: (_) {
-                                        setSheetState(
-                                            () => selectedFormat = fmt);
-                                      },
-                                      selectedColor: context.accentColor,
-                                      backgroundColor:
-                                          context.backgroundColor,
-                                      side: BorderSide(
-                                        color: isSelected
-                                            ? context.accentColor
-                                            : context.borderColor,
-                                      ),
-                                      visualDensity: VisualDensity.compact,
-                                    ),
-                                  );
-                                }),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Icon(Icons.lock_outline,
-                                    size: 16, color: context.textSecondary),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Encrypt',
-                                  style: TextStyle(
-                                    fontFamily: 'ProductSans',
-                                    fontSize: 13,
-                                    color: context.textSecondary,
-                                  ),
-                                ),
-                                const Spacer(),
-                                Switch(
-                                  value: encrypt,
-                                  activeTrackColor: context.accentColor,
-                                  onChanged: (v) =>
-                                      setSheetState(() => encrypt = v),
-                                ),
-                              ],
-                            ),
-                            if (encrypt) ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                'Algorithm',
-                                style: TextStyle(
-                                  fontFamily: 'ProductSans',
-                                  fontSize: 13,
-                                  color: context.textSecondary,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Row(
-                                children: EncryptionAlgorithm.values.map((algo) {
-                                  final isSelected = algo == selectedAlgorithm;
-                                  return Padding(
-                                    padding: const EdgeInsets.only(right: 8),
-                                    child: ChoiceChip(
-                                      label: Text(
-                                        algo.displayName,
-                                        style: TextStyle(
-                                          fontFamily: 'ProductSans',
-                                          fontSize: 12,
-                                          color: isSelected
-                                              ? Colors.white
-                                              : context.textSecondary,
-                                        ),
-                                      ),
-                                      selected: isSelected,
-                                      onSelected: (_) => setSheetState(
-                                          () => selectedAlgorithm = algo),
-                                      selectedColor: context.accentColor,
-                                      backgroundColor: context.backgroundColor,
-                                      side: BorderSide(
-                                        color: isSelected
-                                            ? context.accentColor
-                                            : context.borderColor,
-                                      ),
-                                      visualDensity: VisualDensity.compact,
-                                    ),
-                                  );
-                                }).toList(),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'KDF iterations',
-                                style: TextStyle(
-                                  fontFamily: 'ProductSans',
-                                  fontSize: 13,
-                                  color: context.textSecondary,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Row(
-                                children: kdfOptions.map((kdf) {
-                                  final isSelected = kdf == selectedKdfIterations;
-                                  final label = kdf == 100000
-                                      ? '${(kdf / 1000).round()}K'
-                                      : '${(kdf / 1000).round()}K';
-                                  return Padding(
-                                    padding: const EdgeInsets.only(right: 8),
-                                    child: ChoiceChip(
-                                      label: Text(
-                                        label,
-                                        style: TextStyle(
-                                          fontFamily: 'ProductSans',
-                                          fontSize: 12,
-                                          color: isSelected
-                                              ? Colors.white
-                                              : context.textSecondary,
-                                        ),
-                                      ),
-                                      selected: isSelected,
-                                      onSelected: (_) => setSheetState(
-                                          () => selectedKdfIterations = kdf),
-                                      selectedColor: context.accentColor,
-                                      backgroundColor: context.backgroundColor,
-                                      side: BorderSide(
-                                        color: isSelected
-                                            ? context.accentColor
-                                            : context.borderColor,
-                                      ),
-                                      visualDensity: VisualDensity.compact,
-                                    ),
-                                  );
-                                }).toList(),
-                              ),
-                            ],
-                            const SizedBox(height: 8),
-                            TextField(
-                              controller: titleController,
-                              style: TextStyle(
-                                fontFamily: 'ProductSans',
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                                color: context.textPrimary,
-                              ),
-                              decoration: InputDecoration(
-                                hintText: 'Title',
-                                hintStyle: TextStyle(
-                                  fontFamily: 'ProductSans',
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: context.textTertiary,
-                                ),
-                                border: InputBorder.none,
-                                enabledBorder: InputBorder.none,
-                                focusedBorder: InputBorder.none,
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                            ),
-                            Divider(color: context.dividerColor),
-                            SizedBox(
-                              height: 200,
-                              child: TextField(
-                                controller: contentController,
-                                maxLines: null,
-                                expands: true,
-                                textAlignVertical: TextAlignVertical.top,
-                                style: TextStyle(
-                                  fontFamily: 'ProductSans',
-                                  fontSize: 15,
-                                  color: context.textPrimary,
-                                  height: 1.5,
-                                ),
-                                decoration: InputDecoration(
-                                  hintText: 'Start writing...',
-                                  hintStyle: TextStyle(
-                                    fontFamily: 'ProductSans',
-                                    fontSize: 15,
-                                    color: context.textTertiary,
-                                  ),
-                                  border: InputBorder.none,
-                                  enabledBorder: InputBorder.none,
-                                  focusedBorder: InputBorder.none,
-                                  contentPadding: EdgeInsets.zero,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    ).whenComplete(() {
-      titleController.dispose();
-      contentController.dispose();
-    });
-  }
-
   Future<void> _showDeleteConfirmation() async {
+    final count = _selectedNoteIds.length;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: context.surfaceColor,
         title: Text(
-          'Delete Notes',
+          count == 1 ? 'Delete Note' : 'Delete Notes',
           style: TextStyle(
             fontFamily: 'ProductSans',
             fontWeight: FontWeight.w600,
@@ -725,7 +314,7 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
           ),
         ),
         content: Text(
-          'Delete ${_selectedNoteIds.length} note(s)? This cannot be undone.',
+          'Delete $count ${count == 1 ? 'note' : 'notes'}? This cannot be undone.',
           style: TextStyle(
             fontFamily: 'ProductSans',
             color: context.textSecondary,

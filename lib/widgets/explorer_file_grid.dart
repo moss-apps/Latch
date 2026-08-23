@@ -1041,7 +1041,7 @@ class ExplorerFileGrid extends ConsumerWidget {
     } catch (e) {
       if (ctx.mounted) Navigator.pop(ctx);
       debugPrint('Error exporting file: $e');
-      ToastUtils.showError('Failed to export file: $e');
+      ToastUtils.showError('Failed to export file');
     }
   }
 
@@ -1090,7 +1090,7 @@ class ExplorerFileGrid extends ConsumerWidget {
     } catch (e) {
       if (ctx.mounted) Navigator.pop(ctx);
       debugPrint('Error opening file: $e');
-      ToastUtils.showError('Failed to open file: $e');
+      ToastUtils.showError('Failed to open file');
     }
   }
 

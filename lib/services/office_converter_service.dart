@@ -193,7 +193,7 @@ class OfficeConverterService {
       debugPrint('Error converting document: $e');
       return ConversionResult(
         success: false,
-        error: 'Failed to convert document: $e',
+        error: 'Failed to convert document',
       );
     }
   }
@@ -223,7 +223,7 @@ class OfficeConverterService {
       debugPrint('Error converting DOCX: $e');
       return ConversionResult(
         success: false,
-        error: 'Failed to convert DOCX: $e',
+        error: 'Failed to convert DOCX',
       );
     }
   }
@@ -253,7 +253,7 @@ class OfficeConverterService {
       debugPrint('Error converting ODT: $e');
       return ConversionResult(
         success: false,
-        error: 'Failed to convert ODT: $e',
+        error: 'Failed to convert ODT',
       );
     }
   }
@@ -283,7 +283,7 @@ class OfficeConverterService {
       debugPrint('Error converting RTF: $e');
       return ConversionResult(
         success: false,
-        error: 'Failed to convert RTF: $e',
+        error: 'Failed to convert RTF',
       );
     }
   }

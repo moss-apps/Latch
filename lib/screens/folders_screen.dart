@@ -845,11 +845,12 @@ class _ImportProgressDialogState extends ConsumerState<_ImportProgressDialog> {
       ref.invalidate(foldersNotifierProvider);
       ref.invalidate(vaultNotifierProvider);
     } catch (e) {
+      debugPrint('Folder import error: $e');
       if (!mounted) return;
       setState(() {
         _isImporting = false;
-        _error = e.toString();
-        _status = 'Error: $e';
+        _error = 'Import failed — check the folder and try again';
+        _status = _error!;
       });
     }
   }
@@ -946,7 +947,8 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _error = e.toString();
+        debugPrint('Folder browse error: $e');
+        _error = 'Couldn\'t open this folder — check permissions and try again';
       });
     }
   }
@@ -998,7 +1000,8 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _error = e.toString();
+        debugPrint('Folder browse error: $e');
+        _error = 'Couldn\'t open this folder — check permissions and try again';
       });
     }
   }

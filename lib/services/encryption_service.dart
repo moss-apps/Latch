@@ -932,7 +932,7 @@ class EncryptionService {
           (header[3] == 0x47 || header[3] == 0x32)) {
         // GCM-encrypted streamed file (v1 legacy or v2 authenticated)
         debugPrint('[Encryption] Detected GCM format (byte3=0x${header[3].toRadixString(16)})');
-        return decryptStreamedFileToMemoryGcm(
+        return await decryptStreamedFileToMemoryGcm(
           encryptedPath,
           ivBase64,
           isDecoy: isDecoy,

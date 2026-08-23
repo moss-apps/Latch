@@ -71,9 +71,15 @@ class _NoteFoldersScreenState extends ConsumerState<NoteFoldersScreen> {
             );
           }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
+          return ListView.separated(
+            padding: const EdgeInsets.symmetric(vertical: 4),
             itemCount: folders.length,
+            separatorBuilder: (_, __) => Divider(
+              height: 1,
+              indent: 16,
+              endIndent: 16,
+              color: context.dividerColor,
+            ),
             itemBuilder: (context, index) {
               final folder = folders[index];
               final noteCount = notesAsync.whenOrNull(
@@ -82,82 +88,79 @@ class _NoteFoldersScreenState extends ConsumerState<NoteFoldersScreen> {
                   ) ??
                   0;
 
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
+              return ListTile(
+                leading: Icon(Icons.folder_outlined,
+                    color: context.textSecondary),
+                title: Text(
+                  folder.name,
+                  style: TextStyle(
+                    fontFamily: 'ProductSans',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: context.textPrimary,
+                  ),
+                ),
+                subtitle: Text(
+                  '$noteCount ${noteCount == 1 ? 'note' : 'notes'}',
+                  style: TextStyle(
+                    fontFamily: 'ProductSans',
+                    fontSize: 12,
+                    color: context.textTertiary,
+                  ),
+                ),
+                trailing: PopupMenuButton<String>(
+                  icon:
+                      Icon(Icons.more_vert, color: context.textSecondary),
                   color: context.surfaceColor,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: context.borderColor),
-                ),
-                child: ListTile(
-                  leading: Icon(Icons.folder, color: context.accentColor),
-                  title: Text(
-                    folder.name,
-                    style: TextStyle(
-                      fontFamily: 'ProductSans',
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: context.textPrimary,
-                    ),
-                  ),
-                  subtitle: Text(
-                    '$noteCount note(s)',
-                    style: TextStyle(
-                      fontFamily: 'ProductSans',
-                      fontSize: 12,
-                      color: context.textTertiary,
-                    ),
-                  ),
-                  trailing: PopupMenuButton<String>(
-                    icon: Icon(Icons.more_vert, color: context.textSecondary),
-                    color: context.surfaceColor,
-                    onSelected: (value) {
-                      if (value == 'rename') {
-                        _showRenameDialog(folder);
-                      } else if (value == 'delete') {
-                        _showDeleteConfirmation(folder);
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      PopupMenuItem(
-                        value: 'rename',
-                        child: Row(
-                          children: [
-                            Icon(Icons.edit, size: 18, color: context.textSecondary),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Rename',
-                              style: TextStyle(
-                                fontFamily: 'ProductSans',
-                                color: context.textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete_outline, size: 18, color: AppColors.error),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Delete',
-                              style: TextStyle(
-                                fontFamily: 'ProductSans',
-                                color: AppColors.error,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  onTap: () {
-                    ref.read(selectedNoteFolderProvider.notifier).state = folder.id;
-                    Navigator.pop(context);
+                  onSelected: (value) {
+                    if (value == 'rename') {
+                      _showRenameDialog(folder);
+                    } else if (value == 'delete') {
+                      _showDeleteConfirmation(folder);
+                    }
                   },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'rename',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit_outlined,
+                              size: 18, color: context.textSecondary),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Rename',
+                            style: TextStyle(
+                              fontFamily: 'ProductSans',
+                              color: context.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_outline,
+                              size: 18, color: AppColors.error),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Delete',
+                            style: TextStyle(
+                              fontFamily: 'ProductSans',
+                              color: AppColors.error,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
+                onTap: () {
+                  ref.read(selectedNoteFolderProvider.notifier).state =
+                      folder.id;
+                  Navigator.pop(context);
+                },
               );
             },
           );

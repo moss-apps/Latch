@@ -19,10 +19,17 @@ class PasswordService {
   final EncryptionService _encryptionService = EncryptionService.instance;
 
   static const String _indexKey = 'locker_passwords_index';
+  static const String _decoyIndexKey = 'locker_passwords_index_decoy';
   static const String _dirName = 'passwords';
   static const int _defaultKdfIterations = 100000;
 
-  List<PasswordEntry>? _cachedEntries;
+  final Map<bool, List<PasswordEntry>> _caches = {};
+
+  List<String> _normalizedTags(List<String> tags) => tags
+      .map((t) => t.toLowerCase().trim())
+      .where((t) => t.isNotEmpty)
+      .toSet()
+      .toList();
 
   Future<String> _getDir({bool isDecoy = false}) async {
     final appDir = await getApplicationDocumentsDirectory();
@@ -38,28 +45,34 @@ class PasswordService {
   }
 
   Future<List<PasswordEntry>> loadPasswords({bool isDecoy = false}) async {
-    if (_cachedEntries != null) return _cachedEntries!;
-    final json = await _secureStorage.read(key: _indexKey);
+    final cached = _caches[isDecoy];
+    if (cached != null) return cached;
+    final json = await _secureStorage.read(
+      key: isDecoy ? _decoyIndexKey : _indexKey,
+    );
     if (json == null || json.isEmpty) {
-      _cachedEntries = [];
-      return _cachedEntries!;
+      return _caches[isDecoy] = [];
     }
     try {
       final List<dynamic> decoded = jsonDecode(json) as List<dynamic>;
-      _cachedEntries = decoded
+      return _caches[isDecoy] = decoded
           .map((e) => PasswordEntry.fromJson(e as Map<String, dynamic>))
           .toList();
-    } catch (_) {
-      _cachedEntries = [];
+    } catch (e) {
+      // ponytail: a corrupt index must throw, an empty list here would
+      // silently overwrite every entry on the next _save
+      throw Exception('Password index is corrupt: $e');
     }
-    return _cachedEntries!;
   }
 
-  Future<void> _save() async {
-    if (_cachedEntries == null) return;
-    final json =
-        jsonEncode(_cachedEntries!.map((e) => e.toJson()).toList());
-    await _secureStorage.write(key: _indexKey, value: json);
+  Future<void> _save({bool isDecoy = false}) async {
+    final entries = _caches[isDecoy];
+    if (entries == null) return;
+    final json = jsonEncode(entries.map((e) => e.toJson()).toList());
+    await _secureStorage.write(
+      key: isDecoy ? _decoyIndexKey : _indexKey,
+      value: json,
+    );
   }
 
   Future<Uint8List> _deriveKey(
@@ -101,8 +114,7 @@ class PasswordService {
       kdfIterations,
     );
 
-    final data =
-        Uint8List.fromList(utf8.encode(content.toJsonString()));
+    final data = utf8.encode(content.toJsonString());
     final result = encryptionAlgorithm == EncryptionAlgorithm.aes256Gcm
         ? await _encryptionService.encryptBytesStreamedGcm(
             data,
@@ -129,15 +141,15 @@ class PasswordService {
       iv: result.iv!,
       keyDerivationSalt: base64Encode(saltBytes),
       kdfIterations: kdfIterations,
-      tags: tags,
+      tags: _normalizedTags(tags),
       isEncrypted: true,
       encryptionAlgorithm: encryptionAlgorithm,
       createdAt: now,
       updatedAt: now,
     );
 
-    _cachedEntries!.insert(0, entry);
-    await _save();
+    _caches[isDecoy]!.insert(0, entry);
+    await _save(isDecoy: isDecoy);
 
     await VaultService.instance.registerPasswordEntry(
       passwordId: entry.id,
@@ -185,16 +197,18 @@ class PasswordService {
     String? title,
     PasswordContent? content,
     List<String>? tags,
-    EncryptionAlgorithm encryptionAlgorithm = EncryptionAlgorithm.aes256Gcm,
-    int kdfIterations = _defaultKdfIterations,
+    EncryptionAlgorithm? encryptionAlgorithm,
+    int? kdfIterations,
     bool isDecoy = false,
   }) async {
-    await loadPasswords(isDecoy: isDecoy);
+    final entries = await loadPasswords(isDecoy: isDecoy);
+    final algorithm = encryptionAlgorithm ?? entry.encryptionAlgorithm;
+    final iterations = kdfIterations ?? entry.kdfIterations;
 
     var updated = entry.copyWith(
       title: title,
-      tags: tags,
-      encryptionAlgorithm: encryptionAlgorithm,
+      tags: tags == null ? null : _normalizedTags(tags),
+      encryptionAlgorithm: algorithm,
       updatedAt: DateTime.now(),
     );
 
@@ -205,21 +219,23 @@ class PasswordService {
       final derivedKey = await _encryptionService.deriveFileKeyAsync(
         masterKey,
         salt,
-        kdfIterations,
+        iterations,
       );
 
-      final data =
-          Uint8List.fromList(utf8.encode(content.toJsonString()));
-      final result = updated.encryptionAlgorithm == EncryptionAlgorithm.aes256Gcm
+      final data = utf8.encode(content.toJsonString());
+      // ponytail: encrypt beside the original then swap, so a failed
+      // re-encrypt can't destroy the only copy
+      final tmpPath = '${entry.encryptedContentPath}.tmp';
+      final result = algorithm == EncryptionAlgorithm.aes256Gcm
           ? await _encryptionService.encryptBytesStreamedGcm(
               data,
-              entry.encryptedContentPath,
+              tmpPath,
               isDecoy: isDecoy,
               derivedKey: derivedKey,
             )
           : await _encryptionService.encryptBytesStreamed(
               data,
-              entry.encryptedContentPath,
+              tmpPath,
               isDecoy: isDecoy,
               derivedKey: derivedKey,
             );
@@ -228,18 +244,21 @@ class PasswordService {
         throw Exception('Failed to re-encrypt password entry');
       }
 
+      await _encryptionService.secureDelete(entry.encryptedContentPath);
+      await File(result.encryptedPath!).rename(entry.encryptedContentPath);
+
       updated = updated.copyWith(
-        encryptedContentPath: result.encryptedPath,
+        encryptedContentPath: entry.encryptedContentPath,
         iv: result.iv,
         keyDerivationSalt: base64Encode(salt),
-        kdfIterations: kdfIterations,
+        kdfIterations: iterations,
       );
     }
 
-    final index = _cachedEntries!.indexWhere((e) => e.id == entry.id);
+    final index = entries.indexWhere((e) => e.id == entry.id);
     if (index != -1) {
-      _cachedEntries![index] = updated;
-      await _save();
+      entries[index] = updated;
+      await _save(isDecoy: isDecoy);
 
       await VaultService.instance.registerPasswordEntry(
         passwordId: updated.id,
@@ -260,8 +279,8 @@ class PasswordService {
       {bool isDecoy = false}) async {
     await loadPasswords(isDecoy: isDecoy);
     await _encryptionService.secureDelete(entry.encryptedContentPath);
-    _cachedEntries!.removeWhere((e) => e.id == entry.id);
-    await _save();
+    _caches[isDecoy]!.removeWhere((e) => e.id == entry.id);
+    await _save(isDecoy: isDecoy);
     await VaultService.instance.removePasswordEntry(entry.id, isDecoy: isDecoy);
   }
 
@@ -272,8 +291,8 @@ class PasswordService {
       await _encryptionService.secureDelete(entry.encryptedContentPath);
     }
     final ids = entries.map((e) => e.id).toSet();
-    _cachedEntries!.removeWhere((e) => ids.contains(e.id));
-    await _save();
+    _caches[isDecoy]!.removeWhere((e) => ids.contains(e.id));
+    await _save(isDecoy: isDecoy);
     for (final entry in entries) {
       await VaultService.instance.removePasswordEntry(entry.id, isDecoy: isDecoy);
     }
@@ -281,27 +300,17 @@ class PasswordService {
 
   Future<PasswordEntry> toggleFavorite(PasswordEntry entry,
       {bool isDecoy = false}) async {
-    await loadPasswords(isDecoy: isDecoy);
+    final entries = await loadPasswords(isDecoy: isDecoy);
     final toggled = entry.toggleFavorite();
-    final index = _cachedEntries!.indexWhere((e) => e.id == entry.id);
+    final index = entries.indexWhere((e) => e.id == entry.id);
     if (index != -1) {
-      _cachedEntries![index] = toggled;
-      await _save();
+      entries[index] = toggled;
+      await _save(isDecoy: isDecoy);
     }
     return toggled;
   }
 
-  List<PasswordEntry> searchPasswords(String query) {
-    if (_cachedEntries == null) return [];
-    final lower = query.toLowerCase();
-    return _cachedEntries!
-        .where((e) =>
-            e.title.toLowerCase().contains(lower) ||
-            e.tags.any((t) => t.contains(lower)))
-        .toList();
-  }
-
   void clearCache() {
-    _cachedEntries = null;
+    _caches.clear();
   }
 }
