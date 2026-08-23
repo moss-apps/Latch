@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../models/sync_profile.dart';
 import '../providers/sync_provider.dart';
 import '../providers/vault_providers.dart';
+import '../services/remote/server_errors.dart';
 import '../services/remote/webdav_store.dart';
 import '../services/sync_profile_service.dart';
 import '../services/sync_service.dart' show SyncPhase, SyncProgress;
@@ -13,6 +14,7 @@ import '../themes/app_colors.dart';
 /// Connection settings + sync status for the local-server sync feature
 /// (docs/local_server_sync.md). Supports multiple profiles; exactly one is
 /// "active" (the sync target), held in vault settings as [syncProfileId].
+/// Adding/editing a server happens in [_ServerSheet], a focused bottom sheet.
 class SyncSettingsScreen extends ConsumerStatefulWidget {
   const SyncSettingsScreen({super.key});
 
@@ -21,24 +23,10 @@ class SyncSettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
-  final _urlController = TextEditingController();
-  final _userController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _basePathController = TextEditingController(text: '/locker');
-
-  SyncDirection _direction = SyncDirection.pushOnly;
-  bool _wifiOnly = true;
-
-  /// Profile currently loaded into the editor form. Null = a fresh profile
-  /// being created.
-  String? _editingId;
-
   String? _activeId;
   bool _masterEnabled = false;
 
-  bool _isTesting = false;
   bool _loading = true;
-  bool _obscurePassword = true;
   final List<_SyncLogEntry> _log = [];
 
   @override
@@ -48,31 +36,13 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
     ref.listen<SyncState>(syncProvider, _onSyncStateChanged);
   }
 
-  /// One-shot load of settings + profiles; seeds the form with the active (or
-  /// first) profile. Reactive updates afterwards come from watching the
-  /// providers in [build], but form seeding only happens here and on explicit
-  // user actions — never on a provider re-emit.
+  /// One-shot load of settings + profiles. Reactive updates afterwards come
+  // from watching the providers in [build].
   Future<void> _bootstrap() async {
     final settings = await ref.read(vaultServiceProvider).getSettings();
-    final profiles = await SyncProfileService.instance.listProfiles();
     _activeId = settings.syncProfileId;
     _masterEnabled = settings.syncEnabled;
-    final target =
-        (profiles.where((p) => p.id == _activeId).toList()).firstOrNull ??
-            profiles.firstOrNull;
-    _seedForm(target);
     if (mounted) setState(() => _loading = false);
-  }
-
-  void _seedForm(SyncProfile? p) {
-    _editingId = p?.id;
-    _urlController.text = p?.serverUrl ?? '';
-    _userController.text = p?.username ?? '';
-    _basePathController.text =
-        p?.basePath.isEmpty == true ? '/locker' : (p?.basePath ?? '/locker');
-    _passwordController.clear();
-    _direction = p?.direction ?? SyncDirection.pushOnly;
-    _wifiOnly = p?.wifiOnly ?? true;
   }
 
   void _onSyncStateChanged(SyncState? prev, SyncState next) {
@@ -148,120 +118,49 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
     });
   }
 
-  @override
-  void dispose() {
-    _urlController.dispose();
-    _userController.dispose();
-    _passwordController.dispose();
-    _basePathController.dispose();
-    super.dispose();
+  void _openEditor({SyncProfile? profile}) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: context.backgroundColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => _ServerSheet(
+        profile: profile,
+        onSave: _saveFromSheet,
+      ),
+    );
   }
 
-  bool get _isPlainHttp =>
-      _urlController.text.trim().toLowerCase().startsWith('http://');
-
-  bool get _editingActive => _editingId != null && _editingId == _activeId;
-
-  SyncProfile _profileFromForm() => SyncProfile(
-        id: _editingId ?? const Uuid().v4(),
-        serverUrl: _urlController.text.trim(),
-        username: _userController.text.trim().isEmpty
-            ? null
-            : _userController.text.trim(),
-        basePath: _basePathController.text.trim().isEmpty
-            ? '/locker'
-            : _basePathController.text.trim(),
-        direction: _direction,
-        wifiOnly: _wifiOnly,
-        enabled: true,
-      );
-
-  Future<void> _testConnection() async {
-    final url = _urlController.text.trim();
-    if (url.isEmpty) {
-      _snack('Enter a server URL first');
-      return;
-    }
-    setState(() => _isTesting = true);
+  /// Persists the profile (and password when given). New profiles auto-activate
+  /// so sync works out of the box. Returns whether the sheet may close.
+  Future<bool> _saveFromSheet(
+      SyncProfile profile, String password, bool isNew) async {
     try {
-      final password = _passwordController.text.isNotEmpty
-          ? _passwordController.text
-          : (_editingId == null
-              ? ''
-              : await SyncProfileService.instance.getPassword(_editingId!) ??
-                  '');
-      final store = WebDAVStore(
-        baseUrl: url,
-        username: _userController.text.trim(),
-        password: password,
-        basePath: _basePathController.text.trim().isEmpty
-            ? '/locker'
-            : _basePathController.text.trim(),
-      );
-      await store.testConnection();
-      _snack('Connected ✓');
-      _addLog('Connection test succeeded', ok: true);
-    } catch (e) {
-      final msg = _describeConnError(e);
-      _snack(msg);
-      _addLog('Connection test failed: $msg', ok: false);
-    } finally {
-      if (mounted) setState(() => _isTesting = false);
+      await SyncProfileService.instance.saveProfile(profile);
+      if (password.isNotEmpty) {
+        await SyncProfileService.instance.savePassword(profile.id, password);
+      }
+      if (isNew || _activeId == null) {
+        _activeId = profile.id;
+        _masterEnabled = true;
+        await _persistActivation(profile.id, enabled: true);
+      }
+      ref.invalidate(vaultSettingsProvider);
+      ref.invalidate(syncProfilesProvider);
+      if (mounted) {
+        setState(() {});
+        _snack(isNew
+            ? 'Server added and activated'
+            : 'Saved');
+      }
+      return true;
+    } catch (_) {
+      if (mounted) _snack('Couldn\'t save — try again');
+      return false;
     }
-  }
-
-  /// Map a WebDAV/Dio failure to something actionable. A connect timeout on a
-  /// LAN IP is always "server unreachable", never "timeout too short".
-  // string-match on toString(); avoids importing transitive dio.
-  String _describeConnError(Object e) {
-    final s = e.toString().toLowerCase();
-    if (s.contains('connection timeout') || s.contains('connecttimeout')) {
-      return 'Couldn\'t reach the server (timed out). Check it\'s running on '
-          'the right port and bound to 0.0.0.0, not localhost.';
-    }
-    if (s.contains('connection refused') ||
-        s.contains('reset') ||
-        s.contains('broken pipe')) {
-      return 'Server refused the connection. Wrong port, or the WebDAV '
-          'service isn\'t running.';
-    }
-    if (s.contains('connection error') ||
-        s.contains('socket') ||
-        s.contains('network') ||
-        s.contains('host')) {
-      return 'Network error — wrong address, firewall, or device not on the '
-          'same LAN as the server.';
-    }
-    if (s.contains('401') || s.contains('unauthorized')) {
-      return 'Authentication failed — check username and password.';
-    }
-    return 'Connection failed: $e';
-  }
-
-  Future<void> _save() async {
-    if (_urlController.text.trim().isEmpty) {
-      _snack('Server URL is required');
-      return;
-    }
-    final isNew = _editingId == null;
-    final profile = _profileFromForm();
-    await SyncProfileService.instance.saveProfile(profile);
-    if (_passwordController.text.isNotEmpty) {
-      await SyncProfileService.instance
-          .savePassword(profile.id, _passwordController.text);
-      _passwordController.clear();
-    }
-    _editingId = profile.id;
-
-    // New profiles (or when none is active yet) auto-activate so sync works.
-    if (isNew || _activeId == null) {
-      _activeId = profile.id;
-      _masterEnabled = true;
-      await _persistActivation(profile.id, enabled: true);
-    }
-    ref.invalidate(vaultSettingsProvider);
-    ref.invalidate(syncProfilesProvider);
-    if (mounted) _snack('Saved');
   }
 
   Future<void> _activate(SyncProfile p) async {
@@ -320,18 +219,12 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
         false;
     if (!ok) return;
     await SyncProfileService.instance.deleteProfile(p.id);
-    final wasActive = _activeId == p.id;
-    final wasEditing = _editingId == p.id;
-    if (wasActive) {
+    if (_activeId == p.id) {
       _activeId = null;
       final s = await ref.read(vaultServiceProvider).getSettings();
       await ref
           .read(vaultServiceProvider)
           .updateSettings(s.copyWith(syncProfileId: null));
-    }
-    if (wasEditing) {
-      final remaining = await SyncProfileService.instance.listProfiles();
-      _seedForm(remaining.firstOrNull);
     }
     ref.invalidate(vaultSettingsProvider);
     ref.invalidate(syncProfilesProvider);
@@ -395,141 +288,25 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // ---- Profiles ----
-                _SectionHeader(
-                  title: 'Servers',
-                  trailing: TextButton.icon(
-                    onPressed: () => setState(_seedFormNull),
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Add',
-                        style: TextStyle(fontFamily: 'ProductSans')),
-                  ),
-                ),
+                // ---- Servers ----
                 if (profiles.isEmpty)
                   _emptyServersHint(context)
-                else
+                else ...[
+                  _SectionHeader(
+                    title: 'Servers',
+                    trailing: IconButton(
+                      tooltip: 'Add server',
+                      icon: Icon(Icons.add, size: 20, color: context.accentColor),
+                      onPressed: () => _openEditor(),
+                    ),
+                  ),
                   ...profiles.map((p) => Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: _profileCard(context, p,
                             isActive: p.id == _activeId),
                       )),
-                const SizedBox(height: 8),
-
-                // ---- Editor ----
-                _SectionHeader(
-                    title: _editingId == null ? 'New server' : 'Edit server'),
-                _card(context, [
-                  _field(
-                    controller: _urlController,
-                    label: 'Server URL',
-                    hint: 'https://nas.local/dav',
-                    keyboardType: TextInputType.url,
-                    onChanged: (_) => setState(() {}),
-                  ),
-                  if (_isPlainHttp) _plainHttpWarning(context),
-                  _field(
-                    controller: _userController,
-                    label: 'Username (optional)',
-                    hint: 'app-password user',
-                  ),
-                  _passwordField(context),
-                  _field(
-                    controller: _basePathController,
-                    label: 'Base path',
-                    hint: '/locker',
-                  ),
-                ]),
+                ],
                 const SizedBox(height: 12),
-                _SectionHeader(title: 'Options'),
-                _card(context, [
-                  _formLabel(context, 'Direction'),
-                  const SizedBox(height: 6),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: InputDecorator(
-                      decoration: _fieldDecoration().copyWith(
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 4),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<SyncDirection>(
-                          value: _direction,
-                          isExpanded: true,
-                          items: const [
-                            DropdownMenuItem(
-                              value: SyncDirection.pushOnly,
-                              child: Text('Push only (backup)',
-                                  style: TextStyle(fontFamily: 'ProductSans')),
-                            ),
-                            DropdownMenuItem(
-                              value: SyncDirection.twoWay,
-                              child: Text('Two-way',
-                                  style: TextStyle(fontFamily: 'ProductSans')),
-                            ),
-                          ],
-                          onChanged: (v) =>
-                              setState(() => _direction = v ?? _direction),
-                        ),
-                      ),
-                    ),
-                  ),
-                  SwitchListTile(
-                    title: const Text('Wi-Fi only',
-                        style: TextStyle(fontFamily: 'ProductSans')),
-                    subtitle: Text('Skip sync on mobile data',
-                        style: _subStyle(context)),
-                    value: _wifiOnly,
-                    onChanged: (v) => setState(() => _wifiOnly = v),
-                    activeThumbColor: context.accentColor,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ]),
-                const SizedBox(height: 8),
-                if (_editingActive)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      children: [
-                        Icon(Icons.check_circle,
-                            size: 16, color: context.accentColor),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            'This is the active sync target.',
-                            style: _subStyle(context)
-                                .copyWith(color: context.accentColor),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _isTesting ? null : _testConnection,
-                        child: _isTesting
-                            ? SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: context.accentColor),
-                              )
-                            : const Text('Test',
-                                style: TextStyle(fontFamily: 'ProductSans')),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: _save,
-                        child: Text(_editingId == null ? 'Create' : 'Save',
-                            style: const TextStyle(fontFamily: 'ProductSans')),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
 
                 // ---- Sync ----
                 _SectionHeader(title: 'Sync'),
@@ -548,7 +325,7 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
                     child: Text(
-                      'Push-only backs the vault up as encrypted blobs to your '
+                      'Backup pushes the vault as encrypted blobs to your '
                       'server. Two-way also pulls remote changes and deletions '
                       'onto this device.',
                       style: _subStyle(context),
@@ -593,15 +370,13 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
     );
   }
 
-  void _seedFormNull() => _seedForm(null);
-
   Widget _profileCard(BuildContext context, SyncProfile p,
       {required bool isActive}) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () => setState(() => _seedForm(p)),
+        onTap: () => _openEditor(profile: p),
         child: Container(
           padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
           decoration: BoxDecoration(
@@ -642,7 +417,7 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
                         Text(
                           p.direction == SyncDirection.twoWay
                               ? 'Two-way'
-                              : 'Push only',
+                              : 'Backup',
                           style: _subStyle(context),
                         ),
                       ],
@@ -696,7 +471,7 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
                       _activate(p);
                       break;
                     case 'edit':
-                      setState(() => _seedForm(p));
+                      _openEditor(profile: p);
                       break;
                     case 'delete':
                       _confirmDelete(p);
@@ -713,7 +488,7 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
 
   Widget _emptyServersHint(BuildContext context) => Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           color: context.textPrimary.withValues(alpha: 0.03),
           borderRadius: BorderRadius.circular(12),
@@ -722,9 +497,9 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
         ),
         child: Column(
           children: [
-            Icon(Icons.cloud_off_outlined,
+            Icon(Icons.cloud_outlined,
                 size: 32, color: context.textTertiary),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Text('No servers yet',
                 style: TextStyle(
                     fontFamily: 'ProductSans',
@@ -732,9 +507,17 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
                     color: context.textSecondary)),
             const SizedBox(height: 4),
             Text(
-              'Tap Add to configure a WebDAV server (NAS or cloud).',
+              'Connect to any WebDAV server — a NAS at home '
+              'or a cloud provider.',
               textAlign: TextAlign.center,
               style: _subStyle(context),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.tonalIcon(
+              onPressed: () => _openEditor(),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Add server',
+                  style: TextStyle(fontFamily: 'ProductSans')),
             ),
           ],
         ),
@@ -751,23 +534,6 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: children,
-        ),
-      );
-
-  Widget _plainHttpWarning(BuildContext context) => Container(
-        width: double.infinity,
-        margin: const EdgeInsets.only(top: 4, bottom: 8),
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: AppColors.error.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.error.withValues(alpha: 0.18)),
-        ),
-        child: Text(
-          'This URL is unencrypted. Credentials and data travel in plain text '
-          'over the network. Only use on a trusted LAN.',
-          style: TextStyle(
-              fontFamily: 'ProductSans', fontSize: 12, color: AppColors.error),
         ),
       );
 
@@ -790,95 +556,6 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
         fontFamily: 'ProductSans',
         fontSize: 12,
         color: context.textTertiary,
-      );
-
-  Widget _formLabel(BuildContext context, String text) => Text(
-        text,
-        style: TextStyle(
-            fontFamily: 'ProductSans',
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: context.textTertiary),
-      );
-
-  InputDecoration _fieldDecoration({String? hint, Widget? suffixIcon}) =>
-      InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(
-            fontFamily: 'ProductSans', fontSize: 13, color: context.textSecondary),
-        suffixIcon: suffixIcon,
-        filled: true,
-        fillColor: context.textPrimary.withValues(alpha: 0.03),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: context.borderColor),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: context.borderColor),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: context.accentColor),
-        ),
-      );
-
-  Widget _field({
-    required TextEditingController controller,
-    required String label,
-    String? hint,
-    bool obscure = false,
-    TextInputType? keyboardType,
-    void Function(String)? onChanged,
-  }) =>
-      Padding(
-        padding: const EdgeInsets.only(bottom: 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _formLabel(context, label),
-            const SizedBox(height: 6),
-            TextField(
-              controller: controller,
-              obscureText: obscure,
-              keyboardType: keyboardType,
-              decoration: _fieldDecoration(hint: hint),
-              onChanged: (v) => onChanged?.call(v),
-            ),
-          ],
-        ),
-      );
-
-  Widget _passwordField(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _formLabel(context, 'Password'),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _passwordController,
-              obscureText: _obscurePassword,
-              decoration: _fieldDecoration(
-                hint: _editingId == null
-                    ? 'app password'
-                    : 'leave blank to keep current',
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscurePassword
-                        ? Icons.visibility_off_outlined
-                        : Icons.visibility_outlined,
-                  ),
-                  onPressed: () =>
-                      setState(() => _obscurePassword = !_obscurePassword),
-                  tooltip: _obscurePassword ? 'Show password' : 'Hide password',
-                ),
-              ),
-            ),
-          ],
-        ),
       );
 
   String _formatDate(DateTime d) {
@@ -921,6 +598,389 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
   }
 }
 
+/// Focused add/edit form shown as a bottom sheet. Owns all field state;
+/// persistence goes through [onSave].
+class _ServerSheet extends StatefulWidget {
+  const _ServerSheet({required this.profile, required this.onSave});
+
+  final SyncProfile? profile;
+  final Future<bool> Function(
+      SyncProfile profile, String password, bool isNew) onSave;
+
+  @override
+  State<_ServerSheet> createState() => _ServerSheetState();
+}
+
+class _ServerSheetState extends State<_ServerSheet> {
+  late final TextEditingController _urlController =
+      TextEditingController(text: widget.profile?.serverUrl ?? '');
+  late final TextEditingController _userController =
+      TextEditingController(text: widget.profile?.username ?? '');
+  final _passwordController = TextEditingController();
+  late final TextEditingController _basePathController = TextEditingController(
+      text: widget.profile?.basePath.isEmpty == true
+          ? '/locker'
+          : (widget.profile?.basePath ?? '/locker'));
+
+  late SyncDirection _direction =
+      widget.profile?.direction ?? SyncDirection.pushOnly;
+  late bool _wifiOnly = widget.profile?.wifiOnly ?? true;
+
+  bool _obscurePassword = true;
+  bool _isTesting = false;
+  bool _isSaving = false;
+  String? _urlError;
+
+  bool get _isPlainHttp =>
+      _urlController.text.trim().toLowerCase().startsWith('http://');
+
+  @override
+  void dispose() {
+    _urlController.dispose();
+    _userController.dispose();
+    _passwordController.dispose();
+    _basePathController.dispose();
+    super.dispose();
+  }
+
+  bool _validateUrl() {
+    final url = _urlController.text.trim();
+    if (url.isEmpty) {
+      setState(() => _urlError = 'Server URL is required');
+      return false;
+    }
+    if (Uri.tryParse(url)?.host.isEmpty != false) {
+      setState(() => _urlError = 'Enter a full URL, e.g. https://nas.local/dav');
+      return false;
+    }
+    if (_urlError != null) setState(() => _urlError = null);
+    return true;
+  }
+
+  Future<void> _testConnection() async {
+    if (!_validateUrl()) return;
+    setState(() => _isTesting = true);
+    try {
+      final password = _passwordController.text.isNotEmpty
+          ? _passwordController.text
+          : (widget.profile == null
+              ? ''
+              : await SyncProfileService.instance
+                      .getPassword(widget.profile!.id) ??
+                  '');
+      final store = WebDAVStore(
+        baseUrl: _urlController.text.trim(),
+        username: _userController.text.trim(),
+        password: password,
+        basePath: _basePathController.text.trim().isEmpty
+            ? '/locker'
+            : _basePathController.text.trim(),
+      );
+      await store.testConnection();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Connected ✓')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(describeServerError(e))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isTesting = false);
+    }
+  }
+
+  Future<void> _save() async {
+    if (!_validateUrl()) return;
+    setState(() => _isSaving = true);
+    final profile = SyncProfile(
+      id: widget.profile?.id ?? const Uuid().v4(),
+      serverUrl: _urlController.text.trim(),
+      username: _userController.text.trim().isEmpty
+          ? null
+          : _userController.text.trim(),
+      basePath: _basePathController.text.trim().isEmpty
+          ? '/locker'
+          : _basePathController.text.trim(),
+      direction: _direction,
+      wifiOnly: _wifiOnly,
+      enabled: true,
+    );
+    final ok = await widget.onSave(
+        profile, _passwordController.text, widget.profile == null);
+    if (!mounted) return;
+    if (ok) {
+      Navigator.pop(context);
+    } else {
+      setState(() => _isSaving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isNew = widget.profile == null;
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isNew ? 'Add server' : 'Edit server',
+              style: TextStyle(
+                  fontFamily: 'ProductSans',
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: context.textPrimary),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              isNew
+                  ? 'WebDAV — works with most NAS boxes and cloud providers.'
+                  : _hostOf(widget.profile!.serverUrl),
+              style: _subStyle(context),
+            ),
+            const SizedBox(height: 16),
+            _field(
+              controller: _urlController,
+              label: 'Server URL',
+              hint: 'https://nas.local/dav',
+              keyboardType: TextInputType.url,
+              errorText: _urlError,
+              onChanged: (_) {
+                if (_urlError != null) setState(() => _urlError = null);
+                setState(() {});
+              },
+            ),
+            if (_isPlainHttp) ...[
+              _plainHttpWarning(context),
+              const SizedBox(height: 12),
+            ],
+            _field(
+              controller: _userController,
+              label: 'Username (optional)',
+              hint: 'app-password user',
+            ),
+            _passwordField(context),
+            _field(
+              controller: _basePathController,
+              label: 'Base path',
+              hint: '/locker',
+            ),
+            _formLabel(context, 'Direction'),
+            const SizedBox(height: 6),
+            SegmentedButton<SyncDirection>(
+              segments: [
+                ButtonSegment(
+                  value: SyncDirection.pushOnly,
+                  label: Text('Backup',
+                      style: TextStyle(
+                          fontFamily: 'ProductSans',
+                          color: _direction == SyncDirection.pushOnly
+                              ? context.accentColor
+                              : context.textSecondary)),
+                ),
+                ButtonSegment(
+                  value: SyncDirection.twoWay,
+                  label: Text('Two-way',
+                      style: TextStyle(
+                          fontFamily: 'ProductSans',
+                          color: _direction == SyncDirection.twoWay
+                              ? context.accentColor
+                              : context.textSecondary)),
+                ),
+              ],
+              selected: {_direction},
+              showSelectedIcon: false,
+              onSelectionChanged: (s) =>
+                  setState(() => _direction = s.first),
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Wi-Fi only',
+                  style: TextStyle(fontFamily: 'ProductSans')),
+              subtitle:
+                  Text('Skip sync on mobile data', style: _subStyle(context)),
+              value: _wifiOnly,
+              onChanged: (v) => setState(() => _wifiOnly = v),
+              activeThumbColor: context.accentColor,
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _isTesting || _isSaving ? null : _testConnection,
+                    icon: _isTesting
+                        ? SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: context.accentColor),
+                          )
+                        : const Icon(Icons.network_check, size: 18),
+                    label: const Text('Test',
+                        style: TextStyle(fontFamily: 'ProductSans')),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: FilledButton(
+                    onPressed: _isSaving ? null : _save,
+                    child: _isSaving
+                        ? SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: context.backgroundColor),
+                          )
+                        : Text(isNew ? 'Add server' : 'Save',
+                            style:
+                                const TextStyle(fontFamily: 'ProductSans')),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _hostOf(String url) {
+    final u = Uri.tryParse(url);
+    return u?.host.isNotEmpty == true ? u!.host : url;
+  }
+
+  Widget _plainHttpWarning(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: AppColors.error.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.error.withValues(alpha: 0.18)),
+        ),
+        child: Text(
+          'This URL is unencrypted. Credentials and data travel in plain text '
+          'over the network. Only use on a trusted LAN.',
+          style: TextStyle(
+              fontFamily: 'ProductSans', fontSize: 12, color: AppColors.error),
+        ),
+      );
+
+  TextStyle _subStyle(BuildContext context) => TextStyle(
+        fontFamily: 'ProductSans',
+        fontSize: 12,
+        color: context.textTertiary,
+      );
+
+  Widget _formLabel(BuildContext context, String text) => Text(
+        text,
+        style: TextStyle(
+            fontFamily: 'ProductSans',
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: context.textTertiary),
+      );
+
+  InputDecoration _fieldDecoration({String? hint, Widget? suffixIcon}) =>
+      InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(
+            fontFamily: 'ProductSans',
+            fontSize: 13,
+            color: context.textSecondary),
+        suffixIcon: suffixIcon,
+        filled: true,
+        fillColor: context.textPrimary.withValues(alpha: 0.03),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: context.borderColor),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: context.borderColor),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: context.accentColor),
+        ),
+      );
+
+  Widget _field({
+    required TextEditingController controller,
+    required String label,
+    String? hint,
+    bool obscure = false,
+    TextInputType? keyboardType,
+    String? errorText,
+    void Function(String)? onChanged,
+  }) =>
+      Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _formLabel(context, label),
+            const SizedBox(height: 6),
+            TextField(
+              controller: controller,
+              obscureText: obscure,
+              keyboardType: keyboardType,
+              decoration:
+                  _fieldDecoration(hint: hint).copyWith(errorText: errorText),
+              onChanged: (v) => onChanged?.call(v),
+            ),
+          ],
+        ),
+      );
+
+  Widget _passwordField(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _formLabel(context, 'Password'),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _passwordController,
+              obscureText: _obscurePassword,
+              decoration: _fieldDecoration(
+                hint: widget.profile == null
+                    ? 'app password'
+                    : 'leave blank to keep current',
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscurePassword
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                  ),
+                  onPressed: () =>
+                      setState(() => _obscurePassword = !_obscurePassword),
+                  tooltip: _obscurePassword ? 'Show password' : 'Hide password',
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
 /// Big status banner for the active profile's current run state.
 class _HeroStatus extends StatelessWidget {
   const _HeroStatus({
@@ -947,7 +1007,8 @@ class _HeroStatus extends StatelessWidget {
                   fontFamily: 'ProductSans',
                   fontWeight: FontWeight.w600,
                   color: context.textPrimary)),
-          Text('Add a server below, then set it active.', style: _sub(context)),
+          Text('Add a server to get started — it becomes the sync target.',
+              style: _sub(context)),
         ],
       );
     }
