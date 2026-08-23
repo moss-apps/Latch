@@ -452,6 +452,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
       controller: _pinController,
       enabled: _inputEnabled,
       autofillEnabled: _autofillEnabled,
+      isLoading: _isAuthenticating,
     );
   }
 
