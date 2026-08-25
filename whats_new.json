@@ -1,4 +1,51 @@
 {
+  "0.17.2-beta.3": [
+    {
+      "title": "Media Picker",
+      "items": [
+        {
+          "icon": "photo_library_outlined",
+          "title": "Slide-to-preview",
+          "description": "Slide your finger across the picker to peek at media in a live preview card before importing."
+        },
+        {
+          "icon": "speed",
+          "title": "Faster picker",
+          "description": "Tile rectangle caching makes the media picker noticeably smoother on large galleries."
+        }
+      ]
+    },
+    {
+      "title": "Notes & Passwords",
+      "items": [
+        {
+          "icon": "lock_outlined",
+          "title": "Per-note encryption toggle",
+          "description": "Choose whether each note is encrypted, right from the editor — plus decoy support for notes and passwords."
+        },
+        {
+          "icon": "checklist_outlined",
+          "title": "Selection mode on cards",
+          "description": "NoteCard and password entries now support multi-select with a cleaner ListTile layout."
+        }
+      ]
+    },
+    {
+      "title": "Polish",
+      "items": [
+        {
+          "icon": "bug_report_outlined",
+          "title": "Friendlier errors",
+          "description": "Sync, backup, and conversion errors now show clear human-readable messages instead of raw exception dumps."
+        },
+        {
+          "icon": "info_outlined",
+          "title": "Open Source Libraries",
+          "description": "A new tile in vault settings lists every open-source library Latch is built on."
+        }
+      ]
+    }
+  ],
   "0.17.1-beta.2": [
     {
       "title": "PocketBase Backend",
