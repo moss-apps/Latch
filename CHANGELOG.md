@@ -2,6 +2,44 @@
 
 Notable changes to Latch.
 
+## 0.17.2-beta.3
+
+### Media Picker Enhancements
+- **Slide-to-preview** — sliding over media shows a live preview card
+- Hold preview state with position tracking and tests
+- Tile rectangle cache for faster picker rendering
+
+### Notes Improvements
+- **Encryption toggle** in the note editor
+- Decoy cache and migration in NoteService
+- Selection mode toggle on NoteCard
+- Refreshed note list and note folders screen UI
+- Note service test suite
+
+### Password Vault
+- **Decoy password support** in password service
+- `PasswordCard` refactored to `ListTile` with selection mode
+- Simplified password list — tag filtering removed along with unused provider
+
+### Error Handling
+- `describeServerError` helper for readable sync/server errors
+- Server error mapping tests
+- Improved backup error messages
+- Exception details stripped from user-facing errors, conversion errors, and file grid toasts
+
+### UI & Settings
+- **Open Source Libraries** tile in vault settings
+- Server editor moved to a bottom sheet
+- Authentication loading state with spinner during unlock
+
+### Fixes & Maintenance
+- Added missing `await` to GCM decryption; Flutter version pinned
+- Deprecated `SecurityOption` enum removed
+- Vault notifier dependency wired into unfiled files provider
+- Standardized unlock screen key unlock calls
+
+---
+
 ## 0.17.1-beta.2
 
 ### Embedded PocketBase Sidecar
