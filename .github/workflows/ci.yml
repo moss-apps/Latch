@@ -15,5 +15,6 @@ jobs:
           channel: stable
           flutter-version: 3.44.4
       - run: flutter pub get
+      - run: dart run pdfrx:remove_wasm_modules
       - run: flutter analyze
       - run: flutter test
