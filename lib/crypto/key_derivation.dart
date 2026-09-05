@@ -17,6 +17,12 @@ class KeyDerivation {
   static const int keySize = 32; // 256 bits
   static const int ivSize = 16; // 128 bits
 
+  /// Argon2id KWK defaults (single source of truth — also exported in the
+  /// desktop-backup keybundle so latchd can re-derive the wrapping key).
+  static const int argon2Iterations = 3;
+  static const int argon2MemoryPowerOf2 = 14; // 2^14 KiB = 16 MiB
+  static const int argon2Lanes = 1;
+
   /// Cryptographically secure random bytes.
   static Uint8List randomBytes(int length) {
     final random = Random.secure();
@@ -67,9 +73,9 @@ class KeyDerivation {
   static Future<Uint8List> argon2id(
     String credential,
     Uint8List salt, {
-    int iterations = 3,
-    int memoryPowerOf2 = 14,
-    int lanes = 1,
+    int iterations = argon2Iterations,
+    int memoryPowerOf2 = argon2MemoryPowerOf2,
+    int lanes = argon2Lanes,
     int keyLength = keySize,
   }) {
     return computeArgon2idHash(
