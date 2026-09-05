@@ -555,13 +555,10 @@ class FileService {
 
       if (index == -1) return null;
 
-      if (updatedFile.isDecoy) {
-        _store.cachedDecoyFiles![index] = updatedFile;
-        await _store.saveFileIndex(isDecoy: true);
-      } else {
-        _store.cachedFiles![index] = updatedFile;
-        await _store.saveFileIndex();
-      }
+      // Mutate the loaded list ref — it IS the cache, so the two can never
+      // drift apart if loadFileIndex ever returns a detached copy.
+      files[index] = updatedFile;
+      await _store.saveFileIndex(isDecoy: updatedFile.isDecoy);
 
       return updatedFile;
     } catch (e) {
