@@ -91,6 +91,10 @@ class VaultService {
     final pb = PocketBaseStore(client: client, masterKey: masterKey);
     await migrateLegacyIndex(pb);
     _store.pbStore = pb;
+    // Resurrect legacy-only entries (written while the sidecar was down in
+    // an earlier session) before PB becomes the load source — otherwise
+    // they'd never surface again.
+    await _store.healLegacyDivergence();
     await refresh();
   }
 
