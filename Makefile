@@ -50,3 +50,25 @@ pb-types:
 
 clean:
 	rm -rf $(JNI_DIR)/arm64-v8a/libpocketbase.so locker-pb
+
+## Desktop backup companion (P6.2, docs/desktop_backup.md).
+## latchd pulls the encrypted vault from the phone into latch-backup/.
+LATCHD_MODULE := latchd
+LATCHD_BIN    := latchd/latchd
+
+.PHONY: latchd-test latchd-web clean-latchd
+
+latchd: $(shell find $(LATCHD_MODULE) -name '*.go' -o -path '*internal/webui/web/*' -type f)
+	cd $(LATCHD_MODULE) && CGO_ENABLED=0 go build -trimpath -o $(CURDIR)/$(LATCHD_BIN) ./cmd/latchd
+	@echo "-> $(LATCHD_BIN)"
+
+latchd-test:
+	cd $(LATCHD_MODULE) && go test ./...
+
+## Rebuild the latchd web UI from web-src/ into internal/webui/web/.
+## The dist is committed, so this needs Node and is only for UI work.
+latchd-web:
+	cd $(LATCHD_MODULE)/web-src && npm install && npm run build
+
+clean-latchd:
+	rm -f $(LATCHD_BIN)

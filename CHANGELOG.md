@@ -4,6 +4,28 @@ Notable changes to Latch.
 
 ## 0.17.2-beta.3
 
+### Desktop Backup (latchd web UI)
+- **Drive-style browse shell** — full-width app bar with global search,
+  sidebar type views (All files, Photos, Videos, Songs, Documents,
+  Favorites) with counts, and a de-carded content area
+- **File viewer** — full-screen preview for images, video, audio, PDF and
+  text (≤2 MB), keyboard navigation, per-file download; office/unknown
+  files offer download only. Images fit the whole frame (portrait-safe)
+  with wheel zoom, drag pan, double-click magnification and an on-screen
+  zoom bar with a fit reset
+- **Server-side thumbnails** — `GET /api/thumb/<id>` decrypts and resizes
+  image blobs on the fly (in-memory LRU, ETag-cached; nothing on disk)
+- **Per-file serving** — `GET /api/file/<id>` with Range support and
+  `?dl=1` download; legacy pre-GCM blobs answer 422 with an export hint
+- Sortable list + grid layouts (Photos defaults to grid), incremental
+  rendering replaces the 500-row cap
+- Web UI rebuilt on React + Vite + Tailwind + shadcn (`latchd/web-src/`,
+  dist committed; `make latchd-web` to rebuild) — phone-app tokens and
+  accents carried over unchanged
+- Manifest now surfaced with `dateAdded`/`dateModified`/`mimeType`
+- **Fixed** — unencrypted vault files (manifest `isEncrypted: false`) are
+  served/exported as stored instead of being rejected as legacy blobs
+
 ### Media Picker Enhancements
 - **Slide-to-preview** — sliding over media shows a live preview card
 - Hold preview state with position tracking and tests

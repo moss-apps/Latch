@@ -19,6 +19,7 @@ import '../widgets/whats_new_bottom_sheet.dart';
 import 'accent_color_picker_screen.dart';
 import 'change_security_screen.dart';
 import 'changelog_screen.dart';
+import 'desktop_backup_screen.dart';
 import 'encryption_settings_screen.dart';
 import 'local_backup_screen.dart';
 import 'performance_settings_screen.dart';
@@ -355,6 +356,31 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (context) => const SyncSettingsScreen(),
+                    ),
+                  );
+                },
+                contentPadding: EdgeInsets.zero,
+              ),
+              ListTile(
+                leading:
+                    Icon(Icons.desktop_windows_outlined, color: context.accentColor),
+                title: const Text(
+                  'Desktop Backup',
+                  style: TextStyle(fontFamily: 'ProductSans'),
+                ),
+                subtitle: Text(
+                  'Send encrypted backup to a computer on your Wi-Fi',
+                  style: TextStyle(
+                    fontFamily: 'ProductSans',
+                    fontSize: 12,
+                    color: context.textTertiary,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const DesktopBackupScreen(),
                     ),
                   );
                 },

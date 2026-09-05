@@ -67,6 +67,7 @@ dependencies:
   connectivity_plus: ^6.0.0
   flutter_markdown: ^0.7.7+1
   webdav_client: ^1.2.2
+  mobile_scanner: ^7.4.0
 
 dev_dependencies:
   flutter_lints: ^6.0.0
