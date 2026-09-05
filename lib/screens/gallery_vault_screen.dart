@@ -897,36 +897,6 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                       ),
                     ),
                   ),
-                // Tags indicator
-                if (file.hasTags && !isSelectionMode)
-                  Positioned(
-                    bottom: 8,
-                    left: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.black54,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.label,
-                              size: 12, color: Colors.white),
-                          const SizedBox(width: 2),
-                          Text(
-                            '${file.tagCount}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontFamily: 'ProductSans',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
                 // Filename overlay for all file types
                 Positioned(
                   bottom: 8,
@@ -974,6 +944,41 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                     ),
                   ),
                 ),
+                // Tags pill centered under the icon, above the filename bar
+                // so it never sits behind the filename (notes always carry a
+                // 'note' tag, passwords a 'password' tag).
+                if (file.hasTags && !isSelectionMode)
+                  Positioned(
+                    bottom: 38,
+                    left: 8,
+                    right: 8,
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.label,
+                                size: 12, color: Colors.white),
+                            const SizedBox(width: 2),
+                            Text(
+                              '${file.tagCount}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontFamily: 'ProductSans',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -1091,7 +1096,6 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
       context,
       file: file,
       onFavorite: () => _toggleFavoriteSelected({file.id}),
-      onShare: () => _exportFileToDownloads(file),
       onDelete: () => _deleteSelectedFiles({file.id}),
       onInfo: () => _showFileInfo(file),
       onSelect: () {
@@ -1253,9 +1257,13 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
 
     return Container(
       color: color.withValues(alpha: 0.1),
-      // placeholder is icon-only; filename is drawn by the tile overlay.
-      child: Center(
-        child: Icon(icon, size: 36, color: color),
+      // Lift the icon above the filename bar; extra lift when the tags pill
+      // sits under the icon so the two never overlap.
+      child: Padding(
+        padding: EdgeInsets.only(bottom: file.hasTags ? 52 : 28),
+        child: Center(
+          child: Icon(icon, size: 36, color: color),
+        ),
       ),
     );
   }
