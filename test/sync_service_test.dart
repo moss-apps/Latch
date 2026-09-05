@@ -48,6 +48,51 @@ void main() {
     });
   });
 
+  group('mergeSyncedIntoCurrent', () {
+    test('keeps files hidden during the sync (absent from snapshot)', () {
+      final current = [_file(id: 'a'), _file(id: 'new')];
+      final synced = [_file(id: 'a', remoteHash: 'h1')];
+
+      final merged = SyncService.mergeSyncedIntoCurrent(current, synced);
+
+      expect(merged.map((f) => f.id), ['a', 'new']);
+      expect(merged.first.remoteHash, 'h1');
+    });
+
+    test('current mutations win, sync bookkeeping copied over', () {
+      final current = [
+        _file(id: 'a').copyWith(viewCount: 7),
+      ];
+      final synced = [_file(id: 'a', remoteHash: 'h1')];
+
+      final merged = SyncService.mergeSyncedIntoCurrent(current, synced);
+
+      expect(merged.single.viewCount, 7);
+      expect(merged.single.remoteHash, 'h1');
+    });
+
+    test('synced-only entry with missing blob is not resurrected', () {
+      final synced = [_file(id: 'a'), _file(id: 'deleted')];
+
+      final merged = SyncService.mergeSyncedIntoCurrent(
+        const [],
+        synced,
+        blobExists: (f) => f.id != 'deleted',
+      );
+
+      expect(merged.map((f) => f.id), ['a']);
+    });
+
+    test('pulled entries append when no blob filter says otherwise', () {
+      final merged = SyncService.mergeSyncedIntoCurrent(
+        [_file(id: 'a')],
+        [_file(id: 'a'), _file(id: 'pulled')],
+      );
+
+      expect(merged.map((f) => f.id), ['a', 'pulled']);
+    });
+  });
+
   group('reconcile', () {
     test('empty local and remote yields empty plan', () {
       final plan = SyncService.reconcile(
