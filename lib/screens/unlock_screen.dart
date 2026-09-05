@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../themes/app_colors.dart';
+import '../providers/vault_providers.dart';
 import '../services/auth_service.dart';
 import '../services/decoy_service.dart';
 import '../services/encryption_service.dart';
@@ -11,14 +13,14 @@ import '../widgets/pin_input_widget.dart';
 import 'gallery_vault_screen.dart';
 
 // Unlock screen for returning users.
-class UnlockScreen extends StatefulWidget {
+class UnlockScreen extends ConsumerStatefulWidget {
   const UnlockScreen({super.key});
 
   @override
-  State<UnlockScreen> createState() => _UnlockScreenState();
+  ConsumerState<UnlockScreen> createState() => _UnlockScreenState();
 }
 
-class _UnlockScreenState extends State<UnlockScreen> {
+class _UnlockScreenState extends ConsumerState<UnlockScreen> {
   final AuthService _authService = AuthService();
   final DecoyService _decoyService = DecoyService.instance;
   String? _authMethod;
@@ -96,7 +98,10 @@ class _UnlockScreenState extends State<UnlockScreen> {
       await _decoyService.activateDecoyMode();
     } else {
       await _decoyService.deactivateDecoyMode();
-      unawaited(_startPocketBase());
+      // Capture the notifier while still mounted; the provider is app-scoped
+      // so the instance stays valid after this screen is replaced.
+      final vaultNotifier = ref.read(vaultNotifierProvider.notifier);
+      unawaited(_startPocketBase(vaultNotifier));
     }
     await _authService.resetUnlockAttempts();
 
@@ -111,12 +116,15 @@ class _UnlockScreenState extends State<UnlockScreen> {
 
   // PB holds only ciphertext, so it can't be used until the key exists — but
   // starting it must never block or fail the unlock. Recovery UI is P5.
-  Future<void> _startPocketBase() async {
+  Future<void> _startPocketBase(VaultNotifier vaultNotifier) async {
     try {
       final settings = await VaultService.instance.getSettings();
       if (!settings.pbEnabled) return;
       await PocketBaseRuntime.instance.start();
       await VaultService.instance.activatePocketBase();
+      // The gallery already rendered from the legacy index while PB was
+      // starting; reload now that PB data backs the cache.
+      await vaultNotifier.loadFiles();
     } catch (e) {
       debugPrint('[PB] activation failed, staying on legacy store: $e');
     }
