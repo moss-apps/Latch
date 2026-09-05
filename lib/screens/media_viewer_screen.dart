@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:open_filex/open_filex.dart';
 import '../utils/path_utils.dart';
 import 'package:photo_view/photo_view.dart';
-import 'package:photo_view/photo_view_gallery.dart';
 import 'package:video_player/video_player.dart';
 import '../models/vaulted_file.dart';
 import '../providers/vault_providers.dart';
@@ -110,17 +109,25 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   }
 
   Future<void> _loadCurrentMedia() async {
+    if (_files.isEmpty ||
+        _currentIndex < 0 ||
+        _currentIndex >= _files.length) {
+      return;
+    }
     final file = _files[_currentIndex];
 
     if (file.isVideo) {
       await _initializeVideo(file);
       // Don't load video bytes into memory - videos are streamed from temp file.
       // This prevents massive memory pressure (e.g. 128MB+ videos).
+      // Still prefetch neighbouring images so swiping feels instant.
+      _prefetchNeighbourImages();
       return;
     }
 
     // Resolve the decrypted File path for encrypted images. We keep the File
     // (not its bytes) so Image.file can stream the decode off the main isolate.
+    // Works the same for encrypted and plain files; plain files need no cache.
     if (file.isEncrypted &&
         file.isImage &&
         !_decryptedFileCache.containsKey(file.id)) {
@@ -135,6 +142,44 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
           });
         }
       }
+    }
+
+    _prefetchNeighbourImages();
+  }
+
+  void _prefetchNeighbourImages() {
+    for (final offset in const [-1, 1]) {
+      final i = _currentIndex + offset;
+      if (i < 0 || i >= _files.length) continue;
+      final neighbour = _files[i];
+      if (neighbour.isImage &&
+          neighbour.isEncrypted &&
+          !_decryptedFileCache.containsKey(neighbour.id) &&
+          neighbour.id != widget.initialFile.id) {
+        // Fire-and-forget so the swipe target is likely decrypted on arrival.
+        // Videos are deliberately not prefetched (too heavy).
+        unawaited(_ensureImageLoaded(neighbour));
+      }
+    }
+  }
+
+  Future<void> _ensureImageLoaded(VaultedFile file) async {
+    if (!file.isImage || !file.isEncrypted) return;
+    if (_decryptedFileCache.containsKey(file.id)) return;
+    try {
+      final decryptedFile = file.id == widget.initialFile.id
+          ? widget.initialDecryptedFile
+          : await ref.read(vaultServiceProvider).getVaultedFile(file.id);
+      if (decryptedFile != null &&
+          await decryptedFile.exists() &&
+          mounted &&
+          _files.any((f) => f.id == file.id)) {
+        setState(() {
+          _decryptedFileCache[file.id] = decryptedFile;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error preloading image ${file.originalName}: $e');
     }
   }
 
@@ -271,6 +316,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   }
 
   void _onPageChanged(int index) {
+    if (index < 0 || index >= _files.length) return;
     _videoController?.pause();
     _videoController?.removeListener(_onVideoUpdate);
 
@@ -308,9 +354,15 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   }
 
   void _toggleFavorite() async {
+    if (_files.isEmpty) return;
     final file = _files[_currentIndex];
     final wasFavorite = file.isFavorite;
     await ref.read(vaultNotifierProvider.notifier).toggleFavorite(file.id);
+    if (mounted) {
+      setState(() {
+        _files[_currentIndex] = file.copyWith(isFavorite: !wasFavorite);
+      });
+    }
     ToastUtils.showSuccess(
       wasFavorite ? 'Removed from favorites' : 'Added to favorites',
     );
@@ -726,7 +778,15 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentFile = _files[_currentIndex];
+    if (_files.isEmpty) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        ),
+      );
+    }
+    final currentFile = _files[_currentIndex.clamp(0, _files.length - 1)];
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -737,13 +797,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
         onTap: _toggleControls,
         child: Stack(
           children: [
-            // Main content
-            if (currentFile.isImage)
-              _buildImageGallery()
-            else if (currentFile.isVideo)
-              _buildVideoPlayer(currentFile)
-            else
-              _buildUnsupportedFile(currentFile),
+            // Unified swipeable content: images and videos share one PageView
+            // so swiping works across mixed types, encrypted or plain.
+            _buildSwipeableContent(),
 
             // Top controls
             if (_showControls) _buildTopControls(currentFile),
@@ -807,69 +863,80 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
     );
   }
 
-  Widget _buildImageGallery() {
-    return PhotoViewGallery.builder(
-      scrollPhysics: const BouncingScrollPhysics(),
-      builder: (context, index) {
-        final file = _files[index];
-
-        if (file.isEncrypted) {
-          final decryptedFile = _decryptedFileCache[file.id];
-          if (decryptedFile != null) {
-            // Use customChild for encrypted images to handle decode errors
-            return PhotoViewGalleryPageOptions.customChild(
-              child: PhotoView.customChild(
-                minScale: PhotoViewComputedScale.contained,
-                maxScale: PhotoViewComputedScale.covered * 3,
-                heroAttributes: PhotoViewHeroAttributes(tag: file.id),
-                child: Image.file(
-                  decryptedFile,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    debugPrint('Error decoding encrypted image: $error');
-                    return _buildImageErrorPlaceholder(file);
-                  },
-                ),
-              ),
-            );
-          }
-          // Loading placeholder
-          return PhotoViewGalleryPageOptions.customChild(
-            child: const Center(
-              child: CircularProgressIndicator(color: Colors.white),
-            ),
-          );
-        }
-
-        // Use customChild with Image.file for proper error handling
-        return PhotoViewGalleryPageOptions.customChild(
-          child: PhotoView.customChild(
-            minScale: PhotoViewComputedScale.contained,
-            maxScale: PhotoViewComputedScale.covered * 3,
-            heroAttributes: PhotoViewHeroAttributes(tag: file.id),
-            child: Image.file(
-              File(file.vaultPath),
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) {
-                debugPrint('Error decoding image file: $error');
-                return _buildImageErrorPlaceholder(file);
-              },
-            ),
-          ),
-        );
-      },
+  Widget _buildSwipeableContent() {
+    return PageView.builder(
+      controller: _pageController,
+      physics: const BouncingScrollPhysics(),
       itemCount: _files.length,
-      loadingBuilder: (context, event) => Center(
-        child: CircularProgressIndicator(
-          value: event == null
-              ? null
-              : event.cumulativeBytesLoaded / (event.expectedTotalBytes ?? 1),
-          color: Colors.white,
-        ),
-      ),
-      backgroundDecoration: const BoxDecoration(color: Colors.black),
-      pageController: _pageController,
       onPageChanged: _onPageChanged,
+      itemBuilder: (context, index) {
+        final file = _files[index];
+        if (file.isImage) return _buildImagePage(file);
+        if (file.isVideo) {
+          // Only the current page owns the video controller; neighbours
+          // show a lightweight placeholder until swiped to.
+          if (index == _currentIndex) return _buildVideoPlayer(file);
+          return _buildVideoPlaceholder(file);
+        }
+        return _buildUnsupportedFile(file);
+      },
+    );
+  }
+
+  Widget _buildImagePage(VaultedFile file) {
+    if (!file.isEncrypted) {
+      return _buildZoomableImage(file, File(file.vaultPath));
+    }
+    final cached = _decryptedFileCache[file.id];
+    if (cached != null) return _buildZoomableImage(file, cached);
+    // Trigger async decrypt; rebuilds via setState when ready.
+    final initialDecrypted = widget.initialDecryptedFile;
+    if (file.id == widget.initialFile.id && initialDecrypted != null) {
+      _decryptedFileCache[file.id] = initialDecrypted;
+      return _buildZoomableImage(file, initialDecrypted);
+    }
+    unawaited(_ensureImageLoaded(file));
+    return const Center(
+      child: CircularProgressIndicator(color: Colors.white),
+    );
+  }
+
+  Widget _buildZoomableImage(VaultedFile file, File imageFile) {
+    return PhotoView.customChild(
+      minScale: PhotoViewComputedScale.contained,
+      maxScale: PhotoViewComputedScale.covered * 3,
+      heroAttributes: PhotoViewHeroAttributes(tag: file.id),
+      child: Image.file(
+        imageFile,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint('Error decoding image file ${file.originalName}: $error');
+          return _buildImageErrorPlaceholder(file);
+        },
+      ),
+    );
+  }
+
+  Widget _buildVideoPlaceholder(VaultedFile file) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.play_circle_outline, size: 80, color: Colors.white54),
+          const SizedBox(height: 16),
+          Text(
+            file.originalName,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontFamily: 'ProductSans',
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          const CircularProgressIndicator(color: Colors.white24),
+        ],
+      ),
     );
   }
 
@@ -1408,13 +1475,31 @@ _videoController?.setPlaybackSpeed(_playbackSpeed);
                 if (_files.length == 1) {
                   if (mounted) Navigator.pop(context);
                 } else {
-                  // Remove from list and update
+                  // Stop current video before mutating the PageView list.
+                  _videoLoadCancel?.complete();
+                  _videoLoadCancel = null;
+                  final oldController = _videoController;
+                  _videoController = null;
+                  oldController?.removeListener(_onVideoUpdate);
+                  oldController?.dispose();
+                  _decryptedFileCache.remove(file.id);
+                  final removedIndex = _files.indexWhere((f) => f.id == file.id);
                   setState(() {
-                    _files.remove(file);
+                    _files.removeWhere((f) => f.id == file.id);
                     if (_currentIndex >= _files.length) {
                       _currentIndex = _files.length - 1;
+                    } else if (removedIndex >= 0 &&
+                        removedIndex < _currentIndex) {
+                      _currentIndex -= 1;
                     }
+                    _videoPhase = _VideoLoadPhase.idle;
+                    _isVideoPlaying = false;
+                    _decryptProgress = null;
                   });
+                  if (_pageController.hasClients) {
+                    _pageController.jumpToPage(_currentIndex);
+                  }
+                  _loadCurrentMedia();
                 }
               }
             },
