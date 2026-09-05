@@ -82,8 +82,10 @@ class FileImportService {
 
       // Convert to FileToVault list
       final filesToVault = <FileToVault>[];
+      final fileSizesByPath = <String, int>{};
       for (final image in images) {
         final mimeType = lookupMimeType(image.path) ?? 'image/jpeg';
+        fileSizesByPath[image.path] = await File(image.path).length();
         filesToVault.add(FileToVault(
           sourcePath: image.path,
           originalName: image.name,
@@ -92,9 +94,23 @@ class FileImportService {
         ));
       }
 
+      final (filesToImport, skippedDuplicates) =
+          await _filterDuplicates(filesToVault, fileSizesByPath);
+      if (skippedDuplicates.isNotEmpty) {
+        debugPrint(
+            '[FileImport] Skipping ${skippedDuplicates.length} potential duplicates');
+      }
+      if (filesToImport.isEmpty) {
+        return ImportResult(
+          success: false,
+          error: 'All selected files already exist in vault',
+          importedFiles: [],
+        );
+      }
+
       // Add to vault
       final imported = await _vaultService.addFiles(
-        files: filesToVault,
+        files: filesToImport,
         deleteOriginals: false, // We handle deletion via PhotoManager
         isDecoy: _decoyService.isDecoyModeActive,
         onProgress: onProgress,
@@ -104,6 +120,9 @@ class FileImportService {
 
       // Delete originals from gallery if requested and import was successful
       bool deletedFromGallery = false;
+      if (deleteOriginals && imported.isNotEmpty && assetsToDelete.isNotEmpty) {
+        assetsToDelete = _gateAssetsToDelete(assetsToDelete, imported);
+      }
       if (deleteOriginals && imported.isNotEmpty && assetsToDelete.isNotEmpty) {
         debugPrint(
             '[FileImport] Attempting to delete ${assetsToDelete.length} assets from gallery');
@@ -220,17 +239,26 @@ class FileImportService {
 
       debugPrint('[FileImport] Adding ${filesToVault.length} files to vault');
 
-      // Check for potential duplicates before importing
+      // Duplicate check by name AND size — name alone skips distinct files
+      // that just happen to share a filename.
       final existingFiles = await _vaultService.getAllFiles(isDecoy: isDecoy);
-      final existingNames =
-          existingFiles.map((f) => f.originalName.toLowerCase()).toSet();
+      final existingByName = <String, Set<int>>{};
+      for (final f in existingFiles) {
+        existingByName
+            .putIfAbsent(f.originalName.toLowerCase(), () => <int>{})
+            .add(f.fileSize);
+      }
 
       // Filter out files that might already be in vault
       final filesToImport = <FileToVault>[];
       final skippedDuplicates = <String>[];
+      final attemptedByName = <String, int>{};
 
       for (final file in filesToVault) {
-        if (existingNames.contains(file.originalName.toLowerCase())) {
+        final lower = file.originalName.toLowerCase();
+        attemptedByName[lower] = (attemptedByName[lower] ?? 0) + 1;
+        final size = fileSizesByPath[file.sourcePath] ?? 0;
+        if ((existingByName[lower] ?? const <int>{}).contains(size)) {
           debugPrint(
               '[FileImport] Potential duplicate detected: ${file.originalName}');
           skippedDuplicates.add(file.originalName);
@@ -284,12 +312,25 @@ class FileImportService {
         debugPrint(
             '[FileImport] Attempting to delete ${validAssets.length} assets from gallery');
 
-        // Only delete the assets that were successfully imported
-        final importedNames =
-            imported.map((f) => f.originalName.toLowerCase()).toSet();
+        // Delete only when every picked file of a name is safely in the
+        // vault (imported now or already present as a duplicate) — never
+        // the gallery original of a failed/skipped-and-missing import.
+        final importedByName = <String, int>{};
+        for (final f in imported) {
+          final lower = f.originalName.toLowerCase();
+          importedByName[lower] = (importedByName[lower] ?? 0) + 1;
+        }
+        final skippedByName = <String, int>{};
+        for (final name in skippedDuplicates) {
+          final lower = name.toLowerCase();
+          skippedByName[lower] = (skippedByName[lower] ?? 0) + 1;
+        }
         final assetsToDelete = validAssets.where((asset) {
-          final title = asset.title?.toLowerCase() ?? '';
-          return importedNames.contains(title);
+          final lower = asset.title?.toLowerCase() ?? '';
+          if (!importedByName.containsKey(lower)) return false;
+          final landed =
+              (importedByName[lower] ?? 0) + (skippedByName[lower] ?? 0);
+          return landed >= (attemptedByName[lower] ?? 0);
         }).toList();
 
         if (assetsToDelete.isNotEmpty) {
@@ -572,10 +613,12 @@ class FileImportService {
 
       // Convert to FileToVault list
       final filesToVault = <FileToVault>[];
+      final fileSizesByPath = <String, int>{};
       for (final file in result.files) {
         if (file.path == null) continue;
 
         final mimeType = lookupMimeType(file.path!) ?? 'video/mp4';
+        fileSizesByPath[file.path!] = file.size;
         filesToVault.add(FileToVault(
           sourcePath: file.path!,
           originalName: file.name,
@@ -584,9 +627,23 @@ class FileImportService {
         ));
       }
 
+      final (filesToImport, skippedDuplicates) =
+          await _filterDuplicates(filesToVault, fileSizesByPath);
+      if (skippedDuplicates.isNotEmpty) {
+        debugPrint(
+            '[FileImport] Skipping ${skippedDuplicates.length} potential duplicates');
+      }
+      if (filesToImport.isEmpty) {
+        return ImportResult(
+          success: false,
+          error: 'All selected files already exist in vault',
+          importedFiles: [],
+        );
+      }
+
       // Add to vault
       final imported = await _vaultService.addFiles(
-        files: filesToVault,
+        files: filesToImport,
         deleteOriginals: false, // We handle deletion via PhotoManager
         isDecoy: _decoyService.isDecoyModeActive,
         onProgress: onProgress,
@@ -596,6 +653,9 @@ class FileImportService {
 
       // Delete originals from gallery if requested and import was successful
       bool deletedFromGallery = false;
+      if (deleteOriginals && imported.isNotEmpty && assetsToDelete.isNotEmpty) {
+        assetsToDelete = _gateAssetsToDelete(assetsToDelete, imported);
+      }
       if (deleteOriginals && imported.isNotEmpty && assetsToDelete.isNotEmpty) {
         debugPrint(
             '[FileImport] Attempting to delete ${assetsToDelete.length} video assets from gallery');
@@ -1354,6 +1414,7 @@ class FileImportService {
 
       // Convert to FileToVault list with auto-detected types
       final filesToVault = <FileToVault>[];
+      final fileSizesByPath = <String, int>{};
       for (final file in result.files) {
         if (file.path == null) continue;
 
@@ -1371,6 +1432,7 @@ class FileImportService {
           encrypt: perFileConfig?.encrypt,
           encryptionAlgorithm: perFileConfig?.algorithm,
         ));
+        fileSizesByPath[file.path!] = file.size;
 
         // Categorize for deletion
         if (type == VaultedFileType.image || type == VaultedFileType.video) {
@@ -1386,27 +1448,54 @@ class FileImportService {
         }
       }
 
+      final (filesToImport, skippedDuplicates) =
+          await _filterDuplicates(filesToVault, fileSizesByPath);
+      if (skippedDuplicates.isNotEmpty) {
+        debugPrint(
+            '[FileImport] Skipping ${skippedDuplicates.length} potential duplicates');
+      }
+      if (filesToImport.isEmpty) {
+        return ImportResult(
+          success: false,
+          error: 'All selected files already exist in vault',
+          importedFiles: [],
+        );
+      }
+
       // Add to vault
       final imported = await _vaultService.addFiles(
-        files: filesToVault,
+        files: filesToImport,
         deleteOriginals: false,
         isDecoy: _decoyService.isDecoyModeActive,
         onProgress: onProgress,
       );
 
-      // Delete originals if requested
+      // Delete originals only for files that actually landed in the vault.
       if (deleteOriginals && imported.isNotEmpty) {
+        final importedNames = {
+          for (final f in imported) f.originalName.toLowerCase()
+        };
         // Delete media files via PhotoManager
         if (mediaFileNames.isNotEmpty) {
-          final assets = await _findMatchingAssets(
-            mediaFileNames,
-            RequestType.common,
-          );
-          await _deleteAssetsFromGallery(assets);
+          final mediaToCheck = mediaFileNames
+              .where((n) => importedNames.contains(n.toLowerCase()))
+              .toList();
+          final assets = mediaToCheck.isEmpty
+              ? <AssetEntity>[]
+              : await _findMatchingAssets(
+                  mediaToCheck,
+                  RequestType.common,
+                );
+          final gated = _gateAssetsToDelete(assets, imported);
+          if (gated.isNotEmpty) await _deleteAssetsFromGallery(gated);
         }
         // Delete non-media files directly
         if (nonMediaPaths.isNotEmpty) {
-          await _deleteFiles(nonMediaPaths);
+          final pathsToDelete = nonMediaPaths
+              .where((p) =>
+                  importedNames.contains(p.split('/').last.toLowerCase()))
+              .toList();
+          if (pathsToDelete.isNotEmpty) await _deleteFiles(pathsToDelete);
         }
       }
 
@@ -1481,6 +1570,7 @@ class FileImportService {
 
       // Convert to FileToVault list
       final filesToVault = <FileToVault>[];
+      final fileSizesByPath = <String, int>{};
       for (final file in result.files) {
         if (file.path == null) continue;
 
@@ -1488,6 +1578,7 @@ class FileImportService {
             lookupMimeType(file.path!) ?? 'application/octet-stream';
         final type = getFileTypeFromMime(mimeType);
 
+        fileSizesByPath[file.path!] = file.size;
         filesToVault.add(FileToVault(
           sourcePath: file.path!,
           originalName: file.name,
@@ -1496,9 +1587,23 @@ class FileImportService {
         ));
       }
 
+      final (filesToImport, skippedDuplicates) =
+          await _filterDuplicates(filesToVault, fileSizesByPath);
+      if (skippedDuplicates.isNotEmpty) {
+        debugPrint(
+            '[FileImport] Skipping ${skippedDuplicates.length} potential duplicates');
+      }
+      if (filesToImport.isEmpty) {
+        return ImportResult(
+          success: false,
+          error: 'All selected files already exist in vault',
+          importedFiles: [],
+        );
+      }
+
       // Add to vault
       final imported = await _vaultService.addFiles(
-        files: filesToVault,
+        files: filesToImport,
         deleteOriginals: false, // We handle deletion via PhotoManager
         isDecoy: _decoyService.isDecoyModeActive,
         onProgress: onProgress,
@@ -1509,6 +1614,9 @@ class FileImportService {
 
       // Delete originals from gallery if requested and import was successful
       bool deletedFromGallery = false;
+      if (deleteOriginals && imported.isNotEmpty && assetsToDelete.isNotEmpty) {
+        assetsToDelete = _gateAssetsToDelete(assetsToDelete, imported);
+      }
       if (deleteOriginals && imported.isNotEmpty && assetsToDelete.isNotEmpty) {
         debugPrint(
             '[FileImport] Attempting to delete ${assetsToDelete.length} media assets from gallery');
@@ -1532,7 +1640,54 @@ class FileImportService {
     }
   }
 
-  /// Find matching assets in the gallery by filename
+  /// Name+size duplicate filter shared by the picker-based import paths.
+  /// Name alone skips distinct files that just share a filename.
+  Future<(List<FileToVault>, List<String>)> _filterDuplicates(
+    List<FileToVault> files,
+    Map<String, int> sizesByPath,
+  ) async {
+    final existing = await _vaultService.getAllFiles(
+        isDecoy: _decoyService.isDecoyModeActive);
+    final existingByName = <String, Set<int>>{};
+    for (final f in existing) {
+      existingByName
+          .putIfAbsent(f.originalName.toLowerCase(), () => <int>{})
+          .add(f.fileSize);
+    }
+    final toImport = <FileToVault>[];
+    final skipped = <String>[];
+    for (final file in files) {
+      final size = sizesByPath[file.sourcePath] ?? 0;
+      if ((existingByName[file.originalName.toLowerCase()] ?? const <int>{})
+          .contains(size)) {
+        debugPrint('[FileImport] Potential duplicate detected: ${file.originalName}');
+        skipped.add(file.originalName);
+      } else {
+        toImport.add(file);
+      }
+    }
+    return (toImport, skipped);
+  }
+
+  /// Keep only matched assets whose name actually landed in the vault, so
+  /// failed imports keep their gallery originals.
+  List<AssetEntity> _gateAssetsToDelete(
+    List<AssetEntity> assets,
+    List<VaultedFile> imported,
+  ) {
+    final importedNames = {
+      for (final f in imported) f.originalName.toLowerCase()
+    };
+    return assets
+        .where((a) => importedNames.contains(a.title?.toLowerCase() ?? ''))
+        .toList();
+  }
+
+  /// Find matching assets in the gallery by filename. Names that match MORE
+  /// THAN ONE asset are ambiguous and skipped — deleting a name-matched
+  /// asset we can't uniquely identify risks removing the wrong file (the
+  /// picked original then survives as a "duplicate"). Full scan on purpose:
+  /// ambiguity can only be detected after every album was searched.
   Future<List<AssetEntity>> _findMatchingAssets(
     List<String> fileNames,
     RequestType type,
@@ -1552,20 +1707,13 @@ class FileImportService {
         return matchingAssets;
       }
 
-      // Convert filenames to a set for faster lookup (with and without extension)
-      final fileNameSet = <String>{};
-      for (final name in fileNames) {
-        final lower = name.toLowerCase();
-        fileNameSet.add(lower);
-        final dotIndex = lower.lastIndexOf('.');
-        if (dotIndex > 0) {
-          fileNameSet.add(lower.substring(0, dotIndex));
-        }
-      }
+      // Requested name (lowercased) -> candidate assets by id. Ids dedupe
+      // the same asset appearing in several albums.
+      final candidates = <String, Map<String, AssetEntity>>{
+        for (final name in fileNames)
+          name.toLowerCase(): <String, AssetEntity>{},
+      };
 
-      debugPrint('[FileImport] Looking for files matching: $fileNameSet');
-
-      // Search through all albums - fetch all assets per album at once
       int totalAssetsSearched = 0;
       for (final album in albums) {
         final count = await album.assetCountAsync;
@@ -1579,25 +1727,30 @@ class FileImportService {
           final titleNoExt = title.contains('.')
               ? title.substring(0, title.lastIndexOf('.'))
               : title;
-          if (fileNameSet.contains(title) || fileNameSet.contains(titleNoExt)) {
-            debugPrint(
-                '[FileImport] Found matching asset: ${asset.title} (id: ${asset.id})');
-            matchingAssets.add(asset);
-            fileNameSet.remove(title);
-            fileNameSet.remove(titleNoExt);
-
-            if (fileNameSet.isEmpty) {
-              debugPrint(
-                  '[FileImport] Found all ${matchingAssets.length} matching assets');
-              return matchingAssets;
+          for (final entry in candidates.entries) {
+            if (entry.value.containsKey(asset.id)) continue;
+            final dotIndex = entry.key.lastIndexOf('.');
+            final bare =
+                dotIndex > 0 ? entry.key.substring(0, dotIndex) : entry.key;
+            if (entry.key == title ||
+                entry.key == titleNoExt ||
+                bare == title ||
+                bare == titleNoExt) {
+              entry.value[asset.id] = asset;
             }
           }
         }
       }
 
       debugPrint('[FileImport] Searched $totalAssetsSearched assets total');
-      if (fileNameSet.isNotEmpty) {
-        debugPrint('[FileImport] Could not find matches for: $fileNameSet');
+      for (final entry in candidates.entries) {
+        if (entry.value.length == 1) {
+          debugPrint('[FileImport] Unique match for "${entry.key}"');
+          matchingAssets.add(entry.value.values.first);
+        } else if (entry.value.length > 1) {
+          debugPrint(
+              '[FileImport] Ambiguous name "${entry.key}" matches ${entry.value.length} assets, skipping its deletion');
+        }
       }
     } catch (e, stackTrace) {
       debugPrint('[FileImport] Error finding matching assets: $e');

@@ -57,6 +57,10 @@ class VaultStore implements LocalStore {
   /// `VaultService.activatePocketBase` after the sidecar is up + unlocked.
   LocalStore? pbStore;
 
+  /// True when the non-decoy cache was built without PB data (PB outage).
+  /// Set before reconciling back to PB so PB-only rows aren't deleted.
+  bool _nonDecoyDiverged = false;
+
   /// Read-only secure-storage handle (used by services for the re-encrypt
   /// journal, which lives outside the cached maps).
   Future<String?> read(String key) => _storage.read(key: key);
@@ -161,24 +165,43 @@ class VaultStore implements LocalStore {
     }
 
     if (!isDecoy && pbStore != null) {
+      List<VaultedFile>? pbFiles;
       try {
-        cachedFiles = await pbStore!.loadFileIndex(forceReload: forceReload);
-        return cachedFiles!;
+        pbFiles = await pbStore!.loadFileIndex(forceReload: forceReload);
       } catch (e) {
         debugPrint('[PB] loadFileIndex failed, falling back to legacy: $e');
       }
+      if (pbFiles != null) {
+        cachedFiles = pbFiles;
+        return cachedFiles!;
+      }
+      // PB unreachable: cache-first merge so entries written to legacy
+      // during an earlier outage stay visible instead of being replaced.
+      _nonDecoyDiverged = true;
+      final legacy = await _readLegacyFileIndex(isDecoy: false);
+      cachedFiles = mergeFileLists(cachedFiles ?? const [], legacy);
+      return cachedFiles!;
     }
 
+    final files = await _readLegacyFileIndex(isDecoy: isDecoy);
+    if (isDecoy) {
+      cachedDecoyFiles = files;
+      return cachedDecoyFiles!;
+    }
+    cachedFiles = files;
+    return cachedFiles!;
+  }
+
+  /// Parse the legacy secure-storage JSON index. Rewrites the key when some
+  /// entries failed to parse (recovery). Returns [] on missing/corrupt data.
+  Future<List<VaultedFile>> _readLegacyFileIndex({
+    required bool isDecoy,
+  }) async {
     try {
       final key = isDecoy ? decoyIndexKey : vaultIndexKey;
       final indexJson = await _storage.read(key: key);
       if (indexJson == null || indexJson.isEmpty) {
-        if (isDecoy) {
-          cachedDecoyFiles = [];
-          return cachedDecoyFiles!;
-        }
-        cachedFiles = [];
-        return cachedFiles!;
+        return [];
       }
 
       final List<dynamic> jsonList = jsonDecode(indexJson);
@@ -203,38 +226,132 @@ class VaultStore implements LocalStore {
         );
       }
 
-      if (isDecoy) {
-        cachedDecoyFiles = files;
-        return cachedDecoyFiles!;
-      }
-      cachedFiles = files;
-      return cachedFiles!;
+      return files;
     } catch (e) {
       debugPrint('Error loading vault index: $e');
-      if (isDecoy) {
-        cachedDecoyFiles = [];
-        return cachedDecoyFiles!;
+      return [];
+    }
+  }
+
+  /// Union by id. First occurrence (base) wins; extras with unseen ids are
+  /// appended in order. Never drops entries from either side.
+  static List<VaultedFile> mergeFileLists(
+    List<VaultedFile> base,
+    List<VaultedFile> extra,
+  ) {
+    if (extra.isEmpty) return List.of(base);
+    final ids = base.map((f) => f.id).toSet();
+    return [...base, ...extra.where((f) => !ids.contains(f.id))];
+  }
+
+  /// Pull PB rows the cache is missing (outage survivors with their blob
+  /// still on disk) back into the cache before a reconciling save, so
+  /// reconcile doesn't delete them.
+  Future<void> _healDivergedCache() async {
+    try {
+      final pbFiles = await pbStore!.loadFileIndex(forceReload: true);
+      final cacheIds = (cachedFiles ?? const []).map((f) => f.id).toSet();
+      final missing = <VaultedFile>[];
+      for (final f in pbFiles) {
+        if (cacheIds.contains(f.id)) continue;
+        if (!await File(f.vaultPath).exists()) continue;
+        missing.add(f);
       }
-      cachedFiles = [];
-      return cachedFiles!;
+      if (missing.isNotEmpty) {
+        cachedFiles = mergeFileLists(cachedFiles ?? const [], missing);
+        debugPrint('[PB] healed ${missing.length} PB-only entries into cache');
+      }
+      _nonDecoyDiverged = false;
+    } catch (e) {
+      debugPrint('[PB] divergence heal failed: $e');
+    }
+  }
+
+  /// After PB attach: resurrect legacy-only entries (written while PB was
+  /// down in an earlier session) whose blobs still exist, and push the
+  /// merged index to PB so both backends converge. Best-effort, non-fatal.
+  Future<void> healLegacyDivergence() async {
+    if (pbStore == null) return;
+    try {
+      final pbFiles = await pbStore!.loadFileIndex(forceReload: true);
+      final legacy = await _readLegacyFileIndex(isDecoy: false);
+      final pbIds = pbFiles.map((f) => f.id).toSet();
+      final resurrected = <VaultedFile>[];
+      for (final f in legacy) {
+        if (pbIds.contains(f.id)) continue;
+        if (!await File(f.vaultPath).exists()) continue;
+        resurrected.add(f);
+      }
+      _nonDecoyDiverged = false;
+      if (resurrected.isEmpty) return;
+
+      final merged = mergeFileLists(pbFiles, resurrected);
+      cachedFiles = merged;
+      pbStore!.cachedFiles = merged;
+      await pbStore!.saveFileIndex();
+      await _writeLegacyFileIndex(files: merged, isDecoy: false);
+      debugPrint('[PB] healed ${resurrected.length} legacy-only entries');
+    } catch (e) {
+      _nonDecoyDiverged = true;
+      debugPrint('[PB] healLegacyDivergence failed: $e');
     }
   }
 
   @override
   Future<void> saveFileIndex({bool isDecoy = false}) async {
     if (!isDecoy && pbStore != null) {
+      if (_nonDecoyDiverged) {
+        await _healDivergedCache();
+      }
       pbStore!.cachedFiles = cachedFiles ?? const [];
       try {
         await pbStore!.saveFileIndex();
         return;
       } catch (e) {
         debugPrint('[PB] saveFileIndex failed, falling back to legacy: $e');
+        _nonDecoyDiverged = true;
+        await _writeLegacyFileIndex(
+          files: cachedFiles ?? const [],
+          isDecoy: false,
+          unionWithLegacy: true,
+        );
+        return;
       }
     }
+    await _writeLegacyFileIndex(
+      files: (isDecoy ? cachedDecoyFiles : cachedFiles) ?? const [],
+      isDecoy: isDecoy,
+    );
+  }
+
+  /// Write the legacy secure-storage JSON index. `unionWithLegacy` (PB
+  /// outage fallback) keeps legacy-only entries alive instead of clobbering
+  /// them with a cache snapshot PB never received — only when their blob
+  /// still exists on disk (deletes must shrink).
+  Future<void> _writeLegacyFileIndex({
+    required List<VaultedFile> files,
+    required bool isDecoy,
+    bool unionWithLegacy = false,
+  }) async {
     try {
-      final files = isDecoy ? cachedDecoyFiles : cachedFiles;
+      var toWrite = files;
       final key = isDecoy ? decoyIndexKey : vaultIndexKey;
-      final jsonList = files?.map((file) => file.toJson()).toList() ?? [];
+
+      if (unionWithLegacy) {
+        final legacy = await _readLegacyFileIndex(isDecoy: isDecoy);
+        final fileIds = files.map((f) => f.id).toSet();
+        final survivors = <VaultedFile>[];
+        for (final f in legacy) {
+          if (fileIds.contains(f.id)) continue;
+          if (!await File(f.vaultPath).exists()) continue;
+          survivors.add(f);
+        }
+        if (survivors.isNotEmpty) {
+          toWrite = mergeFileLists(files, survivors);
+        }
+      }
+
+      final jsonList = toWrite.map((file) => file.toJson()).toList();
 
       if (jsonList.isEmpty) {
         final existing = await _storage.read(key: key);
@@ -566,6 +683,7 @@ class VaultStore implements LocalStore {
       decoyDirectory = null;
     } else {
       cachedFiles = [];
+      _nonDecoyDiverged = false;
       cachedAlbums = null;
       cachedFolders = null;
       cachedTags = null;

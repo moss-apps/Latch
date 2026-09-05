@@ -4,13 +4,14 @@ import 'package:flutter/services.dart';
 import '../models/vaulted_file.dart';
 import '../themes/app_colors.dart';
 import 'encrypted_thumbnail.dart';
+import 'sheet_action_row.dart';
 
-/// A contextual bottom sheet shown when long-pressing a media file.
-/// Provides quick one-tap actions without entering selection mode.
+/// Contextual bottom sheet for a single vaulted file. Preview header with
+/// inline favorite/info toggles, then a flat action list ordered by frequency.
+/// Delete is destructive and isolated at the bottom.
 class MediaHoldActionSheet extends StatelessWidget {
   final VaultedFile file;
   final VoidCallback? onFavorite;
-  final VoidCallback? onShare;
   final VoidCallback? onDelete;
   final VoidCallback? onInfo;
   final VoidCallback? onSelect;
@@ -23,7 +24,6 @@ class MediaHoldActionSheet extends StatelessWidget {
     super.key,
     required this.file,
     this.onFavorite,
-    this.onShare,
     this.onDelete,
     this.onInfo,
     this.onSelect,
@@ -37,7 +37,6 @@ class MediaHoldActionSheet extends StatelessWidget {
     BuildContext context, {
     required VaultedFile file,
     VoidCallback? onFavorite,
-    VoidCallback? onShare,
     VoidCallback? onDelete,
     VoidCallback? onInfo,
     VoidCallback? onSelect,
@@ -54,7 +53,6 @@ class MediaHoldActionSheet extends StatelessWidget {
       builder: (ctx) => MediaHoldActionSheet(
         file: file,
         onFavorite: onFavorite,
-        onShare: onShare,
         onDelete: onDelete,
         onInfo: onInfo,
         onSelect: onSelect,
@@ -68,8 +66,38 @@ class MediaHoldActionSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primaryActions = _buildPrimaryActions(context);
-    final secondaryActions = _buildSecondaryActions(context);
+    final rows = <Widget>[
+      if (onOpen != null)
+        SheetActionRow(
+          icon: Icons.open_in_new,
+          label: 'Open',
+          onTap: onOpen,
+        ),
+      if (onExport != null)
+        SheetActionRow(
+          icon: Icons.download_outlined,
+          label: 'Export',
+          onTap: onExport,
+        ),
+      if (onTags != null)
+        SheetActionRow(
+          icon: Icons.label_outline,
+          label: 'Tags',
+          onTap: onTags,
+        ),
+      if (onAddToAlbum != null)
+        SheetActionRow(
+          icon: Icons.folder_outlined,
+          label: 'Add to album',
+          onTap: onAddToAlbum,
+        ),
+      if (onSelect != null)
+        SheetActionRow(
+          icon: Icons.check_circle_outline,
+          label: 'Select',
+          onTap: onSelect,
+        ),
+    ];
 
     return Container(
       width: double.infinity,
@@ -79,79 +107,99 @@ class MediaHoldActionSheet extends StatelessWidget {
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Drag handle
-          Container(
-            margin: const EdgeInsets.only(top: 12),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: context.borderColor,
-              borderRadius: BorderRadius.circular(2),
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: context.borderColor,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ),
-          const SizedBox(height: 16),
-          // Preview / Icon
-          _buildPreview(context),
-          const SizedBox(height: 8),
-          // File name
+          const SizedBox(height: 14),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Text(
-              file.originalName,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: context.textPrimary,
-                fontFamily: 'ProductSans',
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
+            padding: const EdgeInsets.fromLTRB(20, 4, 8, 8),
+            child: Row(
+              children: [
+                _buildPreview(context),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        file.originalName,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: context.textPrimary,
+                          fontFamily: 'ProductSans',
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '${file.type.displayName} \u2022 ${file.formattedSize} \u2022 ${file.formattedDateAdded}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: context.textSecondary,
+                          fontFamily: 'ProductSans',
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                if (onInfo != null)
+                  _HeaderIconButton(
+                    icon: Icons.info_outline,
+                    tooltip: 'File info',
+                    onTap: onInfo,
+                  ),
+                if (onFavorite != null)
+                  _HeaderIconButton(
+                    icon:
+                        file.isFavorite ? Icons.favorite : Icons.favorite_outline,
+                    tooltip: file.isFavorite ? 'Unfavorite' : 'Favorite',
+                    color: file.isFavorite ? Colors.red : null,
+                    onTap: onFavorite,
+                  ),
+              ],
             ),
           ),
           const SizedBox(height: 4),
-          // Meta info
-          Text(
-            '${file.extension.toUpperCase()} • ${file.formattedSize}',
-            style: TextStyle(
-              fontSize: 13,
-              color: context.textSecondary,
-              fontFamily: 'ProductSans',
-            ),
-          ),
-          const SizedBox(height: 20),
-          // Primary action row
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: primaryActions,
-            ),
-          ),
-          // Secondary action row
-          if (secondaryActions.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: secondaryActions,
+          ...rows,
+          if (onDelete != null) ...[
+            if (rows.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 6),
+                child: Divider(height: 1, color: context.dividerColor),
               ),
+            SheetActionRow(
+              icon: Icons.delete_outline,
+              label: 'Delete',
+              onTap: onDelete,
+              isDestructive: true,
             ),
           ],
-          SizedBox(height: 16 + MediaQuery.of(context).padding.bottom),
+          SizedBox(height: 12 + MediaQuery.of(context).padding.bottom),
         ],
       ),
     );
   }
 
   Widget _buildPreview(BuildContext context) {
-    final size = 100.0;
+    const size = 56.0;
     if (file.isImage) {
       if (file.isEncrypted) {
         return ClipRRect(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           child: SizedBox(
             width: size,
             height: size,
@@ -161,7 +209,7 @@ class MediaHoldActionSheet extends StatelessWidget {
       }
       if (File(file.vaultPath).existsSync()) {
         return ClipRRect(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           child: Image.file(
             File(file.vaultPath),
             width: size,
@@ -176,169 +224,52 @@ class MediaHoldActionSheet extends StatelessWidget {
   }
 
   Widget _buildFallbackPreview(BuildContext context) {
-    IconData icon;
-    Color color;
-    switch (file.type) {
-      case VaultedFileType.image:
-        icon = Icons.image;
-        color = context.accentColor;
-        break;
-      case VaultedFileType.video:
-        icon = Icons.videocam;
-        color = Colors.red;
-        break;
-      case VaultedFileType.song:
-        icon = Icons.music_note;
-        color = Colors.purple;
-        break;
-      case VaultedFileType.document:
-        icon = Icons.description;
-        color = context.accentColor;
-        break;
-      case VaultedFileType.other:
-        icon = Icons.insert_drive_file;
-        color = Colors.grey;
-        break;
-    }
+    final color = FileTypeColors.colorForType(file.type,
+        accent: context.accentColor);
     return Container(
-      width: 100,
-      height: 100,
+      width: 56,
+      height: 56,
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: Icon(icon, size: 40, color: color),
+      child: Icon(FileTypeColors.iconForType(file.type),
+          size: 24, color: color),
     );
-  }
-
-  List<Widget> _buildPrimaryActions(BuildContext context) {
-    return [
-      Expanded(child: _ActionButton(
-        icon: file.isFavorite ? Icons.favorite : Icons.favorite_outline,
-        label: file.isFavorite ? 'Unfavorite' : 'Favorite',
-        color: file.isFavorite ? Colors.red : context.accentColor,
-        onTap: onFavorite,
-      )),
-      Expanded(child: _ActionButton(
-        icon: Icons.share,
-        label: 'Share',
-        color: context.accentColor,
-        onTap: onShare,
-      )),
-      Expanded(child: _ActionButton(
-        icon: Icons.delete_outline,
-        label: 'Delete',
-        color: AppColors.error,
-        onTap: onDelete,
-      )),
-      Expanded(child: _ActionButton(
-        icon: Icons.info_outline,
-        label: 'Info',
-        color: context.textSecondary,
-        onTap: onInfo,
-      )),
-      Expanded(child: _ActionButton(
-        icon: Icons.check_circle_outline,
-        label: 'Select',
-        color: context.accentColor,
-        onTap: onSelect,
-      )),
-    ];
-  }
-
-  List<Widget> _buildSecondaryActions(BuildContext context) {
-    final items = <Widget>[];
-
-    if (onTags != null) {
-      items.add(Expanded(child: _ActionButton(
-        icon: Icons.label_outline,
-        label: 'Tags',
-        color: context.accentColor,
-        onTap: onTags,
-      )));
-    }
-
-    if (onAddToAlbum != null) {
-      items.add(Expanded(child: _ActionButton(
-        icon: Icons.folder_outlined,
-        label: 'Album',
-        color: context.accentColor,
-        onTap: onAddToAlbum,
-      )));
-    }
-
-    if (onOpen != null) {
-      items.add(Expanded(child: _ActionButton(
-        icon: Icons.open_in_new,
-        label: 'Open',
-        color: context.accentColor,
-        onTap: onOpen,
-      )));
-    }
-
-    if (onExport != null) {
-      items.add(Expanded(child: _ActionButton(
-        icon: Icons.download_outlined,
-        label: 'Export',
-        color: context.accentColor,
-        onTap: onExport,
-      )));
-    }
-
-    return items;
   }
 }
 
-class _ActionButton extends StatelessWidget {
+class _HeaderIconButton extends StatelessWidget {
   final IconData icon;
-  final String label;
-  final Color color;
+  final String tooltip;
+  final Color? color;
   final VoidCallback? onTap;
 
-  const _ActionButton({
+  const _HeaderIconButton({
     required this.icon,
-    required this.label,
-    required this.color,
+    required this.tooltip,
+    this.color,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () {
-        Navigator.pop(context);
-        onTap?.call();
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: color, size: 22),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                color: context.textPrimary,
-                fontFamily: 'ProductSans',
-                fontWeight: FontWeight.w500,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+    return Opacity(
+      opacity: onTap != null ? 1 : 0.4,
+      child: IconButton(
+        onPressed: onTap == null
+            ? null
+            : () {
+                HapticFeedback.selectionClick();
+                Navigator.pop(context);
+                onTap!();
+              },
+        icon: Icon(icon, size: 22),
+        color: color ?? context.textSecondary,
+        tooltip: tooltip,
+        visualDensity: VisualDensity.compact,
+        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+        padding: EdgeInsets.zero,
       ),
     );
   }

@@ -100,14 +100,14 @@ class ManifestEntry {
   Map<String, dynamic> toJson() => {
         'id': id,
         'contentHash': contentHash,
-        'modifiedAt': modifiedAt.toIso8601String(),
+        'modifiedAt': modifiedAt.toUtc().toIso8601String(),
         'deleted': deleted,
         'originalName': originalName,
         'type': type,
         'mimeType': mimeType,
         'fileSize': fileSize,
-        'dateAdded': dateAdded?.toIso8601String(),
-        'dateModified': dateModified?.toIso8601String(),
+        'dateAdded': dateAdded?.toUtc().toIso8601String(),
+        'dateModified': dateModified?.toUtc().toIso8601String(),
         'isEncrypted': isEncrypted,
         'encryptionIv': encryptionIv,
         'encryptionAlgorithm': encryptionAlgorithm,
@@ -173,7 +173,7 @@ class RemoteManifest {
   Map<String, dynamic> toJson() => {
         'version': version,
         'deviceId': deviceId,
-        'generatedAt': generatedAt.toIso8601String(),
+        'generatedAt': generatedAt.toUtc().toIso8601String(),
         'entries': entries.map((e) => e.toJson()).toList(),
       };
 

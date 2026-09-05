@@ -447,6 +447,46 @@ class SyncService {
     );
   }
 
+  /// Merge a sync result into the CURRENT cache without clobbering entries
+  /// added/changed/deleted while the sync was running. `refreshedLocal` is
+  /// derived from the pre-sync snapshot, so a wholesale replace would drop
+  /// concurrent hides (and resurrect concurrent deletes).
+  ///
+  /// - id in both: current wins (it carries mutations made during the sync);
+  ///   sync bookkeeping (remoteHash/syncedDeleted) is copied from synced.
+  /// - current-only: kept (added during the sync).
+  /// - synced-only: appended unless `blobExists` reports the blob gone
+  ///   (deleted during the sync — don't resurrect ghosts).
+  static List<VaultedFile> mergeSyncedIntoCurrent(
+    List<VaultedFile> current,
+    List<VaultedFile> synced, {
+    bool Function(VaultedFile)? blobExists,
+  }) {
+    final syncedById = {for (final f in synced) f.id: f};
+    final out = <VaultedFile>[];
+    final seen = <String>{};
+    for (final f in current) {
+      seen.add(f.id);
+      final s = syncedById[f.id];
+      if (s == null ||
+          (s.remoteHash == f.remoteHash &&
+              s.syncedDeleted == f.syncedDeleted)) {
+        out.add(f);
+      } else {
+        out.add(f.copyWith(
+          remoteHash: s.remoteHash,
+          syncedDeleted: s.syncedDeleted,
+        ));
+      }
+    }
+    for (final s in synced) {
+      if (seen.contains(s.id)) continue;
+      if (blobExists != null && !blobExists(s)) continue;
+      out.add(s);
+    }
+    return out;
+  }
+
   /// Destination vault path for a pulled blob. subdir by type (mirrors
   /// VaultStore), filename derived from the content hash (deterministic +
   /// dedup-friendly) with the original extension preserved.

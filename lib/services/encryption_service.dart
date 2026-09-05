@@ -298,6 +298,34 @@ class EncryptionService {
     return isDecoy ? await _ensureDecoyKey() : await _ensureMasterKey();
   }
 
+  /// Export the wrapped master-key bundle for desktop backup (P6.1).
+  ///
+  /// Returns null for legacy unwrapped vaults (keyVersion != '1') — those
+  /// vaults must be migrated (unlock once) before desktop backup can serve
+  /// them. The bundle never contains the master key itself: latchd re-derives
+  /// the KWK via Argon2id(credential, wrapSalt, t/m/p) and unwraps wrappedKey.
+  Future<Map<String, dynamic>?> exportKeybundle({bool isDecoy = false}) async {
+    final versionKey = isDecoy ? _decoyKeyVersionKey : _keyVersionKey;
+    final wrappedKeyKey = isDecoy ? _decoyWrappedKeyKey : _wrappedKeyKey;
+    final saltKey = isDecoy ? _decoyKwkSaltKey : _kwkSaltKey;
+    final ivKey = isDecoy ? _decoyKwkIvKey : _kwkIvKey;
+    if (await _storage.read(key: versionKey) != '1') return null;
+    final wrapped = await _storage.read(key: wrappedKeyKey);
+    final salt = await _storage.read(key: saltKey);
+    final iv = await _storage.read(key: ivKey);
+    if (wrapped == null || salt == null || iv == null) return null;
+    return {
+      'wrappedKey': wrapped,
+      'wrapSalt': salt,
+      'wrapIv': iv,
+      'argon2': {
+        't': KeyDerivation.argon2Iterations,
+        'm': 1 << KeyDerivation.argon2MemoryPowerOf2,
+        'p': KeyDerivation.argon2Lanes,
+      },
+    };
+  }
+
   /// Get or create decoy key (for decoy mode)
   Future<Uint8List> _ensureDecoyKey() async {
     if (_cachedDecoyKey != null) return _cachedDecoyKey!;

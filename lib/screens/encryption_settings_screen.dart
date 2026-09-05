@@ -24,23 +24,7 @@ class _EncryptionSettingsScreenState
     final settingsAsync = ref.watch(vaultSettingsProvider);
 
     return Scaffold(
-      backgroundColor: context.backgroundColor,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: context.textPrimary),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Encryption Settings',
-          style: TextStyle(
-            fontFamily: 'ProductSans',
-            color: context.textPrimary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text('Encryption Settings')),
       body: settingsAsync.when(
         loading: () => Center(
           child: CircularProgressIndicator(color: context.accentColor),
@@ -48,129 +32,68 @@ class _EncryptionSettingsScreenState
         error: (_, __) => Center(
           child: Text(
             'Failed to load settings',
-            style: TextStyle(
-              fontFamily: 'ProductSans',
-              color: context.textPrimary,
-            ),
+            style: TextStyle(color: context.textPrimary),
           ),
         ),
         data: (settings) {
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
             children: [
-              _buildSectionTitle(context, 'Encryption Algorithm'),
-              const SizedBox(height: 8),
+              _sectionTitle('Encryption Algorithm'),
               ...EncryptionAlgorithm.values.map(
-                (algo) => _buildAlgorithmCard(context, settings, algo),
+                (algo) => _algorithmTile(settings, algo),
               ),
               const SizedBox(height: 24),
-              _buildSectionTitle(context, 'KDF Iterations'),
-              const SizedBox(height: 8),
+              _sectionTitle('KDF Iterations'),
               Text(
                 'Higher values are more secure but slower. Changes apply to new credentials only.',
-                style: TextStyle(
-                  fontFamily: 'ProductSans',
-                  fontSize: 12,
-                  color: context.textTertiary,
-                ),
+                style: TextStyle(fontSize: 12, color: context.textTertiary),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               ..._kdfIterationOptions.map(
-                (iterations) => _buildIterationOption(
-                  context,
-                  settings,
-                  iterations,
-                ),
+                (iterations) => _iterationTile(settings, iterations),
               ),
               const SizedBox(height: 24),
-              _buildSectionTitle(context, 'Re-Encrypt Vault'),
-              const SizedBox(height: 8),
+              _sectionTitle('Re-Encrypt Vault'),
               Text(
                 'Re-encrypt all files using the selected algorithm. This may take a while for large vaults.',
-                style: TextStyle(
-                  fontFamily: 'ProductSans',
-                  fontSize: 12,
-                  color: context.textTertiary,
-                ),
+                style: TextStyle(fontSize: 12, color: context.textTertiary),
               ),
-              const SizedBox(height: 12),
-              FilledButton.icon(
-                onPressed: () => _confirmReEncrypt(context, settings),
-                icon: const Icon(Icons.sync),
-                label: const Text(
-                  'Re-Encrypt Files',
-                  style: TextStyle(fontFamily: 'ProductSans'),
-                ),
-                style: FilledButton.styleFrom(
-                  backgroundColor: context.accentColor,
-                  foregroundColor: Colors.white,
-                ),
+              _tile(
+                icon: Icons.sync,
+                title: 'Re-Encrypt Files',
+                subtitle: 'Pick files to re-encrypt now',
+                onTap: () => _confirmReEncrypt(context, settings),
               ),
               const SizedBox(height: 24),
-              _buildSectionTitle(context, 'Manage File Encryption'),
-              const SizedBox(height: 8),
+              _sectionTitle('Manage File Encryption'),
               Text(
                 'Encrypt unencrypted files, or remove encryption to store files as plaintext.',
-                style: TextStyle(
-                  fontFamily: 'ProductSans',
-                  fontSize: 12,
-                  color: context.textTertiary,
+                style: TextStyle(fontSize: 12, color: context.textTertiary),
+              ),
+              _tile(
+                icon: Icons.lock_outline,
+                title: 'Encrypt',
+                subtitle: 'Encrypt files that are stored as plaintext',
+                onTap: () => _pushManage(settings, VaultEncryptionAction.encrypt),
+              ),
+              _tile(
+                icon: Icons.lock_open,
+                title: 'Remove Encryption',
+                subtitle: 'Store encrypted files as plaintext',
+                onTap: () => _pushManage(
+                  settings,
+                  VaultEncryptionAction.removeEncryption,
                 ),
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => EncryptionManageScreen(
-                            action: VaultEncryptionAction.encrypt,
-                            algorithm: settings.encryptionAlgorithm,
-                          ),
-                        ),
-                      ),
-                      icon: const Icon(Icons.lock_outline),
-                      label: const Text(
-                        'Encrypt',
-                        style: TextStyle(fontFamily: 'ProductSans'),
-                      ),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: context.accentColor,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => EncryptionManageScreen(
-                            action: VaultEncryptionAction.removeEncryption,
-                            algorithm: settings.encryptionAlgorithm,
-                          ),
-                        ),
-                      ),
-                      icon: const Icon(Icons.lock_open),
-                      label: const Text(
-                        'Remove',
-                        style: TextStyle(fontFamily: 'ProductSans'),
-                      ),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: context.surfaceColor,
-                        foregroundColor: context.textPrimary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
               const SizedBox(height: 24),
-              _buildSectionTitle(context, 'Current Configuration'),
-              const SizedBox(height: 8),
-              _buildInfoCard(context, settings),
+              _sectionTitle('Current Configuration'),
+              _infoTile('Algorithm', settings.encryptionAlgorithm.displayName),
+              _infoTile('KDF Iterations', settings.kdfIterations.toLocaleString()),
+              _infoTile(
+                'Encryption',
+                settings.encryptionEnabled ? 'Enabled' : 'Disabled',
+              ),
             ],
           );
         },
@@ -178,75 +101,69 @@ class _EncryptionSettingsScreenState
     );
   }
 
-  Widget _buildSectionTitle(BuildContext context, String title) {
+  Widget _sectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Text(
-        title,
+        title.toUpperCase(),
         style: TextStyle(
-          fontFamily: 'ProductSans',
-          fontSize: 18,
+          fontSize: 12,
           fontWeight: FontWeight.w600,
-          color: context.textPrimary,
+          letterSpacing: 0.5,
+          color: context.accentColor,
         ),
       ),
     );
   }
 
-  Widget _buildAlgorithmCard(
-    BuildContext context,
-    VaultSettings settings,
-    EncryptionAlgorithm algo,
-  ) {
+  Widget _tile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon, color: context.accentColor),
+      title: Text(title),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(fontSize: 12, color: context.textTertiary),
+      ),
+      trailing: Icon(Icons.chevron_right, color: context.textTertiary),
+      onTap: onTap,
+    );
+  }
+
+  Widget _algorithmTile(VaultSettings settings, EncryptionAlgorithm algo) {
     final isSelected = settings.encryptionAlgorithm == algo;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      elevation: 0,
-      color: isSelected
-          ? context.accentColor.withValues(alpha: 0.15)
-          : context.surfaceColor,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: isSelected
-            ? BorderSide(color: context.accentColor, width: 2)
-            : BorderSide(color: context.dividerColor),
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(
+        algo == EncryptionAlgorithm.aes256Gcm
+            ? Icons.verified_user_outlined
+            : Icons.lock_outline,
+        color: isSelected ? context.accentColor : context.textSecondary,
       ),
-      child: ListTile(
-        leading: Icon(
-          algo == EncryptionAlgorithm.aes256Gcm
-              ? Icons.verified_user_outlined
-              : Icons.lock_outline,
-          color: isSelected ? context.accentColor : context.textSecondary,
+      title: Text(
+        algo.displayName,
+        style: TextStyle(
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          color: isSelected ? context.accentColor : context.textPrimary,
         ),
-        title: Text(
-          algo.displayName,
-          style: TextStyle(
-            fontFamily: 'ProductSans',
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-            color: isSelected ? context.accentColor : context.textPrimary,
-          ),
-        ),
-        subtitle: Text(
-          algo.description,
-          style: TextStyle(
-            fontFamily: 'ProductSans',
-            fontSize: 12,
-            color: context.textTertiary,
-          ),
-        ),
-        trailing: isSelected
-            ? Icon(Icons.check_circle, color: context.accentColor)
-            : null,
-        onTap: () => _selectAlgorithm(settings, algo),
       ),
+      subtitle: Text(
+        algo.description,
+        style: TextStyle(fontSize: 12, color: context.textTertiary),
+      ),
+      trailing: isSelected
+          ? Icon(Icons.check_circle, color: context.accentColor)
+          : null,
+      onTap: () => _selectAlgorithm(settings, algo),
     );
   }
 
-  Widget _buildIterationOption(
-    BuildContext context,
-    VaultSettings settings,
-    int iterations,
-  ) {
+  Widget _iterationTile(VaultSettings settings, int iterations) {
     final isSelected = settings.kdfIterations == iterations;
     final label = iterations >= 1000000
         ? '${(iterations / 1000000).round()}M'
@@ -254,91 +171,51 @@ class _EncryptionSettingsScreenState
             ? '${(iterations / 1000).round()}K (Default)'
             : '${(iterations / 1000).round()}K';
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      elevation: 0,
-      color: isSelected
-          ? context.accentColor.withValues(alpha: 0.15)
-          : context.surfaceColor,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: isSelected
-            ? BorderSide(color: context.accentColor, width: 2)
-            : BorderSide(color: context.dividerColor),
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+      leading: Icon(
+        Icons.speed_outlined,
+        color: isSelected ? context.accentColor : context.textSecondary,
       ),
-      child: ListTile(
-        title: Text(
-          label,
-          style: TextStyle(
-            fontFamily: 'ProductSans',
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-            color: isSelected ? context.accentColor : context.textPrimary,
-          ),
+      title: Text(
+        label,
+        style: TextStyle(
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          color: isSelected ? context.accentColor : context.textPrimary,
         ),
-        trailing: isSelected
-            ? Icon(Icons.check_circle, color: context.accentColor)
-            : null,
-        onTap: () => _selectIterations(settings, iterations),
       ),
+      trailing: isSelected
+          ? Icon(Icons.check_circle, color: context.accentColor)
+          : null,
+      onTap: () => _selectIterations(settings, iterations),
     );
   }
 
-  Widget _buildInfoCard(BuildContext context, VaultSettings settings) {
-    return Card(
-      elevation: 0,
-      color: context.surfaceColor,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: context.dividerColor),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildInfoRow(
-              context,
-              'Algorithm',
-              settings.encryptionAlgorithm.displayName,
-            ),
-            const SizedBox(height: 8),
-            _buildInfoRow(
-              context,
-              'KDF Iterations',
-              settings.kdfIterations.toLocaleString(),
-            ),
-            const SizedBox(height: 8),
-            _buildInfoRow(
-              context,
-              'Encryption',
-              settings.encryptionEnabled ? 'Enabled' : 'Disabled',
-            ),
-          ],
+  Widget _infoTile(String label, String value) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+      title: Text(label),
+      trailing: Text(
+        value,
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          color: context.textSecondary,
         ),
       ),
     );
   }
 
-  Widget _buildInfoRow(BuildContext context, String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontFamily: 'ProductSans',
-            color: context.textSecondary,
-          ),
+  void _pushManage(VaultSettings settings, VaultEncryptionAction action) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EncryptionManageScreen(
+          action: action,
+          algorithm: settings.encryptionAlgorithm,
         ),
-        Text(
-          value,
-          style: TextStyle(
-            fontFamily: 'ProductSans',
-            fontWeight: FontWeight.w600,
-            color: context.textPrimary,
-          ),
-        ),
-      ],
+      ),
     );
   }
 
@@ -354,17 +231,11 @@ class _EncryptionSettingsScreenState
         backgroundColor: context.surfaceColor,
         title: Text(
           'Change Encryption Algorithm',
-          style: TextStyle(
-            fontFamily: 'ProductSans',
-            color: context.textPrimary,
-          ),
+          style: TextStyle(color: context.textPrimary),
         ),
         content: Text(
           'New files will use ${algo.displayName}. Existing files keep their current algorithm until you re-encrypt the vault.',
-          style: TextStyle(
-            fontFamily: 'ProductSans',
-            color: context.textSecondary,
-          ),
+          style: TextStyle(color: context.textSecondary),
         ),
         actions: [
           TextButton(

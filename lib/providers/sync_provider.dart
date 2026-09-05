@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -117,9 +119,14 @@ class SyncNotifier extends Notifier<SyncState> {
       );
       sw.stop();
 
-      // Persist refreshed remoteHash/modifiedAt so the next run dedups.
+      // Merge refreshed remoteHash/modifiedAt into the live cache — a
+      // wholesale replace would drop files hidden while the sync ran.
       final vault = ref.read(vaultServiceProvider);
-      vault.store.cachedFiles = result.refreshedLocal;
+      vault.store.cachedFiles = SyncService.mergeSyncedIntoCurrent(
+        vault.store.cachedFiles ?? result.refreshedLocal,
+        result.refreshedLocal,
+        blobExists: (f) => File(f.vaultPath).existsSync(),
+      );
       await vault.store.saveFileIndex();
       await SyncProfileService.instance
           .saveProfile(profile.copyWith(lastSyncedAt: result.completedAt));

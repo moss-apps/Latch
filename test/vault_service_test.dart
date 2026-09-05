@@ -4,9 +4,12 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:locker/models/album.dart';
+import 'package:locker/models/vault_folder.dart';
 import 'package:locker/models/vault_settings.dart';
 import 'package:locker/models/vaulted_file.dart';
+import 'package:locker/services/local_store.dart';
 import 'package:locker/services/vault_service.dart';
+import 'package:locker/services/vault_store.dart';
 
 const _secureStorageChannel = 'plugins.it_nomads.com/flutter_secure_storage';
 const _pathProviderChannel = 'plugins.flutter.io/path_provider';
@@ -82,6 +85,70 @@ Future<void> _seedFiles(VaultService vault, List<VaultedFile> files) async {
       isEncrypted: false,
     );
   }
+}
+
+class _FakePBStore implements LocalStore {
+  _FakePBStore({List<VaultedFile>? files}) : _files = files ?? [];
+
+  Object? loadError;
+  Object? saveError;
+  List<VaultedFile> _files;
+
+  @override
+  List<VaultedFile>? cachedFiles;
+
+  @override
+  Future<List<VaultedFile>> loadFileIndex({
+    bool isDecoy = false,
+    bool forceReload = false,
+  }) async {
+    if (loadError != null) throw loadError!;
+    return List.of(_files);
+  }
+
+  @override
+  Future<void> saveFileIndex({bool isDecoy = false}) async {
+    if (saveError != null) throw saveError!;
+    _files = List.of(cachedFiles ?? const []);
+  }
+
+  @override
+  List<Album>? cachedAlbums;
+  @override
+  List<VaultFolder>? cachedFolders;
+  @override
+  List<TagInfo>? cachedTags;
+  @override
+  Future<List<Album>> loadAlbums({bool forceReload = false}) async => [];
+  @override
+  Future<void> saveAlbums() async {}
+  @override
+  Future<List<VaultFolder>> loadFolders({bool forceReload = false}) async =>
+      [];
+  @override
+  Future<void> saveFolders() async {}
+  @override
+  Future<List<TagInfo>> loadTags({bool forceReload = false}) async => [];
+  @override
+  Future<void> saveTags() async {}
+  @override
+  Future<void> reloadAll() async {}
+  @override
+  Future<void> wipe({bool isDecoy = false}) async {}
+}
+
+VaultedFile _pbEraFile(String id, Directory tmpDir, {int size = 10}) {
+  final path = '${tmpDir.path}/$id';
+  File(path).writeAsStringSync('blob-$id');
+  return VaultedFile(
+    id: id,
+    originalName: '$id.jpg',
+    vaultPath: path,
+    type: VaultedFileType.image,
+    mimeType: 'image/jpeg',
+    fileSize: size,
+    dateAdded: DateTime(2024, 1, 1),
+  );
 }
 
 void main() {
@@ -356,6 +423,98 @@ void main() {
 
       expect(storage['vault_file_index'], isNull);
       expect(storage['vault_albums'], isNull);
+    });
+  });
+
+  group('mergeFileLists', () {
+    test('base wins by id, unseen extras appended', () {
+      final base = [_makeFile('a'), _makeFile('b')];
+      final extra = [_makeFile('b'), _makeFile('c')];
+
+      final merged = VaultStore.mergeFileLists(base, extra);
+
+      expect(merged.map((f) => f.id), ['a', 'b', 'c']);
+      expect(merged[1], same(base[1]));
+    });
+  });
+
+  group('PB fallback divergence', () {
+    test('PB load failure surfaces legacy entries instead of empty PB view',
+        () async {
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+      final legacy = _pbEraFile('legacy1', tmpDir);
+      storage['vault_file_index'] =
+          jsonEncode([legacy.toJson()].map((f) => f).toList());
+
+      final pb = _FakePBStore()..loadError = Exception('sidecar down');
+      vault.store.pbStore = pb;
+
+      final files = await vault.store.loadFileIndex(forceReload: true);
+
+      expect(files.map((f) => f.id), ['legacy1']);
+    });
+
+    test('PB save failure writes legacy union, drops blobless zombies',
+        () async {
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+      final survivor = _pbEraFile('survivor', tmpDir); // blob on disk
+      final ghost = _makeFile('ghost'); // vaultPath /tmp/ghost.enc, no blob
+      storage['vault_file_index'] = jsonEncode([survivor, ghost].map((f) => f.toJson()).toList());
+
+      final pb = _FakePBStore()
+        ..loadError = Exception('sidecar down')
+        ..saveError = Exception('sidecar down');
+      vault.store.pbStore = pb;
+
+      vault.store.cachedFiles = [_pbEraFile('fresh', tmpDir)];
+      await vault.store.saveFileIndex();
+
+      final stored = (jsonDecode(storage['vault_file_index']!) as List)
+          .map((j) => VaultedFile.fromJson(j as Map<String, dynamic>))
+          .map((f) => f.id)
+          .toSet();
+      expect(stored, {'fresh', 'survivor'});
+    });
+
+    test('save after outage heals PB-only rows before reconcile', () async {
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+      final pbOnly = _pbEraFile('pbonly', tmpDir);
+      final pb = _FakePBStore(files: [pbOnly])..loadError = Exception('down');
+      vault.store.pbStore = pb;
+
+      // Outage load: cache = legacy only, divergence flagged.
+      await vault.store.loadFileIndex(forceReload: true);
+      expect(vault.store.cachedFiles!.map((f) => f.id), isEmpty);
+
+      // Sidecar recovers; a new hide lands in the cache.
+      pb.loadError = null;
+      vault.store.cachedFiles!.add(_pbEraFile('newhide', tmpDir));
+
+      await vault.store.saveFileIndex();
+
+      // Reconcile must NOT have deleted the PB-only row.
+      expect(
+        vault.store.cachedFiles!.map((f) => f.id).toSet(),
+        {'pbonly', 'newhide'},
+      );
+      final pbSaved = await pb.loadFileIndex(forceReload: true);
+      expect(pbSaved.map((f) => f.id).toSet(), {'pbonly', 'newhide'});
+    });
+
+    test('healLegacyDivergence resurrects legacy-only rows into PB',
+        () async {
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+      final lostWhileDown = _pbEraFile('lost', tmpDir);
+      storage['vault_file_index'] =
+          jsonEncode([lostWhileDown.toJson()].map((f) => f).toList());
+
+      final pb = _FakePBStore();
+      vault.store.pbStore = pb;
+
+      await vault.store.healLegacyDivergence();
+
+      final healed = await pb.loadFileIndex(forceReload: true);
+      expect(healed.map((f) => f.id), ['lost']);
     });
   });
 }
