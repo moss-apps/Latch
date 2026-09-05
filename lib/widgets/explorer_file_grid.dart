@@ -917,7 +917,6 @@ class ExplorerFileGrid extends ConsumerWidget {
           file.isFavorite ? 'Removed from favorites' : 'Added to favorites',
         );
       },
-      onShare: () => _exportFileToDownloads(ctx, ref, file),
       onDelete: () => _confirmDeleteFile(ctx, ref, file),
       onInfo: () => _showFileInfo(ctx, file),
       onSelect: () {
