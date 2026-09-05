@@ -183,120 +183,98 @@ class _LocalBackupScreenState extends ConsumerState<LocalBackupScreen> {
 
   // ---- builders ----
 
-  Widget _sectionCard(BuildContext context, {required Widget child}) => Card(
-        elevation: 0,
-        color: context.backgroundSecondary,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: child,
+  Widget _sectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Text(
+        title.toUpperCase(),
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.5,
+          color: context.accentColor,
         ),
-      );
+      ),
+    );
+  }
 
-  TextStyle _sectionLabel(BuildContext context) => TextStyle(
-        fontFamily: 'ProductSans',
-        fontSize: 14,
-        color: context.textTertiary,
-      );
+  Widget _hint(String text) {
+    return Text(
+      text,
+      style: TextStyle(fontSize: 12, color: context.textTertiary),
+    );
+  }
 
-  TextStyle _tileTitle(BuildContext context) => TextStyle(
-        fontFamily: 'ProductSans',
-        fontWeight: FontWeight.w500,
-        color: context.textPrimary,
-      );
+  Widget _tile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon, color: context.accentColor),
+      title: Text(title),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(fontSize: 12, color: context.textTertiary),
+      ),
+      trailing: Icon(Icons.chevron_right, color: context.textTertiary),
+      onTap: onTap,
+    );
+  }
 
-  TextStyle _tileSubtitle(BuildContext context) => TextStyle(
-        fontFamily: 'ProductSans',
-        fontSize: 12,
-        color: context.textTertiary,
-      );
-
-  ChoiceChip _themedChoiceChip(
-    BuildContext context, {
+  ChoiceChip _themedChoiceChip({
     required String label,
     required bool selected,
     required ValueChanged<bool> onSelected,
   }) {
-    final accent = context.accentColor;
-    final onAccent = Theme.of(context).colorScheme.onPrimary;
     return ChoiceChip(
       label: Text(label),
       selected: selected,
-      selectedColor: accent,
+      selectedColor: context.accentColor,
       side: BorderSide(color: context.borderColor),
-      labelStyle: TextStyle(
-        fontFamily: 'ProductSans',
-        fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-        color: selected ? onAccent : context.textPrimary,
-      ),
-      checkmarkColor: onAccent,
       onSelected: onSelected,
     );
   }
 
-  Widget _buildSummaryCard(BuildContext context) {
+  @override
+  Widget build(BuildContext context) {
     final count = _targetFileCount;
     final size = _humanSize(_targetBytes);
-    return _sectionCard(
-      context,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Row(
-          children: [
-            Icon(Icons.archive_outlined, color: context.accentColor),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Ready to backup',
-                    style: TextStyle(
-                      fontFamily: 'ProductSans',
-                      fontWeight: FontWeight.w600,
-                      color: context.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _allFilesLoaded
-                        ? '$count ${count == 1 ? 'file' : 'files'} • ~$size'
-                        : 'Counting files...',
-                    style: _tileSubtitle(context),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
-  Widget _buildFilesToIncludeCard(BuildContext context) {
-    return _sectionCard(
-      context,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Scaffold(
+      appBar: AppBar(title: const Text('Local backup')),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
         children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 6, bottom: 8),
-            child: Text('Files to include', style: _sectionLabel(context)),
+          _sectionTitle('Summary'),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading:
+                Icon(Icons.archive_outlined, color: context.accentColor),
+            title: const Text('Ready to backup'),
+            subtitle: Text(
+              _allFilesLoaded
+                  ? '$count ${count == 1 ? 'file' : 'files'} • ~$size'
+                  : 'Counting files...',
+              style:
+                  TextStyle(fontSize: 12, color: context.textTertiary),
+            ),
           ),
+          const SizedBox(height: 24),
+          _sectionTitle('Files to include'),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
               _themedChoiceChip(
-                context,
                 label: 'All files',
                 selected: !_backupSelectedFilesOnly,
                 onSelected: (_) =>
                     setState(() => _backupSelectedFilesOnly = false),
               ),
               _themedChoiceChip(
-                context,
                 label: 'Selected files',
                 selected: _backupSelectedFilesOnly,
                 onSelected: (_) =>
@@ -305,46 +283,18 @@ class _LocalBackupScreenState extends ConsumerState<LocalBackupScreen> {
             ],
           ),
           if (_backupSelectedFilesOnly) ...[
-            const SizedBox(height: 4),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.library_books_outlined,
-                  color: context.accentColor),
-              title: Text('Choose files', style: _tileTitle(context)),
-              subtitle: Text(
-                _selectedFilesSubtitle(),
-                style: _tileSubtitle(context),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              trailing:
-                  Icon(Icons.chevron_right, color: context.textTertiary),
+            const SizedBox(height: 8),
+            _tile(
+              icon: Icons.library_books_outlined,
+              title: 'Choose files',
+              subtitle: _selectedFilesSubtitle(),
               onTap: _chooseFilesForBackup,
             ),
             if (_selectedFiles.isEmpty)
-              Padding(
-                padding: const EdgeInsets.only(left: 4, bottom: 4),
-                child: Text(
-                  'No files chosen yet — tap "Choose files".',
-                  style: _tileSubtitle(context),
-                ),
-              ),
+              _hint('No files chosen yet — tap "Choose files".'),
           ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSaveLocationCard(BuildContext context) {
-    return _sectionCard(
-      context,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 6, bottom: 4),
-            child: Text('Save backup ZIP to', style: _sectionLabel(context)),
-          ),
+          const SizedBox(height: 24),
+          _sectionTitle('Save location'),
           ..._saveLocations.map((loc) => _SaveLocationTile(
                 name: loc.name,
                 resolvePath: loc.resolvePath,
@@ -357,44 +307,12 @@ class _LocalBackupScreenState extends ConsumerState<LocalBackupScreen> {
                   await _runBackupToPath(path);
                 },
               )),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.folder_open_outlined, color: context.accentColor),
-            title: Text('Choose folder...', style: _tileTitle(context)),
-            subtitle: Text('Pick any folder on device',
-                style: _tileSubtitle(context)),
+          _tile(
+            icon: Icons.folder_open_outlined,
+            title: 'Choose folder...',
+            subtitle: 'Pick any folder on device',
             onTap: _pickFolderAndBackup,
           ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: Text(
-          'Local backup',
-          style: TextStyle(
-            fontFamily: 'ProductSans',
-            fontWeight: FontWeight.w600,
-            color: context.textPrimary,
-          ),
-        ),
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        elevation: 0,
-        iconTheme: IconThemeData(color: context.textPrimary),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-        children: [
-          _buildSummaryCard(context),
-          const SizedBox(height: 16),
-          _buildFilesToIncludeCard(context),
-          const SizedBox(height: 16),
-          _buildSaveLocationCard(context),
         ],
       ),
     );
@@ -429,10 +347,7 @@ class _BackupProgressDialog extends StatelessWidget {
                 p == null
                     ? 'Preparing backup...'
                     : 'Backing up file ${p.current} of ${p.total}',
-                style: TextStyle(
-                  fontFamily: 'ProductSans',
-                  color: context.textPrimary,
-                ),
+                style: TextStyle(color: context.textPrimary),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -462,25 +377,15 @@ class _SaveLocationTile extends StatelessWidget {
         final path = snapshot.data;
         final available = path != null && path.isNotEmpty;
         return ListTile(
+          contentPadding: EdgeInsets.zero,
           leading: Icon(
             Icons.folder_outlined,
             color: available ? context.accentColor : context.textTertiary,
           ),
-          title: Text(
-            name,
-            style: TextStyle(
-              fontFamily: 'ProductSans',
-              fontWeight: FontWeight.w500,
-              color: context.textPrimary,
-            ),
-          ),
+          title: Text(name),
           subtitle: Text(
             path ?? (snapshot.hasError ? 'Unavailable' : '...'),
-            style: TextStyle(
-              fontFamily: 'ProductSans',
-              fontSize: 12,
-              color: context.textTertiary,
-            ),
+            style: TextStyle(fontSize: 12, color: context.textTertiary),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
