@@ -78,7 +78,6 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
             Text(
               'Sync complete',
               style: TextStyle(
-                fontFamily: 'ProductSans',
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
                 color: ctx.textPrimary,
@@ -100,8 +99,7 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
               width: double.infinity,
               child: FilledButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('Done',
-                    style: TextStyle(fontFamily: 'ProductSans')),
+                child: const Text('Done'),
               ),
             ),
           ],
@@ -194,24 +192,22 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
           context: context,
           builder: (ctx) => AlertDialog(
             backgroundColor: context.backgroundColor,
-            title: const Text('Remove server?',
-                style: TextStyle(fontFamily: 'ProductSans')),
+            title: const Text('Remove server?'),
             content: Text(
               'Delete the profile for ${_hostOf(p.serverUrl)}? '
               'Encrypted blobs already on the server are left in place.',
-              style: _subStyle(ctx).copyWith(color: context.textSecondary),
+              style:
+                  _subStyle(ctx).copyWith(color: context.textSecondary),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancel',
-                    style: TextStyle(fontFamily: 'ProductSans')),
+                child: const Text('Cancel'),
               ),
               FilledButton(
                 style: FilledButton.styleFrom(backgroundColor: AppColors.error),
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Delete',
-                    style: TextStyle(fontFamily: 'ProductSans')),
+                child: const Text('Delete'),
               ),
             ],
           ),
@@ -257,306 +253,358 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
     final active = profiles.where((p) => p.id == _activeId).firstOrNull;
 
     return Scaffold(
-      backgroundColor: context.backgroundColor,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: context.textPrimary),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Server Sync',
-          style: TextStyle(
-            fontFamily: 'ProductSans',
-            color: context.textPrimary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text('Server Sync')),
       body: _loading
           ? Center(
               child: CircularProgressIndicator(color: context.accentColor),
             )
           : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
               children: [
-                _HeroStatus(
-                  state: syncState,
-                  active: active,
-                  masterEnabled: _masterEnabled,
-                ),
-                const SizedBox(height: 20),
-
-                // ---- Servers ----
-                if (profiles.isEmpty)
-                  _emptyServersHint(context)
-                else ...[
-                  _SectionHeader(
-                    title: 'Servers',
-                    trailing: IconButton(
-                      tooltip: 'Add server',
-                      icon: Icon(Icons.add, size: 20, color: context.accentColor),
-                      onPressed: () => _openEditor(),
-                    ),
-                  ),
-                  ...profiles.map((p) => Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: _profileCard(context, p,
-                            isActive: p.id == _activeId),
-                      )),
-                ],
-                const SizedBox(height: 12),
-
-                // ---- Sync ----
-                _SectionHeader(title: 'Sync'),
-                _card(context, [
-                  SwitchListTile(
-                    title: const Text('Enable server sync',
-                        style: TextStyle(fontFamily: 'ProductSans')),
-                    subtitle: Text(
-                        'Master switch for Sync Now and background runs',
-                        style: _subStyle(context)),
-                    value: _masterEnabled,
-                    onChanged: _activeId == null ? null : _setMasterEnabled,
-                    activeThumbColor: context.accentColor,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-                    child: Text(
-                      'Backup pushes the vault as encrypted blobs to your '
-                      'server. Two-way also pulls remote changes and deletions '
-                      'onto this device.',
-                      style: _subStyle(context),
-                    ),
-                  ),
-                  if (syncState.status == SyncStatus.error &&
-                      syncState.error != null)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-                      child: _errorBanner(context, syncState.error!),
-                    ),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      icon: syncState.isSyncing
-                          ? SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: context.backgroundColor),
-                            )
-                          : const Icon(Icons.sync),
-                      label: Text(syncState.isSyncing ? 'Syncing…' : 'Sync Now',
-                          style: const TextStyle(fontFamily: 'ProductSans')),
-                      onPressed: syncState.isSyncing ||
-                              _activeId == null ||
-                              !_masterEnabled
-                          ? null
-                          : _syncNow,
-                    ),
-                  ),
-                ]),
+                ..._statusChildren(syncState, active),
+                const SizedBox(height: 24),
+                ..._serversChildren(profiles),
+                const SizedBox(height: 24),
+                ..._syncChildren(syncState),
                 if (_log.isNotEmpty) ...[
                   const SizedBox(height: 24),
-                  _SectionHeader(title: 'History'),
-                  _card(
-                      context, _log.map((e) => _logTile(context, e)).toList()),
+                  ..._historyChildren(),
                 ],
               ],
             ),
     );
   }
 
-  Widget _profileCard(BuildContext context, SyncProfile p,
-      {required bool isActive}) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => _openEditor(profile: p),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
-          decoration: BoxDecoration(
-            color: isActive
-                ? context.accentColor.withValues(alpha: 0.08)
-                : context.textPrimary.withValues(alpha: 0.03),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isActive
-                  ? context.accentColor.withValues(alpha: 0.5)
-                  : context.borderColor,
+  // ---- builders ----
+
+  Widget _sectionTitle(String title, {Widget? trailing}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title.toUpperCase(),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.5,
+                color: context.accentColor,
+              ),
             ),
           ),
-          child: Row(
-            children: [
-              Icon(Icons.dns_outlined,
-                  size: 22,
-                  color: isActive ? context.accentColor : context.textTertiary),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            _hostOf(p.serverUrl),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                                fontFamily: 'ProductSans',
-                                fontWeight: FontWeight.w600,
-                                color: context.textPrimary),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          p.direction == SyncDirection.twoWay
-                              ? 'Two-way'
-                              : 'Backup',
-                          style: _subStyle(context),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      p.lastSyncedAt == null
-                          ? (p.basePath.isEmpty ? '/locker' : p.basePath)
-                          : 'Synced ${_formatDate(p.lastSyncedAt!)}',
-                      style: _subStyle(context),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 4),
-              if (isActive)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: context.accentColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text('ACTIVE',
-                      style: TextStyle(
-                          fontFamily: 'ProductSans',
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: context.accentColor)),
-                )
-              else
-                IconButton(
-                  tooltip: 'Set as active',
-                  icon: Icon(Icons.radio_button_unchecked,
-                      size: 20, color: context.textTertiary),
-                  onPressed: () => _activate(p),
-                ),
-              PopupMenuButton<String>(
-                icon: Icon(Icons.more_vert,
-                    size: 20, color: context.textTertiary),
-                itemBuilder: (_) => [
-                  if (!isActive)
-                    const PopupMenuItem(
-                        value: 'activate', child: Text('Set as active')),
-                  const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                  const PopupMenuItem(value: 'delete', child: Text('Delete')),
-                ],
-                onSelected: (v) {
-                  switch (v) {
-                    case 'activate':
-                      _activate(p);
-                      break;
-                    case 'edit':
-                      _openEditor(profile: p);
-                      break;
-                    case 'delete':
-                      _confirmDelete(p);
-                      break;
-                  }
-                },
-              ),
-            ],
+          if (trailing != null) trailing,
+        ],
+      ),
+    );
+  }
+
+  TextStyle _subStyle(BuildContext context) => TextStyle(
+        fontSize: 12,
+        color: context.textTertiary,
+      );
+
+  Widget _tile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon, color: context.accentColor),
+      title: Text(title),
+      subtitle: Text(
+        subtitle,
+        style: _subStyle(context),
+      ),
+      trailing: Icon(Icons.chevron_right, color: context.textTertiary),
+      onTap: onTap,
+    );
+  }
+
+  List<Widget> _statusChildren(SyncState syncState, SyncProfile? active) {
+    // No active server configured yet.
+    if (active == null) {
+      return [
+        _sectionTitle('Status'),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading:
+              Icon(Icons.cloud_off_outlined, color: context.textTertiary),
+          title: const Text('No active server'),
+          subtitle: Text(
+            'Add a server to get started — it becomes the sync target.',
+            style: _subStyle(context),
           ),
+        ),
+      ];
+    }
+
+    final (label, color, icon) = switch (syncState.status) {
+      SyncStatus.idle => (
+          'Idle',
+          context.textTertiary,
+          Icons.cloud_queue_outlined
+        ),
+      SyncStatus.syncing => (
+          'Syncing…',
+          context.accentColor,
+          Icons.cloud_sync_outlined
+        ),
+      SyncStatus.success => (
+          'Up to date',
+          Colors.green,
+          Icons.cloud_done_outlined
+        ),
+      SyncStatus.error => ('Error', AppColors.error, Icons.error_outline),
+    };
+
+    final progress = syncState.progress;
+    final showBar =
+        syncState.isSyncing && progress != null && progress.total > 0;
+    final pct =
+        showBar ? (progress.completed / progress.total).clamp(0.0, 1.0) : 0.0;
+
+    String? detail;
+    if (syncState.isSyncing && progress != null && progress.total > 0) {
+      detail =
+          '${_phaseLabel(progress)} ${progress.completed}/${progress.total}';
+    } else if (syncState.status == SyncStatus.success &&
+        syncState.message != null) {
+      detail = syncState.message;
+    } else if (active.lastSyncedAt != null) {
+      detail = 'Last sync ${_formatDate(active.lastSyncedAt!)}';
+    }
+
+    return [
+      _sectionTitle('Status'),
+      ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(icon, color: color),
+        title: Row(
+          children: [
+            Flexible(child: Text(label)),
+            if (syncState.status == SyncStatus.success && !_masterEnabled)
+              _tag('Paused', context.textTertiary),
+            if (active.direction == SyncDirection.twoWay &&
+                syncState.status != SyncStatus.error)
+              _tag('Two-way', context.accentColor),
+          ],
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (detail != null) Text(detail, style: _subStyle(context)),
+            Text(
+              active.serverUrl,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: _subStyle(context),
+            ),
+          ],
+        ),
+      ),
+      if (showBar)
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: LinearProgressIndicator(
+            value: pct,
+            minHeight: 6,
+            borderRadius: BorderRadius.circular(3),
+            backgroundColor: color.withValues(alpha: 0.15),
+            color: color,
+          ),
+        ),
+    ];
+  }
+
+  Widget _tag(String text, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(left: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: color,
         ),
       ),
     );
   }
 
-  Widget _emptyServersHint(BuildContext context) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: context.textPrimary.withValues(alpha: 0.03),
-          borderRadius: BorderRadius.circular(12),
-          border:
-              Border.all(color: context.borderColor, style: BorderStyle.solid),
+  List<Widget> _serversChildren(List<SyncProfile> profiles) {
+    final addButton = IconButton(
+      tooltip: 'Add server',
+      icon: Icon(Icons.add, size: 20, color: context.accentColor),
+      onPressed: () => _openEditor(),
+    );
+
+    if (profiles.isEmpty) {
+      return [
+        _sectionTitle('Servers', trailing: addButton),
+        Text(
+          'Connect to any WebDAV server — a NAS at home '
+          'or a cloud provider.',
+          style: _subStyle(context),
         ),
-        child: Column(
-          children: [
-            Icon(Icons.cloud_outlined,
-                size: 32, color: context.textTertiary),
-            const SizedBox(height: 10),
-            Text('No servers yet',
-                style: TextStyle(
-                    fontFamily: 'ProductSans',
-                    fontWeight: FontWeight.w600,
-                    color: context.textSecondary)),
-            const SizedBox(height: 4),
-            Text(
-              'Connect to any WebDAV server — a NAS at home '
-              'or a cloud provider.',
-              textAlign: TextAlign.center,
-              style: _subStyle(context),
+        _tile(
+          icon: Icons.add,
+          title: 'Add server',
+          subtitle: 'WebDAV — works with most NAS boxes and cloud providers',
+          onTap: () => _openEditor(),
+        ),
+      ];
+    }
+
+    return [
+      _sectionTitle('Servers', trailing: addButton),
+      ...profiles.map((p) => _profileTile(p, isActive: p.id == _activeId)),
+    ];
+  }
+
+  Widget _profileTile(SyncProfile p, {required bool isActive}) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(
+        Icons.dns_outlined,
+        color: isActive ? context.accentColor : context.textTertiary,
+      ),
+      title: Row(
+        children: [
+          Flexible(
+            child: Text(
+              _hostOf(p.serverUrl),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                color:
+                    isActive ? context.accentColor : context.textPrimary,
+              ),
             ),
-            const SizedBox(height: 16),
-            FilledButton.tonalIcon(
-              onPressed: () => _openEditor(),
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('Add server',
-                  style: TextStyle(fontFamily: 'ProductSans')),
-            ),
-          ],
-        ),
-      );
+          ),
+          if (isActive) _tag('ACTIVE', context.accentColor),
+        ],
+      ),
+      subtitle: Text(
+        '${p.direction == SyncDirection.twoWay ? 'Two-way' : 'Backup'} · '
+        '${p.lastSyncedAt == null
+            ? (p.basePath.isEmpty ? '/locker' : p.basePath)
+            : 'Synced ${_formatDate(p.lastSyncedAt!)}'}',
+        style: _subStyle(context),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+      trailing: PopupMenuButton<String>(
+        icon: Icon(Icons.more_vert, size: 20, color: context.textTertiary),
+        itemBuilder: (_) => [
+          if (!isActive)
+            const PopupMenuItem(
+                value: 'activate', child: Text('Set as active')),
+          const PopupMenuItem(value: 'edit', child: Text('Edit')),
+          const PopupMenuItem(value: 'delete', child: Text('Delete')),
+        ],
+        onSelected: (v) {
+          switch (v) {
+            case 'activate':
+              _activate(p);
+              break;
+            case 'edit':
+              _openEditor(profile: p);
+              break;
+            case 'delete':
+              _confirmDelete(p);
+              break;
+          }
+        },
+      ),
+      onTap: () => _openEditor(profile: p),
+    );
+  }
 
-  Widget _card(BuildContext context, List<Widget> children) => Container(
+  List<Widget> _syncChildren(SyncState syncState) {
+    return [
+      _sectionTitle('Sync'),
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('Enable server sync'),
+        subtitle: Text(
+          'Master switch for Sync Now and background runs',
+          style: _subStyle(context),
+        ),
+        value: _masterEnabled,
+        onChanged: _activeId == null ? null : _setMasterEnabled,
+        activeThumbColor: context.accentColor,
+      ),
+      Text(
+        'Backup pushes the vault as encrypted blobs to your '
+        'server. Two-way also pulls remote changes and deletions '
+        'onto this device.',
+        style: _subStyle(context),
+      ),
+      if (syncState.status == SyncStatus.error && syncState.error != null)
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            syncState.error!,
+            style: TextStyle(fontSize: 12, color: AppColors.error),
+          ),
+        ),
+      const SizedBox(height: 16),
+      SizedBox(
         width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
-        decoration: BoxDecoration(
-          color: context.textPrimary.withValues(alpha: 0.03),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: context.borderColor),
+        child: FilledButton.icon(
+          icon: syncState.isSyncing
+              ? SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: context.backgroundColor,
+                  ),
+                )
+              : const Icon(Icons.sync),
+          label: Text(syncState.isSyncing ? 'Syncing…' : 'Sync Now'),
+          onPressed: syncState.isSyncing ||
+                  _activeId == null ||
+                  !_masterEnabled
+              ? null
+              : _syncNow,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: children,
-        ),
-      );
+      ),
+    ];
+  }
 
-  Widget _errorBanner(BuildContext context, String msg) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: AppColors.error.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.error.withValues(alpha: 0.18)),
-        ),
-        child: Text(msg,
-            style: TextStyle(
-                fontFamily: 'ProductSans',
-                fontSize: 12,
-                color: AppColors.error)),
-      );
-
-  TextStyle _subStyle(BuildContext context) => TextStyle(
-        fontFamily: 'ProductSans',
-        fontSize: 12,
-        color: context.textTertiary,
-      );
+  List<Widget> _historyChildren() {
+    return [
+      _sectionTitle('History'),
+      ..._log.map((e) {
+        final color = e.ok ? Colors.green : AppColors.error;
+        return ListTile(
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          leading: Icon(
+            e.ok ? Icons.check_circle_outline : Icons.error_outline,
+            color: color,
+            size: 18,
+          ),
+          title: Text(
+            e.message,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 13, color: context.textPrimary),
+          ),
+          subtitle: Text(_formatDate(e.time), style: _subStyle(context)),
+        );
+      }),
+    ];
+  }
 
   String _formatDate(DateTime d) {
     final local = d.toLocal();
@@ -573,29 +621,20 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
     return '${(d.inMilliseconds / 1000).toStringAsFixed(1)}s';
   }
 
-  Widget _logTile(BuildContext context, _SyncLogEntry e) {
-    final color = e.ok ? Colors.green : AppColors.error;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(e.ok ? Icons.check_circle_outline : Icons.error_outline,
-              color: color, size: 16),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              '${_formatDate(e.time)} — ${e.message}',
-              style: TextStyle(
-                  fontFamily: 'ProductSans',
-                  fontSize: 12,
-                  color: context.textTertiary),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  static String _phaseLabel(SyncProgress p) => switch (p.phase) {
+        SyncPhase.connecting => 'Connecting',
+        SyncPhase.uploading => 'Uploading',
+        SyncPhase.downloading => 'Downloading',
+        SyncPhase.committing => 'Committing',
+        SyncPhase.done => 'Done',
+      };
+}
+
+class _SyncLogEntry {
+  final DateTime time;
+  final String message;
+  final bool ok;
+  const _SyncLogEntry(this.time, this.message, this.ok);
 }
 
 /// Focused add/edit form shown as a bottom sheet. Owns all field state;
@@ -737,7 +776,6 @@ class _ServerSheetState extends State<_ServerSheet> {
             Text(
               isNew ? 'Add server' : 'Edit server',
               style: TextStyle(
-                  fontFamily: 'ProductSans',
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
                   color: context.textPrimary),
@@ -784,7 +822,6 @@ class _ServerSheetState extends State<_ServerSheet> {
                   value: SyncDirection.pushOnly,
                   label: Text('Backup',
                       style: TextStyle(
-                          fontFamily: 'ProductSans',
                           color: _direction == SyncDirection.pushOnly
                               ? context.accentColor
                               : context.textSecondary)),
@@ -793,7 +830,6 @@ class _ServerSheetState extends State<_ServerSheet> {
                   value: SyncDirection.twoWay,
                   label: Text('Two-way',
                       style: TextStyle(
-                          fontFamily: 'ProductSans',
                           color: _direction == SyncDirection.twoWay
                               ? context.accentColor
                               : context.textSecondary)),
@@ -807,8 +843,7 @@ class _ServerSheetState extends State<_ServerSheet> {
             const SizedBox(height: 8),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Wi-Fi only',
-                  style: TextStyle(fontFamily: 'ProductSans')),
+              title: const Text('Wi-Fi only'),
               subtitle:
                   Text('Skip sync on mobile data', style: _subStyle(context)),
               value: _wifiOnly,
@@ -830,8 +865,7 @@ class _ServerSheetState extends State<_ServerSheet> {
                                 color: context.accentColor),
                           )
                         : const Icon(Icons.network_check, size: 18),
-                    label: const Text('Test',
-                        style: TextStyle(fontFamily: 'ProductSans')),
+                    label: const Text('Test'),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -847,9 +881,7 @@ class _ServerSheetState extends State<_ServerSheet> {
                                 strokeWidth: 2,
                                 color: context.backgroundColor),
                           )
-                        : Text(isNew ? 'Add server' : 'Save',
-                            style:
-                                const TextStyle(fontFamily: 'ProductSans')),
+                        : Text(isNew ? 'Add server' : 'Save'),
                   ),
                 ),
               ],
@@ -876,13 +908,12 @@ class _ServerSheetState extends State<_ServerSheet> {
         child: Text(
           'This URL is unencrypted. Credentials and data travel in plain text '
           'over the network. Only use on a trusted LAN.',
-          style: TextStyle(
-              fontFamily: 'ProductSans', fontSize: 12, color: AppColors.error),
+          style:
+              TextStyle(fontSize: 12, color: AppColors.error),
         ),
       );
 
   TextStyle _subStyle(BuildContext context) => TextStyle(
-        fontFamily: 'ProductSans',
         fontSize: 12,
         color: context.textTertiary,
       );
@@ -890,7 +921,6 @@ class _ServerSheetState extends State<_ServerSheet> {
   Widget _formLabel(BuildContext context, String text) => Text(
         text,
         style: TextStyle(
-            fontFamily: 'ProductSans',
             fontSize: 12,
             fontWeight: FontWeight.w600,
             color: context.textTertiary),
@@ -900,7 +930,6 @@ class _ServerSheetState extends State<_ServerSheet> {
       InputDecoration(
         hintText: hint,
         hintStyle: TextStyle(
-            fontFamily: 'ProductSans',
             fontSize: 13,
             color: context.textSecondary),
         suffixIcon: suffixIcon,
@@ -979,212 +1008,4 @@ class _ServerSheetState extends State<_ServerSheet> {
           ],
         ),
       );
-}
-
-/// Big status banner for the active profile's current run state.
-class _HeroStatus extends StatelessWidget {
-  const _HeroStatus({
-    required this.state,
-    required this.active,
-    required this.masterEnabled,
-  });
-
-  final SyncState state;
-  final SyncProfile? active;
-  final bool masterEnabled;
-
-  @override
-  Widget build(BuildContext context) {
-    // No active server configured yet.
-    if (active == null) {
-      return _shell(
-        context,
-        color: context.textTertiary,
-        icon: Icons.cloud_off_outlined,
-        children: [
-          Text('No active server',
-              style: TextStyle(
-                  fontFamily: 'ProductSans',
-                  fontWeight: FontWeight.w600,
-                  color: context.textPrimary)),
-          Text('Add a server to get started — it becomes the sync target.',
-              style: _sub(context)),
-        ],
-      );
-    }
-
-    final (label, color, icon) = switch (state.status) {
-      SyncStatus.idle => (
-          'Idle',
-          context.textTertiary,
-          Icons.cloud_queue_outlined
-        ),
-      SyncStatus.syncing => (
-          'Syncing…',
-          context.accentColor,
-          Icons.cloud_sync_outlined
-        ),
-      SyncStatus.success => (
-          'Up to date',
-          Colors.green,
-          Icons.cloud_done_outlined
-        ),
-      SyncStatus.error => ('Error', AppColors.error, Icons.error_outline),
-    };
-
-    final progress = state.progress;
-    final showBar = state.isSyncing && progress != null && progress.total > 0;
-    final pct =
-        showBar ? (progress.completed / progress.total).clamp(0.0, 1.0) : 0.0;
-
-    String? detail;
-    if (state.isSyncing && progress != null && progress.total > 0) {
-      detail =
-          '${_phaseLabel(progress)} ${progress.completed}/${progress.total}';
-    } else if (state.status == SyncStatus.success && state.message != null) {
-      detail = state.message;
-    } else if (active!.lastSyncedAt != null) {
-      detail = 'Last sync ${_fmt(active!.lastSyncedAt!)}';
-    }
-
-    return _shell(
-      context,
-      color: color,
-      icon: icon,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(label,
-                  style: TextStyle(
-                      fontFamily: 'ProductSans',
-                      fontWeight: FontWeight.w600,
-                      color: context.textPrimary)),
-            ),
-            if (state.status == SyncStatus.success && !masterEnabled)
-              _tag(context, 'Paused', context.textTertiary),
-            if (active!.direction == SyncDirection.twoWay &&
-                state.status != SyncStatus.error)
-              _tag(context, 'Two-way', context.accentColor),
-          ],
-        ),
-        if (detail != null) ...[
-          const SizedBox(height: 2),
-          Text(detail, style: _sub(context)),
-        ],
-        if (showBar) ...[
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: LinearProgressIndicator(
-              value: pct,
-              minHeight: 6,
-              backgroundColor: color.withValues(alpha: 0.15),
-              color: color,
-            ),
-          ),
-        ],
-        const SizedBox(height: 2),
-        Text(active!.serverUrl,
-            maxLines: 1, overflow: TextOverflow.ellipsis, style: _sub(context)),
-      ],
-    );
-  }
-
-  Widget _shell(BuildContext context,
-      {required Color color,
-      required IconData icon,
-      required List<Widget> children}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.22)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: color, size: 28),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: children,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _tag(BuildContext context, String text, Color color) => Container(
-        margin: const EdgeInsets.only(left: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(text,
-            style: TextStyle(
-                fontFamily: 'ProductSans',
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: color)),
-      );
-
-  TextStyle _sub(BuildContext context) => TextStyle(
-        fontFamily: 'ProductSans',
-        fontSize: 12,
-        color: context.textTertiary,
-      );
-
-  static String _phaseLabel(SyncProgress p) => switch (p.phase) {
-        SyncPhase.connecting => 'Connecting',
-        SyncPhase.uploading => 'Uploading',
-        SyncPhase.downloading => 'Downloading',
-        SyncPhase.committing => 'Committing',
-        SyncPhase.done => 'Done',
-      };
-
-  static String _fmt(DateTime d) {
-    final local = d.toLocal();
-    return '${local.day}/${local.month}/${local.year} '
-        '${local.hour.toString().padLeft(2, '0')}:'
-        '${local.minute.toString().padLeft(2, '0')}';
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, this.trailing});
-  final String title;
-  final Widget? trailing;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 4, bottom: 8),
-      child: Row(
-        children: [
-          Text(title,
-              style: TextStyle(
-                  fontFamily: 'ProductSans',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                  color: context.textTertiary)),
-          const Spacer(),
-          if (trailing != null) trailing!,
-        ],
-      ),
-    );
-  }
-}
-
-class _SyncLogEntry {
-  final DateTime time;
-  final String message;
-  final bool ok;
-  const _SyncLogEntry(this.time, this.message, this.ok);
 }
