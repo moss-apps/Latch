@@ -75,6 +75,7 @@ func Serve(addr, targetDir string) error {
 	mux.HandleFunc("/api/pair/start", s.handlePairStart)
 	mux.HandleFunc("/api/pair/stop", s.handlePairStop)
 	mux.HandleFunc("/api/pair/status", s.handlePairStatus)
+	mux.HandleFunc("/api/pair/allow", s.handlePairAllow)
 	mux.HandleFunc("/api/unlock", s.handleUnlock)
 	mux.HandleFunc("/api/lock", s.handleLock)
 	mux.HandleFunc("/api/status", s.handleStatus)
@@ -256,6 +257,15 @@ func (s *Session) pairState(recv *receiver.Receiver) map[string]any {
 		"served":      st.Served,
 		"servedBytes": st.ServedBytes,
 		"lastError":   st.LastError,
+		"usbApproved": recv.UsbApproved(),
+	}
+	if pending := recv.UsbPending(); pending != nil {
+		out["usbPending"] = map[string]any{
+			"device": pending.Device,
+			"since":  pending.Since.Format(time.RFC3339),
+		}
+	} else {
+		out["usbPending"] = nil
 	}
 	if active {
 		ip := lanIP()
@@ -273,6 +283,37 @@ func (s *Session) handlePairStatus(w http.ResponseWriter, r *http.Request) {
 	if s.recv == nil {
 		writeJSON(w, http.StatusOK, map[string]any{"active": false})
 		return
+	}
+	writeJSON(w, http.StatusOK, s.pairState(s.recv))
+}
+
+// handlePairAllow records the desktop owner's verdict on a tap-to-approve
+// USB request: {"allow":true} hands the phone the session token,
+// {"allow":false} tells it it was denied.
+func (s *Session) handlePairAllow(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeErr(w, http.StatusMethodNotAllowed, fmt.Errorf("POST only"))
+		return
+	}
+	var req struct {
+		Allow bool `json:"allow"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<10)).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, fmt.Errorf("bad JSON: %w", err))
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.recv == nil || !s.recv.Active() {
+		writeErr(w, http.StatusGone, fmt.Errorf("no active pairing session"))
+		return
+	}
+	if req.Allow {
+		s.recv.UsbAllow()
+		webuiLog.Print("usb phone approved by the desktop owner")
+	} else {
+		s.recv.UsbDeny()
+		webuiLog.Print("usb phone denied by the desktop owner")
 	}
 	writeJSON(w, http.StatusOK, s.pairState(s.recv))
 }
