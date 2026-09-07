@@ -7,6 +7,7 @@ import '../models/vaulted_file.dart';
 import '../providers/vault_providers.dart';
 import '../services/desktop_link/restore_controller.dart';
 import '../services/desktop_link/transfer_client.dart';
+import '../services/desktop_link/usb_link.dart';
 import '../services/vault_service.dart';
 import '../themes/app_colors.dart';
 
@@ -27,7 +28,7 @@ class DesktopBackupScreen extends ConsumerStatefulWidget {
       _DesktopBackupScreenState();
 }
 
-enum _Mode { choose, scan, manual, checking, confirm, preparing, sending, done, error }
+enum _Mode { choose, scan, manual, usb, checking, confirm, preparing, sending, done, error }
 
 enum _Flow { push, restore }
 
@@ -46,6 +47,8 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
   RestoreProgress? _rprogress;
   DesktopRestoreReport? _rreport;
   bool _cancelled = false;
+  bool _enteredViaUsb = false;
+  bool _usbFound = false;
 
   final _addrCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
@@ -80,6 +83,71 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
   void _enterManual() {
     _teardownScanner();
     setState(() => _mode = _Mode.manual);
+  }
+
+  void _startUsb() {
+    setState(() {
+      _enteredViaUsb = true;
+      _usbFound = false;
+      _cancelled = false;
+      _error = null;
+      _mode = _Mode.usb;
+    });
+    _connectUsb();
+  }
+
+  // Tap-to-approve USB: probe the cable for a latchd session, wait for
+  // Allow on the computer, then join the normal check/confirm flow with
+  // the received token. Nothing typed.
+  Future<void> _connectUsb() async {
+    final link = UsbLink();
+    try {
+      final label = await UsbLink.deviceLabel();
+      if (!mounted) return;
+      final (base, token) = await link.connect(
+        mode: _flow == _Flow.restore ? 'restore' : 'push',
+        deviceLabel: label,
+        onSessionFound: () {
+          if (mounted) setState(() => _usbFound = true);
+        },
+        isCancelled: () => _cancelled,
+      );
+      if (!mounted) return;
+      _beginSession(base, token);
+    } on UsbCancelledException {
+      // Backed out; _reset already moved on.
+    } catch (e) {
+      debugPrint('desktop backup: usb connect failed: $e');
+      if (!mounted) return;
+      setState(() {
+        _error = _friendlyUsbError(e);
+        _mode = _Mode.error;
+      });
+    } finally {
+      link.close();
+    }
+  }
+
+  String _friendlyUsbError(Object e) {
+    if (e is UsbNoRouteException) {
+      return 'No computer answered over USB.\n\n'
+          'Check the cable is seated, USB debugging is on, and the adb '
+          'reverse command from the desktop web UI ("On a USB cable '
+          'instead of Wi-Fi?") is in place — `adb reverse --list` on the '
+          'computer shows live routes.';
+    }
+    if (e is UsbDeniedException) {
+      return 'Denied on the computer. Tap Connect via USB again if that '
+          'was a mistake.';
+    }
+    if (e is UsbApprovalTimeoutException) {
+      return 'Nobody tapped Allow in time. Tap Connect via USB again '
+          'while you sit at the computer.';
+    }
+    if (e is UsbModeMismatchException) {
+      return e.message;
+    }
+    return _friendlyError(e);
   }
 
   void _startPush() {
@@ -287,8 +355,18 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
     }
     if (e is DesktopUnreachableException) {
       final where = _base == null ? '' : ' at ${_base!.host}:${_base!.port}';
+      final usb = _base != null &&
+              (_base!.host == '127.0.0.1' || _base!.host == 'localhost')
+          ? 'The USB link dropped: check the cable is seated and USB '
+              'debugging is still on, then re-run the adb reverse command '
+              'shown in the desktop web UI (`adb reverse --list` shows '
+              'live routes) and try again.\n\n'
+          : 'On a USB cable instead of Wi-Fi: plug in, run the adb reverse '
+              'command shown in the desktop web UI ("On a USB cable instead '
+              'of Wi-Fi?") and tap Connect via USB — no typing.\n\n';
       return 'Could not reach the computer$where.\n'
           'Reason: ${e.cause}\n\n'
+          '$usb'
           'Check that the phone is on Wi-Fi (not mobile data) on the same '
           'network as the computer, that pairing is still open in the '
           'latchd web UI, and that no firewall is blocking the port.';
@@ -322,6 +400,8 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
       _rreport = null;
       _error = null;
       _cancelled = false;
+      _enteredViaUsb = false;
+      _usbFound = false;
     });
   }
 
@@ -349,6 +429,8 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
         return _scanChildren();
       case _Mode.manual:
         return _manualChildren();
+      case _Mode.usb:
+        return _usbChildren();
       case _Mode.checking:
         return _busyChildren('Checking the code…');
       case _Mode.confirm:
@@ -429,7 +511,18 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
       _hint(
         'On your computer, open the latchd web UI and start pairing. '
         'It shows a QR code plus an address and pairing code; use '
-        'either here.',
+        'either here. On a USB cable, Connect via USB needs no typing '
+        '— just approve on the computer.',
+      ),
+      const SizedBox(height: 8),
+      _tile(
+        icon: Icons.usb,
+        title: 'Connect via USB',
+        subtitle: 'Cable + approve on the computer, no typing',
+        onTap: () {
+          setState(() => _flow = _Flow.push);
+          _startUsb();
+        },
       ),
       const SizedBox(height: 8),
       _tile(
@@ -459,6 +552,15 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
         title: 'Restore from this computer',
         subtitle: 'Replaces what the backup contains; keeps the current key',
         onTap: _startRestore,
+      ),
+      _tile(
+        icon: Icons.usb,
+        title: 'Restore over USB',
+        subtitle: 'Cable + approve on the computer, no typing',
+        onTap: () {
+          setState(() => _flow = _Flow.restore);
+          _startUsb();
+        },
       ),
       const SizedBox(height: 24),
       _sectionTitle('Know the risks'),
@@ -505,6 +607,12 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
     return [
       _sectionTitle('Connect'),
       _hint('Copy the two lines shown under the QR code on your computer.'),
+      const SizedBox(height: 8),
+      _hint(
+        'On a USB cable, Connect via USB needs no typing — prefer that. '
+        'Manual fallback: run the adb reverse command shown in the '
+        'desktop web UI, then enter address 127.0.0.1:<port> here.',
+      ),
       const SizedBox(height: 16),
       TextField(
         controller: _addrCtrl,
@@ -583,6 +691,41 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
       token = code;
     }
     _beginSession(base, token);
+  }
+
+  List<Widget> _usbChildren() {
+    return [
+      _sectionTitle('USB'),
+      const SizedBox(height: 24),
+      Center(
+        child: Column(
+          children: [
+            CircularProgressIndicator(color: context.accentColor),
+            const SizedBox(height: 16),
+            Text(
+              _usbFound
+                  ? 'Approve on your computer — tap Allow once in the latchd web UI.'
+                  : 'Looking for the computer over USB…',
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 8),
+      _hint(
+        'Plug in with USB debugging on and run the adb reverse command '
+        'shown in the desktop web UI. Nothing to type: the approval '
+        'happens on the computer.',
+      ),
+      const SizedBox(height: 8),
+      _textAction(
+        label: 'Cancel',
+        onTap: () {
+          _cancelled = true;
+          _reset();
+        },
+      ),
+    ];
   }
 
   List<Widget> _busyChildren(String message) {
@@ -840,7 +983,9 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
       _primaryButton(
         label: 'Try again',
         icon: Icons.refresh,
-        onPressed: (_mode == _Mode.error && _base != null) ? _check : _reset,
+        onPressed: (_mode == _Mode.error && _base != null)
+            ? _check
+            : (_enteredViaUsb ? _startUsb : _reset),
       ),
       _textAction(label: 'Start over', onTap: _reset),
     ];
