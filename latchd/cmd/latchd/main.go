@@ -61,6 +61,8 @@ func usage() {
 
 Backups arrive over Wi-Fi: start a pairing session in the web UI and scan
 the QR from the phone (Latch → Settings → Storage → Desktop Backup).
+Over USB: plug the phone in, run the adb reverse command shown in the
+web UI, tap Connect via USB on the phone, and tap Allow once here.
 
 Credential: --password flag or LATCHD_PASSWORD env (never stored).`)
 }
