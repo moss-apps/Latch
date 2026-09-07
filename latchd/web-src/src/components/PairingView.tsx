@@ -23,13 +23,26 @@ declare global {
 
 type LiveKind = "waiting" | "busy" | "ok" | "err"
 type Veil = { icon: GlyphName; text: string } | null
+type SessionMode = "push" | "restore"
 
-const STEPS = [
+const STEPS_PUSH = [
   <>
     Open <strong>Latch</strong> on your phone.
   </>,
   <>
     Go to <strong>Settings&nbsp;→&nbsp;Storage&nbsp;→&nbsp;Desktop Backup</strong>.
+  </>,
+  <>
+    <strong>Scan this code</strong>, or type the address and pairing code by hand.
+  </>,
+]
+
+const STEPS_RESTORE = [
+  <>
+    Open <strong>Latch</strong> on your phone.
+  </>,
+  <>
+    Go to <strong>Settings&nbsp;→&nbsp;Storage&nbsp;→&nbsp;Desktop Backup&nbsp;→&nbsp;Restore from this computer</strong>.
   </>,
   <>
     <strong>Scan this code</strong>, or type the address and pairing code by hand.
@@ -142,6 +155,7 @@ export function PairingView({
 }) {
   const [creds, setCreds] = useState<{ host: string; token: string; url: string } | null>(null)
   const [veil, setVeil] = useState<Veil>(null)
+  const [mode, setMode] = useState<SessionMode>("push")
   const [live, setLive] = useState<{ kind: LiveKind; text: string }>({
     kind: "waiting",
     text: "Opening pairing session…",
@@ -153,6 +167,7 @@ export function PairingView({
   const completeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const startedRef = useRef(false)
   const doneRef = useRef(false)
+  const modeRef = useRef<SessionMode>("push")
   const hasLocalRef = useRef(hasLocal)
   const unlockedRef = useRef(unlocked)
   hasLocalRef.current = hasLocal
@@ -184,29 +199,62 @@ export function PairingView({
   }
 
   function pairApply(d: PairInfo) {
+    const m: SessionMode = d.mode === "restore" ? "restore" : "push"
     if (d.active) {
       startedRef.current = true
       setChipsEnabled(true)
       setCreds({ host: `${d.host}:${d.port}`, token: fmtCode(d.token), url: d.url })
-      const got = `${d.files} ${d.files === 1 ? "file" : "files"} · ${fmtSize(d.bytes)}`
-      if (d.state === "receiving") {
-        setLive({ kind: "busy", text: `Receiving: ${got}` })
-        setVeil({ icon: "sync_alt", text: "Receiving…" })
-      } else if (d.state === "verifying") {
-        setLive({ kind: "busy", text: "Verifying the received backup…" })
-        setVeil({ icon: "verified", text: "Verifying…" })
+      if (m === "restore") {
+        if (d.state === "receiving") {
+          const served =
+            d.served > 0
+              ? `: ${d.served} ${d.served === 1 ? "file" : "files"} · ${fmtSize(d.servedBytes)}`
+              : ""
+          setLive({ kind: "busy", text: `Serving your phone${served}` })
+          setVeil({ icon: "sync_alt", text: "Serving…" })
+        } else {
+          setLive({
+            kind: "waiting",
+            text: "Waiting for your phone. Start the restore in the Latch app and scan the code.",
+          })
+          setVeil(null)
+        }
       } else {
-        setLive({
-          kind: "waiting",
-          text: "Waiting for your phone. Scan the code in the Latch app.",
-        })
-        setVeil(null)
+        const got = `${d.files} ${d.files === 1 ? "file" : "files"} · ${fmtSize(d.bytes)}`
+        if (d.state === "receiving") {
+          setLive({ kind: "busy", text: `Receiving: ${got}` })
+          setVeil({ icon: "sync_alt", text: "Receiving…" })
+        } else if (d.state === "verifying") {
+          setLive({ kind: "busy", text: "Verifying the received backup…" })
+          setVeil({ icon: "verified", text: "Verifying…" })
+        } else {
+          setLive({
+            kind: "waiting",
+            text: "Waiting for your phone. Scan the code in the Latch app.",
+          })
+          setVeil(null)
+        }
       }
       ensurePoll()
       return
     }
 
     stopPoll()
+    if (m === "restore") {
+      // Restore sessions have no completion signal; closed = stopped/error.
+      if (startedRef.current) {
+        setChipsEnabled(true)
+        setCancelDisabled(true)
+        setVeil(null)
+        setLive({
+          kind: "err",
+          text: d.lastError
+            ? `Restore session closed: ${d.lastError}`
+            : "Restore session closed. Codes expire after five idle minutes; start a new code and scan again.",
+        })
+      }
+      return
+    }
     if (d.state === "complete" && !doneRef.current) {
       doneRef.current = true
       setChipsEnabled(false)
@@ -249,20 +297,25 @@ export function PairingView({
     }
   }
 
-  function startPairing() {
+  function startPairing(m: SessionMode) {
+    modeRef.current = m
+    setMode(m)
     startedRef.current = false
     doneRef.current = false
     setCancelDisabled(false)
-    setLive({ kind: "waiting", text: "Opening pairing session…" })
+    setLive({
+      kind: "waiting",
+      text: m === "restore" ? "Opening restore session…" : "Opening pairing session…",
+    })
     setVeil(null)
     setChipsEnabled(false)
-    api<PairInfo>("/api/pair/start")
+    api<PairInfo>("/api/pair/start", { mode: m })
       .then(pairApply)
       .catch((err: Error) => {
         setVeil({ icon: "error_outline", text: "Failed" })
         setLive({
           kind: "err",
-          text: `Couldn't open the pairing session: ${
+          text: `Couldn't open the ${m === "restore" ? "restore" : "pairing"} session: ${
             err.message || "is latchd healthy?"
           } Try again.`,
         })
@@ -271,8 +324,17 @@ export function PairingView({
       })
   }
 
+  function switchMode(m: SessionMode) {
+    if (m === modeRef.current) return
+    stopPoll()
+    api("/api/pair/stop").catch(() => {
+      /* already gone */
+    })
+    startPairing(m)
+  }
+
   useEffect(() => {
-    startPairing()
+    startPairing("push")
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -307,23 +369,38 @@ export function PairingView({
     api("/api/pair/stop").catch(() => {
       /* already gone */
     })
-    startPairing()
+    startPairing(modeRef.current)
   }
 
+  const restore = mode === "restore"
+  const steps = restore ? STEPS_RESTORE : STEPS_PUSH
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto grid w-full max-w-[1100px] gap-14 px-6 py-10 lg:grid-cols-[minmax(0,1fr)_380px] lg:py-16">
         <div className="flex flex-col gap-6">
           <Logomark className="h-16 text-logo" />
           <div>
-            <h1 className="text-4xl font-bold tracking-tight">Pair your phone</h1>
+            <h1 className="text-4xl font-bold tracking-tight">
+              {restore ? "Restore to your phone" : "Pair your phone"}
+            </h1>
             <p className="mt-3 max-w-md text-lg leading-relaxed text-text2">
-              This screen creates the pairing credentials. Your phone pushes the encrypted
-              backup here; the vault itself never leaves either device unlocked.
+              {restore ? (
+                <>
+                  This screen serves the backup stored on this computer. Your
+                  phone pulls the encrypted snapshot over the session; nothing
+                  on this computer is changed.
+                </>
+              ) : (
+                <>
+                  This screen creates the pairing credentials. Your phone pushes
+                  the encrypted backup here; the vault itself never leaves
+                  either device unlocked.
+                </>
+              )}
             </p>
           </div>
           <ol className="flex max-w-md flex-col gap-3.5">
-            {STEPS.map((s, i) => (
+            {steps.map((s, i) => (
               <li key={i} className="flex items-start gap-3">
                 <span className="grid size-6 shrink-0 place-items-center rounded-full bg-brand/10 text-xs font-bold text-brand">
                   {i + 1}
@@ -338,14 +415,41 @@ export function PairingView({
           >
             <Mi n="warning" className="mt-0.5 shrink-0 text-[18px] text-error" />
             <p className="text-sm leading-relaxed text-text2">
-              Pairing opens latchd to your local network over plain HTTP. The token only
-              admits your phone, files arrive already encrypted, and the session closes
-              itself after five idle minutes. Pair on networks you trust.
+              {restore
+                ? "The restore session opens latchd to your local network over plain HTTP. The token only admits your phone, the backup stays exactly as it is, and the session closes itself after five idle minutes. Restore on networks you trust."
+                : "Pairing opens latchd to your local network over plain HTTP. The token only admits your phone, files arrive already encrypted, and the session closes itself after five idle minutes. Pair on networks you trust."}
             </p>
           </div>
         </div>
 
         <div className="h-fit w-full rounded-2xl border border-divider bg-card p-6 shadow-lg shadow-black/5">
+          <div
+            className="mb-5 grid grid-cols-2 gap-1 rounded-lg bg-background p-1"
+            role="tablist"
+            aria-label="Session mode"
+          >
+            {(
+              [
+                ["push", "Receive backup"],
+                ["restore", "Restore to phone"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                role="tab"
+                aria-selected={mode === value}
+                onClick={() => switchMode(value)}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  mode === value
+                    ? "bg-card text-text1 shadow-sm"
+                    : "text-text3 hover:text-text2"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <div className="relative">
             <div className="grid place-items-center rounded-xl bg-white p-4">
               <canvas ref={canvasRef} width={200} height={200} role="img"
@@ -434,7 +538,7 @@ export function PairingView({
             onClick={cancelPairing}
             className="mt-3 text-xs text-text3 underline-offset-2 transition-colors hover:text-text2 hover:underline disabled:opacity-60"
           >
-            Cancel pairing
+            {restore ? "Cancel restore session" : "Cancel pairing"}
           </button>
         </div>
       </div>
