@@ -26,8 +26,8 @@ loopback interface.
 > `TransferServer` was removed and replaced by a push client; the
 > phone-hosted model is gone.
 
-Status: **P6.0 + P6.1r + P6.2r done** (flipped model). P6.3/P6.4 remain
-planned.
+Status: **P6.0 + P6.1r + P6.2r + P6.3 + P6.4 done** (flipped model).
+P6.5 remains deferred.
 
 Relationship to the existing paths:
 
@@ -175,10 +175,17 @@ demand.
 The session (and its listener + token) dies on completion, on cancel in
 the web UI, or after an idle timeout with no successful requests.
 
-USB variant (P6.4): `adb forward tcp:<port> tcp:<port>` makes the
-desktop's receiver reachable at `127.0.0.1:<port>` **on the phone** over
-the cable; same token, entered manually (the phone can still scan the QR,
-but over USB the wired reachability is the reliable one).
+USB variant (P6.4, tap-to-approve): `adb reverse tcp:<port> tcp:<port>`
+maps the desktop's receiver port onto `127.0.0.1:<port>` **on the phone**
+over the cable. The phone probes its loopback, announces itself
+(`POST /usb-hello` — loopback-only, LAN callers get a bare 404), and the
+desktop owner taps Allow once in the web UI; the phone picks up the
+session token and runs the normal push/pull sets. No address, no code.
+Setting up the reverse already proves physical possession of an
+adb-authorized device, so the tap binds the session instead of a typed
+secret. Manual address+code entry stays as a fallback. A dropped cable
+surfaces as an explicit USB error with a retry; the desktop session keeps
+its 5-minute idle expiry.
 
 ### Crypto on the desktop
 
@@ -204,6 +211,7 @@ Receiver endpoints (all bearer-gated; anything else is 401):
 | `PUT /keybundle` | push | Install/refresh key bundle JSON (validated shape) |
 | `PUT /blob/<sha256>` | push | One ciphertext blob, streamed; sha256 checked before it touches disk (422 on mismatch) |
 | `PUT /manifest` | push | Completion signal: atomic swap, then verify + reap; 200 only if the resulting backup verifies |
+| `POST /usb-hello` | phone→desktop (USB) | Tap-to-approve handshake: `{device, mode}` → pending until the desktop allows, then the session token. Loopback-only; anything else gets a bare 404 |
 
 Backup = the phone's `PUT` set against a session the desktop started.
 Restore (P6.3) = the same receiver serving the `GET` set (`/manifest`,
@@ -224,7 +232,7 @@ bearer-gated). The UI must not assume endpoints beyond this table.
 | `GET /api/thumb/<id>` | Unlocked only. Server-generated JPEG thumbnail (~320px, q75) for image entries; in-memory LRU, ETag + 304 — plaintext never touches disk. Non-images → 404 (UI falls back to a type glyph) |
 | `POST /api/unlock` / `POST /api/lock` | Vault password → master key in memory / drop it (also clears thumbnails) |
 | `POST /api/verify` / `POST /api/export` | Hash-verify every blob / decrypt snapshot to `~/latchd-exports/<subdir>` |
-| `POST /api/pair/start` / `stop` · `GET /api/pair/status` | Pairing receiver lifecycle + 1.5s poll state |
+| `POST /api/pair/start` / `stop` / `allow` · `GET /api/pair/status` | Pairing receiver lifecycle + USB tap-to-approve verdict + 1.5s poll state |
 
 > **Follow-up — folder records.** The manifest carries `folderId` per file,
 > but folder rows live only in the phone's PocketBase, so the web UI offers
@@ -275,7 +283,7 @@ Two modes, same data:
 | P6.1 | ~~Phone: `TransferServer` + QR screen~~ → **r**: phone push client + scanner screen | `lib/services/desktop_link/transfer_client.dart`, `lib/screens/desktop_backup_screen.dart`, `pubspec.yaml` (−`qr_flutter`, +`mobile_scanner`) | Done (flipped) |
 | P6.2 | ~~Companion puller~~ → **r**: companion pairing receiver + QR web UI + unlock-after-push, `verify`, browse-after-unlock, export-decrypted | `latchd/` (Go module: `cmd/latchd`, `internal/{receiver,backup,cryptoutil,webui}`, React web UI built from `web-src/` into `web/` via `go:embed`, vendored QR encoder) | Done (flipped) |
 | P6.3 | Restore both modes (GET set + restore sessions; phone-side pre-vault pull); first-run entry point | `latchd/internal/receiver` (GET set), phone `desktop_link/restore_controller.dart`, first-run flow | Done |
-| P6.4 | USB transport: `adb forward` hint in web UI + manual-code path on phone | web UI copy, phone manual entry | Planned |
+| P6.4 | USB transport: adb reverse hint + tap-to-approve (no typing); manual-code fallback | web UI approval prompt, phone USB connect | Done |
 | P6.5 | Polish: snapshot retention (dated manifests), scheduled backup reminders, orphan reaping report | `latchd/`, phone settings | Deferred |
 
 Each phase keeps the repo's verification discipline: one runnable check
