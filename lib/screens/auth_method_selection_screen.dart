@@ -5,6 +5,7 @@ import '../widgets/auth_method_card.dart';
 import 'pin_setup_screen.dart';
 import 'password_setup_screen.dart';
 import 'biometric_setup_screen.dart';
+import 'restore_setup_screen.dart';
 import '../services/auth_service.dart';
 
 /// First-time authentication method selection screen.
@@ -241,6 +242,23 @@ class _AuthMethodSelectionScreenState extends State<AuthMethodSelectionScreen>
                                   ),
                                 );
                               },
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _entrance(
+                      a: 0.82,
+                      b: 0.96,
+                      dy: 28,
+                      child: AuthMethodCard(
+                        icon: Icons.settings_backup_restore,
+                        title: 'Restore from desktop backup',
+                        description: 'Pull an existing backup from your computer',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const RestoreSetupScreen(),
+                          ),
+                        ),
                       ),
                     ),
                   ],
