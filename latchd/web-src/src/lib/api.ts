@@ -20,12 +20,15 @@ export interface StatusInfo {
 export interface PairInfo {
   active: boolean
   state: string
+  mode: string
   host: string
   port: number
   token: string
   url: string
   files: number
   bytes: number
+  served: number
+  servedBytes: number
   lastError: string
 }
 
