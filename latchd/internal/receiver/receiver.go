@@ -1,15 +1,26 @@
 // Package receiver hosts the pairing receiver: a token-gated LAN listener
-// that exists only while a pairing session is active. The phone scans the
-// QR shown in the web UI and pushes the encrypted snapshot here:
+// that exists only while a pairing session is active. In push mode the
+// phone scans the QR shown in the web UI and pushes the encrypted
+// snapshot here:
 //
 //	GET  /info                 blob digests already on disk (phone diffs)
 //	PUT  /keybundle            password-wrapped master key (validated shape)
 //	PUT  /blob/<sha256>        one ciphertext blob, sha-verified on arrival
 //	PUT  /manifest             completion signal: atomic swap + verify
 //
+// In restore mode the same listener serves the stored snapshot back to
+// the phone (which pulls it):
+//
+//	GET  /info                 blob digests on disk (+ session mode)
+//	GET  /keybundle            stored keybundle (404 if absent)
+//	GET  /manifest             stored manifest envelope (404 if absent)
+//	GET  /blob/<sha256>        one stored ciphertext blob (404 if absent)
+//
 // Every request carries `Authorization: Bearer <session token>`. The
-// listener closes on manifest completion, on Stop, or after the idle
-// timeout — never long-running.
+// listener closes on manifest completion (push), on Stop, or after the
+// idle timeout — never long-running. Restore sessions have no completion
+// signal; the phone finishes pulling and the idle timeout reaps the
+// listener.
 package receiver
 
 import (
@@ -48,6 +59,13 @@ const (
 	PreferredPortLast  = 7820
 )
 
+// Session modes. Push = phone→desktop backup; Restore = desktop→phone
+// pull of the stored snapshot.
+const (
+	ModePush    = "push"
+	ModeRestore = "restore"
+)
+
 // Session states reported to the web UI.
 const (
 	StateWaiting   = "waiting"
@@ -61,9 +79,11 @@ const (
 // Stats is a point-in-time snapshot for the web UI.
 type Stats struct {
 	State     string `json:"state"`
-	Received  int    `json:"received"` // blobs accepted this session
-	Bytes     int64  `json:"bytes"`    // blob bytes accepted this session
-	Files     int    `json:"files"`    // blobs on disk after the verify pass
+	Received  int    `json:"received"`     // blobs accepted this session (push)
+	Bytes     int64  `json:"bytes"`        // blob bytes accepted this session (push)
+	Files     int    `json:"files"`        // blobs on disk after the verify pass
+	Served    int    `json:"served"`      // blobs served this session (restore)
+	ServedBytes int64 `json:"servedBytes"` // blob bytes served this session (restore)
 	LastError string `json:"lastError,omitempty"`
 }
 
@@ -73,6 +93,7 @@ type Receiver struct {
 	ln       net.Listener
 	srv      *http.Server
 	token    string
+	mode     string
 	target   backup.Target
 	stats    Stats
 	lastSeen time.Time
@@ -88,7 +109,12 @@ var shaHex = regexp.MustCompile(`^[0-9a-f]{64}$`)
 var lg = log.New(os.Stdout, "latchd receiver: ", log.LstdFlags)
 
 // Start binds host:port (port 0 = ephemeral) with a fresh 256-bit token.
-func Start(target backup.Target, host string, port int, onComplete func()) (*Receiver, error) {
+// mode selects the request set: ModePush (PUT set, phone→desktop) or
+// ModeRestore (GET set, desktop→phone). Empty mode defaults to ModePush.
+func Start(target backup.Target, host string, port int, mode string, onComplete func()) (*Receiver, error) {
+	if mode != ModeRestore {
+		mode = ModePush
+	}
 	tokenRaw := make([]byte, 32)
 	if _, err := rand.Read(tokenRaw); err != nil {
 		return nil, err
@@ -100,11 +126,18 @@ func Start(target backup.Target, host string, port int, onComplete func()) (*Rec
 	r := &Receiver{
 		ln:         ln,
 		token:      hex.EncodeToString(tokenRaw),
+		mode:       mode,
 		target:     target,
 		stats:      Stats{State: StateWaiting},
 		lastSeen:   time.Now(),
 		onComplete: onComplete,
 		done:       make(chan struct{}),
+	}
+	if mode == ModeRestore {
+		// Surface what the session can serve before the first request.
+		if hashes, err := target.Hashes(); err == nil {
+			r.stats.Files = len(hashes)
+		}
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/info", r.gated(r.handleInfo))
@@ -114,20 +147,20 @@ func Start(target backup.Target, host string, port int, onComplete func()) (*Rec
 	r.srv = &http.Server{Handler: mux}
 	go r.srv.Serve(ln)
 	go r.idleWatch()
-	lg.Printf("listening on %s", ln.Addr().String())
+	lg.Printf("listening on %s (%s mode)", ln.Addr().String(), mode)
 	return r, nil
 }
 
 // StartPreferred binds host on the first free port in the preferred range
 // (7810-7820), falling back to an ephemeral port if all are taken.
-func StartPreferred(target backup.Target, host string, onComplete func()) (*Receiver, error) {
+func StartPreferred(target backup.Target, host string, mode string, onComplete func()) (*Receiver, error) {
 	for p := PreferredPortFirst; p <= PreferredPortLast; p++ {
-		r, err := Start(target, host, p, onComplete)
+		r, err := Start(target, host, p, mode, onComplete)
 		if err == nil {
 			return r, nil
 		}
 	}
-	return Start(target, host, 0, onComplete)
+	return Start(target, host, 0, mode, onComplete)
 }
 
 // Addr is the listener address (host:port as bound).
@@ -138,6 +171,9 @@ func (r *Receiver) Port() int { return r.ln.Addr().(*net.TCPAddr).Port }
 
 // Token is the hex session token shown in the QR.
 func (r *Receiver) Token() string { return r.token }
+
+// Mode is the session mode (push or restore).
+func (r *Receiver) Mode() string { return r.mode }
 
 // PairingURL builds `http://<host>:<port>/#<token>` for the QR.
 func (r *Receiver) PairingURL(host string) string {
@@ -286,13 +322,46 @@ func (r *Receiver) handleInfo(w http.ResponseWriter, req *http.Request) {
 		"app":          "latchd",
 		"protocol":     2,
 		"host":         host,
+		"mode":         r.mode,
 		"hasManifest":  manifest != nil,
 		"hasKeybundle": kb != nil,
 		"hashes":       hashes,
 	})
 }
 
+// readOnly rejects the push (PUT) set in a restore session.
+func (r *Receiver) readOnly(w http.ResponseWriter) {
+	writeJSON(w, http.StatusMethodNotAllowed, map[string]string{
+		"error": "restore session is read-only — nothing can be pushed while it is open"})
+}
+
+// serveStored streams stored bytes back to the phone.
+func serveStored(w http.ResponseWriter, data []byte) {
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+	w.WriteHeader(http.StatusOK)
+	w.Write(data)
+}
+
 func (r *Receiver) handleKeybundle(w http.ResponseWriter, req *http.Request) {
+	if r.mode == ModeRestore {
+		if req.Method != http.MethodGet {
+			r.readOnly(w)
+			return
+		}
+		kb, err := r.target.StoredKeybundle()
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		if kb == nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "no keybundle in the backup"})
+			return
+		}
+		r.touch(StateReceiving)
+		serveStored(w, kb)
+		return
+	}
 	if req.Method != http.MethodPut {
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "PUT only"})
 		return
@@ -321,6 +390,43 @@ func (r *Receiver) handleKeybundle(w http.ResponseWriter, req *http.Request) {
 }
 
 func (r *Receiver) handleBlob(w http.ResponseWriter, req *http.Request) {
+	if r.mode == ModeRestore {
+		if req.Method != http.MethodGet {
+			r.readOnly(w)
+			return
+		}
+		sha := filepath.Base(req.URL.Path)
+		if !shaHex.MatchString(sha) {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid blob digest"})
+			return
+		}
+		f, err := os.Open(r.target.BlobPath(sha))
+		if err != nil {
+			if os.IsNotExist(err) {
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "blob not in the backup"})
+				return
+			}
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		defer f.Close()
+		st, err := f.Stat()
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		r.touch(StateReceiving)
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Length", strconv.FormatInt(st.Size(), 10))
+		n, err := io.Copy(w, f)
+		if err == nil {
+			r.mu.Lock()
+			r.stats.Served++
+			r.stats.ServedBytes += n
+			r.mu.Unlock()
+		}
+		return
+	}
 	if req.Method != http.MethodPut {
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "PUT only"})
 		return
@@ -369,6 +475,24 @@ func (r *Receiver) handleBlob(w http.ResponseWriter, req *http.Request) {
 }
 
 func (r *Receiver) handleManifest(w http.ResponseWriter, req *http.Request) {
+	if r.mode == ModeRestore {
+		if req.Method != http.MethodGet {
+			r.readOnly(w)
+			return
+		}
+		envelope, err := r.target.StoredManifest()
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		if envelope == nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "no manifest in the backup"})
+			return
+		}
+		r.touch(StateReceiving)
+		serveStored(w, envelope)
+		return
+	}
 	if req.Method != http.MethodPut {
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "PUT only"})
 		return
