@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"net"
@@ -162,6 +163,17 @@ func (s *Session) handlePairStart(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusMethodNotAllowed, fmt.Errorf("POST only"))
 		return
 	}
+	// Optional {"mode":"restore"} body opens a restore session (the phone
+	// pulls the stored snapshot) instead of a push pairing.
+	mode := receiver.ModePush
+	if body, err := io.ReadAll(io.LimitReader(r.Body, 1<<10)); err == nil && len(body) > 0 {
+		var req struct {
+			Mode string `json:"mode"`
+		}
+		if json.Unmarshal(body, &req) == nil && req.Mode == receiver.ModeRestore {
+			mode = receiver.ModeRestore
+		}
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.recv != nil && s.recv.Active() {
@@ -178,9 +190,9 @@ func (s *Session) handlePairStart(w http.ResponseWriter, r *http.Request) {
 	}
 	// Prefer the fixed pairing port so a single firewall rule covers every
 	// session; fall back to ephemeral if it is taken.
-	recv, err := receiver.Start(s.target(), "0.0.0.0", pairingPort, onComplete)
+	recv, err := receiver.Start(s.target(), "0.0.0.0", pairingPort, mode, onComplete)
 	if err != nil {
-		recv, err = receiver.Start(s.target(), "0.0.0.0", 0, onComplete)
+		recv, err = receiver.Start(s.target(), "0.0.0.0", 0, mode, onComplete)
 	}
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, fmt.Errorf(
@@ -195,9 +207,9 @@ func (s *Session) handlePairStart(w http.ResponseWriter, r *http.Request) {
 			"to any port %d proto tcp` if the phone cannot connect",
 			subnet, recv.Port())
 	}
-	webuiLog.Printf("pairing session started: advertising http://%s:%d "+
+	webuiLog.Printf("pairing session started (%s mode): advertising http://%s:%d "+
 		"(LAN candidates: %s%s)",
-		lanIP(), recv.Port(), strings.Join(lanIPs(), ", "), fwHint)
+		mode, lanIP(), recv.Port(), strings.Join(lanIPs(), ", "), fwHint)
 	writeJSON(w, http.StatusOK, s.pairState(recv))
 }
 
@@ -235,12 +247,15 @@ func (s *Session) pairState(recv *receiver.Receiver) map[string]any {
 	st := recv.Stats()
 	active := recv.Active()
 	out := map[string]any{
-		"active":    active,
-		"state":     st.State,
-		"received":  st.Received,
-		"bytes":     st.Bytes,
-		"files":     st.Files,
-		"lastError": st.LastError,
+		"active":      active,
+		"state":       st.State,
+		"mode":        recv.Mode(),
+		"received":    st.Received,
+		"bytes":       st.Bytes,
+		"files":       st.Files,
+		"served":      st.Served,
+		"servedBytes": st.ServedBytes,
+		"lastError":   st.LastError,
 	}
 	if active {
 		ip := lanIP()
