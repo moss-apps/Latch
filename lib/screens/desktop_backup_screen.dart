@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:pointycastle/export.dart' show InvalidCipherTextException;
 
 import '../models/vaulted_file.dart';
 import '../providers/vault_providers.dart';
+import '../services/desktop_link/restore_controller.dart';
 import '../services/desktop_link/transfer_client.dart';
+import '../services/vault_service.dart';
 import '../themes/app_colors.dart';
 
 /// Desktop backup screen, flipped architecture (P6.1r).
@@ -26,16 +29,22 @@ class DesktopBackupScreen extends ConsumerStatefulWidget {
 
 enum _Mode { choose, scan, manual, checking, confirm, preparing, sending, done, error }
 
+enum _Flow { push, restore }
+
 class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
   _Mode _mode = _Mode.choose;
+  _Flow _flow = _Flow.push;
   String? _error;
 
   Uri? _base;
   String? _token;
   ReceiverInfo? _receiver;
+  RestoreSourceInfo? _source;
   DesktopVaultSnapshot? _snapshot;
   DesktopPushProgress? _progress;
   DesktopPushReport? _report;
+  RestoreProgress? _rprogress;
+  DesktopRestoreReport? _rreport;
   bool _cancelled = false;
 
   final _addrCtrl = TextEditingController();
@@ -71,6 +80,16 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
   void _enterManual() {
     _teardownScanner();
     setState(() => _mode = _Mode.manual);
+  }
+
+  void _startPush() {
+    setState(() => _flow = _Flow.push);
+    _enterScan();
+  }
+
+  void _startRestore() {
+    setState(() => _flow = _Flow.restore);
+    _enterScan();
   }
 
   void _note(String message) {
@@ -117,6 +136,44 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
 
   Future<void> _check() async {
     setState(() => _mode = _Mode.checking);
+    if (_flow == _Flow.restore) {
+      final client = DesktopRestoreClient();
+      try {
+        final source = await client.check(base: _base!, token: _token!);
+        if (!mounted) return;
+        if (!source.isRestoreSession) {
+          setState(() {
+            _error = 'The computer is receiving a backup, not serving one. '
+                'In the latchd web UI switch the session to "Restore to '
+                'phone" and try again.';
+            _mode = _Mode.error;
+          });
+          return;
+        }
+        if (!source.hasManifest) {
+          setState(() {
+            _error = 'The computer has no backup to restore. Make a backup '
+                'first.';
+            _mode = _Mode.error;
+          });
+          return;
+        }
+        setState(() {
+          _source = source;
+          _mode = _Mode.confirm;
+        });
+      } catch (e) {
+        debugPrint('desktop backup: restore check failed: $e');
+        if (!mounted) return;
+        setState(() {
+          _error = _friendlyError(e);
+          _mode = _Mode.error;
+        });
+      } finally {
+        client.close();
+      }
+      return;
+    }
     final client = DesktopPushClient();
     try {
       final receiver = await client.check(base: _base!, token: _token!);
@@ -138,6 +195,7 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
   }
 
   Future<void> _send() async {
+    if (_flow == _Flow.restore) return _restore();
     setState(() => _mode = _Mode.preparing);
     try {
       final snapshot = _snapshot ??
@@ -182,6 +240,45 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
     }
   }
 
+  Future<void> _restore() async {
+    setState(() {
+      _rprogress = null;
+      _cancelled = false;
+      _mode = _Mode.sending;
+    });
+    final client = DesktopRestoreClient();
+    final controller = RestoreController(
+      VaultService.instance.store,
+      ref.read(encryptionServiceProvider),
+    );
+    try {
+      final report = await controller.restoreIntoVault(
+        client: client,
+        base: _base!,
+        token: _token!,
+        onProgress: (p) {
+          if (mounted) setState(() => _rprogress = p);
+        },
+        isCancelled: () => _cancelled,
+      );
+      if (!mounted) return;
+      setState(() {
+        _rreport = report;
+        _mode = _Mode.done;
+      });
+      ref.read(vaultNotifierProvider.notifier).loadFiles();
+    } catch (e) {
+      debugPrint('desktop backup: restore failed: $e');
+      if (!mounted) return;
+      setState(() {
+        _error = _friendlyError(e);
+        _mode = e is RestoreCancelledException ? _Mode.confirm : _Mode.error;
+      });
+    } finally {
+      client.close();
+    }
+  }
+
   String _friendlyError(Object e) {
     if (e is PushRejectedException) {
       return 'The computer rejected this code. Pairing codes expire after '
@@ -200,6 +297,12 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
       return 'This vault uses an older key format (legacy vault). Unlock it '
           'once in the app to migrate, then try the backup again.';
     }
+    if (e is InvalidCipherTextException) {
+      return 'This backup was made from a different vault: its contents do '
+          'not decrypt under this phone\'s key. Restoring a backup onto a '
+          'fresh install is done from the welcome screen, before a vault '
+          'exists here.';
+    }
     return 'Something went wrong:\n$e';
   }
 
@@ -207,12 +310,16 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
     _teardownScanner();
     setState(() {
       _mode = _Mode.choose;
+      _flow = _Flow.push;
       _base = null;
       _token = null;
       _receiver = null;
+      _source = null;
       _snapshot = null;
       _progress = null;
       _report = null;
+      _rprogress = null;
+      _rreport = null;
       _error = null;
       _cancelled = false;
     });
@@ -329,13 +436,29 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
         icon: Icons.qr_code_scanner,
         title: 'Scan the QR code',
         subtitle: 'Point your camera at the desktop screen',
-        onTap: _enterScan,
+        onTap: _startPush,
       ),
       _tile(
         icon: Icons.keyboard,
         title: 'Type the address and code',
         subtitle: 'Enter what is shown under the QR code',
-        onTap: _enterManual,
+        onTap: () {
+          setState(() => _flow = _Flow.push);
+          _enterManual();
+        },
+      ),
+      const SizedBox(height: 24),
+      _sectionTitle('Restore'),
+      _hint(
+        'Pull an earlier backup from this computer back onto this phone. '
+        'The desktop must switch its session to "Restore to phone" first.',
+      ),
+      const SizedBox(height: 8),
+      _tile(
+        icon: Icons.settings_backup_restore,
+        title: 'Restore from this computer',
+        subtitle: 'Replaces what the backup contains; keeps the current key',
+        onTap: _startRestore,
       ),
       const SizedBox(height: 24),
       _sectionTitle('Know the risks'),
@@ -499,6 +622,7 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
   }
 
   List<Widget> _confirmChildren() {
+    if (_flow == _Flow.restore) return _confirmRestoreChildren();
     final receiver = _receiver;
     final files =
         ref.read(vaultNotifierProvider).value ?? const <VaultedFile>[];
@@ -529,7 +653,33 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
     ];
   }
 
+  List<Widget> _confirmRestoreChildren() {
+    final files =
+        ref.read(vaultNotifierProvider).value ?? const <VaultedFile>[];
+    final live = files.where((f) => !f.syncedDeleted).length;
+    return [
+      _sectionTitle('Confirm restore'),
+      _kv('Computer', '${_base!.host}:${_base!.port}${_computerName()}'),
+      _kv('In the backup', '${_source?.blobCount ?? 0} encrypted files'),
+      _kv('On this phone', '$live files'),
+      const SizedBox(height: 16),
+      _hint(
+        'What the backup contains REPLACES the matching files on this '
+        'phone; files not in the backup stay as they are. This phone\'s '
+        'unlock key is kept — the backup must come from this same vault.',
+      ),
+      const SizedBox(height: 16),
+      _primaryButton(
+        label: 'Restore now',
+        icon: Icons.settings_backup_restore,
+        onPressed: _restore,
+      ),
+      _textAction(label: 'Cancel', onTap: _reset),
+    ];
+  }
+
   List<Widget> _sendingChildren() {
+    if (_flow == _Flow.restore) return _restoringChildren();
     final p = _progress;
     final value = (p != null && p.total > 0) ? p.sent / p.total : null;
     return [
@@ -560,7 +710,38 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
     ];
   }
 
+  List<Widget> _restoringChildren() {
+    final p = _rprogress;
+    final value = (p != null && p.total > 0) ? p.restored / p.total : null;
+    return [
+      _sectionTitle('Restoring'),
+      const SizedBox(height: 16),
+      LinearProgressIndicator(
+        value: value,
+        minHeight: 6,
+        borderRadius: BorderRadius.circular(3),
+        color: context.accentColor,
+        backgroundColor: context.textTertiary.withValues(alpha: 0.2),
+      ),
+      const SizedBox(height: 12),
+      _hint(
+        p == null
+            ? 'Reading the backup\'s manifest…'
+            : (p.total == 0
+                ? 'The backup contains no files; finishing…'
+                : 'Restoring ${p.restored} of ${p.total} files · '
+                    '${_formatBytes(p.bytes)}'),
+      ),
+      const SizedBox(height: 8),
+      _textAction(
+        label: 'Cancel',
+        onTap: () => _cancelled = true,
+      ),
+    ];
+  }
+
   List<Widget> _doneChildren() {
+    if (_flow == _Flow.restore) return _doneRestoreChildren();
     final report = _report;
     return [
       _sectionTitle('Done'),
@@ -603,6 +784,47 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
         },
       ),
       _textAction(label: 'Pair with another computer', onTap: _reset),
+    ];
+  }
+
+  List<Widget> _doneRestoreChildren() {
+    final report = _rreport;
+    return [
+      _sectionTitle('Done'),
+      const SizedBox(height: 16),
+      Icon(Icons.check_circle, color: context.accentColor, size: 44),
+      const SizedBox(height: 12),
+      Center(
+        child: Text(
+          'Backup restored',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 16,
+            color: context.textPrimary,
+          ),
+        ),
+      ),
+      const SizedBox(height: 8),
+      _hint(
+        report == null || report.restored == 0
+            ? 'The backup contained no files to restore.'
+            : 'Restored ${report.restored} file(s)'
+                '${report.skipped > 0 ? ' (${report.skipped} were missing '
+                    'from the backup)' : ''} · '
+                '${_formatBytes(report.bytes)}.',
+      ),
+      const SizedBox(height: 4),
+      _hint(
+        'Your vault on this phone now matches the backup for everything '
+        'it contained.',
+      ),
+      const SizedBox(height: 16),
+      _primaryButton(
+        label: 'Done',
+        icon: Icons.check,
+        onPressed: () => Navigator.of(context).pop(),
+      ),
+      _textAction(label: 'Restore again', onTap: _restore),
     ];
   }
 
