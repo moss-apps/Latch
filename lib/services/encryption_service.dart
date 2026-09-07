@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' show log;
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -60,6 +61,7 @@ class EncryptionService {
   Uint8List? _cachedDecoyKey;
   String? _pendingCredential;
   String? _pendingDecoyCredential;
+  bool _restoredKeyNeedsRewrap = false;
 
   // memo keyed by salt:iterations — re-encrypt mints a new salt, so entries self-invalidate.
   final Map<String, Uint8List> _fileKeyCache = {};
@@ -82,12 +84,19 @@ class EncryptionService {
     _pool = null;
   }
 
-  /// Set pending credential for key unlocking (called by AuthService after verify/create)
-  void setPendingCredential(String credential, {bool isDecoy = false}) {
+  /// Set pending credential for key unlocking (called by AuthService after verify/create).
+  /// After a desktop-backup restore the key is still wrapped with the ORIGINAL
+  /// vault password; the first non-decoy credential set here re-wraps it with
+  /// this device's credential (one-shot).
+  Future<void> setPendingCredential(String credential, {bool isDecoy = false}) async {
     if (isDecoy) {
       _pendingDecoyCredential = credential;
-    } else {
-      _pendingCredential = credential;
+      return;
+    }
+    _pendingCredential = credential;
+    if (_restoredKeyNeedsRewrap && _cachedMasterKey != null) {
+      _restoredKeyNeedsRewrap = false;
+      await _wrapAndStoreKey(_cachedMasterKey!, credential, isDecoy: false);
     }
   }
 
@@ -324,6 +333,51 @@ class EncryptionService {
         'p': KeyDerivation.argon2Lanes,
       },
     };
+  }
+
+  /// Install a keybundle received during restore-before-setup (P6.3). The ONLY
+  /// path that installs a received keybundle. [originalPassword] is verified by
+  /// unwrapping first — a wrong password fails the GCM tag BEFORE anything is
+  /// written. On success the received bundle becomes this vault's key material
+  /// verbatim, and a one-shot re-wrap is armed so the credential chosen in the
+  /// resumed setup flow wraps the restored key for this device.
+  Future<Uint8List> installRestoredKeybundle(
+    Map<String, dynamic> bundle,
+    String originalPassword,
+  ) async {
+    final wrappedB64 = bundle['wrappedKey'] as String?;
+    final saltB64 = bundle['wrapSalt'] as String?;
+    final ivB64 = bundle['wrapIv'] as String?;
+    final params = bundle['argon2'] as Map<String, dynamic>?;
+    if (wrappedB64 == null || saltB64 == null || ivB64 == null || params == null) {
+      throw StateError('Malformed keybundle');
+    }
+
+    final t = (params['t'] as num?)?.toInt() ?? KeyDerivation.argon2Iterations;
+    final m = (params['m'] as num?)?.toInt() ?? (1 << KeyDerivation.argon2MemoryPowerOf2);
+    final p = (params['p'] as num?)?.toInt() ?? KeyDerivation.argon2Lanes;
+    final memoryPowerOf2 = (log(m) / log(2)).round();
+
+    final kwk = await KeyDerivation.argon2id(
+      originalPassword,
+      base64Decode(saltB64),
+      iterations: t,
+      memoryPowerOf2: memoryPowerOf2,
+      lanes: p,
+    );
+    final masterKey = KeyWrap.unwrap(base64Decode(wrappedB64), kwk, base64Decode(ivB64));
+
+    await _storage.write(key: _keyVersionKey, value: '1');
+    await _storage.write(key: _wrappedKeyKey, value: wrappedB64);
+    await _storage.write(key: _kwkSaltKey, value: saltB64);
+    await _storage.write(key: _kwkIvKey, value: ivB64);
+    // A fresh install may have parked a throwaway raw key; it is not the real
+    // key anymore once the restored bundle is installed.
+    await _storage.delete(key: _masterKeyKey);
+
+    _cachedMasterKey = masterKey;
+    _restoredKeyNeedsRewrap = true;
+    return masterKey;
   }
 
   /// Get or create decoy key (for decoy mode)
