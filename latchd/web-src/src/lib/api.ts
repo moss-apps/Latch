@@ -17,6 +17,11 @@ export interface StatusInfo {
   lastBackup: string | null
 }
 
+export interface UsbPending {
+  device: string
+  since: string
+}
+
 export interface PairInfo {
   active: boolean
   state: string
@@ -30,6 +35,8 @@ export interface PairInfo {
   served: number
   servedBytes: number
   lastError: string
+  usbPending: UsbPending | null
+  usbApproved: boolean
 }
 
 export class ApiError extends Error {

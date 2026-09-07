@@ -153,7 +153,12 @@ export function PairingView({
   unlocked: boolean
   onEnterMain: (unlocked: boolean, note?: string) => void
 }) {
-  const [creds, setCreds] = useState<{ host: string; token: string; url: string } | null>(null)
+  const [creds, setCreds] = useState<{
+    host: string
+    port: number
+    token: string
+    url: string
+  } | null>(null)
   const [veil, setVeil] = useState<Veil>(null)
   const [mode, setMode] = useState<SessionMode>("push")
   const [live, setLive] = useState<{ kind: LiveKind; text: string }>({
@@ -162,6 +167,8 @@ export function PairingView({
   })
   const [chipsEnabled, setChipsEnabled] = useState(false)
   const [cancelDisabled, setCancelDisabled] = useState(false)
+  const [usbPending, setUsbPending] = useState<{ device: string } | null>(null)
+  const [usbApproved, setUsbApproved] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const completeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -203,7 +210,9 @@ export function PairingView({
     if (d.active) {
       startedRef.current = true
       setChipsEnabled(true)
-      setCreds({ host: `${d.host}:${d.port}`, token: fmtCode(d.token), url: d.url })
+      setCreds({ host: `${d.host}:${d.port}`, port: d.port, token: fmtCode(d.token), url: d.url })
+      setUsbPending(d.usbPending ? { device: d.usbPending.device } : null)
+      setUsbApproved(d.usbApproved === true)
       if (m === "restore") {
         if (d.state === "receiving") {
           const served =
@@ -240,6 +249,8 @@ export function PairingView({
     }
 
     stopPoll()
+    setUsbPending(null)
+    setUsbApproved(false)
     if (m === "restore") {
       // Restore sessions have no completion signal; closed = stopped/error.
       if (startedRef.current) {
@@ -309,6 +320,8 @@ export function PairingView({
     })
     setVeil(null)
     setChipsEnabled(false)
+    setUsbPending(null)
+    setUsbApproved(false)
     api<PairInfo>("/api/pair/start", { mode: m })
       .then(pairApply)
       .catch((err: Error) => {
@@ -349,8 +362,13 @@ export function PairingView({
     }
   }, [creds])
 
-  function cancelPairing() {
-    setCancelDisabled(true)
+  // Back leaves the screen but keeps the session alive: re-entering
+  // re-adopts the same code (pair/start returns the active session).
+  function goBack() {
+    onEnterMain(unlockedRef.current)
+  }
+
+  function cancelPairing() {    setCancelDisabled(true)
     api("/api/pair/stop")
       .then(() => getJSON<PairInfo>("/api/pair/status"))
       .then((d) => {
@@ -372,11 +390,32 @@ export function PairingView({
     startPairing(modeRef.current)
   }
 
+  function allowUsb(allow: boolean) {
+    setUsbPending(null)
+    api<PairInfo>("/api/pair/allow", { allow })
+      .then(pairApply)
+      .catch(() => {
+        /* poll will re-show the prompt */
+      })
+  }
+
   const restore = mode === "restore"
   const steps = restore ? STEPS_RESTORE : STEPS_PUSH
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto grid w-full max-w-[1100px] gap-14 px-6 py-10 lg:grid-cols-[minmax(0,1fr)_380px] lg:py-16">
+      <div className="mx-auto w-full max-w-[1100px] px-6 py-10 lg:py-16">
+        {hasLocal && (
+          <button
+            type="button"
+            onClick={goBack}
+            aria-label="Back to files"
+            className="mb-6 inline-flex h-9 items-center gap-0.5 rounded-lg pr-3 pl-1.5 text-sm text-text2 transition-colors hover:bg-bg2 hover:text-text"
+          >
+            <Mi n="chevron_left" className="text-[20px]" />
+            Back
+          </button>
+        )}
+        <div className="grid gap-14 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="flex flex-col gap-6">
           <Logomark className="h-16 text-logo" />
           <div>
@@ -450,6 +489,44 @@ export function PairingView({
               </button>
             ))}
           </div>
+          {usbPending && (
+            <div
+              className="mb-4 rounded-xl border border-brand/30 bg-brand/10 p-4"
+              role="alert"
+            >
+              <p className="flex items-center gap-2 text-sm font-semibold text-text">
+                <Mi n="smartphone" className="text-[18px]" />
+                {usbPending.device} wants to connect over USB
+              </p>
+              <p className="mt-1 text-[13px] leading-relaxed text-text2">
+                Only allow this if you just tapped{" "}
+                <strong>Connect via USB</strong> on your phone.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <Button
+                  size="sm"
+                  className="h-8"
+                  onClick={() => allowUsb(true)}
+                >
+                  Allow once
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8"
+                  onClick={() => allowUsb(false)}
+                >
+                  Deny
+                </Button>
+              </div>
+            </div>
+          )}
+          {usbApproved && !usbPending && (
+            <p className="mb-4 flex items-center gap-2 rounded-xl bg-background p-3 text-[13px] text-text2">
+              <Mi n="check_circle" className="text-[16px]" />
+              USB phone approved — continue on your phone.
+            </p>
+          )}
           <div className="relative">
             <div className="grid place-items-center rounded-xl bg-white p-4">
               <canvas ref={canvasRef} width={200} height={200} role="img"
@@ -517,6 +594,64 @@ export function PairingView({
             </Button>
           </div>
 
+          <details className="group mt-4 rounded-xl bg-background p-3">
+            <summary className="cursor-pointer list-none text-sm font-medium text-text2 transition-colors hover:text-text [&::-webkit-details-marker]:hidden">
+              <span className="inline-flex items-center gap-1.5">
+                <Mi n="smartphone" className="text-[16px]" />
+                On a USB cable instead of Wi-Fi?
+                <span className="rounded-full border border-divider bg-card px-2 py-0.5 text-[12px] font-semibold text-brand group-open:hidden">
+                  Click here
+                </span>
+                <span className="hidden rounded-full border border-divider bg-card px-2 py-0.5 text-[12px] font-semibold text-brand group-open:inline">
+                  Hide
+                </span>
+              </span>
+            </summary>
+            <div className="mt-2 space-y-2 text-sm leading-relaxed text-text2">
+              <p>
+                Plug the phone in with USB debugging on, then run this on
+                this computer:
+              </p>
+              <div className="flex items-center justify-between gap-2 rounded-lg bg-card px-2.5 py-1.5">
+                <code className="truncate font-mono text-[13px] text-text">
+                  {creds
+                    ? `adb reverse tcp:${creds.port} tcp:${creds.port}`
+                    : "adb reverse tcp:<port> tcp:<port>"}
+                </code>
+                <CopyButton
+                  getValue={() =>
+                    getJSON<PairInfo>("/api/pair/status").then((d) =>
+                      d.active
+                        ? `adb reverse tcp:${d.port} tcp:${d.port}`
+                        : "",
+                    )
+                  }
+                  icon="link"
+                  label="Copy"
+                  disabled={!chipsEnabled}
+                />
+              </div>
+              <p>
+                Then on the phone tap <strong>Connect via USB</strong> and
+                tap <strong>Allow once</strong> here — no address, no code
+                to type.
+              </p>
+              <p>
+                Cable come loose mid-transfer? Plug back in, check{" "}
+                <span className="font-mono text-[13px] text-text">
+                  adb reverse --list
+                </span>{" "}
+                still shows the port (re-run the command if not), and tap{" "}
+                <strong>Connect via USB</strong> again. Typing the address
+                and code by hand still works as a fallback:{" "}
+                <span className="font-mono text-[13px] text-text">
+                  {creds ? `127.0.0.1:${creds.port}` : "127.0.0.1:<port>"}
+                </span>
+                .
+              </p>
+            </div>
+          </details>
+
           <p className="mt-4 flex items-center gap-2 text-sm text-text2" role="status" aria-live="polite">
             <span
               className={`size-2 shrink-0 rounded-full ${
@@ -540,6 +675,7 @@ export function PairingView({
           >
             {restore ? "Cancel restore session" : "Cancel pairing"}
           </button>
+        </div>
         </div>
       </div>
     </div>

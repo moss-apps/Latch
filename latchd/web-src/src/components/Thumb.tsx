@@ -3,28 +3,37 @@ import type { FileEntry } from "@/lib/api"
 import { thumbUrl } from "@/lib/api"
 import { Mi } from "@/components/Mi"
 import { typeSpec, typeColor } from "@/lib/glyphs"
+import { useShowThumbnails } from "@/lib/display"
 import { useTheme } from "@/lib/theme"
 
 // A tile shows either the server thumbnail (images) or the type glyph.
 // Nothing is cropped: images use object-contain so a portrait shows in full,
 // letterboxed on a fixed-aspect tile instead of being sliced to a square.
+// When iconsOnly is set (or the global "show thumbnails" pref is off),
+// every file renders its type glyph and no thumbnail is fetched.
 export function Thumb({
   file,
   boxClass,
   iconClass,
   aspect = "aspect-square",
   fit = "cover",
+  iconsOnly,
 }: {
   file: FileEntry
   boxClass?: string
   iconClass?: string
   aspect?: string
   fit?: "cover" | "contain"
+  iconsOnly?: boolean
 }) {
   const t = useTheme()
+  const showThumbs = useShowThumbnails()
+  const forceGlyph = iconsOnly ?? !showThumbs
   const isImage =
     file.type === "image" || (file.mimeType || "").startsWith("image/")
-  const [glyph, setGlyph] = useState(!isImage)
+  // Which file failed to thumbnail; resets per file so a retry isn't stuck.
+  const [failedId, setFailedId] = useState<string | null>(null)
+  const glyph = forceGlyph || !isImage || failedId === file.id
 
   if (glyph) {
     const st = typeSpec(file.type)
@@ -53,7 +62,7 @@ export function Thumb({
         className={`absolute inset-0 h-full w-full ${
           fit === "contain" ? "object-contain" : "object-cover"
         }`}
-        onError={() => setGlyph(true)}
+        onError={() => setFailedId(file.id)}
       />
     </div>
   )

@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch"
 import { api, ApiError } from "@/lib/api"
 import { fmtDate } from "@/lib/format"
 import { ACCENTS, setAccent, setTheme, useTheme } from "@/lib/theme"
+import { setShowThumbnails, useShowThumbnails } from "@/lib/display"
 
 interface SettingsDialogProps {
   open: boolean
@@ -34,6 +35,7 @@ export function SettingsDialog({
   onPairAgain,
 }: SettingsDialogProps) {
   const t = useTheme()
+  const showThumbs = useShowThumbnails()
 
   const [verify, setVerify] = useState<{ kind: StatusKind; text: string }>({
     kind: "",
@@ -182,6 +184,17 @@ export function SettingsDialog({
               aria-label="Dark mode"
             />
           </div>
+          <div className="flex items-center justify-between gap-3 px-1 py-1.5">
+            <span className="text-sm text-text2">Image thumbnails</span>
+            <Switch
+              checked={showThumbs}
+              onCheckedChange={(checked) => setShowThumbnails(checked)}
+              aria-label="Image thumbnails"
+            />
+          </div>
+          <p className="px-1 pb-1 text-xs leading-relaxed text-text3">
+            Off shows a file-type icon instead of the image preview.
+          </p>
           <div className="mt-2 flex flex-wrap gap-2.5 px-1 pb-2" role="radiogroup" aria-label="Accent color">
             {ACCENTS.map((a) => {
               const selected = a[0] === t.accentId
