@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { fmtSort, nextSort, parseSort, type SortKey, type SortSpec } from "@/lib/sort"
+import { setShowThumbnails, useShowThumbnails } from "@/lib/display"
 import { VIEWS } from "@/lib/views"
 
 const CHUNK = 200
@@ -89,6 +90,7 @@ export function BrowserPane({
   }, [list.length])
 
   const viewDef = VIEWS.find((v) => v.id === view)
+  const showThumbs = useShowThumbnails()
   const title = searching ? "Search results" : (viewDef?.label ?? "All files")
   const countText = searching
     ? `${list.length} match${list.length === 1 ? "" : "es"}`
@@ -132,6 +134,18 @@ export function BrowserPane({
         <h2 className="text-xl font-bold tracking-tight">{title}</h2>
         <span className="text-sm text-text3">{countText}</span>
         <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            aria-label={showThumbs ? "Show file-type icons instead of thumbnails" : "Show thumbnails instead of file-type icons"}
+            aria-pressed={!showThumbs}
+            title={showThumbs ? "Show file-type icons" : "Show thumbnails"}
+            className={`grid size-8 place-items-center rounded-[10px] border border-divider transition-colors ${
+              showThumbs ? "text-text3 hover:text-text2" : "bg-bg2 text-text"
+            }`}
+            onClick={() => setShowThumbnails(!showThumbs)}
+          >
+            <Mi n={showThumbs ? "image" : "insert_drive_file"} className="text-[18px]" />
+          </button>
           <Select
             value={fmtSort(sort)}
             onValueChange={(v) => onSortChange(parseSort(v))}

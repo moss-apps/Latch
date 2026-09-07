@@ -151,6 +151,16 @@ void main() {
       expect(token, goodToken);
     });
 
+    test('accepts loopback URL for USB-forwarded sessions', () {
+      final parsed =
+          DesktopPushClient.parsePairingUrl('http://127.0.0.1:7810/#$goodToken');
+      expect(parsed, isNotNull);
+      final (base, token) = parsed!;
+      expect(base.host, '127.0.0.1');
+      expect(base.port, 7810);
+      expect(token, goodToken);
+    });
+
     test('rejects missing token, wrong scheme, garbage', () {
       expect(DesktopPushClient.parsePairingUrl('http://1.2.3.4:1/#xyz'),
           isNull);

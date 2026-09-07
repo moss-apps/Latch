@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"net"
@@ -74,6 +75,7 @@ func Serve(addr, targetDir string) error {
 	mux.HandleFunc("/api/pair/start", s.handlePairStart)
 	mux.HandleFunc("/api/pair/stop", s.handlePairStop)
 	mux.HandleFunc("/api/pair/status", s.handlePairStatus)
+	mux.HandleFunc("/api/pair/allow", s.handlePairAllow)
 	mux.HandleFunc("/api/unlock", s.handleUnlock)
 	mux.HandleFunc("/api/lock", s.handleLock)
 	mux.HandleFunc("/api/status", s.handleStatus)
@@ -162,6 +164,17 @@ func (s *Session) handlePairStart(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusMethodNotAllowed, fmt.Errorf("POST only"))
 		return
 	}
+	// Optional {"mode":"restore"} body opens a restore session (the phone
+	// pulls the stored snapshot) instead of a push pairing.
+	mode := receiver.ModePush
+	if body, err := io.ReadAll(io.LimitReader(r.Body, 1<<10)); err == nil && len(body) > 0 {
+		var req struct {
+			Mode string `json:"mode"`
+		}
+		if json.Unmarshal(body, &req) == nil && req.Mode == receiver.ModeRestore {
+			mode = receiver.ModeRestore
+		}
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.recv != nil && s.recv.Active() {
@@ -178,9 +191,9 @@ func (s *Session) handlePairStart(w http.ResponseWriter, r *http.Request) {
 	}
 	// Prefer the fixed pairing port so a single firewall rule covers every
 	// session; fall back to ephemeral if it is taken.
-	recv, err := receiver.Start(s.target(), "0.0.0.0", pairingPort, onComplete)
+	recv, err := receiver.Start(s.target(), "0.0.0.0", pairingPort, mode, onComplete)
 	if err != nil {
-		recv, err = receiver.Start(s.target(), "0.0.0.0", 0, onComplete)
+		recv, err = receiver.Start(s.target(), "0.0.0.0", 0, mode, onComplete)
 	}
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, fmt.Errorf(
@@ -195,9 +208,9 @@ func (s *Session) handlePairStart(w http.ResponseWriter, r *http.Request) {
 			"to any port %d proto tcp` if the phone cannot connect",
 			subnet, recv.Port())
 	}
-	webuiLog.Printf("pairing session started: advertising http://%s:%d "+
+	webuiLog.Printf("pairing session started (%s mode): advertising http://%s:%d "+
 		"(LAN candidates: %s%s)",
-		lanIP(), recv.Port(), strings.Join(lanIPs(), ", "), fwHint)
+		mode, lanIP(), recv.Port(), strings.Join(lanIPs(), ", "), fwHint)
 	writeJSON(w, http.StatusOK, s.pairState(recv))
 }
 
@@ -235,12 +248,24 @@ func (s *Session) pairState(recv *receiver.Receiver) map[string]any {
 	st := recv.Stats()
 	active := recv.Active()
 	out := map[string]any{
-		"active":    active,
-		"state":     st.State,
-		"received":  st.Received,
-		"bytes":     st.Bytes,
-		"files":     st.Files,
-		"lastError": st.LastError,
+		"active":      active,
+		"state":       st.State,
+		"mode":        recv.Mode(),
+		"received":    st.Received,
+		"bytes":       st.Bytes,
+		"files":       st.Files,
+		"served":      st.Served,
+		"servedBytes": st.ServedBytes,
+		"lastError":   st.LastError,
+		"usbApproved": recv.UsbApproved(),
+	}
+	if pending := recv.UsbPending(); pending != nil {
+		out["usbPending"] = map[string]any{
+			"device": pending.Device,
+			"since":  pending.Since.Format(time.RFC3339),
+		}
+	} else {
+		out["usbPending"] = nil
 	}
 	if active {
 		ip := lanIP()
@@ -258,6 +283,37 @@ func (s *Session) handlePairStatus(w http.ResponseWriter, r *http.Request) {
 	if s.recv == nil {
 		writeJSON(w, http.StatusOK, map[string]any{"active": false})
 		return
+	}
+	writeJSON(w, http.StatusOK, s.pairState(s.recv))
+}
+
+// handlePairAllow records the desktop owner's verdict on a tap-to-approve
+// USB request: {"allow":true} hands the phone the session token,
+// {"allow":false} tells it it was denied.
+func (s *Session) handlePairAllow(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeErr(w, http.StatusMethodNotAllowed, fmt.Errorf("POST only"))
+		return
+	}
+	var req struct {
+		Allow bool `json:"allow"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<10)).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, fmt.Errorf("bad JSON: %w", err))
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.recv == nil || !s.recv.Active() {
+		writeErr(w, http.StatusGone, fmt.Errorf("no active pairing session"))
+		return
+	}
+	if req.Allow {
+		s.recv.UsbAllow()
+		webuiLog.Print("usb phone approved by the desktop owner")
+	} else {
+		s.recv.UsbDeny()
+		webuiLog.Print("usb phone denied by the desktop owner")
 	}
 	writeJSON(w, http.StatusOK, s.pairState(s.recv))
 }

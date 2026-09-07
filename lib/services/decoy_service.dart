@@ -124,7 +124,7 @@ class DecoyService {
       if (!RegExp(r'^[0-9]{6}$').hasMatch(pin)) return false;
 
       await _createHashedCredential(pin, _decoyPinSaltKey, _decoyPinKey, _decoyPinIterationsKey);
-      EncryptionService.instance.setPendingCredential(pin, isDecoy: true);
+      await EncryptionService.instance.setPendingCredential(pin, isDecoy: true);
 
       _cachedSettings = (_cachedSettings ?? const DecoySettings()).copyWith(
         hasPinSet: true,
@@ -144,7 +144,7 @@ class DecoyService {
       if (password.isEmpty) return false;
 
       await _createHashedCredential(password, _decoyPasswordSaltKey, _decoyPasswordKey, _decoyPasswordIterationsKey);
-      EncryptionService.instance.setPendingCredential(password, isDecoy: true);
+      await EncryptionService.instance.setPendingCredential(password, isDecoy: true);
 
       _cachedSettings = (_cachedSettings ?? const DecoySettings()).copyWith(
         hasPasswordSet: true,
@@ -161,14 +161,14 @@ class DecoyService {
   /// Verify decoy PIN
   Future<bool> verifyDecoyPin(String pin) async {
     final result = await _verifyCredential(pin, _decoyPinKey, _decoyPinSaltKey, _decoyPinIterationsKey);
-    if (result) EncryptionService.instance.setPendingCredential(pin, isDecoy: true);
+    if (result) await EncryptionService.instance.setPendingCredential(pin, isDecoy: true);
     return result;
   }
 
   /// Verify decoy password
   Future<bool> verifyDecoyPassword(String password) async {
     final result = await _verifyCredential(password, _decoyPasswordKey, _decoyPasswordSaltKey, _decoyPasswordIterationsKey);
-    if (result) EncryptionService.instance.setPendingCredential(password, isDecoy: true);
+    if (result) await EncryptionService.instance.setPendingCredential(password, isDecoy: true);
     return result;
   }
 

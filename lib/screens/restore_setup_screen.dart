@@ -1,57 +1,49 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:pointycastle/export.dart' show InvalidCipherTextException;
 
-import '../models/vaulted_file.dart';
-import '../providers/vault_providers.dart';
 import '../services/desktop_link/restore_controller.dart';
 import '../services/desktop_link/transfer_client.dart';
 import '../services/desktop_link/usb_link.dart';
+import '../services/encryption_service.dart';
 import '../services/vault_service.dart';
 import '../themes/app_colors.dart';
+import 'auth_method_selection_screen.dart';
 
-/// Desktop backup screen, flipped architecture (P6.1r).
-///
-/// The desktop's latchd web UI generates a one-time pairing code (QR +
-/// address + code) while its receiver is open. This screen accepts that
-/// code two equal ways, scanning the QR or typing the address and code,
-/// confirms what will be sent, and pushes the encrypted vault to the
-/// computer: key bundle first, missing blobs, manifest last. Centered
-/// max-width flat list layout so the screen looks identical on phones
-/// and tablets.
-class DesktopBackupScreen extends ConsumerStatefulWidget {
-  const DesktopBackupScreen({super.key});
+/// Restore-before-setup (P6.3, mode 2). Fresh install, no vault yet: the user
+/// scans the desktop's restore-session QR (or types address + code), types the
+/// ORIGINAL vault password to prove ownership — the received keybundle is
+/// unwrapped with it and installed as this device's key material — and the
+/// manifest + blobs are pulled into the fresh vault. Setup (PIN / password /
+/// biometric choice) resumes right after, and the chosen credential re-wraps
+/// the restored key.
+class RestoreSetupScreen extends StatefulWidget {
+  const RestoreSetupScreen({super.key});
 
   @override
-  ConsumerState<DesktopBackupScreen> createState() =>
-      _DesktopBackupScreenState();
+  State<RestoreSetupScreen> createState() => _RestoreSetupScreenState();
 }
 
-enum _Mode { choose, scan, manual, usb, checking, confirm, preparing, sending, done, error }
+enum _Mode { choose, scan, manual, usb, checking, confirm, restoring, done, error }
 
-enum _Flow { push, restore }
-
-class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
+class _RestoreSetupScreenState extends State<RestoreSetupScreen> {
   _Mode _mode = _Mode.choose;
-  _Flow _flow = _Flow.push;
   String? _error;
 
   Uri? _base;
   String? _token;
-  ReceiverInfo? _receiver;
   RestoreSourceInfo? _source;
-  DesktopVaultSnapshot? _snapshot;
-  DesktopPushProgress? _progress;
-  DesktopPushReport? _report;
-  RestoreProgress? _rprogress;
-  DesktopRestoreReport? _rreport;
+  Map<String, dynamic>? _keybundle;
+  RestoreProgress? _progress;
+  DesktopRestoreReport? _report;
   bool _cancelled = false;
   bool _enteredViaUsb = false;
   bool _usbFound = false;
 
   final _addrCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  final _passwordFocus = FocusNode();
   MobileScannerController? _scanner;
   String? _lastCode;
   DateTime _lastCodeAt = DateTime.fromMillisecondsSinceEpoch(0);
@@ -61,12 +53,11 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
     _teardownScanner();
     _addrCtrl.dispose();
     _codeCtrl.dispose();
+    _passwordCtrl.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
-  // Camera lifecycle: the controller exists only while the scan body is on
-  // screen. Disposal happens a frame later so the MobileScanner widget is
-  // unmounted first.
   void _teardownScanner() {
     final scanner = _scanner;
     if (scanner == null) return;
@@ -96,7 +87,7 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
     _connectUsb();
   }
 
-  // Tap-to-approve USB: probe the cable for a latchd session, wait for
+  // Tap-to-approve USB: probe the cable for a restore session, wait for
   // Allow on the computer, then join the normal check/confirm flow with
   // the received token. Nothing typed.
   Future<void> _connectUsb() async {
@@ -105,7 +96,7 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
       final label = await UsbLink.deviceLabel();
       if (!mounted) return;
       final (base, token) = await link.connect(
-        mode: _flow == _Flow.restore ? 'restore' : 'push',
+        mode: 'restore',
         deviceLabel: label,
         onSessionFound: () {
           if (mounted) setState(() => _usbFound = true);
@@ -117,7 +108,7 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
     } on UsbCancelledException {
       // Backed out; _reset already moved on.
     } catch (e) {
-      debugPrint('desktop backup: usb connect failed: $e');
+      debugPrint('restore setup: usb connect failed: $e');
       if (!mounted) return;
       setState(() {
         _error = _friendlyUsbError(e);
@@ -150,16 +141,6 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
     return _friendlyError(e);
   }
 
-  void _startPush() {
-    setState(() => _flow = _Flow.push);
-    _enterScan();
-  }
-
-  void _startRestore() {
-    setState(() => _flow = _Flow.restore);
-    _enterScan();
-  }
-
   void _note(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
@@ -179,8 +160,8 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
   void _beginSession(Uri base, String token) {
     _base = base;
     _token = token;
-    _receiver = null;
-    _snapshot = null;
+    _source = null;
+    _keybundle = null;
     _report = null;
     _cancelled = false;
     _teardownScanner();
@@ -204,139 +185,84 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
 
   Future<void> _check() async {
     setState(() => _mode = _Mode.checking);
-    if (_flow == _Flow.restore) {
-      final client = DesktopRestoreClient();
-      try {
-        final source = await client.check(base: _base!, token: _token!);
-        if (!mounted) return;
-        if (!source.isRestoreSession) {
-          setState(() {
-            _error = 'The computer is receiving a backup, not serving one. '
-                'In the latchd web UI switch the session to "Restore to '
-                'phone" and try again.';
-            _mode = _Mode.error;
-          });
-          return;
-        }
-        if (!source.hasManifest) {
-          setState(() {
-            _error = 'The computer has no backup to restore. Make a backup '
-                'first.';
-            _mode = _Mode.error;
-          });
-          return;
-        }
-        setState(() {
-          _source = source;
-          _mode = _Mode.confirm;
-        });
-      } catch (e) {
-        debugPrint('desktop backup: restore check failed: $e');
-        if (!mounted) return;
-        setState(() {
-          _error = _friendlyError(e);
-          _mode = _Mode.error;
-        });
-      } finally {
-        client.close();
-      }
-      return;
-    }
-    final client = DesktopPushClient();
+    final client = DesktopRestoreClient();
     try {
-      final receiver = await client.check(base: _base!, token: _token!);
+      final source = await client.check(base: _base!, token: _token!);
+      if (!source.isRestoreSession) {
+        _fail(
+          'The computer is receiving a backup, not serving one. In the '
+          'latchd web UI switch the session to "Restore to phone" and try '
+          'again.',
+        );
+        return;
+      }
+      if (!source.hasManifest) {
+        _fail('The computer has no backup to restore. Make a backup first.');
+        return;
+      }
+      if (!source.hasKeybundle) {
+        _fail('The backup on the computer has no unlock key, so it cannot '
+            'be restored onto a fresh install.');
+        return;
+      }
+      final keybundle = await client.fetchKeybundle(
+        base: _base!,
+        token: _token!,
+      );
+      if (keybundle == null) {
+        _fail('The computer no longer offers the unlock key. Restart the '
+            'restore session and try again.');
+        return;
+      }
       if (!mounted) return;
       setState(() {
-        _receiver = receiver;
+        _source = source;
+        _keybundle = keybundle;
         _mode = _Mode.confirm;
       });
     } catch (e) {
-      debugPrint('desktop backup: check failed: $e');
-      if (!mounted) return;
-      setState(() {
-        _error = _friendlyError(e);
-        _mode = _Mode.error;
-      });
+      debugPrint('restore setup: check failed: $e');
+      _fail(_friendlyError(e));
     } finally {
       client.close();
     }
   }
 
-  Future<void> _send() async {
-    if (_flow == _Flow.restore) return _restore();
-    setState(() => _mode = _Mode.preparing);
+  Future<void> _restore() async {
+    final password = _passwordCtrl.text;
+    if (password.isEmpty) {
+      _note('Type the vault password you used on your old device.');
+      return;
+    }
+    setState(() {
+      _progress = null;
+      _cancelled = false;
+      _mode = _Mode.restoring;
+    });
+    final client = DesktopRestoreClient();
+    final controller = RestoreController(
+      VaultService.instance.store,
+      EncryptionService.instance,
+    );
     try {
-      final snapshot = _snapshot ??
-          await DesktopVaultSnapshot.fromLiveVault(
-            files: ref.read(vaultNotifierProvider).value ?? const [],
-            crypto: ref.read(encryptionServiceProvider),
-            deviceId: await desktopLinkDeviceId(),
-          );
-      if (!mounted) return;
-      setState(() {
-        _snapshot = snapshot;
-        _progress = null;
-        _mode = _Mode.sending;
-      });
-      final client = DesktopPushClient();
-      final DesktopPushReport report;
-      try {
-        report = await client.push(
-          base: _base!,
-          token: _token!,
-          snapshot: snapshot,
-          onProgress: (p) {
-            if (mounted) setState(() => _progress = p);
-          },
-          isCancelled: () => _cancelled,
-        );
-      } finally {
-        client.close();
-      }
+      final report = await controller.restoreFresh(
+        client: client,
+        base: _base!,
+        token: _token!,
+        keybundle: _keybundle!,
+        originalPassword: password,
+        onProgress: (p) {
+          if (mounted) setState(() => _progress = p);
+        },
+        isCancelled: () => _cancelled,
+      );
       if (!mounted) return;
       setState(() {
         _report = report;
         _mode = _Mode.done;
       });
     } catch (e) {
-      debugPrint('desktop backup: push failed: $e');
-      if (!mounted) return;
-      setState(() {
-        _error = _friendlyError(e);
-        _mode = e is PushCancelledException ? _Mode.confirm : _Mode.error;
-      });
-    }
-  }
-
-  Future<void> _restore() async {
-    setState(() {
-      _rprogress = null;
-      _cancelled = false;
-      _mode = _Mode.sending;
-    });
-    final client = DesktopRestoreClient();
-    final controller = RestoreController(
-      VaultService.instance.store,
-      ref.read(encryptionServiceProvider),
-    );
-    try {
-      final report = await controller.restoreIntoVault(
-        client: client,
-        base: _base!,
-        token: _token!,
-        onProgress: (p) {
-          if (mounted) setState(() => _rprogress = p);
-        },
-        isCancelled: () => _cancelled,
-      );
-      if (!mounted) return;
-      setState(() {
-        _rreport = report;
-        _mode = _Mode.done;
-      });
-      ref.read(vaultNotifierProvider.notifier).loadFiles();
-    } catch (e) {
-      debugPrint('desktop backup: restore failed: $e');
+      debugPrint('restore setup: restore failed: $e');
       if (!mounted) return;
       setState(() {
         _error = _friendlyError(e);
@@ -347,11 +273,19 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
     }
   }
 
+  void _fail(String message) {
+    if (!mounted) return;
+    setState(() {
+      _error = message;
+      _mode = _Mode.error;
+    });
+  }
+
   String _friendlyError(Object e) {
     if (e is PushRejectedException) {
-      return 'The computer rejected this code. Pairing codes expire after '
-          'five idle minutes. Generate a new code on the desktop and scan it '
-          'again.';
+      return 'The computer rejected this code. Restore sessions expire '
+          'after five idle minutes. Generate a new code on the desktop and '
+          'scan it again.';
     }
     if (e is DesktopUnreachableException) {
       final where = _base == null ? '' : ' at ${_base!.host}:${_base!.port}';
@@ -368,18 +302,12 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
           'Reason: ${e.cause}\n\n'
           '$usb'
           'Check that the phone is on Wi-Fi (not mobile data) on the same '
-          'network as the computer, that pairing is still open in the '
-          'latchd web UI, and that no firewall is blocking the port.';
-    }
-    if (e is LegacyVaultException) {
-      return 'This vault uses an older key format (legacy vault). Unlock it '
-          'once in the app to migrate, then try the backup again.';
+          'network as the computer, that the restore session is still open '
+          'in the latchd web UI, and that no firewall is blocking the port.';
     }
     if (e is InvalidCipherTextException) {
-      return 'This backup was made from a different vault: its contents do '
-          'not decrypt under this phone\'s key. Restoring a backup onto a '
-          'fresh install is done from the welcome screen, before a vault '
-          'exists here.';
+      return 'That password does not unlock the backup. Type the vault '
+          'password you used on the device the backup came from.';
     }
     return 'Something went wrong:\n$e';
   }
@@ -388,16 +316,12 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
     _teardownScanner();
     setState(() {
       _mode = _Mode.choose;
-      _flow = _Flow.push;
       _base = null;
       _token = null;
-      _receiver = null;
       _source = null;
-      _snapshot = null;
+      _keybundle = null;
       _progress = null;
       _report = null;
-      _rprogress = null;
-      _rreport = null;
       _error = null;
       _cancelled = false;
       _enteredViaUsb = false;
@@ -405,10 +329,17 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
     });
   }
 
+  void _continueSetup() {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const AuthMethodSelectionScreen()),
+      (_) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Desktop Backup')),
+      appBar: AppBar(title: const Text('Restore from Desktop Backup')),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),
@@ -435,10 +366,8 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
         return _busyChildren('Checking the code…');
       case _Mode.confirm:
         return _confirmChildren();
-      case _Mode.preparing:
-        return _busyChildren('Preparing the backup…');
-      case _Mode.sending:
-        return _sendingChildren();
+      case _Mode.restoring:
+        return _restoringChildren();
       case _Mode.done:
         return _doneChildren();
       case _Mode.error:
@@ -509,71 +438,44 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
     return [
       _sectionTitle('Connect'),
       _hint(
-        'On your computer, open the latchd web UI and start pairing. '
-        'It shows a QR code plus an address and pairing code; use '
-        'either here. On a USB cable, Connect via USB needs no typing '
-        '— just approve on the computer.',
+        'On your computer, open the latchd web UI and switch the session '
+        'to "Restore to phone". It shows a QR code plus an address and '
+        'code; use either here. On a USB cable, Connect via USB needs no '
+        'typing — just approve on the computer.',
       ),
       const SizedBox(height: 8),
       _tile(
         icon: Icons.usb,
         title: 'Connect via USB',
         subtitle: 'Cable + approve on the computer, no typing',
-        onTap: () {
-          setState(() => _flow = _Flow.push);
-          _startUsb();
-        },
+        onTap: _startUsb,
       ),
       const SizedBox(height: 8),
       _tile(
         icon: Icons.qr_code_scanner,
         title: 'Scan the QR code',
         subtitle: 'Point your camera at the desktop screen',
-        onTap: _startPush,
+        onTap: _enterScan,
       ),
       _tile(
         icon: Icons.keyboard,
         title: 'Type the address and code',
         subtitle: 'Enter what is shown under the QR code',
-        onTap: () {
-          setState(() => _flow = _Flow.push);
-          _enterManual();
-        },
+        onTap: _enterManual,
       ),
       const SizedBox(height: 24),
-      _sectionTitle('Restore'),
+      _sectionTitle('What happens'),
       _hint(
-        'Pull an earlier backup from this computer back onto this phone. '
-        'The desktop must switch its session to "Restore to phone" first.',
-      ),
-      const SizedBox(height: 8),
-      _tile(
-        icon: Icons.settings_backup_restore,
-        title: 'Restore from this computer',
-        subtitle: 'Replaces what the backup contains; keeps the current key',
-        onTap: _startRestore,
-      ),
-      _tile(
-        icon: Icons.usb,
-        title: 'Restore over USB',
-        subtitle: 'Cable + approve on the computer, no typing',
-        onTap: () {
-          setState(() => _flow = _Flow.restore);
-          _startUsb();
-        },
-      ),
-      const SizedBox(height: 24),
-      _sectionTitle('Know the risks'),
-      _hint(
-        'Plain HTTP on your local network. Anyone on the same Wi-Fi '
-        'who grabs the code can copy the encrypted backup while '
-        'pairing is open. Only pair on networks you trust, and close '
-        'the pairing window on your computer when you are done.',
+        'The encrypted backup is copied to this phone, and its unlock key '
+        'becomes this device\'s vault key once you confirm it with the '
+        'ORIGINAL vault password. You then choose how to unlock the vault '
+        'here (PIN, password or biometrics) — that choice replaces the '
+        'old password on this device.',
       ),
       const SizedBox(height: 16),
       _hint(
-        'Pairing on the desktop closes automatically once the backup '
-        'completes, or after five idle minutes.',
+        'Plain HTTP on your local network. Only restore on networks you '
+        'trust, and close the session on your computer when you are done.',
       ),
     ];
   }
@@ -743,12 +645,6 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
     ];
   }
 
-  String _computerName() {
-    final host = _receiver?.host ?? '';
-    if (host.isEmpty || host == 'localhost') return '';
-    return ' · $host';
-  }
-
   Widget _kv(String label, String value) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
@@ -765,55 +661,36 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
   }
 
   List<Widget> _confirmChildren() {
-    if (_flow == _Flow.restore) return _confirmRestoreChildren();
-    final receiver = _receiver;
-    final files =
-        ref.read(vaultNotifierProvider).value ?? const <VaultedFile>[];
-    final live = files.where((f) => !f.syncedDeleted).length;
+    final source = _source;
     return [
       _sectionTitle('Confirm'),
-      _kv('Computer', '${_base!.host}:${_base!.port}${_computerName()}'),
+      _kv('Computer', '${_base!.host}:${_base!.port}'),
       _kv(
         'On the computer',
-        switch ((receiver?.hasManifest ?? false,
-            receiver?.blobCount ?? 0)) {
-          (false, 0) => 'no backup yet, this is the first one',
-          (true, var n) => 'an earlier backup exists '
-              '($n encrypted files stored)',
-          (_, var n) => '$n encrypted files from an interrupted pairing',
-        },
-      ),
-      _kv('On this phone', '$live files'),
-      const SizedBox(height: 16),
-      _hint(
-        'Only files missing on the computer are sent. The wrapped '
-        'unlock key travels with them; nobody on the network can read '
-        'the backup without your vault password.',
+        'a backup with ${source?.blobCount ?? 0} encrypted file(s)',
       ),
       const SizedBox(height: 16),
-      _primaryButton(label: 'Send backup', icon: Icons.backup, onPressed: _send),
-      _textAction(label: 'Cancel', onTap: _reset),
-    ];
-  }
-
-  List<Widget> _confirmRestoreChildren() {
-    final files =
-        ref.read(vaultNotifierProvider).value ?? const <VaultedFile>[];
-    final live = files.where((f) => !f.syncedDeleted).length;
-    return [
-      _sectionTitle('Confirm restore'),
-      _kv('Computer', '${_base!.host}:${_base!.port}${_computerName()}'),
-      _kv('In the backup', '${_source?.blobCount ?? 0} encrypted files'),
-      _kv('On this phone', '$live files'),
-      const SizedBox(height: 16),
+      _sectionTitle('Original vault password'),
       _hint(
-        'What the backup contains REPLACES the matching files on this '
-        'phone; files not in the backup stay as they are. This phone\'s '
-        'unlock key is kept — the backup must come from this same vault.',
+        'The password this vault used on the device the backup came from. '
+        'It is checked against the backup before anything is written; a '
+        'wrong password changes nothing.',
+      ),
+      const SizedBox(height: 8),
+      TextField(
+        controller: _passwordCtrl,
+        focusNode: _passwordFocus,
+        obscureText: true,
+        autocorrect: false,
+        enableSuggestions: false,
+        onSubmitted: (_) => _restore(),
+        decoration: const InputDecoration(
+          labelText: 'Vault password',
+        ),
       ),
       const SizedBox(height: 16),
       _primaryButton(
-        label: 'Restore now',
+        label: 'Restore backup',
         icon: Icons.settings_backup_restore,
         onPressed: _restore,
       ),
@@ -821,40 +698,8 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
     ];
   }
 
-  List<Widget> _sendingChildren() {
-    if (_flow == _Flow.restore) return _restoringChildren();
-    final p = _progress;
-    final value = (p != null && p.total > 0) ? p.sent / p.total : null;
-    return [
-      _sectionTitle('Sending'),
-      const SizedBox(height: 16),
-      LinearProgressIndicator(
-        value: value,
-        minHeight: 6,
-        borderRadius: BorderRadius.circular(3),
-        color: context.accentColor,
-        backgroundColor: context.textTertiary.withValues(alpha: 0.2),
-      ),
-      const SizedBox(height: 12),
-      _hint(
-        p == null
-            ? 'Counting what the computer is missing…'
-            : (p.total == 0
-                ? 'The computer already has everything; refreshing the '
-                    'manifest…'
-                : 'Sending ${p.sent} of ${p.total} files · '
-                    '${_formatBytes(p.bytes)}'),
-      ),
-      const SizedBox(height: 8),
-      _textAction(
-        label: 'Cancel',
-        onTap: () => _cancelled = true,
-      ),
-    ];
-  }
-
   List<Widget> _restoringChildren() {
-    final p = _rprogress;
+    final p = _progress;
     final value = (p != null && p.total > 0) ? p.restored / p.total : null;
     return [
       _sectionTitle('Restoring'),
@@ -869,9 +714,9 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
       const SizedBox(height: 12),
       _hint(
         p == null
-            ? 'Reading the backup\'s manifest…'
+            ? 'Checking the unlock key and counting files…'
             : (p.total == 0
-                ? 'The backup contains no files; finishing…'
+                ? 'The backup is empty; finishing…'
                 : 'Restoring ${p.restored} of ${p.total} files · '
                     '${_formatBytes(p.bytes)}'),
       ),
@@ -884,54 +729,7 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
   }
 
   List<Widget> _doneChildren() {
-    if (_flow == _Flow.restore) return _doneRestoreChildren();
     final report = _report;
-    return [
-      _sectionTitle('Done'),
-      const SizedBox(height: 16),
-      Icon(Icons.check_circle, color: context.accentColor, size: 44),
-      const SizedBox(height: 12),
-      Center(
-        child: Text(
-          'Backup sent',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-            color: context.textPrimary,
-          ),
-        ),
-      ),
-      const SizedBox(height: 8),
-      _hint(
-        report == null || report.pushed == 0
-            ? 'The computer already had everything; its backup is '
-                'up to date.'
-            : 'Sent ${report.pushed} new file(s)'
-                '${report.alreadyPresent > 0 ? ' (${report.alreadyPresent} '
-                    'were already there)' : ''} · '
-                '${_formatBytes(report.bytes)}.',
-      ),
-      const SizedBox(height: 4),
-      _hint(
-        'The computer is verifying the files now. Unlock it there with '
-        'your vault password to browse and export.',
-      ),
-      const SizedBox(height: 16),
-      _primaryButton(
-        label: 'Send again',
-        icon: Icons.refresh,
-        onPressed: () {
-          _snapshot = null;
-          _cancelled = false;
-          _send();
-        },
-      ),
-      _textAction(label: 'Pair with another computer', onTap: _reset),
-    ];
-  }
-
-  List<Widget> _doneRestoreChildren() {
-    final report = _rreport;
     return [
       _sectionTitle('Done'),
       const SizedBox(height: 16),
@@ -958,22 +756,21 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
       ),
       const SizedBox(height: 4),
       _hint(
-        'Your vault on this phone now matches the backup for everything '
-        'it contained.',
+        'One more step: choose how to unlock the vault on this phone. The '
+        'vault key stays wrapped with the original password until then.',
       ),
       const SizedBox(height: 16),
       _primaryButton(
-        label: 'Done',
-        icon: Icons.check,
-        onPressed: () => Navigator.of(context).pop(),
+        label: 'Continue setup',
+        icon: Icons.arrow_forward,
+        onPressed: _continueSetup,
       ),
-      _textAction(label: 'Restore again', onTap: _restore),
     ];
   }
 
   List<Widget> _errorChildren() {
     return [
-      _sectionTitle('Pairing failed'),
+      _sectionTitle('Restore failed'),
       const SizedBox(height: 8),
       Text(
         _error ?? 'Something went wrong.',
