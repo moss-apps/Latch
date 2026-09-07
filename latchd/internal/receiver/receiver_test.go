@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -361,6 +362,116 @@ func TestRestoreSessionServesBackup(t *testing.T) {
 			t.Fatalf("empty backup %s: %d, want 404", path, res.StatusCode)
 		}
 		res.Body.Close()
+	}
+}
+
+func TestUsbHelloApprove(t *testing.T) {
+	// Tap-to-approve: the phone announces itself without a token, waits,
+	// and picks up the session token once the desktop allows.
+	r, err := Start(backup.Target{Dir: t.TempDir()}, "127.0.0.1", 0, ModePush, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Stop("")
+	base := fmt.Sprintf("http://127.0.0.1:%d", r.Port())
+	client := &http.Client{}
+
+	hello := func(device, mode string) (int, map[string]string) {
+		t.Helper()
+		req, _ := http.NewRequest(http.MethodPost, base+"/usb-hello",
+			strings.NewReader(fmt.Sprintf(`{"device":%q,"mode":%q}`, device, mode)))
+		res, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		var out map[string]string
+		if err := jsonDecode(res.Body, &out); err != nil {
+			t.Fatal(err)
+		}
+		return res.StatusCode, out
+	}
+
+	if code, out := hello("Test Phone", ModePush); code != http.StatusOK || out["status"] != "pending" {
+		t.Fatalf("hello: %d %+v, want pending", code, out)
+	}
+	if p := r.UsbPending(); p == nil || p.Device != "Test Phone" {
+		t.Fatalf("pending: %+v", p)
+	}
+	// Re-polls stay pending without spamming new requests.
+	if code, out := hello("Test Phone", ModePush); code != http.StatusOK || out["status"] != "pending" {
+		t.Fatalf("re-poll: %d %+v", code, out)
+	}
+
+	// Wrong mode is rejected so the phone can say which tab to open.
+	if code, _ := hello("Test Phone", ModeRestore); code != http.StatusConflict {
+		t.Fatalf("mode mismatch: %d, want 409", code)
+	}
+
+	// Non-loopback callers learn nothing: bare 404, no pending change.
+	req, _ := http.NewRequest(http.MethodPost, "/usb-hello",
+		strings.NewReader(`{"device":"LAN stranger","mode":"push"}`))
+	req.RemoteAddr = "192.168.1.50:1234"
+	rec := httptest.NewRecorder()
+	r.handleUsbHello(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("LAN usb-hello: %d, want 404", rec.Code)
+	}
+	if p := r.UsbPending(); p == nil || p.Device != "Test Phone" {
+		t.Fatalf("LAN hello touched state: %+v", p)
+	}
+
+	// Allow hands over the session token, and the token works.
+	r.UsbAllow()
+	if p := r.UsbPending(); p != nil {
+		t.Fatalf("pending after allow: %+v", p)
+	}
+	code, out := hello("Test Phone", ModePush)
+	if code != http.StatusOK || out["status"] != "approved" || out["token"] != r.Token() {
+		t.Fatalf("approved: %d %+v", code, out)
+	}
+	infoReq, _ := http.NewRequest(http.MethodGet, base+"/info", nil)
+	infoReq.Header.Set("Authorization", "Bearer "+out["token"])
+	infoRes, err := client.Do(infoReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	infoRes.Body.Close()
+	if infoRes.StatusCode != http.StatusOK {
+		t.Fatalf("bearer /info with USB token: %d, want 200", infoRes.StatusCode)
+	}
+}
+
+func TestUsbHelloDeny(t *testing.T) {
+	r, err := Start(backup.Target{Dir: t.TempDir()}, "127.0.0.1", 0, ModeRestore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Stop("")
+	base := fmt.Sprintf("http://127.0.0.1:%d", r.Port())
+
+	hello := func() (int, map[string]string) {
+		t.Helper()
+		req, _ := http.NewRequest(http.MethodPost, base+"/usb-hello",
+			strings.NewReader(`{"device":"Test Phone","mode":"restore"}`))
+		res, err := (&http.Client{}).Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		var out map[string]string
+		if err := jsonDecode(res.Body, &out); err != nil {
+			t.Fatal(err)
+		}
+		return res.StatusCode, out
+	}
+
+	if code, out := hello(); code != http.StatusOK || out["status"] != "pending" {
+		t.Fatalf("hello: %d %+v, want pending", code, out)
+	}
+	r.UsbDeny()
+	if code, out := hello(); code != http.StatusForbidden || out["status"] != "denied" {
+		t.Fatalf("denied: %d %+v, want 403 denied", code, out)
 	}
 }
 

@@ -16,6 +16,13 @@
 //	GET  /manifest             stored manifest envelope (404 if absent)
 //	GET  /blob/<sha256>        one stored ciphertext blob (404 if absent)
 //
+// Either mode additionally serves the tap-to-approve USB handshake:
+//
+//	POST /usb-hello            {device, mode} → pending until the desktop
+//	                           owner taps Allow, then the session token.
+//	                           Loopback-only (i.e. via `adb reverse`);
+//	                           non-loopback callers get a bare 404.
+//
 // Every request carries `Authorization: Bearer <session token>`. The
 // listener closes on manifest completion (push), on Stop, or after the
 // idle timeout — never long-running. Restore sessions have no completion
@@ -99,8 +106,22 @@ type Receiver struct {
 	lastSeen time.Time
 	closed   bool
 
+	// Tap-to-approve USB state. A phone on the cable announces itself via
+	// /usb-hello (reachable without the token, but only from loopback —
+	// i.e. through `adb reverse`); the desktop owner taps Allow in the
+	// web UI and the phone picks up the session token. No typing.
+	usbPending     *UsbRequest
+	usbApproved    bool
+	usbDeniedUntil time.Time
+
 	onComplete func() // optional, called once when a push verifies
 	done       chan struct{}
+}
+
+// UsbRequest is a tap-to-approve request from a phone on the USB cable.
+type UsbRequest struct {
+	Device string    `json:"device"`
+	Since  time.Time `json:"since"`
 }
 
 var shaHex = regexp.MustCompile(`^[0-9a-f]{64}$`)
@@ -144,6 +165,10 @@ func Start(target backup.Target, host string, port int, mode string, onComplete 
 	mux.HandleFunc("/keybundle", r.gated(r.handleKeybundle))
 	mux.HandleFunc("/manifest", r.gated(r.handleManifest))
 	mux.HandleFunc("/blob/", r.gated(r.handleBlob))
+	// Deliberately ungated (the phone has no token yet) but loopback-only:
+	// over `adb reverse` the phone arrives as 127.0.0.1, while LAN callers
+	// get a 404 and learn nothing.
+	mux.HandleFunc("/usb-hello", r.handleUsbHello)
 	r.srv = &http.Server{Handler: mux}
 	go r.srv.Serve(ln)
 	go r.idleWatch()
@@ -303,6 +328,128 @@ func (r *Receiver) fail(state, msg string) {
 	r.stats.State = state
 	r.stats.LastError = msg
 	r.mu.Unlock()
+}
+
+// poke refreshes the idle deadline without changing session state.
+func (r *Receiver) poke() {
+	r.mu.Lock()
+	r.lastSeen = time.Now()
+	r.mu.Unlock()
+}
+
+// fromLoopback reports whether req arrived over loopback. Connections via
+// `adb reverse` are opened by the host adb server, so a phone on the cable
+// always looks like 127.0.0.1 — as does the desktop itself, which is
+// equally trusted here (it already owns the backup dir).
+func fromLoopback(req *http.Request) bool {
+	host, _, err := net.SplitHostPort(req.RemoteAddr)
+	if err != nil {
+		return false
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
+// UsbPending snapshots the current tap-to-approve request, if any.
+func (r *Receiver) UsbPending() *UsbRequest {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.usbPending == nil {
+		return nil
+	}
+	cp := *r.usbPending
+	return &cp
+}
+
+// UsbApproved reports whether the desktop owner already tapped Allow.
+func (r *Receiver) UsbApproved() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.usbApproved
+}
+
+// UsbAllow approves the pending USB request (web UI "Allow once").
+// Idempotent: allowing twice keeps the session approved.
+func (r *Receiver) UsbAllow() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.usbPending = nil
+	r.usbApproved = true
+	r.lastSeen = time.Now()
+}
+
+// UsbDeny rejects the pending USB request. Hellos during the cooldown get
+// an explicit denial instead of silently re-creating the prompt.
+func (r *Receiver) UsbDeny() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.usbPending = nil
+	r.usbDeniedUntil = time.Now().Add(time.Minute)
+}
+
+// handleUsbHello serves the tap-to-approve handshake for phones on the USB
+// cable: POST {"device","mode"} → pending until the desktop allows, then
+// the session token. Loopback-only; anything else gets a bare 404.
+func (r *Receiver) handleUsbHello(w http.ResponseWriter, req *http.Request) {
+	if !fromLoopback(req) {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not found"})
+		return
+	}
+	if req.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "POST only"})
+		return
+	}
+	var hello struct {
+		Device string `json:"device"`
+		Mode   string `json:"mode"`
+	}
+	if err := json.NewDecoder(io.LimitReader(req.Body, 1<<10)).Decode(&hello); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad JSON"})
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.closed {
+		writeJSON(w, http.StatusGone, map[string]string{"error": "session closed"})
+		return
+	}
+	if hello.Mode != "" && hello.Mode != r.mode {
+		writeJSON(w, http.StatusConflict, map[string]string{
+			"error": fmt.Sprintf(
+				"the computer is in %q mode — switch its session to %q and try again",
+				r.mode, hello.Mode),
+		})
+		return
+	}
+	if !r.usbDeniedUntil.IsZero() && time.Now().Before(r.usbDeniedUntil) {
+		writeJSON(w, http.StatusForbidden, map[string]string{
+			"status": "denied",
+			"error":  "denied on the computer — tap Connect via USB on the phone to ask again",
+		})
+		return
+	}
+	if r.usbApproved {
+		writeJSON(w, http.StatusOK, map[string]string{
+			"status": "approved", "token": r.token,
+		})
+		return
+	}
+	device := strings.TrimSpace(hello.Device)
+	if device == "" {
+		device = "USB phone"
+	}
+	if len(device) > 80 {
+		device = device[:80]
+	}
+	if r.usbPending == nil {
+		r.usbPending = &UsbRequest{Device: device, Since: time.Now()}
+		lg.Printf("usb approval requested by %q (%s mode) — waiting for Allow in the web UI",
+			device, r.mode)
+	} else {
+		r.usbPending.Device = device
+	}
+	r.lastSeen = time.Now()
+	writeJSON(w, http.StatusOK, map[string]string{"status": "pending"})
 }
 
 func (r *Receiver) handleInfo(w http.ResponseWriter, req *http.Request) {
