@@ -274,7 +274,7 @@ Two modes, same data:
 | P6.0 | This document | `docs/desktop_backup.md` | Done |
 | P6.1 | ~~Phone: `TransferServer` + QR screen~~ → **r**: phone push client + scanner screen | `lib/services/desktop_link/transfer_client.dart`, `lib/screens/desktop_backup_screen.dart`, `pubspec.yaml` (−`qr_flutter`, +`mobile_scanner`) | Done (flipped) |
 | P6.2 | ~~Companion puller~~ → **r**: companion pairing receiver + QR web UI + unlock-after-push, `verify`, browse-after-unlock, export-decrypted | `latchd/` (Go module: `cmd/latchd`, `internal/{receiver,backup,cryptoutil,webui}`, React web UI built from `web-src/` into `web/` via `go:embed`, vendored QR encoder) | Done (flipped) |
-| P6.3 | Restore both modes (GET set + restore sessions; phone-side pre-vault pull); first-run entry point | `latchd/internal/receiver` (GET set), phone `desktop_link/restore_controller.dart`, first-run flow | Planned |
+| P6.3 | Restore both modes (GET set + restore sessions; phone-side pre-vault pull); first-run entry point | `latchd/internal/receiver` (GET set), phone `desktop_link/restore_controller.dart`, first-run flow | Done |
 | P6.4 | USB transport: `adb forward` hint in web UI + manual-code path on phone | web UI copy, phone manual entry | Planned |
 | P6.5 | Polish: snapshot retention (dated manifests), scheduled backup reminders, orphan reaping report | `latchd/`, phone settings | Deferred |
 
@@ -298,6 +298,9 @@ latchd/internal/cryptoutil/                         argon2id unwrap, GCM, PBKDF2
 latchd/internal/webui/                              loopback UI + file/thumb API server [P6.2r]
 latchd/web-src/                                     React+Vite source for the web UI (builds into web/, dist committed) [P6.2r]
 latchd/internal/webui/web/vendor/qrcode.js         vendored QR encoder (MIT, qrcode-generator) [P6.2r]
+lib/services/desktop_link/restore_controller.dart  restore client + import (both modes) [P6.3]
+lib/screens/restore_setup_screen.dart              first-run restore (scan → password) [P6.3]
+test/desktop_restore_test.dart                      e2e: push → wipe → restore → unlock [P6.3]
 ```
 
 Removed by the flip: `lib/services/desktop_link/transfer_server.dart`,
@@ -359,6 +362,9 @@ check:
    surface.
 5. **Where restore-before-setup lives in first-run:** replacing the
    auth-method selection flow vs a button beside it. UX call, P6.3.
+   **Decided (P6.3):** button beside the auth-method cards —
+   "Restore from desktop backup" on `AuthMethodSelectionScreen` pushes
+   `RestoreSetupScreen`; setup resumes after the restore completes.
 6. **`BackupService` ZIP coexistence:** kept deliberately (decided). Revisit
    its `_passwords_index.json` inclusion as a hardening item — it writes
    the password-store index verbatim into the decrypted ZIP.
