@@ -244,7 +244,7 @@ class SyncService {
           // Blob does not match the authenticated manifest → tamper/corruption.
           throw StateError('Blob hash mismatch for remote entry ${e.id}');
         }
-        final vp = _localVaultPath(vaultRoot: vaultRoot, entry: e);
+        final vp = vaultPathFor(vaultRoot: vaultRoot, entry: e);
         await File(vp).parent.create(recursive: true);
         await File(vp).writeAsBytes(blob);
         final existingIdx = refreshed.indexWhere((f) => f.id == e.id);
@@ -253,9 +253,9 @@ class SyncService {
           if (old.vaultPath != vp) {
             await _deleteIfExists(old.vaultPath);
           }
-          refreshed[existingIdx] = _vaultedFileFromEntry(e, vaultPath: vp);
+          refreshed[existingIdx] = vaultedFileFromEntry(e, vaultPath: vp);
         } else {
-          refreshed.add(_vaultedFileFromEntry(e, vaultPath: vp));
+          refreshed.add(vaultedFileFromEntry(e, vaultPath: vp));
         }
         pulled++;
         done++;
@@ -490,7 +490,7 @@ class SyncService {
   /// Destination vault path for a pulled blob. subdir by type (mirrors
   /// VaultStore), filename derived from the content hash (deterministic +
   /// dedup-friendly) with the original extension preserved.
-  static String _localVaultPath({
+  static String vaultPathFor({
     required String vaultRoot,
     required ManifestEntry entry,
   }) {
@@ -505,7 +505,7 @@ class SyncService {
 
   /// Reconstruct a [VaultedFile] from a manifest entry at [vaultPath]. The
   /// inverse of [buildManifest]'s per-file mapping.
-  static VaultedFile _vaultedFileFromEntry(
+  static VaultedFile vaultedFileFromEntry(
     ManifestEntry e, {
     required String vaultPath,
   }) {

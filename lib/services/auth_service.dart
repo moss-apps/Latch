@@ -67,7 +67,7 @@ class AuthService {
       await _createHashedCredential(password, _passwordSaltKey, _passwordHashKey, _passwordIterationsKey);
       await _storage.write(key: _firstTimeKey, value: 'false');
       await _storage.write(key: _authMethodKey, value: 'password');
-      EncryptionService.instance.setPendingCredential(password);
+      await EncryptionService.instance.setPendingCredential(password);
 
       return true;
     } catch (e) {
@@ -85,7 +85,7 @@ class AuthService {
       await _createHashedCredential(pin, _pinSaltKey, _pinHashKey, _pinIterationsKey);
       await _storage.write(key: _firstTimeKey, value: 'false');
       await _storage.write(key: _authMethodKey, value: 'pin');
-      EncryptionService.instance.setPendingCredential(pin);
+      await EncryptionService.instance.setPendingCredential(pin);
 
       return true;
     } catch (e) {
@@ -96,7 +96,7 @@ class AuthService {
   /// Verify the provided PIN against stored hash
   Future<bool> verifyPIN(String pin) async {
     if (await _verifyCredential(pin, _pinHashKey, _pinSaltKey, _pinIterationsKey)) {
-      EncryptionService.instance.setPendingCredential(pin);
+      await EncryptionService.instance.setPendingCredential(pin);
       return true;
     }
     return _verifyCredential(pin, _backupPinHashKey, _backupPinSaltKey, _backupPinIterationsKey);
@@ -104,7 +104,7 @@ class AuthService {
 
   Future<bool> verifyPassword(String password) async {
     if (await _verifyCredential(password, _passwordHashKey, _passwordSaltKey, _passwordIterationsKey)) {
-      EncryptionService.instance.setPendingCredential(password);
+      await EncryptionService.instance.setPendingCredential(password);
       return true;
     }
     return _verifyCredential(password, _backupPasswordHashKey, _backupPasswordSaltKey, _backupPasswordIterationsKey);
