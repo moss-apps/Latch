@@ -1,0 +1,95 @@
+name: Release latchd
+
+# Prebuilt latchd companions so users can run Latch Web without cloning
+# the repo (docs/desktop_backup.md, open decision 2). The web UI dist is
+# committed, so this is a pure Go build — no Node toolchain.
+on:
+  push:
+    tags: ['latchd-v*']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+          cache-dependency-path: latchd/go.sum
+      - run: go test ./...
+        working-directory: latchd
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { goos: linux, goarch: amd64 }
+          - { goos: linux, goarch: arm64 }
+          - { goos: windows, goarch: amd64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+          cache-dependency-path: latchd/go.sum
+      - name: Build
+        working-directory: latchd
+        env:
+          CGO_ENABLED: 0
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          version="${GITHUB_REF_NAME#latchd-v}"
+          ext=""
+          if [ "$GOOS" = windows ]; then ext=".exe"; fi
+          go build -trimpath -ldflags "-s -w -X main.version=$version" \
+            -o "../latchd-$GOOS-$GOARCH$ext" ./cmd/latchd
+      - uses: actions/upload-artifact@v4
+        with:
+          name: latchd-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: latchd-*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: cd dist && sha256sum latchd-* > SHA256SUMS
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          body: |
+            Latch desktop backup companion ("Latch Web") — hosts the local
+            web UI the phone pairs with to push encrypted vault backups.
+            Nothing leaves your machine: the UI binds loopback only.
+
+            ## Linux
+
+            ```
+            curl -fsSL https://raw.githubusercontent.com/moss-apps/Latch/main/scripts/install-latchd.sh | bash
+            latchd serve
+            ```
+
+            Or grab `latchd-linux-amd64` / `latchd-linux-arm64` directly.
+
+            ## Windows
+
+            Download `latchd-windows-amd64.exe`, then:
+
+            ```
+            .\latchd-windows-amd64.exe serve
+            ```
+
+            Open http://127.0.0.1:7800, start a pairing session, and scan
+            the QR from Latch → Settings → Storage → Desktop Backup.
