@@ -70,7 +70,7 @@ verify, restore, and export-decrypt a backup. No repo clone, no toolchain:
 **Linux**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/moss-apps/Latch/main/scripts/install-latchd.sh | bash
+curl -fsSL https://raw.githubusercontent.com/moss-apps/Latch/HEAD/scripts/install-latchd.sh | bash
 ```
 
 **Windows**

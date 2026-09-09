@@ -84,7 +84,7 @@ jobs:
             **Linux**
 
             ```
-            curl -fsSL https://raw.githubusercontent.com/moss-apps/Latch/main/scripts/install-latchd.sh | sh
+            curl -fsSL https://raw.githubusercontent.com/moss-apps/Latch/HEAD/scripts/install-latchd.sh | sh
             latchd serve
             ```
 

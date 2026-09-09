@@ -3,9 +3,9 @@
 # so users can host Latch Web without cloning the repo.
 #
 # Usage:
-#	curl -fsSL https://raw.githubusercontent.com/moss-apps/Latch/main/scripts/install-latchd.sh | sh
+#	curl -fsSL https://raw.githubusercontent.com/moss-apps/Latch/HEAD/scripts/install-latchd.sh | sh
 #
-# Overrides: LATCHD_REPO, LATCHD_VERSION (a latchd-v* tag), LATCHD_BINDIR.
+# Overrides: LATCHD_REPO, LATCHD_VERSION (an app-version tag, e.g. 0.18.0-beta.1), LATCHD_BINDIR.
 set -eu
 
 REPO="${LATCHD_REPO:-moss-apps/Latch}"
