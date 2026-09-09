@@ -190,6 +190,17 @@ final filesByTagProvider =
   return vaultService.sortFiles(files, sortOption);
 });
 
+/// Provider for files with no tags
+final untaggedFilesProvider = FutureProvider<List<VaultedFile>>((ref) async {
+  // ponytail: depend on the vault list so tag changes invalidate this too
+  ref.watch(vaultNotifierProvider);
+  final vaultService = ref.watch(vaultServiceProvider);
+  final sortOption = ref.watch(sortOptionProvider);
+
+  final files = await vaultService.getUntaggedFiles();
+  return vaultService.sortFiles(files, sortOption);
+});
+
 /// Provider for favorite files
 final favoriteFilesProvider = FutureProvider<List<VaultedFile>>((ref) async {
   // ponytail: depend on the vault list so deletes/imports invalidate this too
