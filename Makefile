@@ -55,8 +55,9 @@ clean:
 ## latchd pulls the encrypted vault from the phone into latch-backup/.
 LATCHD_MODULE := latchd
 LATCHD_BIN    := latchd/latchd
-## Release version: the nearest latchd-v* tag, else "dev".
-LATCHD_VERSION ?= $(shell v=$$(git describe --tags --match 'latchd-v*' 2>/dev/null | sed 's/^latchd-v//'); echo $${v:-dev})
+## Release version: the app-version tag at HEAD (0.x.y-beta.z, same as
+## mobile), else "dev". Exact match so dirty checkouts never stamp.
+LATCHD_VERSION ?= $(shell v=$$(git describe --tags --exact-match --match '0.*' 2>/dev/null); echo $${v:-dev})
 
 .PHONY: latchd-test latchd-web latchd-release clean-latchd
 

@@ -27,7 +27,8 @@ import (
 
 const defaultDir = "latch-backup"
 
-// version is stamped at release time: -ldflags "-X main.version=<latchd-v tag>".
+// version is stamped at release time from the app-version tag:
+// -ldflags "-X main.version=0.18.0-beta.1" (mirrors the mobile release).
 var version = "dev"
 
 func main() {

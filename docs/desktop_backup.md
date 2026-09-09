@@ -365,9 +365,11 @@ check:
    **Decided (2026-09):** GitHub Releases prebuilt binaries
    (`latchd-linux-amd64`, `latchd-linux-arm64`,
    `latchd-windows-amd64.exe`) built by
-   `.github/workflows/release-latchd.yml` on `latchd-v*` tags, plus
-   `scripts/install-latchd.sh` for one-line Linux installs. Source
-   builds stay available via `make latchd`.
+   `.github/workflows/release-latchd.yml` on app-version tags
+   (`0.x.y-beta.z`, same number as the mobile release — the app itself
+   ships via Google Play, so the release carries latchd instead of an
+   APK), plus `scripts/install-latchd.sh` for one-line Linux installs.
+   Source builds stay available via `make latchd`.
 3. **Web UI tech:** hand-rolled static HTML/JS with `go:embed` (no build
    toolchain) vs a tiny framework SPA. Default: static, revisit if the
    browse UI grows.

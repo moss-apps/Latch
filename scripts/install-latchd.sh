@@ -30,10 +30,15 @@ esac
 command -v curl >/dev/null 2>&1 || fail "curl is required"
 
 if [ -z "$VERSION" ]; then
+	# Release tags carry the mobile version (0.x.y-beta.z); old prefixed
+	# tags (Latch-*, v*, latchd-*) start with a letter and never match.
+	# grep -o keeps document order regardless of compact/pretty JSON.
 	VERSION=$(curl -fsSL "https://api.github.com/repos/$REPO/releases?per_page=100" |
-		sed -n 's/.*"tag_name": *"\(latchd-v[^"]*\)".*/\1/p' | head -n 1)
+		grep -o '"tag_name": *"[^"]*"' |
+		sed -n 's/^"tag_name": *"\([0-9][^"]*\)"$/\1/p' |
+		head -n 1)
 fi
-[ -n "$VERSION" ] || fail "no latchd release found in $REPO (looked for latchd-v* tags)"
+[ -n "$VERSION" ] || fail "no release found in $REPO (looked for 0.* version tags)"
 
 asset="latchd-$os-$arch"
 base="https://github.com/$REPO/releases/download/$VERSION"
