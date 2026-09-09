@@ -106,3 +106,35 @@ jobs:
             **Latch app:** public on
             [Google Play](https://play.google.com/store/apps/details?id=com.mossapps.locker) —
             the release no longer attaches an APK.
+
+  # Post-release smoke: download the shipped asset like a user would,
+  # checksum it, and prove `serve` answers on the loopback UI. Runs the
+  # real artifact on the real OS — the windows job is our Windows test.
+  smoke:
+    needs: release
+    strategy:
+      matrix:
+        include:
+          - { os: ubuntu-latest, asset: latchd-linux-amd64 }
+          - { os: windows-latest, asset: latchd-windows-amd64.exe }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Download and checksum
+        shell: bash
+        run: |
+          base="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}"
+          curl -fsSL -o "$RUNNER_TEMP/${{ matrix.asset }}" "$base/${{ matrix.asset }}"
+          curl -fsSL -o "$RUNNER_TEMP/SHA256SUMS" "$base/SHA256SUMS"
+          cd "$RUNNER_TEMP"
+          grep " ${{ matrix.asset }}\$" SHA256SUMS | sha256sum -c -
+      - name: Serve smoke test
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP"
+          ./${{ matrix.asset }} --version
+          ./${{ matrix.asset }} serve &
+          pid=$!
+          curl -fsS --retry 10 --retry-connrefused --retry-delay 1 \
+            http://127.0.0.1:7800/api/status
+          curl -fsS -o /dev/null http://127.0.0.1:7800/
+          kill $pid 2>/dev/null || true
