@@ -25,6 +25,7 @@ import '../widgets/floating_capsule_bottom_bar.dart';
 import '../widgets/file_info_sheet.dart';
 import '../widgets/office_conversion_confirm_dialog.dart';
 import '../widgets/per_file_encryption_sheet.dart';
+import '../widgets/add_tags_sheet.dart';
 import 'albums_screen.dart';
 import 'favorites_screen.dart';
 import 'tags_screen.dart';
@@ -800,6 +801,8 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
         final selectedFiles = ref.watch(selectedFilesProvider);
         final isSelectionMode = ref.watch(isSelectionModeProvider);
         final isSelected = selectedFiles.contains(file.id);
+        final tapOpensMedia =
+            ref.watch(vaultSettingsProvider).value?.tapOpensMedia ?? true;
 
         final isPressed = _pressedFileId == file.id;
 
@@ -811,6 +814,8 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
             onTap: () {
               if (isSelectionMode) {
                 _toggleSelection(file.id);
+              } else if (tapOpensMedia) {
+                _openFile(file);
               } else {
                 _showMediaHoldActionSheet(file);
               }
@@ -2465,250 +2470,11 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
   }
 
   void _showAddTagsSheet(Set<String> selectedFiles) {
-    final tagController = TextEditingController();
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => Consumer(
-        builder: (context, ref, _) {
-          final tagsAsync = ref.watch(tagsProvider);
-
-          return Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom,
-            ),
-            child: Container(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.7,
-              ),
-              decoration: BoxDecoration(
-                color: context.backgroundColor,
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    margin: const EdgeInsets.only(top: 12),
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: context.borderColor,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Add Tags',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: context.textPrimary,
-                            fontFamily: 'ProductSans',
-                          ),
-                        ),
-                        Text(
-                          '${selectedFiles.length} file(s) selected',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: context.textSecondary,
-                            fontFamily: 'ProductSans',
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextField(
-                          controller: tagController,
-                          decoration: InputDecoration(
-                            hintText: 'Create new tag',
-                            hintStyle: TextStyle(
-                              fontFamily: 'ProductSans',
-                              color: context.textTertiary,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide:
-                                  BorderSide(color: context.accentColor),
-                            ),
-                            prefixIcon: Icon(Icons.label_outline,
-                                color: AppColors.lightTextSecondary),
-                            suffixIcon: IconButton(
-                              icon: Icon(Icons.add, color: context.accentColor),
-                              tooltip: 'Add tag',
-                              onPressed: () async {
-                                final tag = tagController.text.trim();
-                                if (tag.isEmpty) return;
-
-                                // Create tag if it doesn't exist
-                                final vaultService =
-                                    ref.read(vaultServiceProvider);
-                                await vaultService.createTag(tag);
-
-                                for (final fileId in selectedFiles) {
-                                  await ref
-                                      .read(vaultNotifierProvider.notifier)
-                                      .addTag(fileId, tag);
-                                }
-
-                                if (!context.mounted) return;
-                                Navigator.pop(context);
-                                ref.invalidate(tagsProvider);
-                                ToastUtils.showSuccess('Tag added');
-                                _exitSelectionMode();
-                              },
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Existing Tags',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: context.textTertiary,
-                            fontFamily: 'ProductSans',
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        tagsAsync.when(
-                          loading: () => const Padding(
-                            padding: EdgeInsets.all(16),
-                            child: Center(
-                              child: SizedBox(
-                                width: 20,
-                                height: 20,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              ),
-                            ),
-                          ),
-                          error: (_, __) => Text(
-                            'Failed to load tags',
-                            style: TextStyle(
-                              fontFamily: 'ProductSans',
-                              color: context.textSecondary,
-                            ),
-                          ),
-                          data: (tags) {
-                            if (tags.isEmpty) {
-                              return Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 16),
-                                child: Center(
-                                  child: Text(
-                                    'No tags yet. Create one above!',
-                                    style: TextStyle(
-                                      fontFamily: 'ProductSans',
-                                      color: context.textTertiary,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }
-                            return Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: tags
-                                  .map((tag) => ActionChip(
-                                        avatar: Container(
-                                          width: 12,
-                                          height: 12,
-                                          decoration: BoxDecoration(
-                                            color: Color(tag.colorValue),
-                                            shape: BoxShape.circle,
-                                          ),
-                                        ),
-                                        label: Text(
-                                          tag.name,
-                                          style: const TextStyle(
-                                            fontFamily: 'ProductSans',
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                        onPressed: () async {
-                                          for (final fileId in selectedFiles) {
-                                            await ref
-                                                .read(vaultNotifierProvider
-                                                    .notifier)
-                                                .addTag(fileId, tag.name);
-                                          }
-
-                                          if (!context.mounted) return;
-                                          Navigator.pop(context);
-                                          ref.invalidate(tagsProvider);
-                                          ToastUtils.showSuccess('Tag added');
-                                          _exitSelectionMode();
-                                        },
-                                      ))
-                                  .toList(),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Quick Tags',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: context.textTertiary,
-                            fontFamily: 'ProductSans',
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: predefinedTags
-                              .map((tag) => ActionChip(
-                                    label: Text(
-                                      tag,
-                                      style: const TextStyle(
-                                        fontFamily: 'ProductSans',
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                    onPressed: () async {
-                                      // Create tag if doesn't exist
-                                      final vaultService =
-                                          ref.read(vaultServiceProvider);
-                                      await vaultService.createTag(tag);
-
-                                      for (final fileId in selectedFiles) {
-                                        await ref
-                                            .read(
-                                                vaultNotifierProvider.notifier)
-                                            .addTag(fileId, tag);
-                                      }
-
-                                      if (!context.mounted) return;
-                                      Navigator.pop(context);
-                                      ref.invalidate(tagsProvider);
-                                      ToastUtils.showSuccess('Tag added');
-                                      _exitSelectionMode();
-                                    },
-                                  ))
-                              .toList(),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: MediaQuery.of(context).padding.bottom),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    ).whenComplete(tagController.dispose);
+    AddTagsSheet.show(
+      context,
+      fileIds: selectedFiles,
+      onTagsAdded: (_) => _exitSelectionMode(),
+    );
   }
 
   Future<void> _toggleFavoriteSelected(Set<String> selectedFiles) async {
