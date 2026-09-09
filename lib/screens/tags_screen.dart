@@ -41,6 +41,7 @@ class TagsScreen extends ConsumerStatefulWidget {
 
 class _TagsScreenState extends ConsumerState<TagsScreen> {
   String? _selectedTag;
+  bool _showingUntagged = false;
   bool _isSelectionMode = false;
   final Set<String> _selectedFiles = {};
 
@@ -57,10 +58,10 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: _buildAppBar(),
-      body: _selectedTag != null
+      body: _selectedTag != null || _showingUntagged
           ? _buildTagFilesView()
           : _buildTagsListView(tagsAsync),
-      floatingActionButton: _selectedTag == null
+      floatingActionButton: _selectedTag == null && !_showingUntagged
           ? FloatingActionButton.extended(
               elevation: 0,
               onPressed: _showCreateTagDialog,
@@ -81,9 +82,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
 
   PreferredSizeWidget _buildAppBar() {
     if (_isSelectionMode) {
-      final files = _selectedTag != null
-          ? (ref.read(filesByTagProvider(_selectedTag!)).value ?? [])
-          : <VaultedFile>[];
+      final files = _currentViewFiles();
       final allSelected =
           files.isNotEmpty && files.every((f) => _selectedFiles.contains(f.id));
 
@@ -112,11 +111,12 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                 ),
               ),
             ),
-          IconButton(
-            icon: const Icon(Icons.label_off_outlined, color: Colors.white),
-            onPressed: _removeTagFromSelected,
-            tooltip: 'Remove tag',
-          ),
+          if (_selectedTag != null)
+            IconButton(
+              icon: const Icon(Icons.label_off_outlined, color: Colors.white),
+              onPressed: _removeTagFromSelected,
+              tooltip: 'Remove tag',
+            ),
           IconButton(
             icon: const Icon(Icons.delete_outline, color: Colors.white),
             onPressed: _deleteSelectedFiles,
@@ -125,6 +125,8 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
         ],
       );
     }
+
+    final inFilesView = _selectedTag != null || _showingUntagged;
 
     return AppBar(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -135,20 +137,22 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
         onPressed: () {
           if (_selectedTag != null) {
             setState(() => _selectedTag = null);
+          } else if (_showingUntagged) {
+            setState(() => _showingUntagged = false);
           } else {
             Navigator.pop(context);
           }
         },
       ),
       title: Text(
-        _selectedTag ?? 'Tags',
+        _showingUntagged ? 'Untagged' : (_selectedTag ?? 'Tags'),
         style: const TextStyle(
           fontFamily: 'ProductSans',
           fontWeight: FontWeight.w600,
         ),
       ),
       actions: [
-        if (_selectedTag != null)
+        if (inFilesView)
           IconButton(
             icon: const Icon(Icons.sort),
             onPressed: _showSortOptions,
@@ -178,8 +182,19 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
         ),
       ),
       data: (tags) {
-        if (tags.isEmpty) {
-          return _buildEmptyTagsState();
+        // Live counts derived from the vault list so untagging/deleting
+        // updates immediately (stored usageCount drifts and never decreases).
+        final allFiles = ref.watch(vaultNotifierProvider).value ?? [];
+        final tagCounts = <String, int>{};
+        var untaggedCount = 0;
+        for (final file in allFiles) {
+          if (file.tags.isEmpty) {
+            untaggedCount++;
+            continue;
+          }
+          for (final tag in file.tags) {
+            tagCounts[tag] = (tagCounts[tag] ?? 0) + 1;
+          }
         }
 
         return RefreshIndicator(
@@ -189,15 +204,126 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
           color: context.accentColor,
           child: ListView.builder(
             padding: const EdgeInsets.all(16),
-            itemCount: tags.length,
-            itemBuilder: (context, index) => _buildTagItem(tags[index]),
+            itemCount: 1 + tags.length + (tags.isEmpty ? 1 : 0),
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _buildUntaggedCard(untaggedCount),
+                );
+              }
+              final tagIndex = index - 1;
+              if (tagIndex < tags.length) {
+                return _buildTagItem(tags[tagIndex], tagCounts);
+              }
+              return _buildNoTagsHint();
+            },
           ),
         );
       },
     );
   }
 
-  Widget _buildTagItem(TagInfo tag) {
+  Widget _buildUntaggedCard(int count) {
+    return Card(
+      margin: EdgeInsets.zero,
+      color: context.backgroundSecondary,
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: () => setState(() => _showingUntagged = true),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: context.textTertiary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.label_off,
+                  color: context.textTertiary,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Untagged',
+                      style: TextStyle(
+                        fontFamily: 'ProductSans',
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                        color: context.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$count ${count == 1 ? 'file' : 'files'} with no tags',
+                      style: TextStyle(
+                        fontFamily: 'ProductSans',
+                        fontSize: 13,
+                        color: context.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right,
+                color: context.textTertiary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNoTagsHint() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 32),
+      child: Column(
+        children: [
+          Icon(
+            Icons.label_outline,
+            size: 64,
+            color: context.textTertiary,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No tags yet',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: context.textPrimary,
+              fontFamily: 'ProductSans',
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Create tags to organize your files by category',
+            style: TextStyle(
+              fontSize: 14,
+              color: context.textSecondary,
+              fontFamily: 'ProductSans',
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTagItem(TagInfo tag, Map<String, int> tagCounts) {
+    final count = tagCounts[tag.name] ?? 0;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       color: context.backgroundSecondary,
@@ -240,7 +366,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${tag.usageCount} ${tag.usageCount == 1 ? 'file' : 'files'}',
+                      '$count ${count == 1 ? 'file' : 'files'}',
                       style: TextStyle(
                         fontFamily: 'ProductSans',
                         fontSize: 13,
@@ -261,69 +387,10 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
     );
   }
 
-  Widget _buildEmptyTagsState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              color: context.accentColor.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.label_outline,
-              size: 64,
-              color: context.accentColor,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'No tags yet',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: context.textPrimary,
-              fontFamily: 'ProductSans',
-            ),
-          ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 48),
-            child: Text(
-              'Create tags to organize your files by category',
-              style: TextStyle(
-                fontSize: 14,
-                color: context.textSecondary,
-                fontFamily: 'ProductSans',
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: _showCreateTagDialog,
-            icon: const Icon(Icons.add),
-            label: const Text('Create Tag'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: context.accentColor,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildTagFilesView() {
-    final filesAsync = ref.watch(filesByTagProvider(_selectedTag!));
+    final filesAsync = _showingUntagged
+        ? ref.watch(untaggedFilesProvider)
+        : ref.watch(filesByTagProvider(_selectedTag!));
 
     return filesAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -343,7 +410,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
 
         return RefreshIndicator(
           onRefresh: () async {
-            ref.invalidate(filesByTagProvider(_selectedTag!));
+            _invalidateCurrentFileView();
           },
           color: context.accentColor,
           child: GridView.builder(
@@ -377,7 +444,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'No files with this tag',
+            _showingUntagged ? 'No untagged files' : 'No files with this tag',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -387,7 +454,9 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Add this tag to files from the gallery',
+            _showingUntagged
+                ? 'Every file in your vault has at least one tag'
+                : 'Add this tag to files from the gallery',
             style: TextStyle(
               fontSize: 14,
               color: context.textSecondary,
@@ -567,6 +636,21 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
     );
   }
 
+  List<VaultedFile> _currentViewFiles() {
+    if (_showingUntagged) {
+      return ref.read(untaggedFilesProvider).value ?? [];
+    }
+    return ref.read(filesByTagProvider(_selectedTag!)).value ?? [];
+  }
+
+  void _invalidateCurrentFileView() {
+    if (_showingUntagged) {
+      ref.invalidate(untaggedFilesProvider);
+    } else {
+      ref.invalidate(filesByTagProvider(_selectedTag!));
+    }
+  }
+
   void _enterSelectionMode(String fileId) {
     setState(() {
       _isSelectionMode = true;
@@ -595,9 +679,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
   }
 
   void _toggleSelectAll() {
-    final files = _selectedTag != null
-        ? (ref.read(filesByTagProvider(_selectedTag!)).value ?? [])
-        : <VaultedFile>[];
+    final files = _currentViewFiles();
     final allSelected =
         files.isNotEmpty && files.every((f) => _selectedFiles.contains(f.id));
 
@@ -613,12 +695,11 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
   }
 
   void _openFile(VaultedFile file) {
-    final filesAsync = ref.read(filesByTagProvider(_selectedTag!));
     FileOpenService.open(
       context,
       ref,
       file,
-      currentFiles: filesAsync.value ?? [],
+      currentFiles: _currentViewFiles(),
       onUnsupported: () => _showFileOptionsSheet(file),
     );
   }
@@ -1224,7 +1305,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
 
     ToastUtils.showSuccess('Removed tag from ${selectedList.length} file(s)');
     _exitSelectionMode();
-    ref.invalidate(filesByTagProvider(_selectedTag!));
+    _invalidateCurrentFileView();
     ref.invalidate(tagsProvider);
   }
 
@@ -1279,7 +1360,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
           .deleteFiles(_selectedFiles.toList());
 
       _exitSelectionMode();
-      ref.invalidate(filesByTagProvider(_selectedTag!));
+      _invalidateCurrentFileView();
       ref.invalidate(tagsProvider);
 
       if (success) {

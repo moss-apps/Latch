@@ -22,6 +22,11 @@ class TagService {
     return files.where((f) => f.hasTag(tag)).toList();
   }
 
+  Future<List<VaultedFile>> getUntaggedFiles() async {
+    final files = await _fileService.getAllFiles();
+    return files.where((f) => f.tags.isEmpty).toList();
+  }
+
   Future<VaultedFile?> addTagToFile(String fileId, String tag) async {
     final file = await _fileService.getFileById(fileId);
     if (file == null) return null;
