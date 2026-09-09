@@ -33,6 +33,8 @@ class ExplorerFileGrid extends ConsumerWidget {
     final subfoldersAsync = ref.watch(explorerSubfoldersProvider);
     final selectedFiles = ref.watch(selectedFilesProvider);
     final isSelectionMode = ref.watch(isSelectionModeProvider);
+    final tapOpensMedia =
+        ref.watch(vaultSettingsProvider).value?.tapOpensMedia ?? true;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -108,6 +110,7 @@ class ExplorerFileGrid extends ConsumerWidget {
                                   files,
                                   isSelected,
                                   isSelectionMode,
+                                  tapOpensMedia,
                                 ),
                               );
                             },
@@ -147,6 +150,7 @@ class ExplorerFileGrid extends ConsumerWidget {
                                   files, // Pass displaying files list for the viewer carousel
                                   isSelected,
                                   isSelectionMode,
+                                  tapOpensMedia,
                                 );
                               }
                             },
@@ -378,11 +382,14 @@ class ExplorerFileGrid extends ConsumerWidget {
     List<VaultedFile> allFiles,
     bool isSelected,
     bool isSelectionMode,
+    bool tapOpensMedia,
   ) {
     return GestureDetector(
       onTap: () {
         if (isSelectionMode) {
           _toggleSelection(ref, file.id);
+        } else if (tapOpensMedia) {
+          _openFile(context, ref, file, allFiles);
         } else {
           _showMediaHoldActionSheet(context, ref, file, allFiles);
         }
@@ -491,11 +498,14 @@ class ExplorerFileGrid extends ConsumerWidget {
     List<VaultedFile> allFiles,
     bool isSelected,
     bool isSelectionMode,
+    bool tapOpensMedia,
   ) {
     return GestureDetector(
       onTap: () {
         if (isSelectionMode) {
           _toggleSelection(ref, file.id);
+        } else if (tapOpensMedia) {
+          _openFile(context, ref, file, allFiles);
         } else {
           _showMediaHoldActionSheet(context, ref, file, allFiles);
         }
