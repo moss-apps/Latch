@@ -85,7 +85,6 @@ func Serve(addr, targetDir string) error {
 	mux.HandleFunc("/api/file/", s.handleFile)
 	mux.HandleFunc("/api/thumb/", s.handleThumb)
 
-	fmt.Printf("latchd web UI on http://%s (loopback only)\n", addr)
 	return http.ListenAndServe(addr, mux)
 }
 

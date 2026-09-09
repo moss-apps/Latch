@@ -59,6 +59,33 @@ player (UAC 2.0 DAC support). Latch can hand audio playback to Flick and
 return via `locker://return`. Details in the
 [Flick Integration Guide](docs/flick_integration.md).
 
+## Desktop Backup (Latch Web)
+
+`latchd` is a tiny companion you run on your desktop. It hosts a local
+web UI (`http://127.0.0.1:7800`, loopback only), shows a pairing QR, and
+receives encrypted vault backups from the phone over Wi-Fi or USB — no
+server, no accounts, ciphertext only in transit. It can also browse,
+verify, restore, and export-decrypt a backup. No repo clone, no toolchain:
+
+**Linux**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/moss-apps/Latch/main/scripts/install-latchd.sh | bash
+```
+
+**Windows**
+
+Download `latchd-windows-amd64.exe` from
+[releases](https://github.com/moss-apps/Latch/releases).
+
+Then:
+
+1. Run `latchd serve` and open <http://127.0.0.1:7800>
+2. Start a pairing session (if your firewall asks, latchd prints the exact rule)
+3. Phone: Latch → Settings → Storage → Desktop Backup → scan the QR
+
+Full spec: [docs/desktop_backup.md](docs/desktop_backup.md).
+
 ## Technology Stack
 
 **Flutter**
