@@ -307,6 +307,32 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
               _buildSectionTitle(context, 'Appearance'),
               _buildThemeToggle(context, ref),
               _buildAccentColorOption(context, ref),
+              SwitchListTile(
+                secondary: Icon(
+                  Icons.touch_app,
+                  color: context.accentColor,
+                ),
+                title: const Text(
+                  'Tap to Open Media',
+                  style: TextStyle(fontFamily: 'ProductSans'),
+                ),
+                subtitle: Text(
+                  'Tapping a file opens it directly; long-press for the action menu',
+                  style: TextStyle(
+                    fontFamily: 'ProductSans',
+                    fontSize: 12,
+                    color: context.textTertiary,
+                  ),
+                ),
+                value: settings.tapOpensMedia,
+                onChanged: (value) async {
+                  await _saveVaultSettings(
+                    settings.copyWith(tapOpensMedia: value),
+                  );
+                },
+                activeThumbColor: context.accentColor,
+                contentPadding: EdgeInsets.zero,
+              ),
               const SizedBox(height: 20),
               Divider(color: context.borderColor),
               const SizedBox(height: 20),

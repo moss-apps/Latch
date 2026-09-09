@@ -421,6 +421,8 @@ class VaultService {
   Future<List<VaultedFile>> getFilesByTag(String tag) =>
       _tags.getFilesByTag(tag);
 
+  Future<List<VaultedFile>> getUntaggedFiles() => _tags.getUntaggedFiles();
+
   Future<VaultedFile?> addTagToFile(String fileId, String tag) =>
       _tags.addTagToFile(fileId, tag);
 
