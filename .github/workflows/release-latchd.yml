@@ -1,11 +1,13 @@
 name: Release latchd
 
-# Prebuilt latchd companions so users can run Latch Web without cloning
-# the repo (docs/desktop_backup.md, open decision 2). The web UI dist is
-# committed, so this is a pure Go build — no Node toolchain.
+# App-version releases (tag 0.x.y-beta.z, same number as the mobile
+# release — Latch itself ships via Google Play now). The web UI dist is
+# committed, so this is a pure Go build — no Node toolchain. The What's
+# New body is the maintainer's changelog; latchd install notes are
+# appended, never replaced (append_body).
 on:
   push:
-    tags: ['latchd-v*']
+    tags: ['0.*']
 
 permissions:
   contents: read
@@ -44,7 +46,7 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
-          version="${GITHUB_REF_NAME#latchd-v}"
+          version="${GITHUB_REF_NAME}"
           ext=""
           if [ "$GOOS" = windows ]; then ext=".exe"; fi
           go build -trimpath -ldflags "-s -w -X main.version=$version" \
@@ -68,22 +70,26 @@ jobs:
         run: cd dist && sha256sum latchd-* > SHA256SUMS
       - uses: softprops/action-gh-release@v2
         with:
+          name: v${{ github.ref_name }}
           files: dist/*
+          append_body: true
           body: |
-            Latch desktop backup companion ("Latch Web") — hosts the local
-            web UI the phone pairs with to push encrypted vault backups.
-            Nothing leaves your machine: the UI binds loopback only.
+            ## Desktop companion (latchd)
 
-            ## Linux
+            Host Latch Web on your desktop — pairing QR plus encrypted vault
+            backup over Wi-Fi or USB. The web UI binds loopback only; nothing
+            leaves your machine.
+
+            **Linux**
 
             ```
-            curl -fsSL https://raw.githubusercontent.com/moss-apps/Latch/main/scripts/install-latchd.sh | bash
+            curl -fsSL https://raw.githubusercontent.com/moss-apps/Latch/main/scripts/install-latchd.sh | sh
             latchd serve
             ```
 
             Or grab `latchd-linux-amd64` / `latchd-linux-arm64` directly.
 
-            ## Windows
+            **Windows**
 
             Download `latchd-windows-amd64.exe`, then:
 
@@ -91,5 +97,11 @@ jobs:
             .\latchd-windows-amd64.exe serve
             ```
 
-            Open http://127.0.0.1:7800, start a pairing session, and scan
-            the QR from Latch → Settings → Storage → Desktop Backup.
+            Open http://127.0.0.1:7800, start a pairing session, and scan the
+            QR from Latch → Settings → Storage → Desktop Backup.
+
+            ---
+
+            **Latch app:** public on
+            [Google Play](https://play.google.com/store/apps/details?id=com.mossapps.locker) —
+            the release no longer attaches an APK.
