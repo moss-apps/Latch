@@ -55,8 +55,11 @@ clean:
 ## latchd pulls the encrypted vault from the phone into latch-backup/.
 LATCHD_MODULE := latchd
 LATCHD_BIN    := latchd/latchd
+## Release version: the app-version tag at HEAD (0.x.y-beta.z, same as
+## mobile), else "dev". Exact match so dirty checkouts never stamp.
+LATCHD_VERSION ?= $(shell v=$$(git describe --tags --exact-match --match '0.*' 2>/dev/null); echo $${v:-dev})
 
-.PHONY: latchd-test latchd-web clean-latchd
+.PHONY: latchd-test latchd-web latchd-release clean-latchd
 
 latchd: $(shell find $(LATCHD_MODULE) -name '*.go' -o -path '*internal/webui/web/*' -type f)
 	cd $(LATCHD_MODULE) && CGO_ENABLED=0 go build -trimpath -o $(CURDIR)/$(LATCHD_BIN) ./cmd/latchd
@@ -69,6 +72,21 @@ latchd-test:
 ## The dist is committed, so this needs Node and is only for UI work.
 latchd-web:
 	cd $(LATCHD_MODULE)/web-src && npm install && npm run build
+
+## Cross-build release artifacts into dist/ — the same set the
+## release-latchd.yml workflow attaches on latchd-v* tags. Run at a tag.
+latchd-release:
+	@set -e; mkdir -p dist; \
+	for target in linux/amd64 linux/arm64 windows/amd64; do \
+		os=$${target%/*}; arch=$${target#*/}; ext=; \
+		if [ "$$os" = windows ]; then ext=.exe; fi; \
+		echo ">> building $$os/$$arch"; \
+		(cd $(LATCHD_MODULE) && CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch \
+			go build -trimpath -ldflags "-s -w -X main.version=$(LATCHD_VERSION)" \
+			-o $(CURDIR)/dist/latchd-$$os-$$arch$$ext ./cmd/latchd); \
+	done; \
+	cd dist && sha256sum latchd-* > SHA256SUMS; \
+	echo "-> dist/ (latchd $(LATCHD_VERSION))"
 
 clean-latchd:
 	rm -f $(LATCHD_BIN)

@@ -14,6 +14,7 @@ import '../services/vault_service.dart';
 import '../themes/app_colors.dart';
 import '../utils/toast_utils.dart';
 import '../widgets/file_info_sheet.dart';
+import '../widgets/add_tags_sheet.dart';
 
 enum _VideoLoadPhase { idle, decrypting, initializing, ready }
 
@@ -1175,6 +1176,11 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
               onPressed: _toggleFavorite,
             ),
             IconButton(
+              icon: const Icon(Icons.label_outline, color: Colors.white),
+              tooltip: 'Add tags',
+              onPressed: _showAddTagsSheet,
+            ),
+            IconButton(
               icon: const Icon(Icons.info_outline, color: Colors.white),
               tooltip: 'File info',
               onPressed: _showFileInfo,
@@ -1182,6 +1188,17 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  void _showAddTagsSheet() {
+    final currentFile = _files[_currentIndex.clamp(0, _files.length - 1)];
+    AddTagsSheet.show(
+      context,
+      fileIds: {currentFile.id},
+      onTagsAdded: (tags) => setState(() {
+        _files[_currentIndex] = _files[_currentIndex].addTags(tags);
+      }),
     );
   }
 

@@ -1,0 +1,140 @@
+name: Release latchd
+
+# App-version releases (tag 0.x.y-beta.z, same number as the mobile
+# release — Latch itself ships via Google Play now). The web UI dist is
+# committed, so this is a pure Go build — no Node toolchain. The What's
+# New body is the maintainer's changelog; latchd install notes are
+# appended, never replaced (append_body).
+on:
+  push:
+    tags: ['0.*']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+          cache-dependency-path: latchd/go.sum
+      - run: go test ./...
+        working-directory: latchd
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { goos: linux, goarch: amd64 }
+          - { goos: linux, goarch: arm64 }
+          - { goos: windows, goarch: amd64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+          cache-dependency-path: latchd/go.sum
+      - name: Build
+        working-directory: latchd
+        env:
+          CGO_ENABLED: 0
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          version="${GITHUB_REF_NAME}"
+          ext=""
+          if [ "$GOOS" = windows ]; then ext=".exe"; fi
+          go build -trimpath -ldflags "-s -w -X main.version=$version" \
+            -o "../latchd-$GOOS-$GOARCH$ext" ./cmd/latchd
+      - uses: actions/upload-artifact@v4
+        with:
+          name: latchd-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: latchd-*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: cd dist && sha256sum latchd-* > SHA256SUMS
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: v${{ github.ref_name }}
+          files: dist/*
+          append_body: true
+          prerelease: ${{ contains(github.ref_name, '-beta') }}
+          body: |
+            ## Desktop companion (latchd)
+
+            Host Latch Web on your desktop — pairing QR plus encrypted vault
+            backup over Wi-Fi or USB. The web UI binds loopback only; nothing
+            leaves your machine.
+
+            **Linux**
+
+            ```
+            curl -fsSL https://raw.githubusercontent.com/moss-apps/Latch/HEAD/scripts/install-latchd.sh | sh
+            latchd serve
+            ```
+
+            Or grab `latchd-linux-amd64` / `latchd-linux-arm64` directly.
+
+            **Windows**
+
+            Download `latchd-windows-amd64.exe`, then:
+
+            ```
+            .\latchd-windows-amd64.exe serve
+            ```
+
+            Open http://127.0.0.1:7800, start a pairing session, and scan the
+            QR from Latch → Settings → Storage → Desktop Backup.
+
+            ---
+
+            **Latch app:** public on
+            [Google Play](https://play.google.com/store/apps/details?id=com.mossapps.locker) —
+            the release no longer attaches an APK.
+
+  # Post-release smoke: download the shipped asset like a user would,
+  # checksum it, and prove `serve` answers on the loopback UI. Runs the
+  # real artifact on the real OS — the windows job is our Windows test.
+  smoke:
+    needs: release
+    strategy:
+      matrix:
+        include:
+          - { os: ubuntu-latest, asset: latchd-linux-amd64 }
+          - { os: windows-latest, asset: latchd-windows-amd64.exe }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Download and checksum
+        shell: bash
+        run: |
+          base="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}"
+          curl -fsSL -o "$RUNNER_TEMP/${{ matrix.asset }}" "$base/${{ matrix.asset }}"
+          curl -fsSL -o "$RUNNER_TEMP/SHA256SUMS" "$base/SHA256SUMS"
+          cd "$RUNNER_TEMP"
+          grep " ${{ matrix.asset }}\$" SHA256SUMS | sha256sum -c -
+      - name: Serve smoke test
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP"
+          ./${{ matrix.asset }} --version
+          ./${{ matrix.asset }} serve &
+          pid=$!
+          curl -fsS --retry 10 --retry-connrefused --retry-delay 1 \
+            http://127.0.0.1:7800/api/status
+          curl -fsS -o /dev/null http://127.0.0.1:7800/
+          kill $pid 2>/dev/null || true

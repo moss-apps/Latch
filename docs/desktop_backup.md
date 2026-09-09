@@ -362,6 +362,14 @@ check:
 2. **Companion distribution:** source + `make latchd`, or commit a
    prebuilt Linux binary. Default: Makefile-built; binary distribution
    when a non-developer user exists.
+   **Decided (2026-09):** GitHub Releases prebuilt binaries
+   (`latchd-linux-amd64`, `latchd-linux-arm64`,
+   `latchd-windows-amd64.exe`) built by
+   `.github/workflows/release-latchd.yml` on app-version tags
+   (`0.x.y-beta.z`, same number as the mobile release — the app itself
+   ships via Google Play, so the release carries latchd instead of an
+   APK), plus `scripts/install-latchd.sh` for one-line Linux installs.
+   Source builds stay available via `make latchd`.
 3. **Web UI tech:** hand-rolled static HTML/JS with `go:embed` (no build
    toolchain) vs a tiny framework SPA. Default: static, revisit if the
    browse UI grows.

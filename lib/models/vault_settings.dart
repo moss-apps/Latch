@@ -22,6 +22,7 @@ class VaultSettings {
   final bool wipeVaultOnMaxFailedAttempts;
   final int maxFailedAttemptsBeforeWipe;
   final bool showPermissionWarning;
+  final bool tapOpensMedia;
 
   // Encrypted-at-rest sync (see docs/local_server_sync.md)
   final bool syncEnabled;
@@ -51,6 +52,7 @@ class VaultSettings {
     this.wipeVaultOnMaxFailedAttempts = false,
     this.maxFailedAttemptsBeforeWipe = 12,
     this.showPermissionWarning = true,
+    this.tapOpensMedia = true,
     this.syncEnabled = false,
     this.syncProfileId,
     this.pbEnabled = true,
@@ -76,6 +78,7 @@ class VaultSettings {
     bool? wipeVaultOnMaxFailedAttempts,
     int? maxFailedAttemptsBeforeWipe,
     bool? showPermissionWarning,
+    bool? tapOpensMedia,
     bool? syncEnabled,
     String? syncProfileId,
     bool? pbEnabled,
@@ -107,6 +110,7 @@ class VaultSettings {
           maxFailedAttemptsBeforeWipe ?? this.maxFailedAttemptsBeforeWipe,
       showPermissionWarning:
           showPermissionWarning ?? this.showPermissionWarning,
+      tapOpensMedia: tapOpensMedia ?? this.tapOpensMedia,
       syncEnabled: syncEnabled ?? this.syncEnabled,
       syncProfileId: syncProfileId ?? this.syncProfileId,
       pbEnabled: pbEnabled ?? this.pbEnabled,
@@ -133,6 +137,7 @@ class VaultSettings {
         'wipeVaultOnMaxFailedAttempts': wipeVaultOnMaxFailedAttempts,
         'maxFailedAttemptsBeforeWipe': maxFailedAttemptsBeforeWipe,
         'showPermissionWarning': showPermissionWarning,
+        'tapOpensMedia': tapOpensMedia,
         'syncEnabled': syncEnabled,
         'syncProfileId': syncProfileId,
         'pbEnabled': pbEnabled,
@@ -171,6 +176,7 @@ class VaultSettings {
           json['maxFailedAttemptsBeforeWipe'] as int? ?? 12,
       showPermissionWarning:
           json['showPermissionWarning'] as bool? ?? true,
+      tapOpensMedia: json['tapOpensMedia'] as bool? ?? true,
       syncEnabled: json['syncEnabled'] as bool? ?? false,
       syncProfileId: json['syncProfileId'] as String?,
       pbEnabled: json['pbEnabled'] as bool? ?? true,
