@@ -27,6 +27,9 @@ import (
 
 const defaultDir = "latch-backup"
 
+// version is stamped at release time: -ldflags "-X main.version=<latchd-v tag>".
+var version = "dev"
+
 func main() {
 	if len(os.Args) < 2 {
 		usage()
@@ -40,6 +43,8 @@ func main() {
 		err = cmdVerify(os.Args[2:])
 	case "export-decrypted":
 		err = cmdExport(os.Args[2:])
+	case "version", "--version":
+		fmt.Println(version)
 	default:
 		usage()
 		os.Exit(2)
@@ -58,6 +63,7 @@ func usage() {
   latchd verify [--dir D]         verify a local backup
   latchd export-decrypted --out O [--dir D]
                                   decrypt a local backup to plaintext
+  latchd version                  print the build version
 
 Backups arrive over Wi-Fi: start a pairing session in the web UI and scan
 the QR from the phone (Latch → Settings → Storage → Desktop Backup).
@@ -78,6 +84,7 @@ func cmdServe(args []string) error {
 	if fs.NArg() > 0 {
 		listen = fs.Arg(0)
 	}
+	fmt.Printf("latchd %s — web UI on http://%s (loopback only)\n", version, listen)
 	return webui.Serve(listen, *dir)
 }
 
