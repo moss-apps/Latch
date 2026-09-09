@@ -2,6 +2,25 @@
 
 Notable changes to Latch.
 
+## 0.18.0-beta.1
+
+### Vault Browsing
+- **Tap to open media** — tapping a photo/video in the gallery or vault
+  explorer now opens it directly in the viewer instead of showing the
+  action sheet first; long-press still opens the action menu (hold
+  without dragging in the gallery). Users who prefer the old behavior
+  can turn it off in Settings → Appearance → "Tap to Open Media"
+
+### Tags
+- **Tag from the media viewer** — new tag button in the viewer's top
+  bar (next to favorite/info) opens the add-tags sheet for the current
+  file
+- **Untagged view** — pinned "Untagged" card at the top of the Tags
+  screen shows files without any tag
+- **Fixed tag counts** — file counts on the Tags screen are now derived
+  live from the vault instead of a stored counter, so untagging a file
+  (or deleting it) correctly lowers the count
+
 ## 0.17.2-beta.3
 
 ### Desktop Backup (latchd web UI)
