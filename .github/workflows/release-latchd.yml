@@ -73,6 +73,7 @@ jobs:
           name: v${{ github.ref_name }}
           files: dist/*
           append_body: true
+          prerelease: ${{ contains(github.ref_name, '-beta') }}
           body: |
             ## Desktop companion (latchd)
 
