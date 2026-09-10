@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/vaulted_file.dart';
+import '../providers/vault_providers.dart';
 import '../themes/app_colors.dart';
 import 'encrypted_thumbnail.dart';
 import 'sheet_action_row.dart';
@@ -9,7 +11,7 @@ import 'sheet_action_row.dart';
 /// Contextual bottom sheet for a single vaulted file. Preview header with
 /// inline favorite/info toggles, then a flat action list ordered by frequency.
 /// Delete is destructive and isolated at the bottom.
-class MediaHoldActionSheet extends StatelessWidget {
+class MediaHoldActionSheet extends ConsumerWidget {
   final VaultedFile file;
   final VoidCallback? onFavorite;
   final VoidCallback? onDelete;
@@ -65,7 +67,7 @@ class MediaHoldActionSheet extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final rows = <Widget>[
       if (onOpen != null)
         SheetActionRow(
@@ -125,7 +127,7 @@ class MediaHoldActionSheet extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 4, 8, 8),
             child: Row(
               children: [
-                _buildPreview(context),
+                _buildPreview(context, ref),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
@@ -194,9 +196,14 @@ class MediaHoldActionSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildPreview(BuildContext context) {
+  Widget _buildPreview(BuildContext context, WidgetRef ref) {
     const size = 56.0;
     if (file.isImage) {
+      if (!file.isEncrypted &&
+          (ref.watch(vaultSettingsProvider).value?.hideUnencryptedThumbnails ??
+              false)) {
+        return _buildFallbackPreview(context);
+      }
       if (file.isEncrypted) {
         return ClipRRect(
           borderRadius: BorderRadius.circular(12),

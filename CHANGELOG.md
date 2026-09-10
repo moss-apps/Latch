@@ -29,6 +29,7 @@ Notable changes to Latch.
 - Vault store merge + PB fallback tests; refreshed files merged into live cache
 
 ### Settings & UI
+- **Hide unencrypted thumbnails** setting — replace previews with file-type icons for unencrypted files
 - Performance, local backup, and encryption settings screens simplified
 - Unlock screen converted to Riverpod with key export support
 - ProductSans font removed from sync settings

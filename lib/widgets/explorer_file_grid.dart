@@ -424,7 +424,7 @@ class ExplorerFileGrid extends ConsumerWidget {
                 child: SizedBox(
                   width: 44,
                   height: 44,
-                  child: _buildFileThumbnail(file, context),
+                  child: _buildFileThumbnail(file, context, ref),
                 ),
               ),
               if (isSelectionMode)
@@ -536,7 +536,7 @@ class ExplorerFileGrid extends ConsumerWidget {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(isSelected ? 9 : 11),
-                child: _buildFileThumbnail(file, context),
+                child: _buildFileThumbnail(file, context, ref),
               ),
             ),
 
@@ -635,7 +635,16 @@ class ExplorerFileGrid extends ConsumerWidget {
     );
   }
 
-  Widget _buildFileThumbnail(VaultedFile file, BuildContext context) {
+  Widget _buildFileThumbnail(
+    VaultedFile file,
+    BuildContext context,
+    WidgetRef ref,
+  ) {
+    if (!file.isEncrypted &&
+        (ref.watch(vaultSettingsProvider).value?.hideUnencryptedThumbnails ??
+            false)) {
+      return _buildFilePlaceholder(file, context);
+    }
     if (file.isImage) {
       if (file.isEncrypted) {
         return EncryptedThumbnail(file: file);

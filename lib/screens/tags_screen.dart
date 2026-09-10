@@ -561,6 +561,11 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
   }
 
   Widget _buildFileThumbnail(VaultedFile file) {
+    if (!file.isEncrypted &&
+        (ref.watch(vaultSettingsProvider).value?.hideUnencryptedThumbnails ??
+            false)) {
+      return _buildPlaceholder(file);
+    }
     if (file.isImage) {
       if (file.isEncrypted) {
         return EncryptedThumbnail(file: file);

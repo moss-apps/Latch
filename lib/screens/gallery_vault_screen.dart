@@ -1160,6 +1160,11 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
   }
 
   Widget _buildFileThumbnail(VaultedFile file) {
+    if (!file.isEncrypted &&
+        (ref.watch(vaultSettingsProvider).value?.hideUnencryptedThumbnails ??
+            false)) {
+      return _buildPlaceholder(file);
+    }
     // Show image thumbnail
     if (file.isImage) {
       if (file.isEncrypted) {

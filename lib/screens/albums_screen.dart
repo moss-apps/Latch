@@ -235,6 +235,13 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
           if (snapshot.hasData && snapshot.data != null) {
             final file = snapshot.data!;
             if (file.isImage) {
+              if (!file.isEncrypted &&
+                  (ref.watch(vaultSettingsProvider)
+                          .value
+                          ?.hideUnencryptedThumbnails ??
+                      false)) {
+                return _buildPlaceholderCover(album);
+              }
               if (file.isEncrypted) {
                 return EncryptedThumbnail(file: file);
               }
@@ -263,6 +270,13 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
           if (snapshot.hasData && snapshot.data!.isNotEmpty) {
             final imageFiles = snapshot.data!.where((f) => f.isImage).toList();
             if (imageFiles.isNotEmpty) {
+              if (!imageFiles.first.isEncrypted &&
+                  (ref.watch(vaultSettingsProvider)
+                          .value
+                          ?.hideUnencryptedThumbnails ??
+                      false)) {
+                return _buildPlaceholderCover(album);
+              }
               if (imageFiles.first.isEncrypted) {
                 return EncryptedThumbnail(file: imageFiles.first);
               }
@@ -1025,15 +1039,21 @@ class _ChangeCoverSheetState extends ConsumerState<_ChangeCoverSheet> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(isSelected ? 5 : 8),
               child: file.isImage
-                    ? (file.isEncrypted
-                        ? EncryptedThumbnail(file: file)
-                        : Image.file(
-                            File(file.vaultPath),
-                            fit: BoxFit.cover,
-                            cacheWidth: 200,
-                            filterQuality: FilterQuality.low,
-                            errorBuilder: (_, __, ___) => _buildPlaceholder(),
-                          ))
+                  ? (file.isEncrypted
+                      ? EncryptedThumbnail(file: file)
+                      : (ref.watch(vaultSettingsProvider)
+                                  .value
+                                  ?.hideUnencryptedThumbnails ??
+                              false)
+                          ? _buildPlaceholder()
+                          : Image.file(
+                              File(file.vaultPath),
+                              fit: BoxFit.cover,
+                              cacheWidth: 200,
+                              filterQuality: FilterQuality.low,
+                              errorBuilder: (_, __, ___) =>
+                                  _buildPlaceholder(),
+                            ))
                   : (file.isVideo && file.isEncrypted
                       ? Stack(
                           fit: StackFit.expand,
