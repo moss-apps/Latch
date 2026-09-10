@@ -1,4 +1,56 @@
 {
+  "0.18.0-beta.1": [
+    {
+      "title": "Desktop Backup",
+      "items": [
+        {
+          "icon": "folder_outlined",
+          "title": "Backup to your desktop",
+          "description": "Run the new latchd companion on your computer and back up your vault over Wi-Fi or USB — pairing approved with a QR scan."
+        },
+        {
+          "icon": "sync",
+          "title": "Restore anywhere",
+          "description": "Set up a new device by restoring an encrypted backup from your desktop, right from the app."
+        }
+      ]
+    },
+    {
+      "title": "Browsing & Tags",
+      "items": [
+        {
+          "icon": "touch_app_outlined",
+          "title": "Tap to open",
+          "description": "Tapping media now opens it directly in the viewer — the old action-sheet behavior is a setting away in Appearance."
+        },
+        {
+          "icon": "photo_library_outlined",
+          "title": "Better tags",
+          "description": "Tag files straight from the media viewer, browse a pinned Untagged view, and trust live tag counts."
+        },
+        {
+          "icon": "speed",
+          "title": "Smoother gallery",
+          "description": "The gallery now uses a paged view with image prefetch for fluid swiping."
+        }
+      ]
+    },
+    {
+      "title": "Refinements",
+      "items": [
+        {
+          "icon": "auto_awesome_outlined",
+          "title": "Redesigned action sheet",
+          "description": "The hold-to-action sheet got a cleaner flat layout with a new action row widget."
+        },
+        {
+          "icon": "build_outlined",
+          "title": "Under the hood",
+          "description": "Sync merge healing, size-based duplicate checks, and simplified settings screens keep things fast and tidy."
+        }
+      ]
+    }
+  ],
   "0.17.2-beta.3": [
     {
       "title": "Media Picker",

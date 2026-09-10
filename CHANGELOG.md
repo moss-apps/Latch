@@ -4,6 +4,42 @@ Notable changes to Latch.
 
 ## 0.18.0-beta.1
 
+### Desktop Backup & Restore (latchd)
+- **latchd desktop companion** — Go-based companion binary hosting the Latch web UI for pairing and encrypted vault backup over Wi-Fi or USB
+- Pairing receiver with QR approval; web UI binds loopback only
+- `backup` package for encrypted vault storage; `cryptoutil` mirrors the app's Dart crypto
+- **Restore flow** — restore setup screen, restore pairing mode, keybundle install + rewrap logic, end-to-end tested
+- **USB pairing** — `UsbLink` service, tap-to-approve handshake, USB connection modes in backup/restore screens, thumbnail display toggle
+- `latchd` release workflow + installer script, version command with build-time version stamp
+- Desktop backup spec; Argon2id params centralized; P6 pairing direction revised
+
+### Performance
+- Gallery replaced with **PageView** and image prefetch for smoother swiping
+- Size-based duplicate checks and safe deletion during import
+- Optimization plan docs (baseline + phase 1)
+
+### Media Actions
+- **Redesigned media hold action sheet** with new `SheetActionRow` widget
+- Multi-select sheet flattened to a simple list
+- Share action removed from the file grid
+
+### Sync & Vault Consistency
+- `mergeSyncedIntoCurrent` added to SyncService with tests
+- PocketBase outage divergence handled in vault store; legacy divergence healed during vault init
+- Vault store merge + PB fallback tests; refreshed files merged into live cache
+
+### Settings & UI
+- Performance, local backup, and encryption settings screens simplified
+- Unlock screen converted to Riverpod with key export support
+- ProductSans font removed from sync settings
+
+### Maintenance
+- Android build tools and dependencies updated
+- CI bumped to Flutter 3.47.2 (pdfrx requirement); pdfrx wasm CI step dropped
+- Post-release smoke tests on Linux and Windows runners
+- Sync manifest dates converted to UTC
+- `extractNativeLibs` enabled in the manifest
+
 ### Vault Browsing
 - **Tap to open media** — tapping a photo/video in the gallery or vault
   explorer now opens it directly in the viewer instead of showing the

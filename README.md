@@ -65,20 +65,60 @@ return via `locker://return`. Details in the
 web UI (`http://127.0.0.1:7800`, loopback only), shows a pairing QR, and
 receives encrypted vault backups from the phone over Wi-Fi or USB — no
 server, no accounts, ciphertext only in transit. It can also browse,
-verify, restore, and export-decrypt a backup. No repo clone, no toolchain:
+verify, restore, and export-decrypt a backup.
 
-**Linux**
+### Installation
+
+**Linux** (amd64 / arm64) — one-line installer, installs to
+`~/.local/bin/latchd` with sha256 verification:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/moss-apps/Latch/HEAD/scripts/install-latchd.sh | bash
 ```
 
-**Windows**
+Installer overrides (environment variables): `LATCHD_BINDIR` (install
+directory), `LATCHD_VERSION` (pin a release tag, e.g. `0.18.0-beta.1`),
+`LATCHD_REPO` (alternative fork).
 
-Download `latchd-windows-amd64.exe` from
+**Windows** — download `latchd-windows-amd64.exe` from
 [releases](https://github.com/moss-apps/Latch/releases).
 
-Then:
+**From source** — needs Go; no repo clone required for the installer
+paths above:
+
+```bash
+make latchd          # builds ./latchd/latchd
+```
+
+macOS is not supported yet (prebuilt binaries are Linux/Windows only).
+
+### Configuration
+
+`latchd` needs no config file. Subcommands and their options:
+
+| Command | Purpose | Options |
+|---------|---------|---------|
+| `latchd serve` | Loopback web UI: pairing QR, browse, restore | `--addr 127.0.0.1:7800` (listen address), `--dir latch-backup` (backup directory) |
+| `latchd verify` | Verify a local backup against its manifest | `--dir latch-backup`, `--password` |
+| `latchd export-decrypted` | Decrypt a local backup to plaintext | `--out <dir>` (required), `--dir latch-backup`, `--password` |
+| `latchd version` | Print the build version | — |
+
+The vault password comes from `--password`, the `LATCHD_PASSWORD`
+environment variable, or an interactive prompt. It is never stored and
+kept in memory only — prefer the prompt or env var over the flag.
+
+Network defaults:
+
+- **Web UI:** `127.0.0.1:7800`, loopback only — never exposed to the LAN.
+- **Pairing receiver:** `0.0.0.0:7801` (fixed port so one firewall rule
+  covers every session; falls back to an ephemeral port if taken). It
+  exists only while a pairing session is active and is token-gated. On
+  Linux/ufw, latchd prints the exact rule at session start, e.g.
+  `sudo ufw allow from <lan-subnet> to any port 7801 proto tcp`.
+- **USB:** `adb reverse tcp:<port> tcp:<port>` (shown in the web UI),
+  then tap Connect via USB on the phone and Allow once on the desktop.
+
+### Quick start
 
 1. Run `latchd serve` and open <http://127.0.0.1:7800>
 2. Start a pairing session (if your firewall asks, latchd prints the exact rule)

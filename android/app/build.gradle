@@ -72,6 +72,13 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
+
+    packagingOptions {
+        jniLibs {
+            // Replaces android:extractNativeLibs="true" from the manifest (removed for AGP 9).
+            useLegacyPackaging = true
+        }
+    }
 }
 
 dependencies {
