@@ -231,6 +231,13 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen> {
           if (snapshot.hasData && snapshot.data != null) {
             final file = snapshot.data!;
             if (file.isImage) {
+              if (!file.isEncrypted &&
+                  (ref.watch(vaultSettingsProvider)
+                          .value
+                          ?.hideUnencryptedThumbnails ??
+                      false)) {
+                return _buildPlaceholderCover();
+              }
               if (file.isEncrypted) {
                 return EncryptedThumbnail(file: file);
               }
