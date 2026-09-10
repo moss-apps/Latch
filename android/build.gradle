@@ -9,6 +9,19 @@ rootProject.buildDir = "../build"
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
     project.evaluationDependsOn(":app")
+    // file_picker skips the Kotlin plugin under AGP 9, but this project
+    // runs with android.builtInKotlin=false, so its Kotlin sources never
+    // compile. Force-apply KGP the same way it does for AGP < 9.
+    if (project.name == 'file_picker') {
+        apply plugin: 'org.jetbrains.kotlin.android'
+        project.afterEvaluate {
+            android {
+                kotlinOptions {
+                    jvmTarget = JavaVersion.VERSION_17.toString()
+                }
+            }
+        }
+    }
 }
 
 tasks.register("clean", Delete) {
