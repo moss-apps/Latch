@@ -1,47 +1,71 @@
 import { useEffect, useState } from "react"
-import { Mi } from "@/components/Mi"
 import { Button } from "@/components/ui/button"
+import { Markdown } from "@/lib/markdown"
 import { api, getJSON, type LegalDoc, type LegalInfo } from "@/lib/api"
 
 interface LegalGateProps {
   onAccepted: () => void
 }
 
+// LegalDocTabs is the underline tab bar shared by the first-run gate and
+// the Settings → Legal reader.
+export function LegalDocTabs({
+  documents,
+  activeId,
+  onSelect,
+  className = "",
+}: {
+  documents: LegalDoc[]
+  activeId: string
+  onSelect: (id: string) => void
+  className?: string
+}) {
+  return (
+    <nav
+      className={`flex gap-1 overflow-x-auto border-b border-divider ${className}`.trim()}
+      role="tablist"
+      aria-label="Legal documents"
+    >
+      {documents.map((d) => (
+        <button
+          key={d.id}
+          type="button"
+          role="tab"
+          aria-selected={d.id === activeId}
+          onClick={() => onSelect(d.id)}
+          className={`shrink-0 border-b-2 px-3 pt-2.5 pb-2 text-sm font-semibold transition-colors ${
+            d.id === activeId
+              ? "border-brand text-text"
+              : "border-transparent text-text3 hover:text-text2"
+          }`}
+        >
+          {d.title}
+        </button>
+      ))}
+    </nav>
+  )
+}
+
 export function LegalGate({ onAccepted }: LegalGateProps) {
   const [info, setInfo] = useState<LegalInfo | null>(null)
-  const [activeId, setActiveId] = useState<string>("eula")
-  const [body, setBody] = useState<string>("Loading…")
+  const [activeId, setActiveId] = useState("eula")
   const [accepting, setAccepting] = useState(false)
   const [error, setError] = useState("")
 
   useEffect(() => {
     getJSON<LegalInfo>("/api/legal")
       .then((d) => {
-        setInfo(d)
         if (d.accepted) {
           onAccepted()
           return
         }
+        setInfo(d)
         if (d.documents.length > 0) setActiveId(d.documents[0].id)
       })
       .catch(() => setError("Could not reach latchd. Is it running?"))
     // onAccepted is stable (App passes an inline refresh; run once on mount).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  useEffect(() => {
-    if (!info) return
-    const doc: LegalDoc | undefined = info.documents.find((d) => d.id === activeId)
-    if (!doc) return
-    setBody("Loading…")
-    fetch(doc.path)
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        return r.text()
-      })
-      .then(setBody)
-      .catch(() => setBody("Could not load this document. It is also in the repo under legal/."))
-  }, [info, activeId])
 
   async function accept() {
     if (!info) return
@@ -57,63 +81,55 @@ export function LegalGate({ onAccepted }: LegalGateProps) {
     }
   }
 
+  const doc = info?.documents.find((d) => d.id === activeId)
+
   return (
     <div
-      className="grid h-full place-items-center overflow-y-auto p-4"
+      className="flex h-full min-h-0 flex-col"
       role="dialog"
       aria-modal="true"
       aria-label="License agreement"
     >
-      <div className="flex max-h-full w-full max-w-[560px] flex-col rounded-2xl border border-divider bg-background shadow-2xl">
-        <header className="flex shrink-0 items-center gap-2 px-5 pt-5">
-          <Mi n="verified" className="text-[22px] text-brand" />
-          <h2 className="text-base font-bold">Before you use Latch</h2>
-        </header>
-        <p className="shrink-0 px-5 pt-1 text-sm leading-relaxed text-text2">
-          Latch is local-first encrypted storage. Read the terms, then accept to
-          continue. No accounts, no tracking — see the Privacy Policy.
+      <header className="flex shrink-0 flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-divider px-4 py-4 md:px-8">
+        <h2 className="text-xl font-bold tracking-tight">Before you use Latch</h2>
+        <p className="min-w-0 text-sm text-text2">
+          Read and accept the License Agreement, Terms and Privacy Policy to
+          continue. No accounts, no tracking — the app is local-first.
         </p>
+        <span className="ml-auto shrink-0 text-xs text-text3">
+          {info ? `Version ${info.version} · asked again if the terms change` : ""}
+        </span>
+      </header>
 
-        {info && (
-          <div className="flex shrink-0 gap-1.5 overflow-x-auto px-5 pt-3" role="tablist" aria-label="Legal documents">
-            {info.documents.map((d) => (
-              <button
-                key={d.id}
-                type="button"
-                role="tab"
-                aria-selected={d.id === activeId}
-                onClick={() => setActiveId(d.id)}
-                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                  d.id === activeId
-                    ? "border-brand bg-brand text-white"
-                    : "border-divider text-text2 hover:bg-bg2"
-                }`}
-              >
-                {d.title}
-              </button>
-            ))}
-          </div>
+      <LegalDocTabs
+        className="shrink-0 px-4 md:px-8"
+        documents={info?.documents ?? []}
+        activeId={activeId}
+        onSelect={setActiveId}
+      />
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 md:px-8">
+        {doc ? (
+          <Markdown source={doc.markdown} />
+        ) : (
+          <p className="text-sm text-text3">{error || "Loading…"}</p>
         )}
+      </div>
 
-        <pre className="mx-5 mt-3 min-h-[220px] flex-1 overflow-y-auto rounded-xl border border-divider bg-bg2 p-4 font-sans text-[13px] leading-relaxed whitespace-pre-wrap text-text2">
-          {body}
-        </pre>
-
-        {error && (
-          <p className="shrink-0 px-5 pt-2 text-sm text-red-600" role="alert">
+      <footer className="flex shrink-0 flex-wrap items-center gap-3 border-t border-divider px-4 py-3 md:px-8">
+        {error && doc && (
+          <p className="text-sm text-red-600" role="alert">
             {error}
           </p>
         )}
-
-        <div className="flex shrink-0 items-center justify-between gap-3 px-5 py-4">
-          <span className="text-xs text-text3">
-            {info ? `Version ${info.version} · stored locally, re-asked on change` : ""}
-          </span>
-          <Button onClick={accept} disabled={!info || accepting} className="h-9">
-            {accepting ? "Accepting…" : "I accept"}
-          </Button>
-        </div>
-      </div>
+        <Button
+          onClick={accept}
+          disabled={!info || accepting}
+          className="ml-auto h-9"
+        >
+          {accepting ? "Accepting…" : "I accept"}
+        </Button>
+      </footer>
     </div>
   )
 }

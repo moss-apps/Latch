@@ -22,7 +22,7 @@ export interface StatusInfo {
 export interface LegalDoc {
   id: string
   title: string
-  path: string
+  markdown: string
 }
 
 export interface LegalInfo {

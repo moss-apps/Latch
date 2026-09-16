@@ -6,6 +6,11 @@
 // pairing, unlock, browse, file, thumbnail, verify, and export endpoints
 // answer 403 until POST /api/legal/accept records the current version.
 //
+// The document texts are embedded in the binary (legaldocs/, synced from the
+// canonical repo-root legal/ by `make legal-sync` — a mismatch fails
+// TestEmbeddedLegalDocsMatchCanonical) and served as markdown inside
+// GET /api/legal, so the web UI needs no separate /legal static hosting.
+//
 // Acceptance is persisted outside the backup directory so changing --dir
 // does not reset it: %AppData%/latchd/legal.json on Windows,
 // ~/.config/latchd/legal.json on Linux, overridable with LATCHD_CONFIG_DIR
@@ -14,6 +19,7 @@
 package webui
 
 import (
+	"embed"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -26,12 +32,29 @@ import (
 // together — a mismatch fails TestLegalVersionMatchesCanonical.
 const LegalVersion = 1
 
-// LegalDocs lists the markdown documents served from /legal/ (static files
-// copied from legal/ into the web dist by the web-src build).
-var LegalDocs = []map[string]string{
-	{"id": "eula", "title": "License Agreement (EULA)", "path": "/legal/eula.md"},
-	{"id": "terms", "title": "Terms and Conditions", "path": "/legal/terms.md"},
-	{"id": "privacy", "title": "Privacy Policy", "path": "/legal/privacy.md"},
+//go:embed legaldocs/*.md
+var legalDocsFS embed.FS
+
+// LegalDoc is one document of the gate, markdown included.
+type LegalDoc struct {
+	ID       string `json:"id"`
+	Title    string `json:"title"`
+	Markdown string `json:"markdown"`
+}
+
+func mustReadLegal(name string) string {
+	raw, err := legalDocsFS.ReadFile("legaldocs/" + name)
+	if err != nil {
+		panic("latchd: embedded legal doc missing: " + err.Error())
+	}
+	return string(raw)
+}
+
+// LegalDocs lists the gate documents in tab order.
+var LegalDocs = []LegalDoc{
+	{ID: "eula", Title: "License Agreement (EULA)", Markdown: mustReadLegal("eula.md")},
+	{ID: "terms", Title: "Terms and Conditions", Markdown: mustReadLegal("terms.md")},
+	{ID: "privacy", Title: "Privacy Policy", Markdown: mustReadLegal("privacy.md")},
 }
 
 type legalRecord struct {

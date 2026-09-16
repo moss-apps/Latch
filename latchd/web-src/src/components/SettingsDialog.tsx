@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { LegalDocTabs } from "@/components/LegalGate"
 import { Mi } from "@/components/Mi"
 import { StatusLine, type StatusKind } from "@/components/StatusLine"
 import { Button } from "@/components/ui/button"
@@ -6,8 +7,9 @@ import { Dialog } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
-import { api, ApiError } from "@/lib/api"
+import { api, ApiError, getJSON, type LegalInfo } from "@/lib/api"
 import { fmtDate } from "@/lib/format"
+import { Markdown } from "@/lib/markdown"
 import { ACCENTS, setAccent, setTheme, useTheme } from "@/lib/theme"
 import { setShowThumbnails, useShowThumbnails } from "@/lib/display"
 
@@ -46,6 +48,17 @@ export function SettingsDialog({
     text: "",
   })
   const [subdir, setSubdir] = useState("latch-export")
+  const [legalInfo, setLegalInfo] = useState<LegalInfo | null>(null)
+  const [legalDoc, setLegalDoc] = useState<string | null>(null)
+
+  function openLegalDoc(id: string) {
+    setLegalDoc(id)
+    if (!legalInfo) {
+      getJSON<LegalInfo>("/api/legal")
+        .then(setLegalInfo)
+        .catch(() => setLegalInfo(null))
+    }
+  }
 
   async function runVerify(btn: HTMLButtonElement) {
     btn.disabled = true
@@ -93,7 +106,11 @@ export function SettingsDialog({
     }
   }
 
+  const legalReaderDoc =
+    legalInfo?.documents.find((d) => d.id === legalDoc) ?? null
+
   return (
+    <>
     <Dialog open={open} onClose={onClose} title="Settings">
       <div className="space-y-6">
         <section>
@@ -223,33 +240,30 @@ export function SettingsDialog({
         <section>
           <SectionTitle>Legal</SectionTitle>
           <div className="space-y-1 px-1 text-sm">
-            <a
-              href="/legal/eula.md"
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-2 py-1 text-text2 underline-offset-2 hover:underline"
+            <button
+              type="button"
+              onClick={() => openLegalDoc("eula")}
+              className="flex w-full items-center gap-2 py-1 text-left text-text2 underline-offset-2 hover:underline"
             >
               <Mi n="verified" className="text-[16px]" />
               License Agreement (EULA)
-            </a>
-            <a
-              href="/legal/terms.md"
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-2 py-1 text-text2 underline-offset-2 hover:underline"
+            </button>
+            <button
+              type="button"
+              onClick={() => openLegalDoc("terms")}
+              className="flex w-full items-center gap-2 py-1 text-left text-text2 underline-offset-2 hover:underline"
             >
               <Mi n="description" className="text-[16px]" />
               Terms and Conditions
-            </a>
-            <a
-              href="/legal/privacy.md"
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-2 py-1 text-text2 underline-offset-2 hover:underline"
+            </button>
+            <button
+              type="button"
+              onClick={() => openLegalDoc("privacy")}
+              className="flex w-full items-center gap-2 py-1 text-left text-text2 underline-offset-2 hover:underline"
             >
               <Mi n="lock" className="text-[16px]" />
               Privacy Policy
-            </a>
+            </button>
           </div>
           <p className="px-1 pt-2 text-xs leading-relaxed text-text3">
             Accepted before first use. Bumped versions ask again.
@@ -257,5 +271,21 @@ export function SettingsDialog({
         </section>
       </div>
     </Dialog>
+
+    <Dialog open={legalDoc !== null} onClose={() => setLegalDoc(null)} title="Legal" wide>
+      <LegalDocTabs
+        documents={legalInfo?.documents ?? []}
+        activeId={legalDoc ?? "eula"}
+        onSelect={setLegalDoc}
+      />
+      <div className="min-h-0 pt-2">
+        {legalReaderDoc ? (
+          <Markdown source={legalReaderDoc.markdown} />
+        ) : (
+          <p className="py-8 text-center text-sm text-text3">Loading…</p>
+        )}
+      </div>
+    </Dialog>
+    </>
   )
 }

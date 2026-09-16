@@ -83,7 +83,7 @@ function App() {
         </div>
 
         {showChrome && (
-          <div className="mx-auto hidden w-full max-w-[560px] min-w-0 sm:block">
+          <div className="mx-auto hidden w-full max-w-[860px] min-w-0 sm:block">
             <div className="relative">
               <Mi
                 n="search"

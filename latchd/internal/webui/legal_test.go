@@ -33,6 +33,29 @@ func TestLegalVersionMatchesCanonical(t *testing.T) {
 	}
 }
 
+// TestEmbeddedLegalDocsMatchCanonical guards the legaldocs/ copies shipped
+// inside the binary against the repo-root canonical texts.
+func TestEmbeddedLegalDocsMatchCanonical(t *testing.T) {
+	missing := 0
+	for _, name := range []string{"eula.md", "terms.md", "privacy.md"} {
+		canonical, err := os.ReadFile("../../../legal/" + name)
+		if err != nil {
+			missing++
+			continue
+		}
+		embedded, err := legalDocsFS.ReadFile("legaldocs/" + name)
+		if err != nil {
+			t.Fatalf("embedded legaldocs/%s missing: %v", name, err)
+		}
+		if string(embedded) != string(canonical) {
+			t.Fatalf("legaldocs/%s is out of sync with legal/%s — run: make legal-sync", name, name)
+		}
+	}
+	if missing == 3 {
+		t.Skip("canonical legal/ texts not present in this checkout")
+	}
+}
+
 func TestLegalGateBlocksThenAccepts(t *testing.T) {
 	withIsolatedConfig(t)
 	s := &Session{targetDir: t.TempDir(), thumbs: newThumbCache()}

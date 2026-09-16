@@ -18,8 +18,13 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"net"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
+	"time"
 
 	"latchd/internal/backup"
 	"latchd/internal/webui"
@@ -33,19 +38,28 @@ var version = "dev"
 
 func main() {
 	if len(os.Args) < 2 {
-		usage()
-		os.Exit(2)
+		// Double-clicked with no subcommand (typical on Windows): serve
+		// and open the browser instead of printing usage and vanishing.
+		if err := cmdServe(nil, true); err != nil {
+			fmt.Fprintf(os.Stderr, "latchd: %v\n", err)
+			fmt.Println("Press Enter to close.")
+			bufio.NewReader(os.Stdin).ReadString('\n')
+			os.Exit(1)
+		}
+		return
 	}
 	var err error
 	switch os.Args[1] {
 	case "serve":
-		err = cmdServe(os.Args[2:])
+		err = cmdServe(os.Args[2:], false)
 	case "verify":
 		err = cmdVerify(os.Args[2:])
 	case "export-decrypted":
 		err = cmdExport(os.Args[2:])
 	case "version", "--version":
 		fmt.Println(version)
+	case "help", "-h", "--help":
+		usage()
 	default:
 		usage()
 		os.Exit(2)
@@ -56,15 +70,54 @@ func main() {
 	}
 }
 
+// defaultServeDir keeps double-click runs writable: on Windows the exe may
+// live under Program Files, so the backup goes to the user's home instead.
+func defaultServeDir() string {
+	if runtime.GOOS == "windows" {
+		if home, err := os.UserHomeDir(); err == nil && home != "" {
+			return filepath.Join(home, "latch-backup")
+		}
+	}
+	return defaultDir
+}
+
+// openBrowser is a best-effort launch of the default browser (ignored where
+// no opener exists, e.g. headless Linux).
+func openBrowser(url string) {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "windows":
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+	case "darwin":
+		cmd = exec.Command("open", url)
+	default:
+		cmd = exec.Command("xdg-open", url)
+	}
+	_ = cmd.Start()
+}
+
+// browserURL turns a listen address into the URL a browser can reach.
+func browserURL(listen string) string {
+	host, port, err := net.SplitHostPort(listen)
+	if err != nil {
+		return "http://" + listen
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" || host == "[::]" {
+		host = "127.0.0.1"
+	}
+	return "http://" + net.JoinHostPort(host, port)
+}
+
 func usage() {
 	fmt.Fprintln(os.Stderr, `latchd — Latch desktop backup companion
 
-  latchd serve [addr]             loopback web UI (default 127.0.0.1:7800);
-                                  pairing QR + credentials live there
-  latchd verify [--dir D]         verify a local backup
+  latchd (no arguments)         double-click mode: serve + open the browser
+  latchd serve [addr] [--open]  loopback web UI (default 127.0.0.1:7800);
+                                pairing QR + credentials live there
+  latchd verify [--dir D]       verify a local backup
   latchd export-decrypted --out O [--dir D]
-                                  decrypt a local backup to plaintext
-  latchd version                  print the build version
+                                decrypt a local backup to plaintext
+  latchd version                print the build version
 
 Backups arrive over Wi-Fi: start a pairing session in the web UI and scan
 the QR from the phone (Latch → Settings → Storage → Desktop Backup).
@@ -74,13 +127,17 @@ web UI, tap Connect via USB on the phone, and tap Allow once here.
 Credential: --password flag or LATCHD_PASSWORD env (never stored).`)
 }
 
-func cmdServe(args []string) error {
+func cmdServe(args []string, open bool) error {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
 	addr := fs.String("addr", "127.0.0.1:7800", "loopback listen address")
-	dir := fs.String("dir", defaultDir, "local backup directory")
+	dir := fs.String("dir", defaultServeDir(), "local backup directory")
 	acceptLegal := fs.Bool("accept-legal", false, "record acceptance of the current legal version (EULA/Terms/Privacy) without opening the web gate")
+	openFlag := fs.Bool("open", false, "open the web UI in the default browser once serving")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if *openFlag {
+		open = true
 	}
 	listen := *addr
 	if fs.NArg() > 0 {
@@ -92,8 +149,15 @@ func cmdServe(args []string) error {
 		}
 		fmt.Printf("latchd %s — legal v%d accepted\n", version, webui.LegalVersion)
 	}
-	fmt.Printf("latchd %s — web UI on http://%s (loopback only)\n", version, listen)
-	fmt.Printf("By using Latch Web you accept the License Agreement, Terms and Privacy Policy (open http://%s/legal or the Legal section in Settings).\n", listen)
+	url := browserURL(listen)
+	fmt.Printf("latchd %s — web UI on %s (loopback only)\n", version, url)
+	fmt.Println("By using Latch Web you accept the License Agreement, Terms and Privacy Policy (shown before first use, later in Settings → Legal).")
+	if open {
+		go func() {
+			time.Sleep(400 * time.Millisecond) // let the listener bind first
+			openBrowser(url)
+		}()
+	}
 	return webui.Serve(listen, *dir)
 }
 
