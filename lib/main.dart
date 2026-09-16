@@ -13,7 +13,9 @@ import 'themes/app_theme.dart';
 import 'providers/theme_provider.dart';
 import 'providers/vault_providers.dart';
 import 'services/auth_service.dart';
+import 'services/legal_consent_service.dart';
 import 'screens/auth_method_selection_screen.dart';
+import 'screens/legal_consent_screen.dart';
 import 'screens/unlock_screen.dart';
 import 'autofill_app.dart';
 import 'utils/frame_rate_optimizer.dart';
@@ -73,8 +75,10 @@ class AppInitializer extends ConsumerStatefulWidget {
 
 class _AppInitializerState extends ConsumerState<AppInitializer> {
   final AuthService _authService = AuthService();
+  final LegalConsentService _legalConsent = LegalConsentService();
   bool _isLoading = true;
   bool _isFirstTime = true;
+  bool _legalAccepted = false;
   StreamSubscription<PendingUpdate?>? _updateSub;
 
   @override
@@ -152,9 +156,11 @@ class _AppInitializerState extends ConsumerState<AppInitializer> {
 
   Future<void> _checkAuthStatus() async {
     final isFirstTime = await _authService.isFirstTime();
+    final legalAccepted = await _legalConsent.isAccepted();
 
     setState(() {
       _isFirstTime = isFirstTime;
+      _legalAccepted = legalAccepted;
       _isLoading = false;
     });
   }
@@ -172,6 +178,12 @@ class _AppInitializerState extends ConsumerState<AppInitializer> {
                 isDarkMode ? const Color(0xFF5C9CE6) : const Color(0xFF1976D2),
           ),
         ),
+      );
+    }
+
+    if (!_legalAccepted) {
+      return LegalConsentScreen(
+        onAccepted: () => setState(() => _legalAccepted = true),
       );
     }
 

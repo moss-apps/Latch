@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../providers/theme_provider.dart';
 import '../providers/vault_providers.dart';
 import '../services/auth_service.dart';
+import '../services/legal_consent_service.dart';
 import '../services/auto_kill_service.dart';
 import '../services/screenshot_protection_service.dart';
 import '../services/update_service.dart';
@@ -21,6 +22,7 @@ import 'change_security_screen.dart';
 import 'changelog_screen.dart';
 import 'desktop_backup_screen.dart';
 import 'encryption_settings_screen.dart';
+import 'legal_doc_screen.dart';
 import 'local_backup_screen.dart';
 import 'performance_settings_screen.dart';
 import 'privacy_policy_screen.dart';
@@ -823,6 +825,58 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                             context,
                             MaterialPageRoute(
                               builder: (context) => const PrivacyPolicyScreen(),
+                            ),
+                          );
+                        },
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      ListTile(
+                        leading: Icon(Icons.gavel_outlined,
+                            color: context.accentColor),
+                        title: const Text('License Agreement',
+                            style: TextStyle(fontFamily: 'ProductSans')),
+                        subtitle: Text(
+                          'EULA, version ${LegalConsentService.legalVersion}',
+                          style: TextStyle(
+                            fontFamily: 'ProductSans',
+                            fontSize: 12,
+                            color: context.textTertiary,
+                          ),
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const LegalDocScreen(
+                                title: 'License Agreement',
+                                assetPath: 'legal/eula.md',
+                              ),
+                            ),
+                          );
+                        },
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      ListTile(
+                        leading: Icon(Icons.article_outlined,
+                            color: context.accentColor),
+                        title: const Text('Terms and Conditions',
+                            style: TextStyle(fontFamily: 'ProductSans')),
+                        subtitle: Text(
+                          'Terms of use',
+                          style: TextStyle(
+                            fontFamily: 'ProductSans',
+                            fontSize: 12,
+                            color: context.textTertiary,
+                          ),
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const LegalDocScreen(
+                                title: 'Terms and Conditions',
+                                assetPath: 'legal/terms.md',
+                              ),
                             ),
                           );
                         },

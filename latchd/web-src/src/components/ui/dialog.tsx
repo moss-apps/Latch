@@ -6,10 +6,12 @@ interface DialogProps {
   open: boolean
   onClose: () => void
   title: string
+  /** Wide lays the dialog out for document reading (legal texts). */
+  wide?: boolean
   children: ReactNode
 }
 
-export function Dialog({ open, onClose, title, children }: DialogProps) {
+export function Dialog({ open, onClose, title, wide = false, children }: DialogProps) {
   useEffect(() => {
     if (!open) return
     function onKey(e: KeyboardEvent) {
@@ -38,7 +40,11 @@ export function Dialog({ open, onClose, title, children }: DialogProps) {
         onClick={onClose}
         aria-hidden="true"
       />
-      <div className="relative flex max-h-[min(640px,85dvh)] w-full max-w-[440px] flex-col rounded-2xl border border-divider bg-background shadow-2xl">
+      <div
+        className={`relative flex max-h-[min(720px,88dvh)] w-full flex-col rounded-2xl border border-divider bg-background shadow-2xl ${
+          wide ? "max-w-[760px]" : "max-w-[440px]"
+        }`}
+      >
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-divider px-5">
           <h2 className="text-base font-bold">{title}</h2>
           <button

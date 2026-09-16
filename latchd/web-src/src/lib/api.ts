@@ -15,6 +15,20 @@ export interface StatusInfo {
   dir: string
   hasLocal: boolean
   lastBackup: string | null
+  legalAccepted: boolean
+  legalVersion: number
+}
+
+export interface LegalDoc {
+  id: string
+  title: string
+  markdown: string
+}
+
+export interface LegalInfo {
+  version: number
+  accepted: boolean
+  documents: LegalDoc[]
 }
 
 export interface UsbPending {

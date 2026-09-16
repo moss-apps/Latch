@@ -56,18 +56,40 @@ jobs:
           name: latchd-${{ matrix.goos }}-${{ matrix.goarch }}
           path: latchd-*
 
-  release:
+  installer:
     needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: latchd-windows-amd64
+          path: dist
+      - name: Build Setup exe (Inno Setup)
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          python latchd/windows-setup/build-license.py
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\iscc.exe" latchd/windows-setup/latch.iss /DMyAppVersion="${{ github.ref_name }}"
+          Get-ChildItem dist/Latch-Setup-*.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: latchd-windows-setup
+          path: dist/Latch-Setup-*.exe
+
+  release:
+    needs: [build, installer]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
       - name: Checksums
-        run: cd dist && sha256sum latchd-* > SHA256SUMS
+        run: cd dist && sha256sum latchd-* Latch-Setup-*.exe > SHA256SUMS
       - uses: softprops/action-gh-release@v2
         with:
           name: v${{ github.ref_name }}
@@ -92,7 +114,9 @@ jobs:
 
             **Windows**
 
-            Download `latchd-windows-amd64.exe`, then:
+            Recommended: run `Latch-Setup-<version>.exe` — it shows the
+            License Agreement up front, installs `latchd.exe`, and can start
+            Latch Web for you. Or use the portable binary directly:
 
             ```
             .\latchd-windows-amd64.exe serve

@@ -72,18 +72,20 @@ func Serve(addr, targetDir string) error {
 		return err
 	}
 	mux.Handle("/", http.FileServer(http.FS(webRoot)))
-	mux.HandleFunc("/api/pair/start", s.handlePairStart)
+	mux.HandleFunc("/api/legal", s.handleLegal)
+	mux.HandleFunc("/api/legal/accept", s.handleLegalAccept)
+	mux.HandleFunc("/api/pair/start", s.requireLegal(s.handlePairStart))
 	mux.HandleFunc("/api/pair/stop", s.handlePairStop)
 	mux.HandleFunc("/api/pair/status", s.handlePairStatus)
-	mux.HandleFunc("/api/pair/allow", s.handlePairAllow)
-	mux.HandleFunc("/api/unlock", s.handleUnlock)
+	mux.HandleFunc("/api/pair/allow", s.requireLegal(s.handlePairAllow))
+	mux.HandleFunc("/api/unlock", s.requireLegal(s.handleUnlock))
 	mux.HandleFunc("/api/lock", s.handleLock)
 	mux.HandleFunc("/api/status", s.handleStatus)
-	mux.HandleFunc("/api/verify", s.handleVerify)
-	mux.HandleFunc("/api/browse", s.handleBrowse)
-	mux.HandleFunc("/api/export", s.handleExport)
-	mux.HandleFunc("/api/file/", s.handleFile)
-	mux.HandleFunc("/api/thumb/", s.handleThumb)
+	mux.HandleFunc("/api/verify", s.requireLegal(s.handleVerify))
+	mux.HandleFunc("/api/browse", s.requireLegal(s.handleBrowse))
+	mux.HandleFunc("/api/export", s.requireLegal(s.handleExport))
+	mux.HandleFunc("/api/file/", s.requireLegal(s.handleFile))
+	mux.HandleFunc("/api/thumb/", s.requireLegal(s.handleThumb))
 
 	return http.ListenAndServe(addr, mux)
 }
@@ -410,6 +412,8 @@ func (s *Session) handleStatus(w http.ResponseWriter, r *http.Request) {
 	out := map[string]any{
 		"unlocked": unlocked, "files": files, "dir": s.targetDir,
 		"hasLocal": false,
+		"legalAccepted": s.isLegalAccepted(),
+		"legalVersion":  LegalVersion,
 	}
 	if raw, _ := t.StoredManifest(); raw != nil {
 		out["hasLocal"] = true

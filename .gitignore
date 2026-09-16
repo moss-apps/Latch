@@ -66,6 +66,9 @@ latch-backup/
 # internal/webui/web/ IS committed so `make latchd` needs no Node
 latchd/web-src/node_modules/
 
+# Inno Setup EULA text (generated from legal/ by windows-setup/build-license.py)
+latchd/windows-setup/license.txt
+
 # JS migration editor types (vendored by `make pb-types`; 787 KB, regenerable)
 pocketbase/pb_data/
 

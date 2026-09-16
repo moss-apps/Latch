@@ -191,6 +191,53 @@ html.viewer-open {
   overflow: hidden;
 }
 
+/* Rendered legal markdown (lib/markdown.tsx). */
+.md {
+  @apply text-sm leading-relaxed text-text2;
+}
+.md h1 {
+  @apply mt-7 mb-3 text-2xl font-bold tracking-tight text-foreground;
+}
+.md h1:first-child {
+  @apply mt-0;
+}
+.md h2 {
+  @apply mt-6 mb-2 text-lg font-bold text-foreground;
+}
+.md h3 {
+  @apply mt-5 mb-1.5 text-base font-semibold text-foreground;
+}
+.md h4 {
+  @apply mt-4 mb-1.5 text-sm font-semibold text-foreground;
+}
+.md p {
+  @apply my-2.5;
+}
+.md ul {
+  @apply my-2.5 list-disc space-y-1 pl-6;
+}
+.md ol {
+  @apply my-2.5 list-decimal space-y-1 pl-6;
+}
+.md li {
+  @apply leading-relaxed;
+}
+.md a {
+  @apply text-brand underline underline-offset-2;
+}
+.md code {
+  @apply rounded-md bg-bg2 px-1.5 py-0.5 font-mono text-[12px] text-foreground;
+}
+.md hr {
+  @apply my-5 border-divider;
+}
+.md blockquote {
+  @apply my-3 border-l-2 border-divider pl-4 text-text3;
+}
+.md strong {
+  @apply font-semibold text-foreground;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

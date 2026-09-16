@@ -59,9 +59,15 @@ LATCHD_BIN    := latchd/latchd
 ## mobile), else "dev". Exact match so dirty checkouts never stamp.
 LATCHD_VERSION ?= $(shell v=$$(git describe --tags --exact-match --match '0.*' 2>/dev/null); echo $${v:-dev})
 
-.PHONY: latchd-test latchd-web latchd-release clean-latchd
+.PHONY: latchd-test latchd-web latchd-release latchd-installer legal-sync clean-latchd
 
-latchd: $(shell find $(LATCHD_MODULE) -name '*.go' -o -path '*internal/webui/web/*' -type f)
+## Sync the canonical legal texts into the embedded legaldocs/ dir the
+## latchd binary ships (go:embed). A mismatch fails the webui Go tests.
+legal-sync:
+	@mkdir -p $(LATCHD_MODULE)/internal/webui/legaldocs
+	@cp legal/eula.md legal/terms.md legal/privacy.md $(LATCHD_MODULE)/internal/webui/legaldocs/
+
+latchd: legal-sync $(shell find $(LATCHD_MODULE) -name '*.go' -o -path '*internal/webui/web/*' -type f)
 	cd $(LATCHD_MODULE) && CGO_ENABLED=0 go build -trimpath -o $(CURDIR)/$(LATCHD_BIN) ./cmd/latchd
 	@echo "-> $(LATCHD_BIN)"
 
@@ -75,7 +81,7 @@ latchd-web:
 
 ## Cross-build release artifacts into dist/ — the same set the
 ## release-latchd.yml workflow attaches on latchd-v* tags. Run at a tag.
-latchd-release:
+latchd-release: legal-sync
 	@set -e; mkdir -p dist; \
 	for target in linux/amd64 linux/arm64 windows/amd64; do \
 		os=$${target%/*}; arch=$${target#*/}; ext=; \
@@ -87,6 +93,16 @@ latchd-release:
 	done; \
 	cd dist && sha256sum latchd-* > SHA256SUMS; \
 	echo "-> dist/ (latchd $(LATCHD_VERSION))"
+
+## Windows installer (Inno Setup): regenerates the EULA text from legal/
+## then compiles latchd/windows-setup/latch.iss. Needs iscc — on Windows
+## (`choco install innosetup`); CI builds this in release-latchd.yml.
+## Expects dist/latchd-windows-amd64.exe from `make latchd-release`.
+latchd-installer:
+	python3 $(LATCHD_MODULE)/windows-setup/build-license.py
+	iscc $(LATCHD_MODULE)/windows-setup/latch.iss /DMyAppVersion=$(LATCHD_VERSION)
+	cd dist && sha256sum Latch-Setup-* >> SHA256SUMS; \
+	echo "-> dist/ (Latch Setup $(LATCHD_VERSION))"
 
 clean-latchd:
 	rm -f $(LATCHD_BIN)
