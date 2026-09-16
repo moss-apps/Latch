@@ -403,7 +403,7 @@ export function PairingView({
   const steps = restore ? STEPS_RESTORE : STEPS_PUSH
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto w-full max-w-[1100px] px-6 py-10 lg:py-16">
+      <div className="mx-auto w-full max-w-[1100px] px-4 py-8 sm:px-6 lg:px-8 lg:py-16">
         {hasLocal && (
           <button
             type="button"
@@ -415,14 +415,14 @@ export function PairingView({
             Back
           </button>
         )}
-        <div className="grid gap-14 lg:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="flex flex-col gap-6">
-          <Logomark className="h-16 text-logo" />
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-[auto_1fr] lg:gap-14">
+        <div className="flex flex-col gap-5 sm:gap-6 order-1 lg:order-none lg:col-start-1 lg:row-start-1">
+          <Logomark className="h-12 text-logo sm:h-16" />
           <div>
-            <h1 className="text-4xl font-bold tracking-tight">
+            <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
               {restore ? "Restore to your phone" : "Pair your phone"}
             </h1>
-            <p className="mt-3 max-w-md text-lg leading-relaxed text-text2">
+            <p className="mt-2 max-w-md text-base leading-relaxed text-text2 sm:mt-3 sm:text-lg">
               {restore ? (
                 <>
                   This screen serves the backup stored on this computer. Your
@@ -438,6 +438,9 @@ export function PairingView({
               )}
             </p>
           </div>
+        </div>
+
+        <div className="flex flex-col gap-6 order-3 lg:order-none lg:col-start-1 lg:row-start-2">
           <ol className="flex max-w-md flex-col gap-3.5">
             {steps.map((s, i) => (
               <li key={i} className="flex items-start gap-3">
@@ -449,7 +452,7 @@ export function PairingView({
             ))}
           </ol>
           <div
-            className="flex max-w-md gap-3 rounded-xl bg-error/10 p-4"
+            className="flex max-w-md gap-3 rounded-xl bg-error/10 p-3.5 sm:p-4"
             role="note"
           >
             <Mi n="warning" className="mt-0.5 shrink-0 text-[18px] text-error" />
@@ -461,7 +464,7 @@ export function PairingView({
           </div>
         </div>
 
-        <div className="h-fit w-full rounded-2xl border border-divider bg-card p-6 shadow-lg shadow-black/5">
+        <div className="h-fit w-full rounded-2xl border border-divider bg-card p-4 shadow-lg shadow-black/5 order-2 sm:p-6 lg:order-none lg:col-start-2 lg:row-span-2 lg:row-start-1">
           <div
             className="mb-5 grid grid-cols-2 gap-1 rounded-lg bg-background p-1"
             role="tablist"
@@ -479,7 +482,7 @@ export function PairingView({
                 role="tab"
                 aria-selected={mode === value}
                 onClick={() => switchMode(value)}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                className={`rounded-md px-2 py-1.5 text-sm font-medium transition-colors sm:px-3 ${
                   mode === value
                     ? "bg-card text-text1 shadow-sm"
                     : "text-text3 hover:text-text2"
@@ -542,28 +545,28 @@ export function PairingView({
 
           <div className="mt-5 space-y-2.5">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-xs font-bold tracking-[0.07em] text-text3 uppercase">
+              <span className="shrink-0 text-xs font-bold tracking-[0.07em] text-text3 uppercase">
                 Address
               </span>
               <button
                 type="button"
                 title="Copy address"
                 disabled={!chipsEnabled}
-                className="truncate text-sm font-medium transition-colors hover:text-brand disabled:text-text3"
+                className="min-w-0 truncate text-right text-sm font-medium transition-colors hover:text-brand disabled:text-text3"
                 onClick={() => copyText(creds?.host ?? "", () => {})}
               >
                 {creds?.host ?? "—"}
               </button>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span className="text-xs font-bold tracking-[0.07em] text-text3 uppercase">
+              <span className="shrink-0 text-xs font-bold tracking-[0.07em] text-text3 uppercase">
                 Pairing code
               </span>
               <button
                 type="button"
                 title="Copy pairing code"
                 disabled={!chipsEnabled}
-                className="truncate font-mono text-sm font-medium transition-colors hover:text-brand disabled:text-text3"
+                className="min-w-0 truncate text-right font-mono text-sm font-medium transition-colors hover:text-brand disabled:text-text3"
                 onClick={() => copyText((creds?.token ?? "").replace(/\s+/g, ""), () => {})}
               >
                 {creds?.token ?? "—"}
