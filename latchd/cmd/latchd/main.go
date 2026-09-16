@@ -78,6 +78,7 @@ func cmdServe(args []string) error {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
 	addr := fs.String("addr", "127.0.0.1:7800", "loopback listen address")
 	dir := fs.String("dir", defaultDir, "local backup directory")
+	acceptLegal := fs.Bool("accept-legal", false, "record acceptance of the current legal version (EULA/Terms/Privacy) without opening the web gate")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -85,7 +86,14 @@ func cmdServe(args []string) error {
 	if fs.NArg() > 0 {
 		listen = fs.Arg(0)
 	}
+	if *acceptLegal {
+		if err := webui.AcceptLegal(*dir); err != nil {
+			return err
+		}
+		fmt.Printf("latchd %s — legal v%d accepted\n", version, webui.LegalVersion)
+	}
 	fmt.Printf("latchd %s — web UI on http://%s (loopback only)\n", version, listen)
+	fmt.Printf("By using Latch Web you accept the License Agreement, Terms and Privacy Policy (open http://%s/legal or the Legal section in Settings).\n", listen)
 	return webui.Serve(listen, *dir)
 }
 

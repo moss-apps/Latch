@@ -217,6 +217,44 @@ export function SettingsDialog({
             })}
           </div>
         </section>
+
+        <Separator />
+
+        <section>
+          <SectionTitle>Legal</SectionTitle>
+          <div className="space-y-1 px-1 text-sm">
+            <a
+              href="/legal/eula.md"
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-2 py-1 text-text2 underline-offset-2 hover:underline"
+            >
+              <Mi n="verified" className="text-[16px]" />
+              License Agreement (EULA)
+            </a>
+            <a
+              href="/legal/terms.md"
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-2 py-1 text-text2 underline-offset-2 hover:underline"
+            >
+              <Mi n="description" className="text-[16px]" />
+              Terms and Conditions
+            </a>
+            <a
+              href="/legal/privacy.md"
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-2 py-1 text-text2 underline-offset-2 hover:underline"
+            >
+              <Mi n="lock" className="text-[16px]" />
+              Privacy Policy
+            </a>
+          </div>
+          <p className="px-1 pt-2 text-xs leading-relaxed text-text3">
+            Accepted before first use. Bumped versions ask again.
+          </p>
+        </section>
       </div>
     </Dialog>
   )

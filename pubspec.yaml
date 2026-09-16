@@ -101,6 +101,9 @@ flutter:
     - assets/reverse_locker_logo_nobg.svg
     - assets/reverse_locker_logo_transparent.png
     - assets/privacy_policy.md
+    - legal/eula.md
+    - legal/terms.md
+    - legal/privacy.md
     - CHANGELOG.md
     - whats_new.json
   # An image asset can refer to one or more resolution-specific "variants", see

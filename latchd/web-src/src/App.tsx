@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { LegalGate } from "@/components/LegalGate"
 import { Logomark } from "@/components/Logomark"
 import { MainView } from "@/components/MainView"
 import { Mi } from "@/components/Mi"
@@ -10,6 +11,7 @@ import { setTheme, useTheme } from "@/lib/theme"
 function App() {
   const t = useTheme()
   const [booted, setBooted] = useState(false)
+  const [legalOk, setLegalOk] = useState(true)
   const [view, setView] = useState<"main" | "pair">("main")
   const [unlocked, setUnlocked] = useState(false)
   const [hasLocal, setHasLocal] = useState(false)
@@ -21,6 +23,7 @@ function App() {
     getJSON<StatusInfo>("/api/status")
       .then((d) => {
         setHasLocal(!!d.hasLocal)
+        setLegalOk(d.legalAccepted !== false)
         if (d.unlocked) {
           setUnlocked(true)
           setView("main")
@@ -62,7 +65,10 @@ function App() {
     if (!u && note) setUnlockNote(note)
     setView("main")
     getJSON<StatusInfo>("/api/status")
-      .then((d) => setHasLocal(!!d.hasLocal))
+      .then((d) => {
+        setHasLocal(!!d.hasLocal)
+        setLegalOk(d.legalAccepted !== false)
+      })
       .catch(() => {})
   }
 
@@ -127,6 +133,26 @@ function App() {
           <div className="grid h-full place-items-center">
             <span className="size-8 animate-spin rounded-full border-[3px] border-divider border-t-brand" />
           </div>
+        ) : !legalOk ? (
+          <LegalGate
+            onAccepted={() => {
+              setLegalOk(true)
+              getJSON<StatusInfo>("/api/status")
+                .then((d) => {
+                  setHasLocal(!!d.hasLocal)
+                  if (d.unlocked) {
+                    setUnlocked(true)
+                    setView("main")
+                  } else if (d.hasLocal) {
+                    setUnlocked(false)
+                    setView("main")
+                  } else {
+                    setView("pair")
+                  }
+                })
+                .catch(() => {})
+            }}
+          />
         ) : view === "pair" ? (
           <PairingView hasLocal={hasLocal} unlocked={unlocked} onEnterMain={enterMain} />
         ) : (
