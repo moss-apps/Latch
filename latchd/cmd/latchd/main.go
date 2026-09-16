@@ -31,6 +31,7 @@ import (
 )
 
 const defaultDir = "latch-backup"
+const defaultAddr = "127.0.0.1:7800"
 
 // version is stamped at release time from the app-version tag:
 // -ldflags "-X main.version=0.18.0-beta.1" (mirrors the mobile release).
@@ -38,12 +39,21 @@ var version = "dev"
 
 func main() {
 	if len(os.Args) < 2 {
-		// Double-clicked with no subcommand (typical on Windows): serve
+		// Double-clicked with no subcommand (typical on Windows): if a
+		// Latch Web instance is already up, just open it; otherwise serve
 		// and open the browser instead of printing usage and vanishing.
+		if ln, err := net.Listen("tcp", defaultAddr); err != nil {
+			openBrowser(browserURL(defaultAddr))
+			return
+		} else {
+			_ = ln.Close()
+		}
 		if err := cmdServe(nil, true); err != nil {
 			fmt.Fprintf(os.Stderr, "latchd: %v\n", err)
-			fmt.Println("Press Enter to close.")
-			bufio.NewReader(os.Stdin).ReadString('\n')
+			if runtime.GOOS == "windows" {
+				fmt.Println("Press Enter to close.")
+				bufio.NewReader(os.Stdin).ReadString('\n')
+			}
 			os.Exit(1)
 		}
 		return
@@ -129,7 +139,7 @@ Credential: --password flag or LATCHD_PASSWORD env (never stored).`)
 
 func cmdServe(args []string, open bool) error {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
-	addr := fs.String("addr", "127.0.0.1:7800", "loopback listen address")
+	addr := fs.String("addr", defaultAddr, "loopback listen address")
 	dir := fs.String("dir", defaultServeDir(), "local backup directory")
 	acceptLegal := fs.Bool("accept-legal", false, "record acceptance of the current legal version (EULA/Terms/Privacy) without opening the web gate")
 	openFlag := fs.Bool("open", false, "open the web UI in the default browser once serving")

@@ -64,13 +64,72 @@ mkdir -p "$BINDIR"
 chmod +x "$tmp/$asset"
 mv "$tmp/$asset" "$BINDIR/latchd"
 
+# The binary must at least run on this machine.
+"$BINDIR/latchd" --version >/dev/null 2>&1 ||
+	fail "installed binary failed to run; wrong architecture?"
+
+DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}"
+
+# App icon: the Latch dot-L on a rounded blue tile.
+mkdir -p "$DATA_DIR/icons/hicolor/scalable/apps"
+cat >"$DATA_DIR/icons/hicolor/scalable/apps/latchd.svg" <<'EOF'
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-60 -60 601 772">
+  <rect x="-60" y="-60" width="601" height="772" rx="110" fill="#1976d2"/>
+  <g fill="#ffffff">
+    <circle cx="31.36" cy="318.03" r="31.36"/><circle cx="31.36" cy="422.57" r="31.36"/><circle cx="31.36" cy="527.1" r="31.36"/><circle cx="31.36" cy="620.34" r="31.36"/>
+    <circle cx="80.88" cy="120.26" r="31.36"/><circle cx="80.88" cy="224.8" r="31.36"/>
+    <circle cx="135.6" cy="31.36" r="31.36"/><circle cx="135.6" cy="318.03" r="31.36"/><circle cx="135.6" cy="620.34" r="31.36"/>
+    <circle cx="241.15" cy="31.36" r="31.36"/><circle cx="240.14" cy="318.03" r="31.36"/><circle cx="240.14" cy="620.34" r="31.36"/>
+    <circle cx="345.4" cy="31.36" r="31.36"/><circle cx="344.68" cy="318.03" r="31.36"/><circle cx="344.68" cy="620.34" r="31.36"/>
+    <circle cx="397.52" cy="120.26" r="31.36"/><circle cx="397.52" cy="224.8" r="31.36"/>
+    <circle cx="449.64" cy="318.03" r="31.36"/><circle cx="449.64" cy="422.57" r="31.36"/><circle cx="449.64" cy="527.1" r="31.36"/><circle cx="449.64" cy="620.34" r="31.36"/>
+  </g>
+</svg>
+EOF
+
+# Application menu entry; no-arg latchd serves and opens the browser.
+mkdir -p "$DATA_DIR/applications"
+cat >"$DATA_DIR/applications/latchd.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Latch Web
+GenericName=Desktop Backup
+Comment=Host Latch Web for the Latch mobile app
+Exec="$BINDIR/latchd"
+Terminal=false
+Icon=latchd
+Categories=Utility;FileTools;
+Keywords=latch;backup;vault;
+StartupNotify=true
+EOF
+command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$DATA_DIR/applications" 2>/dev/null || true
+
+# Optional systemd user service (installed but not enabled).
+mkdir -p "$CONFIG_DIR/systemd/user"
+cat >"$CONFIG_DIR/systemd/user/latchd.service" <<EOF
+[Unit]
+Description=Latch Web (desktop backup companion)
+After=network.target
+
+[Service]
+ExecStart=$BINDIR/latchd serve --addr 127.0.0.1:7800
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
+EOF
+
 case ":$PATH:" in
 	*":$BINDIR:"*) ;;
 	*) echo ">> note: $BINDIR is not in your PATH" ;;
 esac
 
-echo ">> installed $BINDIR/latchd"
+echo ">> installed $BINDIR/latchd ($VERSION)"
+echo ">> installed app menu entry (Latch Web), icon and systemd unit"
 echo
-echo "Start it:    latchd serve"
-echo "Then open:   http://127.0.0.1:7800"
+echo "Start it:     latchd   (or launch Latch Web from your app menu)"
+echo "Web UI:       http://127.0.0.1:7800"
+echo "Always on:    systemctl --user enable --now latchd"
 echo "On the phone: Latch > Settings > Storage > Desktop Backup > scan the QR"
