@@ -25,19 +25,6 @@ enum VaultedFileType {
     }
   }
 
-  String get icon {
-    switch (this) {
-      case VaultedFileType.image:
-        return 'picture_icon.png';
-      case VaultedFileType.video:
-        return 'video_icon.png';
-      case VaultedFileType.song:
-      case VaultedFileType.document:
-      case VaultedFileType.other:
-        return 'otherfiles_icon.png';
-    }
-  }
-
   static VaultedFileType fromString(String value) {
     switch (value.toLowerCase()) {
       case 'image':
