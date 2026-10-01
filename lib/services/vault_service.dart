@@ -164,7 +164,7 @@ class VaultService {
   Future<bool> removeFile(String fileId, {bool isDecoy = false}) =>
       _files.removeFile(fileId, isDecoy: isDecoy);
 
-  Future<int> removeFiles(
+  Future<BulkDeleteResult> removeFiles(
     List<String> fileIds, {
     bool isDecoy = false,
     void Function(int current, int total, {int currentSize, int totalSize})?

@@ -517,4 +517,88 @@ void main() {
       expect(healed.map((f) => f.id), ['lost']);
     });
   });
+
+  group('removeFiles failure safety', () {
+    VaultedFile undeletable(String id) => VaultedFile(
+          id: id,
+          originalName: '$id.jpg',
+          vaultPath: '/proc/version',
+          type: VaultedFileType.image,
+          mimeType: 'image/jpeg',
+          fileSize: 5,
+          dateAdded: DateTime(2024, 1, 1),
+        );
+
+    test('failed deletion keeps only the failed entry and can be retried',
+        () async {
+      if (!Platform.isLinux) return;
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+      await vault.updateSettings(
+        const VaultSettings().copyWith(secureDelete: false),
+      );
+
+      final good = _pbEraFile('good', tmpDir);
+      final bad = undeletable('bad');
+      vault.store.cachedFiles = [good, bad];
+      await vault.store.saveFileIndex();
+
+      final result = await vault.removeFiles(['good', 'bad']);
+
+      expect(result.removed, ['good']);
+      expect(result.failed, ['bad']);
+      expect(result.allSucceeded, isFalse);
+      expect(File(good.vaultPath).existsSync(), isFalse);
+      expect((await vault.getAllFiles()).map((f) => f.id), ['bad']);
+
+      final fixedPath = '${tmpDir.path}/bad-fixed';
+      File(fixedPath).writeAsStringSync('blob-bad');
+      await vault.updateFile(bad.copyWith(vaultPath: fixedPath));
+
+      final retry = await vault.removeFiles(['bad']);
+      expect(retry.allSucceeded, isTrue);
+      expect(await vault.getAllFiles(), isEmpty);
+    });
+
+    test('failed thumbnail deletion keeps the entry and can be retried',
+        () async {
+      if (!Platform.isLinux) return;
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+      await vault.updateSettings(
+        const VaultSettings().copyWith(secureDelete: false),
+      );
+
+      final file = _pbEraFile('thumbed', tmpDir)
+          .copyWith(thumbnailPath: '/proc/version');
+      vault.store.cachedFiles = [file];
+      await vault.store.saveFileIndex();
+
+      final result = await vault.removeFiles(['thumbed']);
+
+      expect(result.removed, isEmpty);
+      expect(result.failed, ['thumbed']);
+      expect(await vault.getAllFiles(), hasLength(1));
+
+      await vault.updateFile(file.copyWith(thumbnailPath: ''));
+      final retry = await vault.removeFiles(['thumbed']);
+      expect(retry.allSucceeded, isTrue);
+      expect(await vault.getAllFiles(), isEmpty);
+    });
+
+    test('secure delete failure keeps the entry', () async {
+      if (!Platform.isLinux) return;
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+      await vault.updateSettings(
+        const VaultSettings().copyWith(secureDelete: true),
+      );
+
+      vault.store.cachedFiles = [undeletable('bad')];
+      await vault.store.saveFileIndex();
+
+      final result = await vault.removeFiles(['bad']);
+
+      expect(result.removed, isEmpty);
+      expect(result.failed, ['bad']);
+      expect((await vault.getAllFiles()).map((f) => f.id), ['bad']);
+    });
+  });
 }
