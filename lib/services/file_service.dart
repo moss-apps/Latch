@@ -55,6 +55,22 @@ class _BatchPreparationResult {
   });
 }
 
+/// Outcome of a bulk delete.
+///
+/// Only [removed] entries were deleted from disk and dropped from the index.
+/// [failed] entries are still in the index and can be retried.
+class BulkDeleteResult {
+  final List<String> removed;
+  final List<String> failed;
+
+  const BulkDeleteResult({required this.removed, required this.failed});
+
+  bool get allSucceeded => failed.isEmpty;
+  bool get anyRemoved => removed.isNotEmpty;
+  int get removedCount => removed.length;
+  int get failedCount => failed.length;
+}
+
 /// File CRUD, import, export, re-encrypt, notes/password registration.
 /// Splits out of `VaultService`.
 ///
@@ -567,6 +583,32 @@ class FileService {
     }
   }
 
+  /// Deletes the on-disk payload and thumbnail for [file].
+  ///
+  /// Throws when either deletion fails so callers can retain the index entry
+  /// and let the user retry.
+  Future<void> _deleteFilePayload(VaultedFile file) async {
+    final vaultFile = File(file.vaultPath);
+    if (await vaultFile.exists()) {
+      if (_store.cachedSettings?.secureDelete == true) {
+        final deleted = await _encryptionService.secureDelete(file.vaultPath);
+        if (!deleted) {
+          throw FileSystemException('Secure delete failed', file.vaultPath);
+        }
+      } else {
+        await vaultFile.delete();
+      }
+    }
+
+    final thumbnailPath = file.thumbnailPath;
+    if (thumbnailPath != null) {
+      final thumbFile = File(thumbnailPath);
+      if (await thumbFile.exists()) {
+        await thumbFile.delete();
+      }
+    }
+  }
+
   Future<bool> removeFile(String fileId, {bool isDecoy = false}) async {
     try {
       final files = await _store.loadFileIndex(isDecoy: isDecoy);
@@ -576,21 +618,7 @@ class FileService {
 
       final file = files[fileIndex];
 
-      final vaultFile = File(file.vaultPath);
-      if (await vaultFile.exists()) {
-        if (_store.cachedSettings?.secureDelete == true) {
-          await _encryptionService.secureDelete(file.vaultPath);
-        } else {
-          await vaultFile.delete();
-        }
-      }
-
-      if (file.thumbnailPath != null) {
-        final thumbFile = File(file.thumbnailPath!);
-        if (await thumbFile.exists()) {
-          await thumbFile.delete();
-        }
-      }
+      await _deleteFilePayload(file);
 
       if (!isDecoy && file.albumIds.isNotEmpty) {
         for (final albumId in file.albumIds) {
@@ -624,7 +652,7 @@ class FileService {
     }
   }
 
-  Future<int> removeFiles(
+  Future<BulkDeleteResult> removeFiles(
     List<String> fileIds, {
     bool isDecoy = false,
     void Function(int current, int total, {int currentSize, int totalSize})?
@@ -637,26 +665,13 @@ class FileService {
 
     final albumUpdates = <String, Set<String>>{};
     final folderUpdates = <String, Set<String>>{};
-    int removed = 0;
+    final removedIds = <String>[];
+    final failedIds = <String>[];
     int currentSize = 0;
 
     for (final file in filesToDelete) {
       try {
-        final vaultFile = File(file.vaultPath);
-        if (await vaultFile.exists()) {
-          if (_store.cachedSettings?.secureDelete == true) {
-            await _encryptionService.secureDelete(file.vaultPath);
-          } else {
-            await vaultFile.delete();
-          }
-        }
-
-        if (file.thumbnailPath != null) {
-          final thumbFile = File(file.thumbnailPath!);
-          if (await thumbFile.exists()) {
-            await thumbFile.delete();
-          }
-        }
+        await _deleteFilePayload(file);
 
         if (!isDecoy && file.albumIds.isNotEmpty) {
           for (final albumId in file.albumIds) {
@@ -668,13 +683,18 @@ class FileService {
           folderUpdates.putIfAbsent(file.folderId!, () => {}).add(file.id);
         }
 
-        removed++;
+        removedIds.add(file.id);
         currentSize += file.fileSize;
-        onProgress?.call(removed, fileIds.length,
-            currentSize: currentSize, totalSize: totalSize);
       } catch (e) {
         debugPrint('Error deleting file ${file.id}: $e');
+        failedIds.add(file.id);
       }
+      onProgress?.call(
+        removedIds.length + failedIds.length,
+        fileIds.length,
+        currentSize: currentSize,
+        totalSize: totalSize,
+      );
     }
 
     if (!isDecoy && albumUpdates.isNotEmpty) {
@@ -711,16 +731,18 @@ class FileService {
       if (foldersChanged) await _store.saveFolders();
     }
 
-    final deleteIdSet = filesToDelete.map((f) => f.id).toSet();
-    if (isDecoy) {
-      _store.cachedDecoyFiles!.removeWhere((f) => deleteIdSet.contains(f.id));
-      await _store.saveFileIndex(isDecoy: true);
-    } else {
-      _store.cachedFiles!.removeWhere((f) => deleteIdSet.contains(f.id));
-      await _store.saveFileIndex();
+    if (removedIds.isNotEmpty) {
+      final removedSet = removedIds.toSet();
+      if (isDecoy) {
+        _store.cachedDecoyFiles!.removeWhere((f) => removedSet.contains(f.id));
+        await _store.saveFileIndex(isDecoy: true);
+      } else {
+        _store.cachedFiles!.removeWhere((f) => removedSet.contains(f.id));
+        await _store.saveFileIndex();
+      }
     }
 
-    return removed;
+    return BulkDeleteResult(removed: removedIds, failed: failedIds);
   }
 
   Future<List<VaultedFile>> getAllFiles({bool isDecoy = false}) async {
