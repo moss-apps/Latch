@@ -834,14 +834,19 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
     );
 
     if (confirmed == true) {
-      final success =
+      final result =
           await ref.read(vaultNotifierProvider.notifier).deleteFiles(
                 _selectedFiles.toList(),
               );
 
       if (!mounted) return;
-      if (success) {
+      if (result.allSucceeded) {
         ToastUtils.showSuccess('Files deleted');
+        ref.invalidate(filesInAlbumProvider(widget.albumId));
+        ref.invalidate(albumsNotifierProvider);
+      } else if (result.anyRemoved) {
+        ToastUtils.showError(
+            'Deleted ${result.removedCount}; ${result.failedCount} could not be deleted');
         ref.invalidate(filesInAlbumProvider(widget.albumId));
         ref.invalidate(albumsNotifierProvider);
       } else {
