@@ -217,7 +217,7 @@ class FolderService {
     String? parentFolderId,
     bool recursive = true,
     bool deleteOriginals = false,
-    bool encrypt = false,
+    bool? encrypt,
     bool isDecoy = false,
     Function(int current, int total)? onProgress,
     Function(String fileName, int fileNumber, int total)? onFileProgress,

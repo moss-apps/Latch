@@ -324,7 +324,7 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
       ),
     );
 
-    final success = await ref.read(vaultNotifierProvider.notifier).deleteFiles(
+    final result = await ref.read(vaultNotifierProvider.notifier).deleteFiles(
           selectedFiles.toList(),
           onProgress: (current, total, {int? currentSize, int? totalSize}) {
             progressState.value = progressState.value.copyWith(
@@ -341,8 +341,11 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
 
     _exitSelectionMode();
 
-    if (success) {
+    if (result.allSucceeded) {
       ToastUtils.showSuccess('Files deleted');
+    } else if (result.anyRemoved) {
+      ToastUtils.showError(
+          'Deleted ${result.removedCount}; ${result.failedCount} could not be deleted');
     } else {
       ToastUtils.showError('Failed to delete some files');
     }

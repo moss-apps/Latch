@@ -1360,7 +1360,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
     );
 
     if (confirmed == true) {
-      final success = await ref
+      final result = await ref
           .read(vaultNotifierProvider.notifier)
           .deleteFiles(_selectedFiles.toList());
 
@@ -1368,8 +1368,11 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
       _invalidateCurrentFileView();
       ref.invalidate(tagsProvider);
 
-      if (success) {
+      if (result.allSucceeded) {
         ToastUtils.showSuccess('Files deleted');
+      } else if (result.anyRemoved) {
+        ToastUtils.showError(
+            'Deleted ${result.removedCount}; ${result.failedCount} could not be deleted');
       } else {
         ToastUtils.showError('Failed to delete some files');
       }

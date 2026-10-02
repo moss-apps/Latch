@@ -997,9 +997,9 @@ class ExplorerFileGrid extends ConsumerWidget {
     );
 
     if (confirmed == true) {
-      final success =
+      final result =
           await ref.read(vaultNotifierProvider.notifier).deleteFiles([file.id]);
-      if (success) {
+      if (result.allSucceeded) {
         ToastUtils.showSuccess('File deleted');
       } else {
         ToastUtils.showError('Failed to delete file');

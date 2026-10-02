@@ -25,19 +25,6 @@ enum VaultedFileType {
     }
   }
 
-  String get icon {
-    switch (this) {
-      case VaultedFileType.image:
-        return 'picture_icon.png';
-      case VaultedFileType.video:
-        return 'video_icon.png';
-      case VaultedFileType.song:
-      case VaultedFileType.document:
-      case VaultedFileType.other:
-        return 'otherfiles_icon.png';
-    }
-  }
-
   static VaultedFileType fromString(String value) {
     switch (value.toLowerCase()) {
       case 'image':
@@ -93,6 +80,11 @@ class VaultedFile {
   final String? remoteHash;
   final bool syncedDeleted;
 
+  /// sha256-hex of the stored plaintext payload. Lets imports verify that a
+  /// same-name/same-size file already in the vault really has the same bytes
+  /// before the source original is skipped or deleted.
+  final String? contentHash;
+
   const VaultedFile({
     required this.id,
     required this.originalName,
@@ -123,6 +115,7 @@ class VaultedFile {
     this.modifiedAt,
     this.remoteHash,
     this.syncedDeleted = false,
+    this.contentHash,
   });
 
   /// Create a copy with updated fields
@@ -156,6 +149,7 @@ class VaultedFile {
     DateTime? modifiedAt,
     String? remoteHash,
     bool? syncedDeleted,
+    String? contentHash,
   }) {
     return VaultedFile(
       id: id ?? this.id,
@@ -187,6 +181,7 @@ class VaultedFile {
       modifiedAt: modifiedAt ?? this.modifiedAt,
       remoteHash: remoteHash ?? this.remoteHash,
       syncedDeleted: syncedDeleted ?? this.syncedDeleted,
+      contentHash: contentHash ?? this.contentHash,
     );
   }
 
@@ -310,6 +305,7 @@ class VaultedFile {
       'modifiedAt': modifiedAt?.toIso8601String(),
       'remoteHash': remoteHash,
       'syncedDeleted': syncedDeleted,
+      'contentHash': contentHash,
     };
   }
 
@@ -361,6 +357,7 @@ class VaultedFile {
           : null,
       remoteHash: json['remoteHash'] as String?,
       syncedDeleted: json['syncedDeleted'] as bool? ?? false,
+      contentHash: json['contentHash'] as String?,
     );
   }
 

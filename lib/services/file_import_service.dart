@@ -98,13 +98,14 @@ class FileImportService {
           await _filterDuplicates(filesToVault, fileSizesByPath);
       if (skippedDuplicates.isNotEmpty) {
         debugPrint(
-            '[FileImport] Skipping ${skippedDuplicates.length} potential duplicates');
+            '[FileImport] Skipping ${skippedDuplicates.length} verified duplicates');
       }
       if (filesToImport.isEmpty) {
         return ImportResult(
           success: false,
           error: 'All selected files already exist in vault',
           importedFiles: [],
+          skippedDuplicates: skippedDuplicates.length,
         );
       }
 
@@ -119,22 +120,33 @@ class FileImportService {
       debugPrint('[FileImport] Imported ${imported.length} files to vault');
 
       // Delete originals from gallery if requested and import was successful
-      bool deletedFromGallery = false;
+      int requestedOriginals = 0;
+      int deletedOriginalsCount = 0;
       if (deleteOriginals && imported.isNotEmpty && assetsToDelete.isNotEmpty) {
         assetsToDelete = _gateAssetsToDelete(assetsToDelete, imported);
+        requestedOriginals = assetsToDelete.length;
       }
-      if (deleteOriginals && imported.isNotEmpty && assetsToDelete.isNotEmpty) {
+      if (requestedOriginals > 0) {
         debugPrint(
             '[FileImport] Attempting to delete ${assetsToDelete.length} assets from gallery');
-        deletedFromGallery = await _deleteAssetsFromGallery(assetsToDelete);
-        debugPrint('[FileImport] Gallery deletion result: $deletedFromGallery');
+        deletedOriginalsCount = await _deleteAssetsFromGallery(assetsToDelete);
+        debugPrint(
+            '[FileImport] Gallery deletion result: $deletedOriginalsCount/$requestedOriginals');
       }
+      final retainedOriginals =
+          (requestedOriginals - deletedOriginalsCount).clamp(0, requestedOriginals);
 
       return ImportResult(
         success: true,
         importedFiles: imported,
-        message: 'Imported ${imported.length} image(s)',
-        deletedOriginals: deletedFromGallery,
+        message:
+            'Imported ${imported.length} image(s)${retainedOriginals > 0 ? " ($retainedOriginals original(s) still on device)" : ""}',
+        deletedOriginals:
+            requestedOriginals > 0 && retainedOriginals == 0,
+        retainedOriginals: retainedOriginals,
+        skippedDuplicates: skippedDuplicates.length,
+        failedCount: (filesToImport.length - imported.length)
+            .clamp(0, filesToImport.length),
       );
     } catch (e) {
       debugPrint('[FileImport] Error importing images from gallery: $e');
@@ -239,37 +251,22 @@ class FileImportService {
 
       debugPrint('[FileImport] Adding ${filesToVault.length} files to vault');
 
-      // Duplicate check by name AND size — name alone skips distinct files
-      // that just happen to share a filename.
-      final existingFiles = await _vaultService.getAllFiles(isDecoy: isDecoy);
-      final existingByName = <String, Set<int>>{};
-      for (final f in existingFiles) {
-        existingByName
-            .putIfAbsent(f.originalName.toLowerCase(), () => <int>{})
-            .add(f.fileSize);
-      }
-
-      // Filter out files that might already be in vault
-      final filesToImport = <FileToVault>[];
-      final skippedDuplicates = <String>[];
+      // Delete gating needs the per-name attempt count across all picked
+      // assets, including ones later verified as duplicates.
       final attemptedByName = <String, int>{};
-
       for (final file in filesToVault) {
         final lower = file.originalName.toLowerCase();
         attemptedByName[lower] = (attemptedByName[lower] ?? 0) + 1;
-        final size = fileSizesByPath[file.sourcePath] ?? 0;
-        if ((existingByName[lower] ?? const <int>{}).contains(size)) {
-          debugPrint(
-              '[FileImport] Potential duplicate detected: ${file.originalName}');
-          skippedDuplicates.add(file.originalName);
-        } else {
-          filesToImport.add(file);
-        }
       }
+
+      // Content-verified duplicate check: name+size shortlists candidates,
+      // but only a matching stored payload hash counts as a duplicate.
+      final (filesToImport, skippedDuplicates) =
+          await _filterDuplicates(filesToVault, fileSizesByPath);
 
       if (skippedDuplicates.isNotEmpty) {
         debugPrint(
-            '[FileImport] Skipping ${skippedDuplicates.length} potential duplicates');
+            '[FileImport] Skipping ${skippedDuplicates.length} verified duplicates');
       }
 
       if (filesToImport.isEmpty) {
@@ -277,6 +274,7 @@ class FileImportService {
           success: false,
           error: 'All selected files already exist in vault',
           importedFiles: [],
+          skippedDuplicates: skippedDuplicates.length,
         );
       }
 
@@ -307,11 +305,9 @@ class FileImportService {
       debugPrint('[FileImport] Imported ${imported.length} files to vault');
 
       // Delete originals from gallery if requested and import was successful
-      bool deletedFromGallery = false;
+      int requestedOriginals = 0;
+      int deletedOriginalsCount = 0;
       if (deleteOriginals && imported.isNotEmpty && validAssets.isNotEmpty) {
-        debugPrint(
-            '[FileImport] Attempting to delete ${validAssets.length} assets from gallery');
-
         // Delete only when every picked file of a name is safely in the
         // vault (imported now or already present as a duplicate) — never
         // the gallery original of a failed/skipped-and-missing import.
@@ -333,29 +329,39 @@ class FileImportService {
           return landed >= (attemptedByName[lower] ?? 0);
         }).toList();
 
+        requestedOriginals = assetsToDelete.length;
         if (assetsToDelete.isNotEmpty) {
-          deletedFromGallery = await _deleteAssetsFromGallery(assetsToDelete);
+          debugPrint(
+              '[FileImport] Attempting to delete ${assetsToDelete.length} assets from gallery');
+          deletedOriginalsCount = await _deleteAssetsFromGallery(assetsToDelete);
 
-          if (deletedFromGallery) {
+          if (deletedOriginalsCount == requestedOriginals) {
             debugPrint(
                 '[FileImport] Successfully deleted ${assetsToDelete.length} assets from gallery');
           } else {
             debugPrint(
-                '[FileImport] Failed to delete assets from gallery. Files are imported but originals remain.');
-            debugPrint(
-                '[FileImport] This creates duplicates - one in vault, one in gallery.');
+                '[FileImport] Deleted $deletedOriginalsCount of $requestedOriginals gallery originals. Files are imported but some originals remain.');
             debugPrint(
                 '[FileImport] User may need to manually delete from gallery or grant "All Files Access" permission.');
           }
         }
       }
 
+      final retainedOriginals =
+          (requestedOriginals - deletedOriginalsCount).clamp(0, requestedOriginals);
+      final messageSuffix = retainedOriginals > 0
+          ? ' ($retainedOriginals original(s) still on device)'
+          : '';
+
       return ImportResult(
         success: true,
         importedFiles: imported,
-        message:
-            'Imported ${imported.length} file(s)${deletedFromGallery ? " and removed from gallery" : ""}',
-        deletedOriginals: deletedFromGallery,
+        message: 'Imported ${imported.length} file(s)$messageSuffix',
+        deletedOriginals: requestedOriginals > 0 && retainedOriginals == 0,
+        retainedOriginals: retainedOriginals,
+        skippedDuplicates: skippedDuplicates.length,
+        failedCount: (filesToImport.length - imported.length)
+            .clamp(0, filesToImport.length),
       );
     } catch (e, stackTrace) {
       debugPrint('[FileImport] Error importing from assets: $e');
@@ -631,13 +637,14 @@ class FileImportService {
           await _filterDuplicates(filesToVault, fileSizesByPath);
       if (skippedDuplicates.isNotEmpty) {
         debugPrint(
-            '[FileImport] Skipping ${skippedDuplicates.length} potential duplicates');
+            '[FileImport] Skipping ${skippedDuplicates.length} verified duplicates');
       }
       if (filesToImport.isEmpty) {
         return ImportResult(
           success: false,
           error: 'All selected files already exist in vault',
           importedFiles: [],
+          skippedDuplicates: skippedDuplicates.length,
         );
       }
 
@@ -652,22 +659,32 @@ class FileImportService {
       debugPrint('[FileImport] Imported ${imported.length} videos to vault');
 
       // Delete originals from gallery if requested and import was successful
-      bool deletedFromGallery = false;
+      int requestedOriginals = 0;
+      int deletedOriginalsCount = 0;
       if (deleteOriginals && imported.isNotEmpty && assetsToDelete.isNotEmpty) {
         assetsToDelete = _gateAssetsToDelete(assetsToDelete, imported);
+        requestedOriginals = assetsToDelete.length;
       }
-      if (deleteOriginals && imported.isNotEmpty && assetsToDelete.isNotEmpty) {
+      if (requestedOriginals > 0) {
         debugPrint(
             '[FileImport] Attempting to delete ${assetsToDelete.length} video assets from gallery');
-        deletedFromGallery = await _deleteAssetsFromGallery(assetsToDelete);
-        debugPrint('[FileImport] Gallery deletion result: $deletedFromGallery');
+        deletedOriginalsCount = await _deleteAssetsFromGallery(assetsToDelete);
+        debugPrint(
+            '[FileImport] Gallery deletion result: $deletedOriginalsCount/$requestedOriginals');
       }
+      final retainedOriginals =
+          (requestedOriginals - deletedOriginalsCount).clamp(0, requestedOriginals);
 
       return ImportResult(
         success: true,
         importedFiles: imported,
-        message: 'Imported ${imported.length} video(s)',
-        deletedOriginals: deletedFromGallery,
+        message:
+            'Imported ${imported.length} video(s)${retainedOriginals > 0 ? " ($retainedOriginals original(s) still on device)" : ""}',
+        deletedOriginals: requestedOriginals > 0 && retainedOriginals == 0,
+        retainedOriginals: retainedOriginals,
+        skippedDuplicates: skippedDuplicates.length,
+        failedCount: (filesToImport.length - imported.length)
+            .clamp(0, filesToImport.length),
       );
     } catch (e) {
       debugPrint('[FileImport] Error importing videos from gallery: $e');
@@ -725,11 +742,15 @@ class FileImportService {
         );
       }
 
+      final originalRetained = await File(image.path).exists();
       return ImportResult(
         success: true,
         importedFiles: [imported],
-        message: 'Photo captured and saved',
-        deletedOriginals: true,
+        message: originalRetained
+            ? 'Photo captured and saved (original still on device)'
+            : 'Photo captured and saved',
+        deletedOriginals: !originalRetained,
+        retainedOriginals: originalRetained ? 1 : 0,
       );
     } catch (e) {
       debugPrint('Error capturing photo: $e');
@@ -800,11 +821,15 @@ class FileImportService {
         );
       }
 
+      final originalRetained = await File(video.path).exists();
       return ImportResult(
         success: true,
         importedFiles: [imported],
-        message: 'Video recorded and saved',
-        deletedOriginals: true,
+        message: originalRetained
+            ? 'Video recorded and saved (original still on device)'
+            : 'Video recorded and saved',
+        deletedOriginals: !originalRetained,
+        retainedOriginals: originalRetained ? 1 : 0,
       );
     } catch (e) {
       debugPrint('Error recording video: $e');
@@ -862,11 +887,18 @@ class FileImportService {
         );
       }
 
+      // `FileService` deletes the source when requested, but never reports
+      // the outcome; confirm on disk before claiming the original is gone.
+      final originalRetained =
+          deleteOriginal && await File(filePath).exists();
       return ImportResult(
         success: true,
         importedFiles: [imported],
-        message: 'File imported successfully',
-        deletedOriginals: deleteOriginal,
+        message: originalRetained
+            ? 'File imported (original still on device)'
+            : 'File imported successfully',
+        deletedOriginals: deleteOriginal && !originalRetained,
+        retainedOriginals: originalRetained ? 1 : 0,
       );
     } catch (e) {
       debugPrint('Error importing file: $e');
@@ -931,16 +963,32 @@ class FileImportService {
         onProgress: onProgress,
       );
 
-      // Delete original files if requested
-      if (deleteOriginals && imported.isNotEmpty) {
-        await _deleteFiles(originalPaths);
+      // Delete original files if requested, only for documents that landed
+      // in the vault.
+      final importedNames = {
+        for (final f in imported) f.originalName.toLowerCase()
+      };
+      final pathsToDelete = originalPaths
+          .where((p) => importedNames.contains(p.split('/').last.toLowerCase()))
+          .toList();
+      int requestedOriginals = 0;
+      int deletedOriginalsCount = 0;
+      if (deleteOriginals && pathsToDelete.isNotEmpty) {
+        requestedOriginals = pathsToDelete.length;
+        deletedOriginalsCount = await _deleteFiles(pathsToDelete);
       }
+      final retainedOriginals =
+          (requestedOriginals - deletedOriginalsCount).clamp(0, requestedOriginals);
 
       return ImportResult(
         success: true,
         importedFiles: imported,
-        message: 'Imported ${imported.length} document(s)',
-        deletedOriginals: deleteOriginals && originalPaths.isNotEmpty,
+        message:
+            'Imported ${imported.length} document(s)${retainedOriginals > 0 ? " ($retainedOriginals original(s) still on device)" : ""}',
+        deletedOriginals: requestedOriginals > 0 && retainedOriginals == 0,
+        retainedOriginals: retainedOriginals,
+        failedCount: (filesToVault.length - imported.length)
+            .clamp(0, filesToVault.length),
       );
     } catch (e) {
       debugPrint('Error importing documents: $e');
@@ -1028,21 +1076,33 @@ class FileImportService {
 
       debugPrint('[FileImport] Imported ${imported.length} files to vault');
 
-      // Delete originals if requested
-      bool deletedOriginals = false;
-      if (deleteOriginals && imported.isNotEmpty && pathsToDelete.isNotEmpty) {
+      // Delete originals if requested, only for files that landed in the vault.
+      final importedNames = {
+        for (final f in imported) f.originalName.toLowerCase()
+      };
+      final deletablePaths = pathsToDelete
+          .where((p) => importedNames.contains(p.split('/').last.toLowerCase()))
+          .toList();
+      int requestedOriginals = 0;
+      int deletedOriginalsCount = 0;
+      if (deleteOriginals && deletablePaths.isNotEmpty) {
         debugPrint(
-            '[FileImport] Deleting ${pathsToDelete.length} original documents');
-        await _deleteFiles(pathsToDelete);
-        deletedOriginals = true;
+            '[FileImport] Deleting ${deletablePaths.length} original documents');
+        requestedOriginals = deletablePaths.length;
+        deletedOriginalsCount = await _deleteFiles(deletablePaths);
       }
+      final retainedOriginals =
+          (requestedOriginals - deletedOriginalsCount).clamp(0, requestedOriginals);
 
       return ImportResult(
         success: true,
         importedFiles: imported,
         message:
-            'Imported ${imported.length} file(s)${deletedOriginals ? " and removed originals" : ""}',
-        deletedOriginals: deletedOriginals,
+            'Imported ${imported.length} file(s)${retainedOriginals > 0 ? " ($retainedOriginals original(s) still on device)" : ""}',
+        deletedOriginals: requestedOriginals > 0 && retainedOriginals == 0,
+        retainedOriginals: retainedOriginals,
+        failedCount: (filesToVault.length - imported.length)
+            .clamp(0, filesToVault.length),
       );
     } catch (e, stackTrace) {
       debugPrint('[FileImport] Error importing documents from files: $e');
@@ -1121,7 +1181,7 @@ class FileImportService {
       }
 
       final filesToVault = <FileToVault>[];
-      final pathsToDelete = <String>[];
+      final pathsToDelete = <({String path, String name})>[];
       final convertedFiles = <String>[];
       final skippedFiles = <String>[];
       int processed = 0;
@@ -1149,7 +1209,7 @@ class FileImportService {
             encryptionAlgorithm: perFileConfig?.algorithm,
           ));
 
-          pathsToDelete.add(path);
+          pathsToDelete.add((path: path, name: fileName));
           processed++;
           onProgress?.call(processed, totalFiles);
           onFileProgress?.call(FileProgressInfo(
@@ -1190,7 +1250,7 @@ class FileImportService {
               encryptionAlgorithm: perFileConfig?.algorithm,
             ));
 
-            pathsToDelete.add(officeFile.path);
+            pathsToDelete.add((path: officeFile.path, name: officeFile.fileName));
             processed++;
             onProgress?.call(processed, totalFiles);
             onFileProgress?.call(FileProgressInfo(
@@ -1249,7 +1309,7 @@ class FileImportService {
               encryptionAlgorithm: perFileConfig?.algorithm,
             ));
 
-            pathsToDelete.add(officeFile.path);
+            pathsToDelete.add((path: officeFile.path, name: pdfFileName));
             convertedFiles.add('${officeFile.fileName} → $pdfFileName');
 
             debugPrint(
@@ -1272,7 +1332,7 @@ class FileImportService {
               encryptionAlgorithm: perFileConfig?.algorithm,
             ));
 
-            pathsToDelete.add(officeFile.path);
+            pathsToDelete.add((path: officeFile.path, name: officeFile.fileName));
             // Don't add to convertedFiles, maybe add to a 'fallback' list or just implicitly handled
           }
 
@@ -1292,13 +1352,16 @@ class FileImportService {
           try {
             final mimeType =
                 lookupMimeType(officeFile.path) ?? 'application/octet-stream';
+            final perFileConfig = perFileEncryption?[officeFile.path];
             filesToVault.add(FileToVault(
               sourcePath: officeFile.path,
               originalName: officeFile.fileName,
               type: VaultedFileType.document,
               mimeType: mimeType,
+              encrypt: perFileConfig?.encrypt,
+              encryptionAlgorithm: perFileConfig?.algorithm,
             ));
-            pathsToDelete.add(officeFile.path);
+            pathsToDelete.add((path: officeFile.path, name: officeFile.fileName));
           } catch (e2) {
             skippedFiles.add(officeFile.fileName);
           }
@@ -1327,6 +1390,7 @@ class FileImportService {
           importedFiles: [],
           convertedFiles: convertedFiles,
           skippedFiles: skippedFiles,
+          failedCount: totalFiles,
         );
       }
 
@@ -1345,14 +1409,27 @@ class FileImportService {
 
       debugPrint('[FileImport] Imported ${imported.length} documents to vault');
 
-      // Delete originals if requested
-      bool deletedOriginals = false;
-      if (deleteOriginals && imported.isNotEmpty && pathsToDelete.isNotEmpty) {
+      // Delete originals if requested, only for documents that landed in the
+      // vault (converted files are matched by their PDF name).
+      final importedNames = {
+        for (final f in imported) f.originalName.toLowerCase()
+      };
+      final deletablePaths = pathsToDelete
+          .where((p) => importedNames.contains(p.name.toLowerCase()))
+          .toList();
+      int requestedOriginals = 0;
+      int deletedOriginalsCount = 0;
+      if (deleteOriginals && deletablePaths.isNotEmpty) {
         debugPrint(
-            '[FileImport] Deleting ${pathsToDelete.length} original documents');
-        await _deleteFiles(pathsToDelete);
-        deletedOriginals = true;
+            '[FileImport] Deleting ${deletablePaths.length} original documents');
+        requestedOriginals = deletablePaths.length;
+        deletedOriginalsCount =
+            await _deleteFiles(deletablePaths.map((p) => p.path).toList());
       }
+      final retainedOriginals =
+          (requestedOriginals - deletedOriginalsCount).clamp(0, requestedOriginals);
+      final deletedOriginals =
+          requestedOriginals > 0 && retainedOriginals == 0;
 
       final messageBuilder =
           StringBuffer('Imported ${imported.length} document(s)');
@@ -1364,6 +1441,9 @@ class FileImportService {
       }
       if (deletedOriginals) {
         messageBuilder.write(' and removed originals');
+      } else if (retainedOriginals > 0) {
+        messageBuilder.write(
+            ' ($retainedOriginals original(s) still on device)');
       }
 
       return OfficeImportResult(
@@ -1373,6 +1453,9 @@ class FileImportService {
         skippedFiles: skippedFiles,
         message: messageBuilder.toString(),
         deletedOriginals: deletedOriginals,
+        retainedOriginals: retainedOriginals,
+        failedCount:
+            (totalFiles - imported.length).clamp(0, totalFiles),
       );
     } catch (e, stackTrace) {
       debugPrint('[FileImport] Error importing documents with conversion: $e');
@@ -1383,6 +1466,7 @@ class FileImportService {
         importedFiles: [],
         convertedFiles: [],
         skippedFiles: [],
+        failedCount: filePaths.length,
       );
     }
   }
@@ -1452,13 +1536,14 @@ class FileImportService {
           await _filterDuplicates(filesToVault, fileSizesByPath);
       if (skippedDuplicates.isNotEmpty) {
         debugPrint(
-            '[FileImport] Skipping ${skippedDuplicates.length} potential duplicates');
+            '[FileImport] Skipping ${skippedDuplicates.length} verified duplicates');
       }
       if (filesToImport.isEmpty) {
         return ImportResult(
           success: false,
           error: 'All selected files already exist in vault',
           importedFiles: [],
+          skippedDuplicates: skippedDuplicates.length,
         );
       }
 
@@ -1471,6 +1556,8 @@ class FileImportService {
       );
 
       // Delete originals only for files that actually landed in the vault.
+      int requestedOriginals = 0;
+      int deletedOriginalsCount = 0;
       if (deleteOriginals && imported.isNotEmpty) {
         final importedNames = {
           for (final f in imported) f.originalName.toLowerCase()
@@ -1487,7 +1574,10 @@ class FileImportService {
                   RequestType.common,
                 );
           final gated = _gateAssetsToDelete(assets, imported);
-          if (gated.isNotEmpty) await _deleteAssetsFromGallery(gated);
+          if (gated.isNotEmpty) {
+            requestedOriginals += gated.length;
+            deletedOriginalsCount += await _deleteAssetsFromGallery(gated);
+          }
         }
         // Delete non-media files directly
         if (nonMediaPaths.isNotEmpty) {
@@ -1495,15 +1585,26 @@ class FileImportService {
               .where((p) =>
                   importedNames.contains(p.split('/').last.toLowerCase()))
               .toList();
-          if (pathsToDelete.isNotEmpty) await _deleteFiles(pathsToDelete);
+          if (pathsToDelete.isNotEmpty) {
+            requestedOriginals += pathsToDelete.length;
+            deletedOriginalsCount += await _deleteFiles(pathsToDelete);
+          }
         }
       }
+
+      final retainedOriginals =
+          (requestedOriginals - deletedOriginalsCount).clamp(0, requestedOriginals);
 
       return ImportResult(
         success: true,
         importedFiles: imported,
-        message: 'Imported ${imported.length} file(s)',
-        deletedOriginals: deleteOriginals,
+        message:
+            'Imported ${imported.length} file(s)${retainedOriginals > 0 ? " ($retainedOriginals original(s) still on device)" : ""}',
+        deletedOriginals: requestedOriginals > 0 && retainedOriginals == 0,
+        retainedOriginals: retainedOriginals,
+        skippedDuplicates: skippedDuplicates.length,
+        failedCount: (filesToImport.length - imported.length)
+            .clamp(0, filesToImport.length),
       );
     } catch (e) {
       debugPrint('Error importing files: $e');
@@ -1591,13 +1692,14 @@ class FileImportService {
           await _filterDuplicates(filesToVault, fileSizesByPath);
       if (skippedDuplicates.isNotEmpty) {
         debugPrint(
-            '[FileImport] Skipping ${skippedDuplicates.length} potential duplicates');
+            '[FileImport] Skipping ${skippedDuplicates.length} verified duplicates');
       }
       if (filesToImport.isEmpty) {
         return ImportResult(
           success: false,
           error: 'All selected files already exist in vault',
           importedFiles: [],
+          skippedDuplicates: skippedDuplicates.length,
         );
       }
 
@@ -1613,22 +1715,32 @@ class FileImportService {
           '[FileImport] Imported ${imported.length} media files to vault');
 
       // Delete originals from gallery if requested and import was successful
-      bool deletedFromGallery = false;
+      int requestedOriginals = 0;
+      int deletedOriginalsCount = 0;
       if (deleteOriginals && imported.isNotEmpty && assetsToDelete.isNotEmpty) {
         assetsToDelete = _gateAssetsToDelete(assetsToDelete, imported);
+        requestedOriginals = assetsToDelete.length;
       }
-      if (deleteOriginals && imported.isNotEmpty && assetsToDelete.isNotEmpty) {
+      if (requestedOriginals > 0) {
         debugPrint(
             '[FileImport] Attempting to delete ${assetsToDelete.length} media assets from gallery');
-        deletedFromGallery = await _deleteAssetsFromGallery(assetsToDelete);
-        debugPrint('[FileImport] Gallery deletion result: $deletedFromGallery');
+        deletedOriginalsCount = await _deleteAssetsFromGallery(assetsToDelete);
+        debugPrint(
+            '[FileImport] Gallery deletion result: $deletedOriginalsCount/$requestedOriginals');
       }
+      final retainedOriginals =
+          (requestedOriginals - deletedOriginalsCount).clamp(0, requestedOriginals);
 
       return ImportResult(
         success: true,
         importedFiles: imported,
-        message: 'Imported ${imported.length} media file(s)',
-        deletedOriginals: deletedFromGallery,
+        message:
+            'Imported ${imported.length} media file(s)${retainedOriginals > 0 ? " ($retainedOriginals original(s) still on device)" : ""}',
+        deletedOriginals: requestedOriginals > 0 && retainedOriginals == 0,
+        retainedOriginals: retainedOriginals,
+        skippedDuplicates: skippedDuplicates.length,
+        failedCount: (filesToImport.length - imported.length)
+            .clamp(0, filesToImport.length),
       );
     } catch (e) {
       debugPrint('[FileImport] Error importing media: $e');
@@ -1640,33 +1752,80 @@ class FileImportService {
     }
   }
 
-  /// Name+size duplicate filter shared by the picker-based import paths.
-  /// Name alone skips distinct files that just share a filename.
+  /// Duplicate filter shared by the picker-based import paths. Filename+size
+  /// only shortlists candidates; a source is skipped only when a candidate's
+  /// stored payload hash matches the source bytes.
   Future<(List<FileToVault>, List<String>)> _filterDuplicates(
     List<FileToVault> files,
     Map<String, int> sizesByPath,
   ) async {
     final existing = await _vaultService.getAllFiles(
         isDecoy: _decoyService.isDecoyModeActive);
-    final existingByName = <String, Set<int>>{};
+    final existingByName = <String, List<VaultedFile>>{};
     for (final f in existing) {
       existingByName
-          .putIfAbsent(f.originalName.toLowerCase(), () => <int>{})
-          .add(f.fileSize);
+          .putIfAbsent(f.originalName.toLowerCase(), () => <VaultedFile>[])
+          .add(f);
     }
+    final sourceHashes = <String, String?>{};
+    final vaultHashes = <String, String?>{};
     final toImport = <FileToVault>[];
     final skipped = <String>[];
     for (final file in files) {
       final size = sizesByPath[file.sourcePath] ?? 0;
-      if ((existingByName[file.originalName.toLowerCase()] ?? const <int>{})
-          .contains(size)) {
-        debugPrint('[FileImport] Potential duplicate detected: ${file.originalName}');
+      final candidates = (existingByName[file.originalName.toLowerCase()] ??
+              const <VaultedFile>[])
+          .where((c) => c.fileSize == size);
+      var duplicate = false;
+      for (final candidate in candidates) {
+        final sourceHash = await _sourceHash(file.sourcePath, sourceHashes);
+        if (sourceHash == null) continue;
+        final vaultHash = await _contentHash(candidate, vaultHashes);
+        if (vaultHash != null && vaultHash == sourceHash) {
+          duplicate = true;
+          break;
+        }
+      }
+      if (duplicate) {
+        debugPrint(
+            '[FileImport] Verified duplicate detected: ${file.originalName}');
         skipped.add(file.originalName);
       } else {
         toImport.add(file);
       }
     }
     return (toImport, skipped);
+  }
+
+  Future<String?> _sourceHash(String path, Map<String, String?> cache) async {
+    if (cache.containsKey(path)) return cache[path];
+    String? hash;
+    try {
+      hash = await _vaultService.hashFile(path);
+    } catch (e) {
+      debugPrint('[FileImport] Could not hash source file $path: $e');
+    }
+    cache[path] = hash;
+    return hash;
+  }
+
+  Future<String?> _contentHash(
+    VaultedFile file,
+    Map<String, String?> cache,
+  ) async {
+    if (cache.containsKey(file.id)) return cache[file.id];
+    String? hash;
+    try {
+      hash = file.contentHash ??
+          await _vaultService.contentHashFor(
+            file,
+            isDecoy: _decoyService.isDecoyModeActive,
+          );
+    } catch (e) {
+      debugPrint('[FileImport] Could not verify vault payload ${file.id}: $e');
+    }
+    cache[file.id] = hash;
+    return hash;
   }
 
   /// Keep only matched assets whose name actually landed in the vault, so
@@ -1762,11 +1921,14 @@ class FileImportService {
     return matchingAssets;
   }
 
-  /// Delete assets from gallery using PhotoManager
-  Future<bool> _deleteAssetsFromGallery(List<AssetEntity> assets) async {
+  /// Delete assets from gallery using PhotoManager.
+  ///
+  /// Returns the number of assets confirmed deleted. Callers must not report
+  /// the originals as removed unless every requested asset was deleted.
+  Future<int> _deleteAssetsFromGallery(List<AssetEntity> assets) async {
     if (assets.isEmpty) {
       debugPrint('[FileImport] No assets to delete');
-      return true;
+      return 0;
     }
 
     try {
@@ -1793,11 +1955,11 @@ class FileImportService {
             '[FileImport] This may be due to missing "All Files Access" permission on Android 11+');
       }
 
-      return result.isNotEmpty;
+      return result.length;
     } catch (e, stackTrace) {
       debugPrint('[FileImport] Error deleting assets from gallery: $e');
       debugPrint('[FileImport] Stack trace: $stackTrace');
-      return false;
+      return 0;
     }
   }
 
@@ -1855,7 +2017,6 @@ class FileImportService {
         parentFolderId: parentFolderId,
         recursive: recursive,
         deleteOriginals: deleteOriginals,
-        encrypt: false,
         isDecoy: _decoyService.isDecoyModeActive,
         onProgress: onProgress,
         onFileProgress: onFileProgress,
@@ -1885,8 +2046,11 @@ class FileImportService {
     }
   }
 
-  /// Delete files directly (for non-gallery files)
-  Future<void> _deleteFiles(List<String> paths) async {
+  /// Delete files directly (for non-gallery files).
+  ///
+  /// Returns the number of paths confirmed gone (already-missing paths count).
+  Future<int> _deleteFiles(List<String> paths) async {
+    int deleted = 0;
     for (final path in paths) {
       try {
         final file = File(path);
@@ -1894,10 +2058,12 @@ class FileImportService {
           await file.delete();
           debugPrint('Deleted file: $path');
         }
+        deleted++;
       } catch (e) {
         debugPrint('Error deleting file: $path - $e');
       }
     }
+    return deleted;
   }
 }
 
@@ -1907,7 +2073,20 @@ class ImportResult {
   final String? error;
   final String? message;
   final List<VaultedFile> importedFiles;
+
+  /// True only when every original that was requested for deletion is
+  /// confirmed gone. Partial or failed deletion leaves this false.
   final bool deletedOriginals;
+
+  /// Number of originals that were requested for deletion but remain on the
+  /// device, so the user can remove them manually.
+  final int retainedOriginals;
+
+  /// Files skipped because the vault already holds a content-identical copy.
+  final int skippedDuplicates;
+
+  /// Files that were attempted but could not be added to the vault.
+  final int failedCount;
 
   const ImportResult({
     required this.success,
@@ -1915,6 +2094,9 @@ class ImportResult {
     this.message,
     required this.importedFiles,
     this.deletedOriginals = false,
+    this.retainedOriginals = 0,
+    this.skippedDuplicates = 0,
+    this.failedCount = 0,
   });
 
   int get importedCount => importedFiles.length;
@@ -2005,7 +2187,15 @@ class OfficeImportResult {
   final List<VaultedFile> importedFiles;
   final List<String> convertedFiles;
   final List<String> skippedFiles;
+
+  /// True only when every original requested for deletion is confirmed gone.
   final bool deletedOriginals;
+
+  /// Number of originals requested for deletion that remain on the device.
+  final int retainedOriginals;
+
+  /// Files that were attempted but could not be added to the vault.
+  final int failedCount;
 
   const OfficeImportResult({
     required this.success,
@@ -2015,6 +2205,8 @@ class OfficeImportResult {
     required this.convertedFiles,
     required this.skippedFiles,
     this.deletedOriginals = false,
+    this.retainedOriginals = 0,
+    this.failedCount = 0,
   });
 
   int get importedCount => importedFiles.length;

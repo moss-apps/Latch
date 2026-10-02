@@ -894,7 +894,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
 
     if (confirmed != true) return;
 
-    await ref
+    final result = await ref
         .read(vaultNotifierProvider.notifier)
         .deleteFiles(_selectedFiles.toList());
 
@@ -902,7 +902,14 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
     ref.invalidate(filesInFolderProvider(widget.folderId));
     ref.invalidate(folderProvider(widget.folderId));
     ref.invalidate(foldersNotifierProvider);
-    ToastUtils.showSuccess('Files deleted');
+    if (result.allSucceeded) {
+      ToastUtils.showSuccess('Files deleted');
+    } else if (result.anyRemoved) {
+      ToastUtils.showError(
+          'Deleted ${result.removedCount}; ${result.failedCount} could not be deleted');
+    } else {
+      ToastUtils.showError('Failed to delete files');
+    }
   }
 
   void _showSortOptions() {

@@ -4,6 +4,7 @@ import '../models/album.dart';
 import '../models/vault_folder.dart';
 import '../models/vaulted_file.dart';
 import '../models/vault_settings.dart';
+import '../services/file_service.dart';
 import '../services/vault_service.dart';
 import '../services/decoy_service.dart';
 import '../services/encryption_service.dart';
@@ -275,24 +276,24 @@ class VaultNotifier extends Notifier<AsyncValue<List<VaultedFile>>> {
     await loadFiles();
   }
 
-  Future<bool> deleteFiles(
+  Future<BulkDeleteResult> deleteFiles(
     List<String> fileIds, {
     void Function(int current, int total, {int currentSize, int totalSize})?
         onProgress,
   }) async {
     final isDecoy = ref.read(isDecoyModeProvider);
-    final deleted = await _vaultService.removeFiles(
+    final result = await _vaultService.removeFiles(
       fileIds,
       isDecoy: isDecoy,
       onProgress: onProgress,
     );
-    if (deleted > 0) {
+    if (result.anyRemoved) {
       await loadFiles();
       // Clear selection
       ref.read(selectedFilesProvider.notifier).state = {};
       ref.read(isSelectionModeProvider.notifier).state = false;
     }
-    return deleted == fileIds.length;
+    return result;
   }
 
   Future<VaultedFile?> toggleFavorite(String fileId) async {

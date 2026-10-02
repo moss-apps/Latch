@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart' show DioException;
 import 'package:flutter/foundation.dart';
 import 'package:webdav_client/webdav_client.dart' as webdav;
 
@@ -94,14 +95,29 @@ class WebDAVStore implements RemoteStore {
     }
   }
 
-  /// Absent file (404) and reachability errors both come back null.
-  /// 404 and unreachable are conflated; testConnection separates them upstream.
-  Future<Uint8List?> _readOrNull(String name) async {
+  /// True only when the server explicitly confirmed the resource is missing.
+  @visibleForTesting
+  static bool isNotFound(Object error) =>
+      error is DioException && error.response?.statusCode == 404;
+
+  /// Reads [read], returning null only on a confirmed 404.
+  ///
+  /// Transport, authentication, and server failures are rethrown so callers
+  /// cannot mistake them for an absent manifest or blob.
+  @visibleForTesting
+  static Future<Uint8List?> readOrNull(
+    Future<List<int>> Function() read,
+  ) async {
     try {
-      return Uint8List.fromList(await _c.read(_path(name)));
-    } catch (e) {
-      debugPrint('WebDAV read($name): $e');
-      return null;
+      return Uint8List.fromList(await read());
+    } on DioException catch (e) {
+      if (isNotFound(e)) return null;
+      rethrow;
     }
+  }
+
+  /// Throws on anything other than a confirmed 404; see [readOrNull].
+  Future<Uint8List?> _readOrNull(String name) {
+    return readOrNull(() => _c.read(_path(name)));
   }
 }

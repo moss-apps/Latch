@@ -192,7 +192,7 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                   style: TextStyle(fontFamily: 'ProductSans'),
                 ),
                 subtitle: Text(
-                  'AES-256 encryption for all new imports',
+                  'Off by default. Hidden files keep plaintext bytes on disk; encrypted files get their bytes and thumbnails scrambled.',
                   style: TextStyle(
                     fontFamily: 'ProductSans',
                     fontSize: 12,

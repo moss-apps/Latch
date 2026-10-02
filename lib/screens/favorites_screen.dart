@@ -954,15 +954,18 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
 
     if (confirmed == true) {
       final selectedList = _selectedFiles.toList();
-      final success = await ref
+      final result = await ref
           .read(vaultNotifierProvider.notifier)
           .deleteFiles(selectedList);
 
       _exitSelectionMode();
       ref.invalidate(favoriteFilesProvider);
 
-      if (success) {
+      if (result.allSucceeded) {
         ToastUtils.showSuccess('Files deleted');
+      } else if (result.anyRemoved) {
+        ToastUtils.showError(
+            'Deleted ${result.removedCount}; ${result.failedCount} could not be deleted');
       } else {
         ToastUtils.showError('Failed to delete some files');
       }

@@ -1484,10 +1484,10 @@ _videoController?.setPlaybackSpeed(_playbackSpeed);
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(dialogContext);
-              final success = await ref
+              final result = await ref
                   .read(vaultNotifierProvider.notifier)
                   .deleteFiles([file.id]);
-              if (success) {
+              if (result.allSucceeded) {
                 ToastUtils.showSuccess('File deleted');
                 if (_files.length == 1) {
                   if (mounted) Navigator.pop(context);

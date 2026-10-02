@@ -1,12 +1,15 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:locker/models/album.dart';
+import 'package:locker/models/file_to_vault.dart';
 import 'package:locker/models/vault_folder.dart';
 import 'package:locker/models/vault_settings.dart';
 import 'package:locker/models/vaulted_file.dart';
+import 'package:locker/services/file_service.dart';
 import 'package:locker/services/local_store.dart';
 import 'package:locker/services/vault_service.dart';
 import 'package:locker/services/vault_store.dart';
@@ -210,6 +213,124 @@ void main() {
       final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
       final s = await vault.getSettings();
       expect(s.failedUnlockProtectionEnabled, false);
+    });
+  });
+
+  group('encryption precedence', () {
+    test('default settings keep encryptionEnabled=false', () async {
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+      final s = await vault.getSettings();
+      expect(s.encryptionEnabled, false);
+    });
+
+    test('resolveEncryption honors per-file, then call-level, then global', () {
+      expect(
+        FileService.resolveEncryption(
+          perFile: true,
+          callLevel: false,
+          global: false,
+        ),
+        true,
+      );
+      expect(
+        FileService.resolveEncryption(
+          perFile: false,
+          callLevel: true,
+          global: true,
+        ),
+        false,
+      );
+      expect(
+        FileService.resolveEncryption(callLevel: true, global: false),
+        true,
+      );
+      expect(FileService.resolveEncryption(global: true), true);
+      expect(FileService.resolveEncryption(), false);
+    });
+
+    test('explicit per-file false wins over global encrypt-new-files',
+        () async {
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+      await vault.updateSettings(
+        const VaultSettings().copyWith(encryptionEnabled: true),
+      );
+
+      final source = File('${tmpDir.path}/plain.txt')
+        ..writeAsStringSync('plain contents');
+
+      final added = await vault.addFiles(
+        files: [
+          FileToVault(
+            sourcePath: source.path,
+            originalName: 'plain.txt',
+            type: VaultedFileType.document,
+            mimeType: 'text/plain',
+            encrypt: false,
+          ),
+        ],
+      );
+
+      expect(added, hasLength(1));
+      expect(added.single.isEncrypted, false);
+      expect(File(added.single.vaultPath).readAsStringSync(), 'plain contents');
+    });
+
+    test('default global off leaves new files unencrypted', () async {
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+
+      final source = File('${tmpDir.path}/plain2.txt')
+        ..writeAsStringSync('plain contents');
+
+      final added = await vault.addFiles(
+        files: [
+          FileToVault(
+            sourcePath: source.path,
+            originalName: 'plain2.txt',
+            type: VaultedFileType.document,
+            mimeType: 'text/plain',
+          ),
+        ],
+      );
+
+      expect(added.single.isEncrypted, false);
+    });
+  });
+
+  group('content hashing', () {
+    test('hashFile returns sha256 of the file bytes', () async {
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+      final path = '${tmpDir.path}/hashme.txt';
+      File(path).writeAsStringSync('hello');
+
+      final hash = await vault.hashFile(path);
+
+      expect(hash, sha256.convert(utf8.encode('hello')).toString());
+    });
+
+    test('contentHashFor hashes plaintext payload and persists it', () async {
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+      final source = File('${tmpDir.path}/hashable.txt')
+        ..writeAsStringSync('hashable contents');
+
+      final added = await vault.addFiles(
+        files: [
+          FileToVault(
+            sourcePath: source.path,
+            originalName: 'hashable.txt',
+            type: VaultedFileType.document,
+            mimeType: 'text/plain',
+            encrypt: false,
+          ),
+        ],
+      );
+
+      expect(added.single.contentHash, isNull);
+
+      final hash = await vault.contentHashFor(added.single);
+
+      expect(hash, sha256.convert(utf8.encode('hashable contents')).toString());
+      final reloaded = (await vault.getAllFiles()).single;
+      expect(reloaded.contentHash, hash);
     });
   });
 
@@ -515,6 +636,90 @@ void main() {
 
       final healed = await pb.loadFileIndex(forceReload: true);
       expect(healed.map((f) => f.id), ['lost']);
+    });
+  });
+
+  group('removeFiles failure safety', () {
+    VaultedFile undeletable(String id) => VaultedFile(
+          id: id,
+          originalName: '$id.jpg',
+          vaultPath: '/proc/version',
+          type: VaultedFileType.image,
+          mimeType: 'image/jpeg',
+          fileSize: 5,
+          dateAdded: DateTime(2024, 1, 1),
+        );
+
+    test('failed deletion keeps only the failed entry and can be retried',
+        () async {
+      if (!Platform.isLinux) return;
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+      await vault.updateSettings(
+        const VaultSettings().copyWith(secureDelete: false),
+      );
+
+      final good = _pbEraFile('good', tmpDir);
+      final bad = undeletable('bad');
+      vault.store.cachedFiles = [good, bad];
+      await vault.store.saveFileIndex();
+
+      final result = await vault.removeFiles(['good', 'bad']);
+
+      expect(result.removed, ['good']);
+      expect(result.failed, ['bad']);
+      expect(result.allSucceeded, isFalse);
+      expect(File(good.vaultPath).existsSync(), isFalse);
+      expect((await vault.getAllFiles()).map((f) => f.id), ['bad']);
+
+      final fixedPath = '${tmpDir.path}/bad-fixed';
+      File(fixedPath).writeAsStringSync('blob-bad');
+      await vault.updateFile(bad.copyWith(vaultPath: fixedPath));
+
+      final retry = await vault.removeFiles(['bad']);
+      expect(retry.allSucceeded, isTrue);
+      expect(await vault.getAllFiles(), isEmpty);
+    });
+
+    test('failed thumbnail deletion keeps the entry and can be retried',
+        () async {
+      if (!Platform.isLinux) return;
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+      await vault.updateSettings(
+        const VaultSettings().copyWith(secureDelete: false),
+      );
+
+      final file = _pbEraFile('thumbed', tmpDir)
+          .copyWith(thumbnailPath: '/proc/version');
+      vault.store.cachedFiles = [file];
+      await vault.store.saveFileIndex();
+
+      final result = await vault.removeFiles(['thumbed']);
+
+      expect(result.removed, isEmpty);
+      expect(result.failed, ['thumbed']);
+      expect(await vault.getAllFiles(), hasLength(1));
+
+      await vault.updateFile(file.copyWith(thumbnailPath: ''));
+      final retry = await vault.removeFiles(['thumbed']);
+      expect(retry.allSucceeded, isTrue);
+      expect(await vault.getAllFiles(), isEmpty);
+    });
+
+    test('secure delete failure keeps the entry', () async {
+      if (!Platform.isLinux) return;
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+      await vault.updateSettings(
+        const VaultSettings().copyWith(secureDelete: true),
+      );
+
+      vault.store.cachedFiles = [undeletable('bad')];
+      await vault.store.saveFileIndex();
+
+      final result = await vault.removeFiles(['bad']);
+
+      expect(result.removed, isEmpty);
+      expect(result.failed, ['bad']);
+      expect((await vault.getAllFiles()).map((f) => f.id), ['bad']);
     });
   });
 }

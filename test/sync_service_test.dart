@@ -868,6 +868,49 @@ void main() {
       await dirA.delete(recursive: true);
       await dirB.delete(recursive: true);
     });
+
+    test('manifest read failure aborts without committing or replacing it',
+        () async {
+      final dir = await Directory.systemTemp.createTemp('locker_sync_readfail_');
+      final path = '${dir.path}/blob.enc';
+      await File(path).writeAsBytes(Uint8List.fromList([1, 2, 3]));
+
+      final masterKey = Uint8List(32);
+      final existingManifest = Uint8List.fromList([9, 8, 7]);
+      final remote = _MemStore()
+        ..manifestReadError = Exception('server unreachable')
+        .._manifest = existingManifest;
+
+      await expectLater(
+        SyncService.runSync(
+          local: [
+            VaultedFile(
+              id: 'a',
+              originalName: 'a.jpg',
+              vaultPath: path,
+              type: VaultedFileType.image,
+              mimeType: 'image/jpeg',
+              fileSize: 3,
+              dateAdded: DateTime(2024, 1, 1),
+              modifiedAt: DateTime(2024, 1, 1),
+            ),
+          ],
+          masterKey: masterKey,
+          remote: remote,
+          deviceId: 'A',
+          vaultRoot: dir.path,
+          direction: SyncDirection.twoWay,
+          now: DateTime.utc(2024, 6, 1),
+        ),
+        throwsA(isA<Exception>()),
+      );
+
+      expect(remote.putManifestCalls, 0);
+      expect(remote._manifest, same(existingManifest));
+      expect(await remote.listBlobs(), isEmpty);
+
+      await dir.delete(recursive: true);
+    });
   });
 }
 
@@ -875,15 +918,23 @@ void main() {
 class _MemStore implements RemoteStore {
   final Map<String, Uint8List> _blobs = {};
   Uint8List? _manifest;
+  Object? manifestReadError;
+  int putManifestCalls = 0;
 
   @override
   Future<void> testConnection() async {}
 
   @override
-  Future<Uint8List?> getManifest() async => _manifest;
+  Future<Uint8List?> getManifest() async {
+    if (manifestReadError != null) throw manifestReadError!;
+    return _manifest;
+  }
 
   @override
-  Future<void> putManifest(Uint8List bytes) async => _manifest = bytes;
+  Future<void> putManifest(Uint8List bytes) async {
+    putManifestCalls++;
+    _manifest = bytes;
+  }
 
   @override
   Future<void> putBlob(String name, Uint8List bytes) async =>
