@@ -16,7 +16,7 @@ This roadmap turns the product review into phased, actionable work. Phases are o
 | Phase | Focus | Status | Priority |
 |---|---|---|---|
 | 0 | Reliability and data integrity | **Done** | Critical |
-| 1 | Protection defaults and import clarity | **Not started** | High |
+| 1 | Protection defaults and import clarity | **Done** | High |
 | 2 | Session locking | **Not started** | High — recommended next feature |
 | 3 | Large-vault sync and conflict recovery | **Not started** | High |
 | 4 | Import convenience and discovery | **Not started** | Medium |
@@ -41,9 +41,11 @@ Implemented 2026-10-02: failure-safe bulk deletion returns per-file removed/fail
 
 ## Phase 1 — Protection defaults and import clarity
 
-**Status: Not started**
+**Status: Done**
 
 Make it easy to understand what is encrypted and ensure per-file choices behave predictably.
+
+Implemented 2026-10-02: The encryption default stays **off** for new installations (product decision: hiding remains the default promise and encryption is an explicit opt-in), and existing saved choices are preserved. Per-file import choices now take precedence over the global "Encrypt New Files" setting through `FileService.resolveEncryption` (per-file → call-level → global → unencrypted); both logical-OR sites were removed, and the import sheet lets users override individual files even while the global toggle is on. Duplicate handling now verifies content: filename and size shortlist candidates, then a sha256 comparison of the source against the stored plaintext payload decides whether a duplicate is safely present. `VaultedFile.contentHash` records that hash for new and lazily hashed entries, and originals are only removed when content is verified present. `ImportResult` and `OfficeImportResult` expose imported, skipped-duplicate, failed, and retained-original counts, which batch import toasts now display. Checks: `flutter analyze` clean; `flutter test` 170 passing.
 
 | Item | Work | Acceptance criteria |
 |---|---|---|
@@ -53,7 +55,7 @@ Make it easy to understand what is encrypted and ensure per-file choices behave 
 | 1.4 | Improve duplicate verification before skipping or deleting source media. | Filename and size can shortlist candidates, but content comparison verifies duplicates where needed. A source original is never removed unless its content is safely present in the vault. |
 | 1.5 | Report import results per outcome. | Imported, skipped-as-duplicate, failed, and original-retained counts are visible after a batch import. |
 
-**Review findings:** `VaultSettings.encryptionEnabled` currently defaults to `false` for new settings (`lib/models/vault_settings.dart`). The file import path combines the per-file choice with the global setting using logical OR (`lib/services/file_service.dart`), so per-file opt-out cannot override a globally enabled setting. Duplicate pre-filtering uses filename and size (`lib/services/file_import_service.dart`).
+**Decision record:** Keep `VaultSettings.encryptionEnabled` defaulting to `false` for new installations and preserve stored settings for existing users, so no migration was required. Previously the import path combined the per-file choice with the global setting using logical OR (`lib/services/file_service.dart`), so a per-file opt-out could not override a globally enabled setting; that behavior is replaced by explicit precedence. Duplicate pre-filtering previously trusted filename and size (`lib/services/file_import_service.dart`); it now confirms candidate content before skipping or deleting source originals.
 
 ## Phase 2 — In-session locking
 
