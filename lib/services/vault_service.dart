@@ -120,7 +120,7 @@ class VaultService {
     required VaultedFileType type,
     required String mimeType,
     bool deleteOriginal = false,
-    bool encrypt = false,
+    bool? encrypt,
     bool isDecoy = false,
     List<String>? tags,
     List<String>? albumIds,
@@ -144,7 +144,7 @@ class VaultService {
   Future<List<VaultedFile>> addFiles({
     required List<FileToVault> files,
     bool deleteOriginals = false,
-    bool encrypt = false,
+    bool? encrypt,
     bool isDecoy = false,
     Function(int current, int total)? onProgress,
     Function(FileProgressInfo)? onFileProgress,
@@ -160,6 +160,11 @@ class VaultService {
 
   Future<VaultedFile?> updateFile(VaultedFile updatedFile) =>
       _files.updateFile(updatedFile);
+
+  Future<String> hashFile(String path) => FileService.hashFile(path);
+
+  Future<String?> contentHashFor(VaultedFile file, {bool isDecoy = false}) =>
+      _files.contentHashFor(file, isDecoy: isDecoy);
 
   Future<bool> removeFile(String fileId, {bool isDecoy = false}) =>
       _files.removeFile(fileId, isDecoy: isDecoy);
@@ -398,7 +403,7 @@ class VaultService {
     String? parentFolderId,
     bool recursive = true,
     bool deleteOriginals = false,
-    bool encrypt = false,
+    bool? encrypt,
     bool isDecoy = false,
     Function(int current, int total)? onProgress,
     Function(String fileName, int fileNumber, int total)? onFileProgress,

@@ -1,12 +1,15 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:locker/models/album.dart';
+import 'package:locker/models/file_to_vault.dart';
 import 'package:locker/models/vault_folder.dart';
 import 'package:locker/models/vault_settings.dart';
 import 'package:locker/models/vaulted_file.dart';
+import 'package:locker/services/file_service.dart';
 import 'package:locker/services/local_store.dart';
 import 'package:locker/services/vault_service.dart';
 import 'package:locker/services/vault_store.dart';
@@ -210,6 +213,124 @@ void main() {
       final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
       final s = await vault.getSettings();
       expect(s.failedUnlockProtectionEnabled, false);
+    });
+  });
+
+  group('encryption precedence', () {
+    test('default settings keep encryptionEnabled=false', () async {
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+      final s = await vault.getSettings();
+      expect(s.encryptionEnabled, false);
+    });
+
+    test('resolveEncryption honors per-file, then call-level, then global', () {
+      expect(
+        FileService.resolveEncryption(
+          perFile: true,
+          callLevel: false,
+          global: false,
+        ),
+        true,
+      );
+      expect(
+        FileService.resolveEncryption(
+          perFile: false,
+          callLevel: true,
+          global: true,
+        ),
+        false,
+      );
+      expect(
+        FileService.resolveEncryption(callLevel: true, global: false),
+        true,
+      );
+      expect(FileService.resolveEncryption(global: true), true);
+      expect(FileService.resolveEncryption(), false);
+    });
+
+    test('explicit per-file false wins over global encrypt-new-files',
+        () async {
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+      await vault.updateSettings(
+        const VaultSettings().copyWith(encryptionEnabled: true),
+      );
+
+      final source = File('${tmpDir.path}/plain.txt')
+        ..writeAsStringSync('plain contents');
+
+      final added = await vault.addFiles(
+        files: [
+          FileToVault(
+            sourcePath: source.path,
+            originalName: 'plain.txt',
+            type: VaultedFileType.document,
+            mimeType: 'text/plain',
+            encrypt: false,
+          ),
+        ],
+      );
+
+      expect(added, hasLength(1));
+      expect(added.single.isEncrypted, false);
+      expect(File(added.single.vaultPath).readAsStringSync(), 'plain contents');
+    });
+
+    test('default global off leaves new files unencrypted', () async {
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+
+      final source = File('${tmpDir.path}/plain2.txt')
+        ..writeAsStringSync('plain contents');
+
+      final added = await vault.addFiles(
+        files: [
+          FileToVault(
+            sourcePath: source.path,
+            originalName: 'plain2.txt',
+            type: VaultedFileType.document,
+            mimeType: 'text/plain',
+          ),
+        ],
+      );
+
+      expect(added.single.isEncrypted, false);
+    });
+  });
+
+  group('content hashing', () {
+    test('hashFile returns sha256 of the file bytes', () async {
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+      final path = '${tmpDir.path}/hashme.txt';
+      File(path).writeAsStringSync('hello');
+
+      final hash = await vault.hashFile(path);
+
+      expect(hash, sha256.convert(utf8.encode('hello')).toString());
+    });
+
+    test('contentHashFor hashes plaintext payload and persists it', () async {
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+      final source = File('${tmpDir.path}/hashable.txt')
+        ..writeAsStringSync('hashable contents');
+
+      final added = await vault.addFiles(
+        files: [
+          FileToVault(
+            sourcePath: source.path,
+            originalName: 'hashable.txt',
+            type: VaultedFileType.document,
+            mimeType: 'text/plain',
+            encrypt: false,
+          ),
+        ],
+      );
+
+      expect(added.single.contentHash, isNull);
+
+      final hash = await vault.contentHashFor(added.single);
+
+      expect(hash, sha256.convert(utf8.encode('hashable contents')).toString());
+      final reloaded = (await vault.getAllFiles()).single;
+      expect(reloaded.contentHash, hash);
     });
   });
 
