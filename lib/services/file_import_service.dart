@@ -98,13 +98,14 @@ class FileImportService {
           await _filterDuplicates(filesToVault, fileSizesByPath);
       if (skippedDuplicates.isNotEmpty) {
         debugPrint(
-            '[FileImport] Skipping ${skippedDuplicates.length} potential duplicates');
+            '[FileImport] Skipping ${skippedDuplicates.length} verified duplicates');
       }
       if (filesToImport.isEmpty) {
         return ImportResult(
           success: false,
           error: 'All selected files already exist in vault',
           importedFiles: [],
+          skippedDuplicates: skippedDuplicates.length,
         );
       }
 
@@ -143,6 +144,9 @@ class FileImportService {
         deletedOriginals:
             requestedOriginals > 0 && retainedOriginals == 0,
         retainedOriginals: retainedOriginals,
+        skippedDuplicates: skippedDuplicates.length,
+        failedCount: (filesToImport.length - imported.length)
+            .clamp(0, filesToImport.length),
       );
     } catch (e) {
       debugPrint('[FileImport] Error importing images from gallery: $e');
@@ -247,37 +251,22 @@ class FileImportService {
 
       debugPrint('[FileImport] Adding ${filesToVault.length} files to vault');
 
-      // Duplicate check by name AND size — name alone skips distinct files
-      // that just happen to share a filename.
-      final existingFiles = await _vaultService.getAllFiles(isDecoy: isDecoy);
-      final existingByName = <String, Set<int>>{};
-      for (final f in existingFiles) {
-        existingByName
-            .putIfAbsent(f.originalName.toLowerCase(), () => <int>{})
-            .add(f.fileSize);
-      }
-
-      // Filter out files that might already be in vault
-      final filesToImport = <FileToVault>[];
-      final skippedDuplicates = <String>[];
+      // Delete gating needs the per-name attempt count across all picked
+      // assets, including ones later verified as duplicates.
       final attemptedByName = <String, int>{};
-
       for (final file in filesToVault) {
         final lower = file.originalName.toLowerCase();
         attemptedByName[lower] = (attemptedByName[lower] ?? 0) + 1;
-        final size = fileSizesByPath[file.sourcePath] ?? 0;
-        if ((existingByName[lower] ?? const <int>{}).contains(size)) {
-          debugPrint(
-              '[FileImport] Potential duplicate detected: ${file.originalName}');
-          skippedDuplicates.add(file.originalName);
-        } else {
-          filesToImport.add(file);
-        }
       }
+
+      // Content-verified duplicate check: name+size shortlists candidates,
+      // but only a matching stored payload hash counts as a duplicate.
+      final (filesToImport, skippedDuplicates) =
+          await _filterDuplicates(filesToVault, fileSizesByPath);
 
       if (skippedDuplicates.isNotEmpty) {
         debugPrint(
-            '[FileImport] Skipping ${skippedDuplicates.length} potential duplicates');
+            '[FileImport] Skipping ${skippedDuplicates.length} verified duplicates');
       }
 
       if (filesToImport.isEmpty) {
@@ -285,6 +274,7 @@ class FileImportService {
           success: false,
           error: 'All selected files already exist in vault',
           importedFiles: [],
+          skippedDuplicates: skippedDuplicates.length,
         );
       }
 
@@ -369,6 +359,9 @@ class FileImportService {
         message: 'Imported ${imported.length} file(s)$messageSuffix',
         deletedOriginals: requestedOriginals > 0 && retainedOriginals == 0,
         retainedOriginals: retainedOriginals,
+        skippedDuplicates: skippedDuplicates.length,
+        failedCount: (filesToImport.length - imported.length)
+            .clamp(0, filesToImport.length),
       );
     } catch (e, stackTrace) {
       debugPrint('[FileImport] Error importing from assets: $e');
@@ -644,13 +637,14 @@ class FileImportService {
           await _filterDuplicates(filesToVault, fileSizesByPath);
       if (skippedDuplicates.isNotEmpty) {
         debugPrint(
-            '[FileImport] Skipping ${skippedDuplicates.length} potential duplicates');
+            '[FileImport] Skipping ${skippedDuplicates.length} verified duplicates');
       }
       if (filesToImport.isEmpty) {
         return ImportResult(
           success: false,
           error: 'All selected files already exist in vault',
           importedFiles: [],
+          skippedDuplicates: skippedDuplicates.length,
         );
       }
 
@@ -688,6 +682,9 @@ class FileImportService {
             'Imported ${imported.length} video(s)${retainedOriginals > 0 ? " ($retainedOriginals original(s) still on device)" : ""}',
         deletedOriginals: requestedOriginals > 0 && retainedOriginals == 0,
         retainedOriginals: retainedOriginals,
+        skippedDuplicates: skippedDuplicates.length,
+        failedCount: (filesToImport.length - imported.length)
+            .clamp(0, filesToImport.length),
       );
     } catch (e) {
       debugPrint('[FileImport] Error importing videos from gallery: $e');
@@ -990,6 +987,8 @@ class FileImportService {
             'Imported ${imported.length} document(s)${retainedOriginals > 0 ? " ($retainedOriginals original(s) still on device)" : ""}',
         deletedOriginals: requestedOriginals > 0 && retainedOriginals == 0,
         retainedOriginals: retainedOriginals,
+        failedCount: (filesToVault.length - imported.length)
+            .clamp(0, filesToVault.length),
       );
     } catch (e) {
       debugPrint('Error importing documents: $e');
@@ -1102,6 +1101,8 @@ class FileImportService {
             'Imported ${imported.length} file(s)${retainedOriginals > 0 ? " ($retainedOriginals original(s) still on device)" : ""}',
         deletedOriginals: requestedOriginals > 0 && retainedOriginals == 0,
         retainedOriginals: retainedOriginals,
+        failedCount: (filesToVault.length - imported.length)
+            .clamp(0, filesToVault.length),
       );
     } catch (e, stackTrace) {
       debugPrint('[FileImport] Error importing documents from files: $e');
@@ -1351,11 +1352,14 @@ class FileImportService {
           try {
             final mimeType =
                 lookupMimeType(officeFile.path) ?? 'application/octet-stream';
+            final perFileConfig = perFileEncryption?[officeFile.path];
             filesToVault.add(FileToVault(
               sourcePath: officeFile.path,
               originalName: officeFile.fileName,
               type: VaultedFileType.document,
               mimeType: mimeType,
+              encrypt: perFileConfig?.encrypt,
+              encryptionAlgorithm: perFileConfig?.algorithm,
             ));
             pathsToDelete.add((path: officeFile.path, name: officeFile.fileName));
           } catch (e2) {
@@ -1386,6 +1390,7 @@ class FileImportService {
           importedFiles: [],
           convertedFiles: convertedFiles,
           skippedFiles: skippedFiles,
+          failedCount: totalFiles,
         );
       }
 
@@ -1449,6 +1454,8 @@ class FileImportService {
         message: messageBuilder.toString(),
         deletedOriginals: deletedOriginals,
         retainedOriginals: retainedOriginals,
+        failedCount:
+            (totalFiles - imported.length).clamp(0, totalFiles),
       );
     } catch (e, stackTrace) {
       debugPrint('[FileImport] Error importing documents with conversion: $e');
@@ -1459,6 +1466,7 @@ class FileImportService {
         importedFiles: [],
         convertedFiles: [],
         skippedFiles: [],
+        failedCount: filePaths.length,
       );
     }
   }
@@ -1528,13 +1536,14 @@ class FileImportService {
           await _filterDuplicates(filesToVault, fileSizesByPath);
       if (skippedDuplicates.isNotEmpty) {
         debugPrint(
-            '[FileImport] Skipping ${skippedDuplicates.length} potential duplicates');
+            '[FileImport] Skipping ${skippedDuplicates.length} verified duplicates');
       }
       if (filesToImport.isEmpty) {
         return ImportResult(
           success: false,
           error: 'All selected files already exist in vault',
           importedFiles: [],
+          skippedDuplicates: skippedDuplicates.length,
         );
       }
 
@@ -1593,6 +1602,9 @@ class FileImportService {
             'Imported ${imported.length} file(s)${retainedOriginals > 0 ? " ($retainedOriginals original(s) still on device)" : ""}',
         deletedOriginals: requestedOriginals > 0 && retainedOriginals == 0,
         retainedOriginals: retainedOriginals,
+        skippedDuplicates: skippedDuplicates.length,
+        failedCount: (filesToImport.length - imported.length)
+            .clamp(0, filesToImport.length),
       );
     } catch (e) {
       debugPrint('Error importing files: $e');
@@ -1680,13 +1692,14 @@ class FileImportService {
           await _filterDuplicates(filesToVault, fileSizesByPath);
       if (skippedDuplicates.isNotEmpty) {
         debugPrint(
-            '[FileImport] Skipping ${skippedDuplicates.length} potential duplicates');
+            '[FileImport] Skipping ${skippedDuplicates.length} verified duplicates');
       }
       if (filesToImport.isEmpty) {
         return ImportResult(
           success: false,
           error: 'All selected files already exist in vault',
           importedFiles: [],
+          skippedDuplicates: skippedDuplicates.length,
         );
       }
 
@@ -1725,6 +1738,9 @@ class FileImportService {
             'Imported ${imported.length} media file(s)${retainedOriginals > 0 ? " ($retainedOriginals original(s) still on device)" : ""}',
         deletedOriginals: requestedOriginals > 0 && retainedOriginals == 0,
         retainedOriginals: retainedOriginals,
+        skippedDuplicates: skippedDuplicates.length,
+        failedCount: (filesToImport.length - imported.length)
+            .clamp(0, filesToImport.length),
       );
     } catch (e) {
       debugPrint('[FileImport] Error importing media: $e');
@@ -1736,33 +1752,80 @@ class FileImportService {
     }
   }
 
-  /// Name+size duplicate filter shared by the picker-based import paths.
-  /// Name alone skips distinct files that just share a filename.
+  /// Duplicate filter shared by the picker-based import paths. Filename+size
+  /// only shortlists candidates; a source is skipped only when a candidate's
+  /// stored payload hash matches the source bytes.
   Future<(List<FileToVault>, List<String>)> _filterDuplicates(
     List<FileToVault> files,
     Map<String, int> sizesByPath,
   ) async {
     final existing = await _vaultService.getAllFiles(
         isDecoy: _decoyService.isDecoyModeActive);
-    final existingByName = <String, Set<int>>{};
+    final existingByName = <String, List<VaultedFile>>{};
     for (final f in existing) {
       existingByName
-          .putIfAbsent(f.originalName.toLowerCase(), () => <int>{})
-          .add(f.fileSize);
+          .putIfAbsent(f.originalName.toLowerCase(), () => <VaultedFile>[])
+          .add(f);
     }
+    final sourceHashes = <String, String?>{};
+    final vaultHashes = <String, String?>{};
     final toImport = <FileToVault>[];
     final skipped = <String>[];
     for (final file in files) {
       final size = sizesByPath[file.sourcePath] ?? 0;
-      if ((existingByName[file.originalName.toLowerCase()] ?? const <int>{})
-          .contains(size)) {
-        debugPrint('[FileImport] Potential duplicate detected: ${file.originalName}');
+      final candidates = (existingByName[file.originalName.toLowerCase()] ??
+              const <VaultedFile>[])
+          .where((c) => c.fileSize == size);
+      var duplicate = false;
+      for (final candidate in candidates) {
+        final sourceHash = await _sourceHash(file.sourcePath, sourceHashes);
+        if (sourceHash == null) continue;
+        final vaultHash = await _contentHash(candidate, vaultHashes);
+        if (vaultHash != null && vaultHash == sourceHash) {
+          duplicate = true;
+          break;
+        }
+      }
+      if (duplicate) {
+        debugPrint(
+            '[FileImport] Verified duplicate detected: ${file.originalName}');
         skipped.add(file.originalName);
       } else {
         toImport.add(file);
       }
     }
     return (toImport, skipped);
+  }
+
+  Future<String?> _sourceHash(String path, Map<String, String?> cache) async {
+    if (cache.containsKey(path)) return cache[path];
+    String? hash;
+    try {
+      hash = await _vaultService.hashFile(path);
+    } catch (e) {
+      debugPrint('[FileImport] Could not hash source file $path: $e');
+    }
+    cache[path] = hash;
+    return hash;
+  }
+
+  Future<String?> _contentHash(
+    VaultedFile file,
+    Map<String, String?> cache,
+  ) async {
+    if (cache.containsKey(file.id)) return cache[file.id];
+    String? hash;
+    try {
+      hash = file.contentHash ??
+          await _vaultService.contentHashFor(
+            file,
+            isDecoy: _decoyService.isDecoyModeActive,
+          );
+    } catch (e) {
+      debugPrint('[FileImport] Could not verify vault payload ${file.id}: $e');
+    }
+    cache[file.id] = hash;
+    return hash;
   }
 
   /// Keep only matched assets whose name actually landed in the vault, so
@@ -1954,7 +2017,6 @@ class FileImportService {
         parentFolderId: parentFolderId,
         recursive: recursive,
         deleteOriginals: deleteOriginals,
-        encrypt: false,
         isDecoy: _decoyService.isDecoyModeActive,
         onProgress: onProgress,
         onFileProgress: onFileProgress,
@@ -2020,6 +2082,12 @@ class ImportResult {
   /// device, so the user can remove them manually.
   final int retainedOriginals;
 
+  /// Files skipped because the vault already holds a content-identical copy.
+  final int skippedDuplicates;
+
+  /// Files that were attempted but could not be added to the vault.
+  final int failedCount;
+
   const ImportResult({
     required this.success,
     this.error,
@@ -2027,6 +2095,8 @@ class ImportResult {
     required this.importedFiles,
     this.deletedOriginals = false,
     this.retainedOriginals = 0,
+    this.skippedDuplicates = 0,
+    this.failedCount = 0,
   });
 
   int get importedCount => importedFiles.length;
@@ -2124,6 +2194,9 @@ class OfficeImportResult {
   /// Number of originals requested for deletion that remain on the device.
   final int retainedOriginals;
 
+  /// Files that were attempted but could not be added to the vault.
+  final int failedCount;
+
   const OfficeImportResult({
     required this.success,
     this.error,
@@ -2133,6 +2206,7 @@ class OfficeImportResult {
     required this.skippedFiles,
     this.deletedOriginals = false,
     this.retainedOriginals = 0,
+    this.failedCount = 0,
   });
 
   int get importedCount => importedFiles.length;
