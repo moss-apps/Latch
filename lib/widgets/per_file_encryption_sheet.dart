@@ -69,7 +69,6 @@ class _PerFileEncryptionSheetState extends State<PerFileEncryptionSheet> {
     _globalEncrypt = widget.encryptionEnabled;
     _globalAlgorithm = widget.defaultAlgorithm;
     for (final file in _files) {
-      file.encrypt = _globalEncrypt;
       file.algorithm = _globalAlgorithm;
     }
   }
@@ -147,6 +146,8 @@ class _PerFileEncryptionSheetState extends State<PerFileEncryptionSheet> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildGlobalToggle(),
+                const SizedBox(height: 8),
+                _buildExplainer(),
                 const SizedBox(height: 12),
                 if (_globalEncrypt) _buildGlobalAlgorithm(),
                 const SizedBox(height: 8),
@@ -202,6 +203,36 @@ class _PerFileEncryptionSheetState extends State<PerFileEncryptionSheet> {
           activeTrackColor: context.accentColor,
         ),
       ],
+    );
+  }
+
+  Widget _buildExplainer() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: context.accentColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, size: 18, color: context.accentColor),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Hidden files are removed from your gallery but stored as-is. '
+              'Encrypted files also scramble the stored bytes and thumbnails, '
+              'so they cannot be previewed without your vault key.',
+              style: TextStyle(
+                fontFamily: 'ProductSans',
+                fontSize: 12,
+                height: 1.4,
+                color: context.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -298,18 +329,29 @@ class _PerFileEncryptionSheetState extends State<PerFileEncryptionSheet> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 4),
+                      Text(
+                        file.encrypt
+                            ? 'Encrypted (bytes + thumbnails)'
+                            : 'Hidden only (not encrypted)',
+                        style: TextStyle(
+                          fontFamily: 'ProductSans',
+                          fontSize: 11,
+                          color: file.encrypt
+                              ? context.accentColor
+                              : context.textTertiary,
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 Switch(
                   value: file.encrypt,
-                  onChanged: _globalEncrypt
-                      ? null
-                      : (value) {
-                          setState(() {
-                            file.encrypt = value;
-                          });
-                        },
+                  onChanged: (value) {
+                    setState(() {
+                      file.encrypt = value;
+                    });
+                  },
                   activeTrackColor: context.accentColor,
                 ),
               ],
