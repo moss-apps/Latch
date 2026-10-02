@@ -87,12 +87,20 @@ class _EncryptionSettingsScreenState
                 ),
               ),
               const SizedBox(height: 24),
+              _sectionTitle('What Encryption Covers'),
+              Text(
+                'Encrypted files have their stored bytes and thumbnails scrambled with your vault key, so they cannot be opened or previewed without it. Hidden files are removed from the gallery but their bytes stay as-is on disk, which means other apps may still read them and thumbnails can show previews unless Hide Unencrypted Thumbnails is on. Source originals are deleted only after Latch verifies the content is safely in the vault.',
+                style: TextStyle(fontSize: 12, color: context.textTertiary),
+              ),
+              const SizedBox(height: 24),
               _sectionTitle('Current Configuration'),
               _infoTile('Algorithm', settings.encryptionAlgorithm.displayName),
               _infoTile('KDF Iterations', settings.kdfIterations.toLocaleString()),
               _infoTile(
-                'Encryption',
-                settings.encryptionEnabled ? 'Enabled' : 'Disabled',
+                'New imports',
+                settings.encryptionEnabled
+                    ? 'Encrypt by default'
+                    : 'Hide only (no encryption)',
               ),
             ],
           );

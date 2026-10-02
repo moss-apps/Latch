@@ -2944,6 +2944,21 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
   }
 
   // Import methods
+  String _importOutcomeMessage({
+    required int imported,
+    required int skipped,
+    required int failed,
+    required int retained,
+    required bool hiddenFromDevice,
+  }) {
+    final parts = <String>['Imported $imported'];
+    if (skipped > 0) parts.add('$skipped duplicate(s) skipped');
+    if (failed > 0) parts.add('$failed failed');
+    if (retained > 0) parts.add('$retained original(s) retained');
+    if (hiddenFromDevice && retained == 0) parts.add('originals hidden');
+    return parts.join(' · ');
+  }
+
   Future<void> _importImagesFromGallery() async {
     Navigator.pop(context);
 
@@ -3063,11 +3078,18 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
     if (!mounted) return;
 
     if (result.success && result.importedCount > 0) {
-      final msg = result.deletedOriginals
-          ? 'Imported and hidden ${result.importedCount} image(s)'
-          : 'Imported ${result.importedCount} image(s) (originals may still be visible)';
-      ToastUtils.showSuccess(msg);
+      ToastUtils.showSuccess(_importOutcomeMessage(
+        imported: result.importedCount,
+        skipped: result.skippedDuplicates,
+        failed: result.failedCount,
+        retained: result.retainedOriginals,
+        hiddenFromDevice: result.deletedOriginals,
+      ));
       ref.read(vaultNotifierProvider.notifier).loadFiles();
+    } else if (result.skippedDuplicates > 0) {
+      ToastUtils.showInfo(
+        'Skipped ${result.skippedDuplicates} duplicate(s) already in vault',
+      );
     } else if (!result.success) {
       ToastUtils.showError(result.error ?? 'Import failed');
     }
@@ -3194,11 +3216,18 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
     if (!mounted) return;
 
     if (result.success && result.importedCount > 0) {
-      final msg = result.deletedOriginals
-          ? 'Imported and hidden ${result.importedCount} video(s)'
-          : 'Imported ${result.importedCount} video(s) (originals may still be visible)';
-      ToastUtils.showSuccess(msg);
+      ToastUtils.showSuccess(_importOutcomeMessage(
+        imported: result.importedCount,
+        skipped: result.skippedDuplicates,
+        failed: result.failedCount,
+        retained: result.retainedOriginals,
+        hiddenFromDevice: result.deletedOriginals,
+      ));
       ref.read(vaultNotifierProvider.notifier).loadFiles();
+    } else if (result.skippedDuplicates > 0) {
+      ToastUtils.showInfo(
+        'Skipped ${result.skippedDuplicates} duplicate(s) already in vault',
+      );
     } else if (!result.success) {
       ToastUtils.showError(result.error ?? 'Import failed');
     }
@@ -3292,11 +3321,18 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
     if (!mounted) return;
 
     if (result.success && result.importedCount > 0) {
-      final msg = result.deletedOriginals
-          ? 'Imported and hidden ${result.importedCount} file(s)'
-          : 'Imported ${result.importedCount} file(s) (originals may still be visible)';
-      ToastUtils.showSuccess(msg);
+      ToastUtils.showSuccess(_importOutcomeMessage(
+        imported: result.importedCount,
+        skipped: result.skippedDuplicates,
+        failed: result.failedCount,
+        retained: result.retainedOriginals,
+        hiddenFromDevice: result.deletedOriginals,
+      ));
       ref.read(vaultNotifierProvider.notifier).loadFiles();
+    } else if (result.skippedDuplicates > 0) {
+      ToastUtils.showInfo(
+        'Skipped ${result.skippedDuplicates} duplicate(s) already in vault',
+      );
     } else if (!result.success) {
       ToastUtils.showError(result.error ?? 'Import failed');
     }
@@ -3526,15 +3562,20 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
     if (!mounted) return;
 
     if (result.success && result.importedCount > 0) {
-      final msgBuilder =
-          StringBuffer('Imported ${result.importedCount} document(s)');
+      var msg = _importOutcomeMessage(
+        imported: result.importedCount,
+        skipped: 0,
+        failed: result.failedCount,
+        retained: result.retainedOriginals,
+        hiddenFromDevice: result.deletedOriginals,
+      );
       if (result.convertedCount > 0) {
-        msgBuilder.write(' (${result.convertedCount} converted to PDF)');
+        msg = '$msg · ${result.convertedCount} converted to PDF';
       }
-      if (result.deletedOriginals) {
-        msgBuilder.write(' and hidden from device');
+      if (result.skippedFiles.isNotEmpty) {
+        msg = '$msg · ${result.skippedFiles.length} skipped';
       }
-      ToastUtils.showSuccess(msgBuilder.toString());
+      ToastUtils.showSuccess(msg);
       ref.read(vaultNotifierProvider.notifier).loadFiles();
     } else if (!result.success) {
       ToastUtils.showError(result.error ?? 'Import failed');
@@ -3622,11 +3663,18 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
     if (mounted) setState(() => _isImporting = false);
 
     if (result.success && result.importedCount > 0) {
-      final msg = result.deletedOriginals
-          ? 'Imported and hidden ${result.importedCount} song(s)'
-          : 'Imported ${result.importedCount} song(s)';
-      ToastUtils.showSuccess(msg);
+      ToastUtils.showSuccess(_importOutcomeMessage(
+        imported: result.importedCount,
+        skipped: result.skippedDuplicates,
+        failed: result.failedCount,
+        retained: result.retainedOriginals,
+        hiddenFromDevice: result.deletedOriginals,
+      ));
       ref.read(vaultNotifierProvider.notifier).loadFiles();
+    } else if (result.skippedDuplicates > 0) {
+      ToastUtils.showInfo(
+        'Skipped ${result.skippedDuplicates} duplicate(s) already in vault',
+      );
     } else if (!result.success) {
       ToastUtils.showError(result.error ?? 'Import failed');
     } else {
@@ -3709,11 +3757,18 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
     if (mounted) setState(() => _isImporting = false);
 
     if (importResult.success && importResult.importedCount > 0) {
-      final msg = importResult.deletedOriginals
-          ? 'Imported and hidden ${importResult.importedCount} file(s)'
-          : 'Imported ${importResult.importedCount} file(s)';
-      ToastUtils.showSuccess(msg);
+      ToastUtils.showSuccess(_importOutcomeMessage(
+        imported: importResult.importedCount,
+        skipped: importResult.skippedDuplicates,
+        failed: importResult.failedCount,
+        retained: importResult.retainedOriginals,
+        hiddenFromDevice: importResult.deletedOriginals,
+      ));
       ref.read(vaultNotifierProvider.notifier).loadFiles();
+    } else if (importResult.skippedDuplicates > 0) {
+      ToastUtils.showInfo(
+        'Skipped ${importResult.skippedDuplicates} duplicate(s) already in vault',
+      );
     } else if (!importResult.success) {
       ToastUtils.showError(importResult.error ?? 'Import failed');
     } else {
