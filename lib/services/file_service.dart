@@ -105,13 +105,83 @@ class FileService {
         masterKey, salt, file.kdfIterations!);
   }
 
+  /// Precedence: explicit per-file choice, then call-level choice, then the
+  /// global "Encrypt New Files" setting, then unencrypted.
+  static bool resolveEncryption({
+    bool? perFile,
+    bool? callLevel,
+    bool? global,
+  }) {
+    return perFile ?? callLevel ?? global ?? false;
+  }
+
+  static Future<String> hashFile(String path) async {
+    final digest = await sha256.bind(File(path).openRead()).first;
+    return digest.toString();
+  }
+
+  /// sha256 of the stored plaintext payload, computed lazily for older
+  /// entries and persisted on the file record.
+  Future<String?> contentHashFor(VaultedFile file,
+      {bool isDecoy = false}) async {
+    if (file.contentHash != null) return file.contentHash;
+
+    final payload = File(file.vaultPath);
+    if (!await payload.exists()) return null;
+
+    String computed;
+    if (!file.isEncrypted || file.encryptionIv == null) {
+      computed = await hashFile(file.vaultPath);
+    } else {
+      final decoy = isDecoy || file.isDecoy;
+      final derivedKey = await deriveKeyForFile(file, isDecoy: decoy);
+      if (derivedKey == null) return null;
+
+      final tempDir = await getTemporaryDirectory();
+      final tempPath =
+          '${tempDir.path}/lkr_hash_${DateTime.now().microsecondsSinceEpoch}_${file.id}';
+
+      final format = _encryptionService.detectFileFormat(file.vaultPath);
+      final isLegacyCbc = (format == 0 || format == 3);
+      final result = isLegacyCbc
+          ? await _encryptionService.decryptFile(
+              file.vaultPath,
+              tempPath,
+              file.encryptionIv!,
+              isDecoy: decoy,
+              derivedKey: derivedKey,
+            )
+          : await _encryptionService.decryptFileInIsolate(
+              file.vaultPath,
+              tempPath,
+              file.encryptionIv!,
+              isDecoy: decoy,
+              derivedKey: derivedKey,
+            );
+
+      if (!result.success || result.decryptedPath == null) {
+        await _store.deleteFileIfExists(tempPath);
+        return null;
+      }
+
+      try {
+        computed = await hashFile(tempPath);
+      } finally {
+        await _store.deleteFileIfExists(tempPath);
+      }
+    }
+
+    await updateFile(file.copyWith(contentHash: computed));
+    return computed;
+  }
+
   Future<VaultedFile?> addFile({
     required String sourcePath,
     required String originalName,
     required VaultedFileType type,
     required String mimeType,
     bool deleteOriginal = false,
-    bool encrypt = false,
+    bool? encrypt,
     bool isDecoy = false,
     List<String>? tags,
     List<String>? albumIds,
@@ -141,7 +211,7 @@ class FileService {
   Future<List<VaultedFile>> addFiles({
     required List<FileToVault> files,
     bool deleteOriginals = false,
-    bool encrypt = false,
+    bool? encrypt,
     bool isDecoy = false,
     Function(int current, int total)? onProgress,
     Function(FileProgressInfo)? onFileProgress,
@@ -168,8 +238,11 @@ class FileService {
         chunk.map((entry) async {
           final fileSize = await _store.getFileSizeIfExists(entry.file.sourcePath);
           final fileEncrypt = entry.file.encrypt ?? encrypt;
-          final fileShouldEncrypt =
-              fileEncrypt || _store.cachedSettings?.encryptionEnabled == true;
+          final fileShouldEncrypt = resolveEncryption(
+            perFile: entry.file.encrypt,
+            callLevel: encrypt,
+            global: _store.cachedSettings?.encryptionEnabled,
+          );
 
           onFileProgress?.call(FileProgressInfo(
             current: entry.index + 1,
@@ -249,7 +322,7 @@ class FileService {
     required String originalName,
     required VaultedFileType type,
     required String mimeType,
-    required bool encrypt,
+    required bool? encrypt,
     required bool isDecoy,
     Function(int processed, int total)? onEncryptionProgress,
     List<String>? tags,
@@ -298,7 +371,8 @@ class FileService {
       final subdirectory = _store.getSubdirectory(type);
       vaultPath = '${directory.path}/$subdirectory/$vaultFilename';
 
-      final shouldEncrypt = encrypt || _store.cachedSettings?.encryptionEnabled == true;
+      final shouldEncrypt =
+          encrypt ?? _store.cachedSettings?.encryptionEnabled ?? false;
       String? encryptionIv;
       int fileSize;
       EncryptionAlgorithm? usedAlgorithm;
