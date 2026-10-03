@@ -40,8 +40,8 @@ class StubReceiver {
   Future<void> close() => _server.close(force: true);
 
   Future<void> _handle(HttpRequest req) async {
-    final authed = req.headers.value(HttpHeaders.authorizationHeader) ==
-        'Bearer $token';
+    final authed =
+        req.headers.value(HttpHeaders.authorizationHeader) == 'Bearer $token';
     if (rejectToken || !authed) {
       _json(req, HttpStatus.unauthorized, {'error': 'unauthorized'});
       return;
@@ -57,14 +57,13 @@ class StubReceiver {
       return;
     }
     if (req.method == 'PUT' && segments.length == 1) {
-      final body = await req.fold<List<int>>(
-          [], (acc, c) => acc..addAll(c));
+      final body = await req.fold<List<int>>([], (acc, c) => acc..addAll(c));
       final bytes = Uint8List.fromList(body);
       order.add(segments[0]);
       switch (segments[0]) {
         case 'keybundle':
-          uploadedKeybundle = jsonDecode(utf8.decode(bytes))
-              as Map<String, dynamic>;
+          uploadedKeybundle =
+              jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
           _json(req, HttpStatus.ok, {'stored': 'keybundle'});
         case 'manifest':
           uploadedManifest = bytes;
@@ -74,12 +73,9 @@ class StubReceiver {
       }
       return;
     }
-    if (req.method == 'PUT' &&
-        segments.length == 2 &&
-        segments[0] == 'blob') {
+    if (req.method == 'PUT' && segments.length == 2 && segments[0] == 'blob') {
       final sha = segments[1];
-      final body = await req.fold<List<int>>(
-          [], (acc, c) => acc..addAll(c));
+      final body = await req.fold<List<int>>([], (acc, c) => acc..addAll(c));
       final bytes = Uint8List.fromList(body);
       if (sha256.convert(bytes).toString() != sha) {
         _json(req, HttpStatus.unprocessableEntity, {'error': 'mismatch'});
@@ -124,7 +120,8 @@ const testKeybundle = {
   'argon2': {'t': 3, 'm': 16384, 'p': 1},
 };
 
-const goodToken = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const goodToken =
+    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
 void main() {
   late StubReceiver receiver;
@@ -142,8 +139,8 @@ void main() {
 
   group('parsePairingUrl', () {
     test('accepts http URL with #token fragment', () {
-      final parsed =
-          DesktopPushClient.parsePairingUrl('http://192.168.1.24:39371/#$goodToken');
+      final parsed = DesktopPushClient.parsePairingUrl(
+          'http://192.168.1.24:39371/#$goodToken');
       expect(parsed, isNotNull);
       final (base, token) = parsed!;
       expect(base.host, '192.168.1.24');
@@ -152,8 +149,8 @@ void main() {
     });
 
     test('accepts loopback URL for USB-forwarded sessions', () {
-      final parsed =
-          DesktopPushClient.parsePairingUrl('http://127.0.0.1:7810/#$goodToken');
+      final parsed = DesktopPushClient.parsePairingUrl(
+          'http://127.0.0.1:7810/#$goodToken');
       expect(parsed, isNotNull);
       final (base, token) = parsed!;
       expect(base.host, '127.0.0.1');
@@ -162,10 +159,9 @@ void main() {
     });
 
     test('rejects missing token, wrong scheme, garbage', () {
-      expect(DesktopPushClient.parsePairingUrl('http://1.2.3.4:1/#xyz'),
-          isNull);
       expect(
-          DesktopPushClient.parsePairingUrl('https://1.2.3.4:1/#$goodToken'),
+          DesktopPushClient.parsePairingUrl('http://1.2.3.4:1/#xyz'), isNull);
+      expect(DesktopPushClient.parsePairingUrl('https://1.2.3.4:1/#$goodToken'),
           isNull);
       expect(DesktopPushClient.parsePairingUrl(goodToken), isNull);
       expect(DesktopPushClient.parsePairingUrl('  '), isNull);
@@ -173,8 +169,7 @@ void main() {
   });
 
   test('check reports receiver state and honors token', () async {
-    final info = await client.check(
-        base: receiver.base, token: receiver.token);
+    final info = await client.check(base: receiver.base, token: receiver.token);
     expect(info.hasManifest, isFalse);
     expect(info.blobCount, 0);
 
@@ -185,8 +180,7 @@ void main() {
     );
   });
 
-  test('push uploads keybundle, only missing blobs, manifest last',
-      () async {
+  test('push uploads keybundle, only missing blobs, manifest last', () async {
     final keep = Uint8List.fromList([1, 2, 3]);
     final fresh = Uint8List.fromList([9, 8, 7, 6]);
     final keepSha = sha256.convert(keep).toString();

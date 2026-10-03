@@ -106,7 +106,8 @@ class TagService {
     _store.cachedTags ??= await _store.loadTags();
 
     final normalizedName = tagName.toLowerCase().trim();
-    final index = _store.cachedTags!.indexWhere((t) => t.name == normalizedName);
+    final index =
+        _store.cachedTags!.indexWhere((t) => t.name == normalizedName);
 
     if (index == -1) return false;
 

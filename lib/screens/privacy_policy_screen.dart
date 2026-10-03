@@ -36,7 +36,8 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFFFFFFF),
+      backgroundColor:
+          isDark ? const Color(0xFF121212) : const Color(0xFFFFFFFF),
       appBar: AppBar(
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: _textPrimary(isDark)),
@@ -54,7 +55,9 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
         elevation: 0,
       ),
       body: _markdown == null
-          ? Center(child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primary))
+          ? Center(
+              child: CircularProgressIndicator(
+                  color: Theme.of(context).colorScheme.primary))
           : Markdown(
               data: _markdown!,
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
@@ -97,7 +100,10 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
                 blockquoteDecoration: BoxDecoration(
                   border: Border(
                     left: BorderSide(
-                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .primary
+                          .withValues(alpha: 0.3),
                       width: 3,
                     ),
                   ),
@@ -105,13 +111,17 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
                 code: TextStyle(
                   fontFamily: 'monospace',
                   fontSize: 13,
-                  backgroundColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF0F0F0),
+                  backgroundColor: isDark
+                      ? const Color(0xFF2A2A2A)
+                      : const Color(0xFFF0F0F0),
                   color: _textPrimary(isDark),
                 ),
                 horizontalRuleDecoration: BoxDecoration(
                   border: Border(
                     top: BorderSide(
-                      color: isDark ? const Color(0xFF333333) : const Color(0xFFE0E0E0),
+                      color: isDark
+                          ? const Color(0xFF333333)
+                          : const Color(0xFFE0E0E0),
                       width: 1,
                     ),
                   ),
@@ -122,6 +132,8 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
     );
   }
 
-  Color _textPrimary(bool isDark) => isDark ? const Color(0xFFE5E5E5) : const Color(0xFF1A1A1A);
-  Color _textSecondary(bool isDark) => isDark ? const Color(0xFFA0A0A0) : const Color(0xFF555555);
+  Color _textPrimary(bool isDark) =>
+      isDark ? const Color(0xFFE5E5E5) : const Color(0xFF1A1A1A);
+  Color _textSecondary(bool isDark) =>
+      isDark ? const Color(0xFFA0A0A0) : const Color(0xFF555555);
 }

@@ -89,8 +89,7 @@ class PasswordsNotifier extends Notifier<AsyncValue<List<PasswordEntry>>> {
   }
 
   Future<PasswordEntry> toggleFavorite(PasswordEntry entry) async {
-    final toggled =
-        await _service.toggleFavorite(entry, isDecoy: _isDecoy);
+    final toggled = await _service.toggleFavorite(entry, isDecoy: _isDecoy);
     await loadPasswords();
     return toggled;
   }

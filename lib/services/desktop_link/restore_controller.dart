@@ -93,8 +93,7 @@ class DesktopRestoreClient {
     required String token,
   }) async {
     try {
-      final info =
-          (await _getJson(base, '/info', token, orNull404: false))!;
+      final info = (await _getJson(base, '/info', token, orNull404: false))!;
       return RestoreSourceInfo(
         host: (info['host'] as String?) ?? '',
         mode: (info['mode'] as String?) ?? 'push',
@@ -302,7 +301,8 @@ class RestoreController {
     try {
       final result = await importSnapshot(
         manifest: manifest,
-        fetchBlob: (sha) => client.fetchBlob(base: base, token: token, sha: sha),
+        fetchBlob: (sha) =>
+            client.fetchBlob(base: base, token: token, sha: sha),
         vaultRoot: dir.path,
         existingFiles: existing,
         onProgress: onProgress,

@@ -126,7 +126,8 @@ void main() {
     expect(() => codec.open(base64Encode(bytes)), throwsA(anything));
   });
 
-  test('VaultFileDao round-trip: cipher_meta is ciphertext at rest, '
+  test(
+      'VaultFileDao round-trip: cipher_meta is ciphertext at rest, '
       'plaintext after read', () async {
     final pb = _FakePb();
     final port = await pb.start();
@@ -145,7 +146,8 @@ void main() {
     expect(jsonEncode(back.toJson()), jsonEncode(file.toJson()));
   });
 
-  test('PocketBaseStore save reconciles ghosts; tag rides cipher_name; '
+  test(
+      'PocketBaseStore save reconciles ghosts; tag rides cipher_name; '
       'empty albums seed defaults', () async {
     final pb = _FakePb();
     final port = await pb.start();

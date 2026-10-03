@@ -43,7 +43,8 @@ class _EncryptedThumbnailState extends ConsumerState<EncryptedThumbnail> {
             return const _ThumbLoading();
           },
           errorBuilder: (context, error, stackTrace) {
-            debugPrint('EncryptedThumbnail decode error: ${widget.file.originalName} - $error');
+            debugPrint(
+                'EncryptedThumbnail decode error: ${widget.file.originalName} - $error');
             return _ThumbPlaceholder(type: widget.file.type);
           },
         );

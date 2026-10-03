@@ -81,7 +81,8 @@ class ThumbnailService {
   }
 
   Future<Uint8List?> _regenerateThumbnail(VaultedFile file) async {
-    final plaintext = await fileService.getVaultedFile(file.id, isDecoy: file.isDecoy);
+    final plaintext =
+        await fileService.getVaultedFile(file.id, isDecoy: file.isDecoy);
     if (plaintext == null) return null;
     try {
       final thumbBytes = await generateThumbBytes(plaintext, file.type);
@@ -111,10 +112,12 @@ class ThumbnailService {
     }
   }
 
-  Future<Uint8List?> generateThumbBytes(File plaintext, VaultedFileType type) async {
+  Future<Uint8List?> generateThumbBytes(
+      File plaintext, VaultedFileType type) async {
     try {
       if (type == VaultedFileType.video) {
-        return await VideoCompress.getByteThumbnail(plaintext.path, quality: 70);
+        return await VideoCompress.getByteThumbnail(plaintext.path,
+            quality: 70);
       }
       return await FlutterImageCompress.compressWithFile(
         plaintext.path,

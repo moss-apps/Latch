@@ -19,7 +19,8 @@ import '../models/vault_settings.dart';
 class AuthService {
   static const _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(),
-    iOptions: IOSOptions(accessibility: KeychainAccessibility.unlocked_this_device),
+    iOptions:
+        IOSOptions(accessibility: KeychainAccessibility.unlocked_this_device),
   );
 
   static const String _passwordHashKey = 'user_password_hash';
@@ -32,7 +33,8 @@ class AuthService {
   static const String _backupPinSaltKey = 'backup_pin_salt';
   static const String _passwordIterationsKey = 'user_password_iterations';
   static const String _pinIterationsKey = 'user_pin_iterations';
-  static const String _backupPasswordIterationsKey = 'backup_password_iterations';
+  static const String _backupPasswordIterationsKey =
+      'backup_password_iterations';
   static const String _backupPinIterationsKey = 'backup_pin_iterations';
   static const String _hashVersionKey = 'hash_version';
   static const String _firstTimeKey = 'is_first_time';
@@ -64,7 +66,8 @@ class AuthService {
     try {
       if (password.length < minPasswordLength) return false;
 
-      await _createHashedCredential(password, _passwordSaltKey, _passwordHashKey, _passwordIterationsKey);
+      await _createHashedCredential(
+          password, _passwordSaltKey, _passwordHashKey, _passwordIterationsKey);
       await _storage.write(key: _firstTimeKey, value: 'false');
       await _storage.write(key: _authMethodKey, value: 'password');
       await EncryptionService.instance.setPendingCredential(password);
@@ -82,7 +85,8 @@ class AuthService {
 
       if (!RegExp(r'^[0-9]{6}$').hasMatch(pin)) return false;
 
-      await _createHashedCredential(pin, _pinSaltKey, _pinHashKey, _pinIterationsKey);
+      await _createHashedCredential(
+          pin, _pinSaltKey, _pinHashKey, _pinIterationsKey);
       await _storage.write(key: _firstTimeKey, value: 'false');
       await _storage.write(key: _authMethodKey, value: 'pin');
       await EncryptionService.instance.setPendingCredential(pin);
@@ -95,29 +99,35 @@ class AuthService {
 
   /// Verify the provided PIN against stored hash
   Future<bool> verifyPIN(String pin) async {
-    if (await _verifyCredential(pin, _pinHashKey, _pinSaltKey, _pinIterationsKey)) {
+    if (await _verifyCredential(
+        pin, _pinHashKey, _pinSaltKey, _pinIterationsKey)) {
       await EncryptionService.instance.setPendingCredential(pin);
       return true;
     }
-    return _verifyCredential(pin, _backupPinHashKey, _backupPinSaltKey, _backupPinIterationsKey);
+    return _verifyCredential(
+        pin, _backupPinHashKey, _backupPinSaltKey, _backupPinIterationsKey);
   }
 
   Future<bool> verifyPassword(String password) async {
-    if (await _verifyCredential(password, _passwordHashKey, _passwordSaltKey, _passwordIterationsKey)) {
+    if (await _verifyCredential(
+        password, _passwordHashKey, _passwordSaltKey, _passwordIterationsKey)) {
       await EncryptionService.instance.setPendingCredential(password);
       return true;
     }
-    return _verifyCredential(password, _backupPasswordHashKey, _backupPasswordSaltKey, _backupPasswordIterationsKey);
+    return _verifyCredential(password, _backupPasswordHashKey,
+        _backupPasswordSaltKey, _backupPasswordIterationsKey);
   }
 
   /// Verify backup password (used when current auth is biometric)
   Future<bool> verifyBackupPassword(String password) async {
-    return _verifyCredential(password, _backupPasswordHashKey, _backupPasswordSaltKey, _backupPasswordIterationsKey);
+    return _verifyCredential(password, _backupPasswordHashKey,
+        _backupPasswordSaltKey, _backupPasswordIterationsKey);
   }
 
   /// Verify backup PIN (used when current auth is biometric)
   Future<bool> verifyBackupPin(String pin) async {
-    return _verifyCredential(pin, _backupPinHashKey, _backupPinSaltKey, _backupPinIterationsKey);
+    return _verifyCredential(
+        pin, _backupPinHashKey, _backupPinSaltKey, _backupPinIterationsKey);
   }
 
   /// Check if biometric authentication is available on the device
@@ -125,7 +135,8 @@ class AuthService {
     try {
       final backupPinHash = await _storage.read(key: _backupPinHashKey);
       if (backupPinHash != null) return 'pin';
-      final backupPasswordHash = await _storage.read(key: _backupPasswordHashKey);
+      final backupPasswordHash =
+          await _storage.read(key: _backupPasswordHashKey);
       if (backupPasswordHash != null) return 'password';
       return null;
     } catch (e) {
@@ -311,8 +322,10 @@ class AuthService {
         final currentMethod = await getAuthMethod();
         if (currentMethod == 'password') {
           final currentPassword = await _storage.read(key: _passwordHashKey);
-          final currentPasswordSalt = await _storage.read(key: _passwordSaltKey);
-          final currentPasswordIterations = await _storage.read(key: _passwordIterationsKey);
+          final currentPasswordSalt =
+              await _storage.read(key: _passwordSaltKey);
+          final currentPasswordIterations =
+              await _storage.read(key: _passwordIterationsKey);
           if (currentPassword != null) {
             await _storage.write(
                 key: _backupPasswordHashKey, value: currentPassword);
@@ -323,12 +336,14 @@ class AuthService {
           }
           if (currentPasswordIterations != null) {
             await _storage.write(
-                key: _backupPasswordIterationsKey, value: currentPasswordIterations);
+                key: _backupPasswordIterationsKey,
+                value: currentPasswordIterations);
           }
         } else if (currentMethod == 'pin') {
           final currentPin = await _storage.read(key: _pinHashKey);
           final currentPinSalt = await _storage.read(key: _pinSaltKey);
-          final currentPinIterations = await _storage.read(key: _pinIterationsKey);
+          final currentPinIterations =
+              await _storage.read(key: _pinIterationsKey);
           if (currentPin != null) {
             await _storage.write(key: _backupPinHashKey, value: currentPin);
           }
@@ -336,7 +351,8 @@ class AuthService {
             await _storage.write(key: _backupPinSaltKey, value: currentPinSalt);
           }
           if (currentPinIterations != null) {
-            await _storage.write(key: _backupPinIterationsKey, value: currentPinIterations);
+            await _storage.write(
+                key: _backupPinIterationsKey, value: currentPinIterations);
           }
         }
 
@@ -402,12 +418,14 @@ class AuthService {
   Future<bool> changePassword(
       String currentPassword, String newPassword) async {
     try {
-      if (currentPassword.isEmpty || newPassword.length < minPasswordLength) return false;
+      if (currentPassword.isEmpty || newPassword.length < minPasswordLength)
+        return false;
 
       final isVerified = await verifyPassword(currentPassword);
       if (!isVerified) return false;
 
-      await _createHashedCredential(newPassword, _passwordSaltKey, _passwordHashKey, _passwordIterationsKey);
+      await _createHashedCredential(newPassword, _passwordSaltKey,
+          _passwordHashKey, _passwordIterationsKey);
       await _storage.write(key: _authMethodKey, value: 'password');
       await _storage.write(key: _biometricsEnabledKey, value: 'false');
       await _clearBackupCredentials();
@@ -430,7 +448,8 @@ class AuthService {
       final isVerified = await verifyPIN(currentPIN);
       if (!isVerified) return false;
 
-      await _createHashedCredential(newPIN, _pinSaltKey, _pinHashKey, _pinIterationsKey);
+      await _createHashedCredential(
+          newPIN, _pinSaltKey, _pinHashKey, _pinIterationsKey);
       await _storage.write(key: _authMethodKey, value: 'pin');
       await _storage.write(key: _biometricsEnabledKey, value: 'false');
       await _clearBackupCredentials();
@@ -447,12 +466,14 @@ class AuthService {
   Future<bool> switchFromPINToPassword(
       String currentPIN, String newPassword) async {
     try {
-      if (currentPIN.isEmpty || newPassword.length < minPasswordLength) return false;
+      if (currentPIN.isEmpty || newPassword.length < minPasswordLength)
+        return false;
 
       final isVerified = await verifyPIN(currentPIN);
       if (!isVerified) return false;
 
-      await _createHashedCredential(newPassword, _passwordSaltKey, _passwordHashKey, _passwordIterationsKey);
+      await _createHashedCredential(newPassword, _passwordSaltKey,
+          _passwordHashKey, _passwordIterationsKey);
       await _storage.write(key: _authMethodKey, value: 'password');
       await _storage.write(key: _biometricsEnabledKey, value: 'false');
       await _clearBackupCredentials();
@@ -476,7 +497,8 @@ class AuthService {
       final isVerified = await verifyPassword(currentPassword);
       if (!isVerified) return false;
 
-      await _createHashedCredential(newPIN, _pinSaltKey, _pinHashKey, _pinIterationsKey);
+      await _createHashedCredential(
+          newPIN, _pinSaltKey, _pinHashKey, _pinIterationsKey);
       await _storage.write(key: _authMethodKey, value: 'pin');
       await _storage.write(key: _biometricsEnabledKey, value: 'false');
       await _clearBackupCredentials();
@@ -634,17 +656,20 @@ class AuthService {
     return digest.toString();
   }
 
-  Future<String> _createHashedCredential(String credential, String saltKey, String hashKey, String iterationsKey) async {
+  Future<String> _createHashedCredential(String credential, String saltKey,
+      String hashKey, String iterationsKey) async {
     final salt = _generateSalt();
     final iterations = await _getCurrentKdfIterations();
-    final hash = await computePbkdf2Hash(credential, salt, iterations: iterations);
+    final hash =
+        await computePbkdf2Hash(credential, salt, iterations: iterations);
     await _storage.write(key: saltKey, value: base64Encode(salt));
     await _storage.write(key: hashKey, value: hash);
     await _storage.write(key: iterationsKey, value: iterations.toString());
     return hash;
   }
 
-  Future<bool> _verifyCredential(String credential, String hashKey, String saltKey, String iterationsKey) async {
+  Future<bool> _verifyCredential(String credential, String hashKey,
+      String saltKey, String iterationsKey) async {
     try {
       final state = await getUnlockSecurityState();
       if (state.isLockedOut) return false;
@@ -658,15 +683,17 @@ class AuthService {
         final legacyHash = _hashCredentialLegacy(credential);
         // Pad the legacy path with dummy KDF work so verify time does not
         // reveal that this is a legacy (plain SHA-256) account.
-        await computePbkdf2Hash(
-            credential, _generateSalt(), iterations: _defaultKdfIterations);
+        await computePbkdf2Hash(credential, _generateSalt(),
+            iterations: _defaultKdfIterations);
         if (constantTimeEquals(legacyHash, storedHash)) {
           final salt = _generateSalt();
           final iterations = await _getCurrentKdfIterations();
-          final newHash = await computePbkdf2Hash(credential, salt, iterations: iterations);
+          final newHash =
+              await computePbkdf2Hash(credential, salt, iterations: iterations);
           await _storage.write(key: saltKey, value: base64Encode(salt));
           await _storage.write(key: hashKey, value: newHash);
-          await _storage.write(key: iterationsKey, value: iterations.toString());
+          await _storage.write(
+              key: iterationsKey, value: iterations.toString());
           return true;
         }
         return false;
@@ -678,14 +705,17 @@ class AuthService {
           : _defaultKdfIterations;
 
       final salt = base64Decode(storedSalt);
-      final computedHash = await computePbkdf2Hash(credential, salt, iterations: storedIterations);
+      final computedHash = await computePbkdf2Hash(credential, salt,
+          iterations: storedIterations);
       if (!constantTimeEquals(computedHash, storedHash)) return false;
 
       final currentIterations = await _getCurrentKdfIterations();
       if (currentIterations != storedIterations) {
-        final newHash = await computePbkdf2Hash(credential, salt, iterations: currentIterations);
+        final newHash = await computePbkdf2Hash(credential, salt,
+            iterations: currentIterations);
         await _storage.write(key: hashKey, value: newHash);
-        await _storage.write(key: iterationsKey, value: currentIterations.toString());
+        await _storage.write(
+            key: iterationsKey, value: currentIterations.toString());
       }
 
       return true;

@@ -44,7 +44,8 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.error_outline, size: 64, color: AppColors.lightTextTertiary),
+              Icon(Icons.error_outline,
+                  size: 64, color: AppColors.lightTextTertiary),
               const SizedBox(height: 16),
               Text(
                 'Failed to load folders',
@@ -63,8 +64,7 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen> {
           ),
         ),
         data: (folders) {
-          final rootFolders =
-              folders.where((f) => f.isRoot).toList();
+          final rootFolders = folders.where((f) => f.isRoot).toList();
           return _buildFoldersList(rootFolders);
         },
       ),
@@ -217,7 +217,8 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen> {
       parts.add('${folder.fileCount} file${folder.fileCount == 1 ? '' : 's'}');
     }
     if (folder.subfolderCount > 0) {
-      parts.add('${folder.subfolderCount} folder${folder.subfolderCount == 1 ? '' : 's'}');
+      parts.add(
+          '${folder.subfolderCount} folder${folder.subfolderCount == 1 ? '' : 's'}');
     }
     if (parts.isEmpty) return 'Empty';
     return parts.join(', ');
@@ -226,13 +227,15 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen> {
   Widget _buildFolderCover(VaultFolder folder) {
     if (folder.coverImageId != null) {
       return FutureBuilder<VaultedFile?>(
-        future: ref.read(vaultServiceProvider).getFileById(folder.coverImageId!),
+        future:
+            ref.read(vaultServiceProvider).getFileById(folder.coverImageId!),
         builder: (context, snapshot) {
           if (snapshot.hasData && snapshot.data != null) {
             final file = snapshot.data!;
             if (file.isImage) {
               if (!file.isEncrypted &&
-                  (ref.watch(vaultSettingsProvider)
+                  (ref
+                          .watch(vaultSettingsProvider)
                           .value
                           ?.hideUnencryptedThumbnails ??
                       false)) {
@@ -602,15 +605,14 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen> {
                 return;
               }
 
-              final folder = await ref
-                  .read(foldersNotifierProvider.notifier)
-                  .createFolder(
-                    name: name,
-                    parentId: parentFolderId,
-                    description: descController.text.trim().isEmpty
-                        ? null
-                        : descController.text.trim(),
-                  );
+              final folder =
+                  await ref.read(foldersNotifierProvider.notifier).createFolder(
+                        name: name,
+                        parentId: parentFolderId,
+                        description: descController.text.trim().isEmpty
+                            ? null
+                            : descController.text.trim(),
+                      );
 
               if (!context.mounted) return;
               Navigator.pop(context);
@@ -867,7 +869,9 @@ class _ImportProgressDialogState extends ConsumerState<_ImportProgressDialog> {
     return AlertDialog(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       title: Text(
-        _isImporting ? 'Importing Folder' : (_error != null ? 'Import Failed' : 'Import Complete'),
+        _isImporting
+            ? 'Importing Folder'
+            : (_error != null ? 'Import Failed' : 'Import Complete'),
         style: TextStyle(
           fontFamily: 'ProductSans',
           color: context.textPrimary,
@@ -994,7 +998,11 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
           .where((d) => !d.path.split('/').last.startsWith('.'))
           .where((d) => d.path.split('/').last != 'Android')
           .toList()
-        ..sort((a, b) => a.path.split('/').last.toLowerCase().compareTo(b.path.split('/').last.toLowerCase()));
+        ..sort((a, b) => a.path
+            .split('/')
+            .last
+            .toLowerCase()
+            .compareTo(b.path.split('/').last.toLowerCase()));
 
       setState(() {
         if (_currentPath != null) {
@@ -1043,7 +1051,8 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
             : null,
         title: const Text(
           'Select Folder to Import',
-          style: TextStyle(fontFamily: 'ProductSans', fontWeight: FontWeight.w600),
+          style:
+              TextStyle(fontFamily: 'ProductSans', fontWeight: FontWeight.w600),
         ),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         foregroundColor: context.textPrimary,
@@ -1056,7 +1065,8 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.error_outline, size: 64, color: AppColors.error),
+                      Icon(Icons.error_outline,
+                          size: 64, color: AppColors.error),
                       const SizedBox(height: 16),
                       Text(
                         _error!,
@@ -1073,7 +1083,8 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
                   children: [
                     if (_pathStack.isNotEmpty)
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
                         child: InkWell(
                           onTap: _goBack,
                           borderRadius: BorderRadius.circular(8),
@@ -1081,9 +1092,11 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
                             padding: const EdgeInsets.all(8),
                             child: Row(
                               children: [
-                                const Icon(Icons.arrow_back, size: 14, color: AppColors.accent),
+                                const Icon(Icons.arrow_back,
+                                    size: 14, color: AppColors.accent),
                                 const SizedBox(width: 8),
-                                Icon(Icons.folder, size: 16, color: context.accentColor),
+                                Icon(Icons.folder,
+                                    size: 16, color: context.accentColor),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
@@ -1108,7 +1121,8 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.folder_off_outlined, size: 48, color: context.textTertiary),
+                                  Icon(Icons.folder_off_outlined,
+                                      size: 48, color: context.textTertiary),
                                   const SizedBox(height: 16),
                                   Text(
                                     'No subfolders',
@@ -1127,12 +1141,16 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
                                 final dir = _subdirs[index];
                                 final name = dir.path.split('/').last;
                                 return ListTile(
-                                  leading: Icon(Icons.folder, color: context.accentColor),
+                                  leading: Icon(Icons.folder,
+                                      color: context.accentColor),
                                   title: Text(
                                     name,
-                                    style: TextStyle(fontFamily: 'ProductSans', color: context.textPrimary),
+                                    style: TextStyle(
+                                        fontFamily: 'ProductSans',
+                                        color: context.textPrimary),
                                   ),
-                                  trailing: Icon(Icons.chevron_right, color: context.textTertiary),
+                                  trailing: Icon(Icons.chevron_right,
+                                      color: context.textTertiary),
                                   onTap: () => _navigateInto(dir.path),
                                 );
                               },
@@ -1149,7 +1167,8 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
                   icon: const Icon(Icons.check),
                   label: const Text(
                     'Import This Folder',
-                    style: TextStyle(fontFamily: 'ProductSans', fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                        fontFamily: 'ProductSans', fontWeight: FontWeight.w600),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: context.accentColor,

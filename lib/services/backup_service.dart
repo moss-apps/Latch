@@ -117,8 +117,7 @@ class BackupService {
           onProgress?.call(current, total);
         }
 
-        final passwordIndex =
-            await _secureStorage.read(key: _passwordIndexKey);
+        final passwordIndex = await _secureStorage.read(key: _passwordIndexKey);
         if (passwordIndex != null && passwordIndex.isNotEmpty) {
           final indexFile = File('${workDir.path}/$_passwordIndexEntry');
           await indexFile.writeAsString(passwordIndex);

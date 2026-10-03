@@ -140,10 +140,9 @@ class ManifestEntry {
       encryptionAlgorithm: json['encryptionAlgorithm'] as String?,
       keyDerivationSalt: json['keyDerivationSalt'] as String?,
       kdfIterations: (json['kdfIterations'] as num?)?.toInt(),
-      tags: (json['tags'] as List<dynamic>?)
-              ?.map((e) => e as String)
-              .toList() ??
-          [],
+      tags:
+          (json['tags'] as List<dynamic>?)?.map((e) => e as String).toList() ??
+              [],
       isFavorite: json['isFavorite'] as bool? ?? false,
       albumIds: (json['albumIds'] as List<dynamic>?)
               ?.map((e) => e as String)

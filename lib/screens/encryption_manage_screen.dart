@@ -158,9 +158,7 @@ class _EncryptionManageScreenState
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    _isEncrypt
-                        ? 'No unencrypted files'
-                        : 'No encrypted files',
+                    _isEncrypt ? 'No unencrypted files' : 'No encrypted files',
                     style: TextStyle(
                       fontFamily: 'ProductSans',
                       fontSize: 18,
@@ -218,8 +216,7 @@ class _EncryptionManageScreenState
                       fontFamily: 'ProductSans',
                       color: context.textTertiary,
                     ),
-                    prefixIcon:
-                        Icon(Icons.search, color: context.textTertiary),
+                    prefixIcon: Icon(Icons.search, color: context.textTertiary),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
                             icon:
@@ -229,8 +226,7 @@ class _EncryptionManageScreenState
                         : null,
                     filled: true,
                     fillColor: context.surfaceColor,
-                    contentPadding:
-                        const EdgeInsets.symmetric(vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(color: context.dividerColor),
@@ -354,10 +350,10 @@ class _EncryptionManageScreenState
                 child: SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
-                    onPressed: _selectedIds.isEmpty || _isRunning
-                        ? null
-                        : _start,
-                    icon: Icon(_isEncrypt ? Icons.lock_outline : Icons.lock_open),
+                    onPressed:
+                        _selectedIds.isEmpty || _isRunning ? null : _start,
+                    icon:
+                        Icon(_isEncrypt ? Icons.lock_outline : Icons.lock_open),
                     label: Text(
                       '$_actionVerb ${_selectedIds.length} File(s)',
                       style: const TextStyle(fontFamily: 'ProductSans'),
@@ -392,8 +388,7 @@ class _EncryptionManageScreenState
           backgroundColor: context.surfaceColor,
           title: Row(
             children: [
-              Icon(Icons.warning_amber_rounded,
-                  color: Colors.orange, size: 24),
+              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 24),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -437,8 +432,7 @@ class _EncryptionManageScreenState
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         backgroundColor: context.surfaceColor,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
             Icon(Icons.warning_amber_rounded,
@@ -479,8 +473,8 @@ class _EncryptionManageScreenState
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel',
-                style: TextStyle(color: context.textSecondary)),
+            child:
+                Text('Cancel', style: TextStyle(color: context.textSecondary)),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -523,7 +517,11 @@ class _EncryptionManageScreenState
     }
 
     void onProgress(
-      int current, int total, String name, int processed, int totalBytes,
+      int current,
+      int total,
+      String name,
+      int processed,
+      int totalBytes,
     ) {
       progressState.value = progressState.value.copyWith(
         totalFiles: total,

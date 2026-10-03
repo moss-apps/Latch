@@ -32,7 +32,8 @@ class PerformanceSettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
           _sectionTitle(context, 'Performance Metrics'),
-          _infoTile(context, 'Average FPS', metrics.averageFps.toStringAsFixed(1)),
+          _infoTile(
+              context, 'Average FPS', metrics.averageFps.toStringAsFixed(1)),
           _infoTile(
             context,
             'Jank Percentage',

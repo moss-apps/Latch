@@ -173,7 +173,9 @@ class CryptoIsolatePool {
 
   void _ensureInitialized() {
     if (_disposed) throw StateError('CryptoIsolatePool is disposed');
-    if (!_initialized) throw StateError('CryptoIsolatePool not initialized — call initialize() first');
+    if (!_initialized)
+      throw StateError(
+          'CryptoIsolatePool not initialized — call initialize() first');
   }
 
   void _enqueueOrDispatch(_PendingJob pending) {
@@ -211,15 +213,18 @@ class CryptoIsolatePool {
     });
   }
 
-  void _handleMessage(_PoolWorker worker, _ActiveJob job, Map<String, dynamic> msg) {
+  void _handleMessage(
+      _PoolWorker worker, _ActiveJob job, Map<String, dynamic> msg) {
     switch (msg['type'] as String) {
       case 'progress':
-        job.onProgress?.call(msg['bytesProcessed'] as int, msg['totalBytes'] as int);
+        job.onProgress
+            ?.call(msg['bytesProcessed'] as int, msg['totalBytes'] as int);
         break;
 
       case 'encrypt_complete':
         _finishJob(worker, job);
-        (job.completer as Completer<PoolEncryptResult>).complete(PoolEncryptResult(
+        (job.completer as Completer<PoolEncryptResult>)
+            .complete(PoolEncryptResult(
           success: true,
           ivBase64: msg['ivBase64'] as String,
           originalSize: msg['originalSize'] as int,
@@ -230,7 +235,8 @@ class CryptoIsolatePool {
 
       case 'decrypt_complete':
         _finishJob(worker, job);
-        (job.completer as Completer<PoolDecryptResult>).complete(PoolDecryptResult(
+        (job.completer as Completer<PoolDecryptResult>)
+            .complete(PoolDecryptResult(
           success: true,
           decryptedSize: msg['decryptedSize'] as int,
           needsMigration: msg['needsMigration'] as bool,
@@ -459,8 +465,8 @@ Future<void> _workerDoEncrypt(
   final totalBytes = sourceFile.lengthSync();
 
   final random = Random.secure();
-  final iv = Uint8List.fromList(
-      List<int>.generate(16, (_) => random.nextInt(256)));
+  final iv =
+      Uint8List.fromList(List<int>.generate(16, (_) => random.nextInt(256)));
 
   final tempPath = '$destPath.tmp';
   final tempFile = File(tempPath);
@@ -493,7 +499,8 @@ Future<void> _workerDoEncrypt(
           if (chunk.isEmpty) break;
           final outLen = gcm.processBytes(chunk, 0, chunk.length, outBuf, 0);
           if (outLen > 0) {
-            sink.add(Uint8List.fromList(Uint8List.view(outBuf.buffer, 0, outLen)));
+            sink.add(
+                Uint8List.fromList(Uint8List.view(outBuf.buffer, 0, outLen)));
           }
           bytesProcessed += chunk.length;
           replyPort.send({
@@ -560,9 +567,15 @@ Future<void> _workerDoEncrypt(
       'encryptedSize': File(destPath).lengthSync(),
     });
   } catch (e) {
-    try { await sink.flush(); } catch (_) {}
-    try { await sink.close(); } catch (_) {}
-    try { await tempFile.delete(); } catch (_) {}
+    try {
+      await sink.flush();
+    } catch (_) {}
+    try {
+      await sink.close();
+    } catch (_) {}
+    try {
+      await tempFile.delete();
+    } catch (_) {}
     rethrow;
   }
 }
@@ -578,9 +591,13 @@ Future<void> _workerDoDecrypt(
   final raf = encryptedFile.openSync();
   final magic = raf.readSync(4);
 
-  if (magic.length < 4 || magic[0] != 0x4C || magic[1] != 0x4B || magic[2] != 0x52) {
+  if (magic.length < 4 ||
+      magic[0] != 0x4C ||
+      magic[1] != 0x4B ||
+      magic[2] != 0x52) {
     raf.closeSync();
-    replyPort.send({'type': 'error', 'jobId': jobId, 'error': 'Invalid file format'});
+    replyPort.send(
+        {'type': 'error', 'jobId': jobId, 'error': 'Invalid file format'});
     return;
   }
 
@@ -625,7 +642,8 @@ Future<void> _workerDoDecrypt(
         if (chunk.isEmpty) break;
         final outLen = gcm.processBytes(chunk, 0, chunk.length, outBuf, 0);
         if (outLen > 0) {
-          sink.add(Uint8List.fromList(Uint8List.view(outBuf.buffer, 0, outLen)));
+          sink.add(
+              Uint8List.fromList(Uint8List.view(outBuf.buffer, 0, outLen)));
         }
         bytesProcessed += chunk.length;
         replyPort.send({
