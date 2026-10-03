@@ -1,0 +1,46 @@
+version: 2
+updates:
+  - package-ecosystem: pub
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      pub:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  - package-ecosystem: gomod
+    directory: /latchd
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      latchd:
+        patterns: ["*"]
+
+  - package-ecosystem: gomod
+    directory: /pocketbase
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      pocketbase:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /latchd/web-src
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      latchd-web:
+        patterns: ["*"]

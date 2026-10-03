@@ -1,0 +1,40 @@
+name: Feature request
+description: Suggest an idea or improvement
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the [improvement roadmap](https://github.com/moss-apps/Latch/blob/main/docs/IMPROVEMENT_ROADMAP.md)
+        and existing issues first — the project is deliberately scope-conscious.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What pain or gap does this address?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
+  - type: checkboxes
+    id: invariants
+    attributes:
+      label: Invariants
+      options:
+        - label: This does not require a cloud backend, account, or telemetry
+          required: true
+        - label: This does not put secrets outside `flutter_secure_storage`
+          required: true
+        - label: Media stays on-device or is only ever transmitted/stored encrypted
+          required: true
