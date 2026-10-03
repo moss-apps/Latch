@@ -166,8 +166,9 @@ class DecoyService {
   Future<bool> verifyDecoyPin(String pin) async {
     final result = await _verifyCredential(
         pin, _decoyPinKey, _decoyPinSaltKey, _decoyPinIterationsKey);
-    if (result)
+    if (result) {
       await EncryptionService.instance.setPendingCredential(pin, isDecoy: true);
+    }
     return result;
   }
 
@@ -175,9 +176,10 @@ class DecoyService {
   Future<bool> verifyDecoyPassword(String password) async {
     final result = await _verifyCredential(password, _decoyPasswordKey,
         _decoyPasswordSaltKey, _decoyPasswordIterationsKey);
-    if (result)
+    if (result) {
       await EncryptionService.instance
           .setPendingCredential(password, isDecoy: true);
+    }
     return result;
   }
 

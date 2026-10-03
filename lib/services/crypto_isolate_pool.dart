@@ -173,9 +173,10 @@ class CryptoIsolatePool {
 
   void _ensureInitialized() {
     if (_disposed) throw StateError('CryptoIsolatePool is disposed');
-    if (!_initialized)
+    if (!_initialized) {
       throw StateError(
           'CryptoIsolatePool not initialized — call initialize() first');
+    }
   }
 
   void _enqueueOrDispatch(_PendingJob pending) {

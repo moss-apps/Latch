@@ -418,8 +418,9 @@ class AuthService {
   Future<bool> changePassword(
       String currentPassword, String newPassword) async {
     try {
-      if (currentPassword.isEmpty || newPassword.length < minPasswordLength)
+      if (currentPassword.isEmpty || newPassword.length < minPasswordLength) {
         return false;
+      }
 
       final isVerified = await verifyPassword(currentPassword);
       if (!isVerified) return false;
@@ -466,8 +467,9 @@ class AuthService {
   Future<bool> switchFromPINToPassword(
       String currentPIN, String newPassword) async {
     try {
-      if (currentPIN.isEmpty || newPassword.length < minPasswordLength)
+      if (currentPIN.isEmpty || newPassword.length < minPasswordLength) {
         return false;
+      }
 
       final isVerified = await verifyPIN(currentPIN);
       if (!isVerified) return false;
