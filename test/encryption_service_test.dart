@@ -44,7 +44,8 @@ void main() {
       expect(result.success, false);
     });
 
-    test('file-based GCM round-trip (encryptBytesStreamedGcm → decryptStreamedFileToMemoryGcm)',
+    test(
+        'file-based GCM round-trip (encryptBytesStreamedGcm → decryptStreamedFileToMemoryGcm)',
         () async {
       final tmpDir = await Directory.systemTemp.createTemp('latch_gcm_test');
       final encPath = '${tmpDir.path}/test.enc';
@@ -55,8 +56,8 @@ void main() {
       expect(encResult.success, true);
       expect(encResult.iv, isNotNull);
 
-      final decResult = await EncryptionService.instance
-          .decryptStreamedFileToMemoryGcm(
+      final decResult =
+          await EncryptionService.instance.decryptStreamedFileToMemoryGcm(
         encPath,
         encResult.iv!,
         derivedKey: key,

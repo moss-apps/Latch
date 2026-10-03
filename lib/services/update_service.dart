@@ -110,9 +110,8 @@ class UpdateService {
   }
 
   void _emit(PendingUpdate? update) {
-    final key = update == null
-        ? null
-        : (update.latestVersion ?? update.source.name);
+    final key =
+        update == null ? null : (update.latestVersion ?? update.source.name);
     if (key == _lastEmittedKey) return;
     _lastEmittedKey = key;
     _updateController.add(update);

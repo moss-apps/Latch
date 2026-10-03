@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions & ideas
+    url: https://github.com/moss-apps/Latch/discussions
+    about: Ask questions, share setups, or discuss ideas in Discussions.
+  - name: Read the docs
+    url: https://github.com/moss-apps/Latch/tree/main/docs
+    about: Media encryption, desktop backup, sync, and Flick integration specs.
+  - name: Report a security vulnerability
+    url: https://github.com/moss-apps/Latch/security/advisories/new
+    about: Report privately — never in a public issue.

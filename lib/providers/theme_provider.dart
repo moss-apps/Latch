@@ -104,5 +104,6 @@ final currentAccentColorProvider = Provider<Color>((ref) {
 final currentAccentColorVariantProvider = Provider<Color>((ref) {
   final accentColor = ref.watch(accentColorProvider);
   final isDarkMode = ref.watch(isDarkModeProvider);
-  return accentColor.getVariantColor(isDarkMode ? Brightness.dark : Brightness.light);
+  return accentColor
+      .getVariantColor(isDarkMode ? Brightness.dark : Brightness.light);
 });

@@ -236,7 +236,8 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
             final file = snapshot.data!;
             if (file.isImage) {
               if (!file.isEncrypted &&
-                  (ref.watch(vaultSettingsProvider)
+                  (ref
+                          .watch(vaultSettingsProvider)
                           .value
                           ?.hideUnencryptedThumbnails ??
                       false)) {
@@ -271,7 +272,8 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
             final imageFiles = snapshot.data!.where((f) => f.isImage).toList();
             if (imageFiles.isNotEmpty) {
               if (!imageFiles.first.isEncrypted &&
-                  (ref.watch(vaultSettingsProvider)
+                  (ref
+                          .watch(vaultSettingsProvider)
                           .value
                           ?.hideUnencryptedThumbnails ??
                       false)) {
@@ -1041,7 +1043,8 @@ class _ChangeCoverSheetState extends ConsumerState<_ChangeCoverSheet> {
               child: file.isImage
                   ? (file.isEncrypted
                       ? EncryptedThumbnail(file: file)
-                      : (ref.watch(vaultSettingsProvider)
+                      : (ref
+                                  .watch(vaultSettingsProvider)
                                   .value
                                   ?.hideUnencryptedThumbnails ??
                               false)
@@ -1051,8 +1054,7 @@ class _ChangeCoverSheetState extends ConsumerState<_ChangeCoverSheet> {
                               fit: BoxFit.cover,
                               cacheWidth: 200,
                               filterQuality: FilterQuality.low,
-                              errorBuilder: (_, __, ___) =>
-                                  _buildPlaceholder(),
+                              errorBuilder: (_, __, ___) => _buildPlaceholder(),
                             ))
                   : (file.isVideo && file.isEncrypted
                       ? Stack(
@@ -1062,7 +1064,8 @@ class _ChangeCoverSheetState extends ConsumerState<_ChangeCoverSheet> {
                             Container(
                               color: Colors.black26,
                               child: const Center(
-                                child: Icon(Icons.play_circle_outline, size: 32, color: Colors.white70),
+                                child: Icon(Icons.play_circle_outline,
+                                    size: 32, color: Colors.white70),
                               ),
                             ),
                           ],

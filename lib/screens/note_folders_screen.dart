@@ -89,8 +89,8 @@ class _NoteFoldersScreenState extends ConsumerState<NoteFoldersScreen> {
                   0;
 
               return ListTile(
-                leading: Icon(Icons.folder_outlined,
-                    color: context.textSecondary),
+                leading:
+                    Icon(Icons.folder_outlined, color: context.textSecondary),
                 title: Text(
                   folder.name,
                   style: TextStyle(
@@ -109,8 +109,7 @@ class _NoteFoldersScreenState extends ConsumerState<NoteFoldersScreen> {
                   ),
                 ),
                 trailing: PopupMenuButton<String>(
-                  icon:
-                      Icon(Icons.more_vert, color: context.textSecondary),
+                  icon: Icon(Icons.more_vert, color: context.textSecondary),
                   color: context.surfaceColor,
                   onSelected: (value) {
                     if (value == 'rename') {
@@ -268,7 +267,8 @@ class _NoteFoldersScreenState extends ConsumerState<NoteFoldersScreen> {
             ),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, _nameController.text.trim()),
+            onPressed: () =>
+                Navigator.pop(context, _nameController.text.trim()),
             child: Text(
               'Save',
               style: TextStyle(

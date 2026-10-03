@@ -42,7 +42,8 @@ class MediaScannerService {
       // Fallback: Trigger a general media refresh
       // Since PhotoManager doesn't have a direct file scan method,
       // we rely on the platform channel for proper scanning
-      debugPrint('[MediaScanner] Using platform-only scanning (no PhotoManager fallback)');
+      debugPrint(
+          '[MediaScanner] Using platform-only scanning (no PhotoManager fallback)');
 
       return true;
     } catch (e) {

@@ -232,9 +232,8 @@ class DesktopPushClient {
     if (!snapshot.keyWrapped) throw LegacyVaultException();
     try {
       final info = await _getInfo(base, token);
-      final remoteHashes = (info['hashes'] as List? ?? const [])
-          .whereType<String>()
-          .toSet();
+      final remoteHashes =
+          (info['hashes'] as List? ?? const []).whereType<String>().toSet();
       final missing = snapshot.blobs.keys
           .where((sha) => !remoteHashes.contains(sha))
           .toList()

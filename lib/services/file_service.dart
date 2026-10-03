@@ -221,7 +221,9 @@ class FileService {
 
     int completed = 0;
 
-    for (int start = 0; start < files.length; start += _maxConcurrentBatchAdds) {
+    for (int start = 0;
+        start < files.length;
+        start += _maxConcurrentBatchAdds) {
       final chunk = files
           .sublist(
             start,
@@ -236,7 +238,8 @@ class FileService {
 
       final preparedChunk = await Future.wait(
         chunk.map((entry) async {
-          final fileSize = await _store.getFileSizeIfExists(entry.file.sourcePath);
+          final fileSize =
+              await _store.getFileSizeIfExists(entry.file.sourcePath);
           final fileEncrypt = entry.file.encrypt ?? encrypt;
           final fileShouldEncrypt = resolveEncryption(
             perFile: entry.file.encrypt,
@@ -384,12 +387,13 @@ class FileService {
         final algorithm = encryptionAlgorithm ??
             _store.cachedSettings?.encryptionAlgorithm ??
             EncryptionAlgorithm.aes256Ctr;
-        final iterations = kdfIterations ??
-            _store.cachedSettings?.kdfIterations ??
-            100000;
+        final iterations =
+            kdfIterations ?? _store.cachedSettings?.kdfIterations ?? 100000;
         final salt = _encryptionService.generateFileSalt();
-        final masterKey = await _encryptionService.getMasterKey(isDecoy: isDecoy);
-        derivedKey = await _encryptionService.deriveFileKeyAsync(masterKey, salt, iterations);
+        final masterKey =
+            await _encryptionService.getMasterKey(isDecoy: isDecoy);
+        derivedKey = await _encryptionService.deriveFileKeyAsync(
+            masterKey, salt, iterations);
         usedAlgorithm = algorithm;
         usedSalt = base64Encode(salt);
         usedKdfIterations = iterations;
@@ -501,7 +505,8 @@ class FileService {
             await plainFile.writeAsBytes(compressedImageBytes);
           }
           if (plainFile != null) {
-            final thumbBytes = await _thumbnailService.generateThumbBytes(plainFile, type);
+            final thumbBytes =
+                await _thumbnailService.generateThumbBytes(plainFile, type);
             if (thumbBytes != null) {
               final stored = await _thumbnailService.encryptAndStoreThumbnail(
                 thumbBytes,
@@ -555,7 +560,8 @@ class FileService {
       if (sourcePathToUse != null && sourcePathToUse != sourcePath) {
         try {
           await File(sourcePathToUse).delete();
-          debugPrint('[Vault] Cleaned up compressed temp file: $sourcePathToUse');
+          debugPrint(
+              '[Vault] Cleaned up compressed temp file: $sourcePathToUse');
         } catch (e) {
           debugPrint('[Vault] Could not delete temp compressed file: $e');
         }
@@ -792,7 +798,8 @@ class FileService {
       _store.cachedFolders ??= await _store.loadFolders();
       bool foldersChanged = false;
       for (final entry in folderUpdates.entries) {
-        final folderIdx = _store.cachedFolders!.indexWhere((f) => f.id == entry.key);
+        final folderIdx =
+            _store.cachedFolders!.indexWhere((f) => f.id == entry.key);
         if (folderIdx != -1) {
           var folder = _store.cachedFolders![folderIdx];
           for (final fid in entry.value) {
@@ -829,7 +836,8 @@ class FileService {
     return files.where((f) => f.type == type).toList();
   }
 
-  Future<VaultedFile?> getFileById(String fileId, {bool isDecoy = false}) async {
+  Future<VaultedFile?> getFileById(String fileId,
+      {bool isDecoy = false}) async {
     final files = await _store.loadFileIndex(isDecoy: isDecoy);
     try {
       return files.firstWhere((f) => f.id == fileId);
@@ -853,7 +861,8 @@ class FileService {
 
     if (vaultedFile.isEncrypted && vaultedFile.encryptionIv != null) {
       final tempDir = await _store.ensureVaultDirectory();
-      final tempPath = '${tempDir.path}/temp/${vaultedFile.id}_${vaultedFile.originalName}';
+      final tempPath =
+          '${tempDir.path}/temp/${vaultedFile.id}_${vaultedFile.originalName}';
 
       final format = _encryptionService.detectFileFormat(vaultedFile.vaultPath);
       final isLegacyCbc = (format == 0 || format == 3);
@@ -943,9 +952,11 @@ class FileService {
       if (!await sourceFile.exists()) return null;
 
       if (vaultedFile.isEncrypted && vaultedFile.encryptionIv != null) {
-        final format = _encryptionService.detectFileFormat(vaultedFile.vaultPath);
+        final format =
+            _encryptionService.detectFileFormat(vaultedFile.vaultPath);
         final isLegacyCbc = (format == 0 || format == 3);
-        final derivedKey = await deriveKeyForFile(vaultedFile, isDecoy: isDecoy);
+        final derivedKey =
+            await deriveKeyForFile(vaultedFile, isDecoy: isDecoy);
 
         FileDecryptionResult result;
         if (isLegacyCbc) {
@@ -1021,8 +1032,9 @@ class FileService {
       if (journalStr != null) {
         try {
           final journal = jsonDecode(journalStr) as Map<String, dynamic>;
-          final savedIvs =
-              (journal['ivs'] as Map<String, dynamic>?)?.cast<String, String>() ?? {};
+          final savedIvs = (journal['ivs'] as Map<String, dynamic>?)
+                  ?.cast<String, String>() ??
+              {};
           journalIvs.addAll(savedIvs);
           priorInProgress = journal['inProgress'] as String?;
 
@@ -1078,11 +1090,14 @@ class FileService {
           continue;
         }
 
-        final currentFormat = _encryptionService.detectFileFormat(file.vaultPath);
+        final currentFormat =
+            _encryptionService.detectFileFormat(file.vaultPath);
         final targetIsGcm = targetAlgorithm == EncryptionAlgorithm.aes256Gcm;
         final currentIsGcm = (currentFormat == 1 || currentFormat == 4);
 
-        if (currentIsGcm == targetIsGcm && currentFormat != 0 && currentFormat != 3) {
+        if (currentIsGcm == targetIsGcm &&
+            currentFormat != 0 &&
+            currentFormat != 3) {
           processedBytes += file.fileSize;
           onProgress?.call(i + 1, encryptedFiles.length, file.originalName,
               processedBytes, totalBytes);
@@ -1100,8 +1115,8 @@ class FileService {
         final oldDerivedKey = await deriveKeyForFile(file, isDecoy: isDecoy);
         final newSalt = _encryptionService.generateFileSalt();
         final newIterations = _store.cachedSettings?.kdfIterations ?? 100000;
-        final masterKey =
-            await _encryptionService.getMasterKey(isDecoy: isDecoy || file.isDecoy);
+        final masterKey = await _encryptionService.getMasterKey(
+            isDecoy: isDecoy || file.isDecoy);
         final newDerivedKey = await _encryptionService.deriveFileKeyAsync(
             masterKey, newSalt, newIterations);
 
@@ -1117,14 +1132,12 @@ class FileService {
           onProgress: onProgress == null
               ? null
               : (processed, _, isEnc) => onProgress(
-                    i,
-                    encryptedFiles.length,
-                    file.originalName,
-                    baseBytes +
-                        (isEnc
-                            ? halfBytes + (processed ~/ 2)
-                            : processed ~/ 2),
-                    totalBytes),
+                  i,
+                  encryptedFiles.length,
+                  file.originalName,
+                  baseBytes +
+                      (isEnc ? halfBytes + (processed ~/ 2) : processed ~/ 2),
+                  totalBytes),
         );
 
         journalIvs[file.vaultPath] = newIv;
@@ -1201,10 +1214,10 @@ class FileService {
         }
 
         final salt = _encryptionService.generateFileSalt();
-        final masterKey =
-            await _encryptionService.getMasterKey(isDecoy: isDecoy || file.isDecoy);
-        final derivedKey =
-            await _encryptionService.deriveFileKeyAsync(masterKey, salt, iterations);
+        final masterKey = await _encryptionService.getMasterKey(
+            isDecoy: isDecoy || file.isDecoy);
+        final derivedKey = await _encryptionService.deriveFileKeyAsync(
+            masterKey, salt, iterations);
 
         final baseBytes = processedBytes;
         final newIv = await _encryptionService.encryptFileInPlace(
@@ -1230,8 +1243,8 @@ class FileService {
           count++;
         }
         processedBytes += file.fileSize;
-        onProgress?.call(
-            i + 1, targets.length, file.originalName, processedBytes, totalBytes);
+        onProgress?.call(i + 1, targets.length, file.originalName,
+            processedBytes, totalBytes);
       }
 
       await _store.saveFileIndex(isDecoy: isDecoy);
@@ -1322,8 +1335,8 @@ class FileService {
           count++;
         }
         processedBytes += file.fileSize;
-        onProgress?.call(
-            i + 1, targets.length, file.originalName, processedBytes, totalBytes);
+        onProgress?.call(i + 1, targets.length, file.originalName,
+            processedBytes, totalBytes);
       }
 
       await _store.saveFileIndex(isDecoy: isDecoy);
@@ -1365,10 +1378,12 @@ class FileService {
     bool isDecoy = false,
   }) async {
     final files = isDecoy
-        ? (_store.cachedDecoyFiles ??= await _store.loadFileIndex(isDecoy: true))
+        ? (_store.cachedDecoyFiles ??=
+            await _store.loadFileIndex(isDecoy: true))
         : (_store.cachedFiles ??= await _store.loadFileIndex());
 
-    final existingIndex = files.indexWhere((f) => f.metadata?['noteId'] == noteId);
+    final existingIndex =
+        files.indexWhere((f) => f.metadata?['noteId'] == noteId);
 
     final mimeType = switch (fileExtension) {
       'md' => 'text/markdown',
@@ -1409,7 +1424,8 @@ class FileService {
 
   Future<void> removeNoteEntry(String noteId, {bool isDecoy = false}) async {
     final files = isDecoy
-        ? (_store.cachedDecoyFiles ??= await _store.loadFileIndex(isDecoy: true))
+        ? (_store.cachedDecoyFiles ??=
+            await _store.loadFileIndex(isDecoy: true))
         : (_store.cachedFiles ??= await _store.loadFileIndex());
 
     files.removeWhere((f) => f.metadata?['noteId'] == noteId);
@@ -1432,7 +1448,8 @@ class FileService {
     bool isDecoy = false,
   }) async {
     final files = isDecoy
-        ? (_store.cachedDecoyFiles ??= await _store.loadFileIndex(isDecoy: true))
+        ? (_store.cachedDecoyFiles ??=
+            await _store.loadFileIndex(isDecoy: true))
         : (_store.cachedFiles ??= await _store.loadFileIndex());
 
     final existingIndex =
@@ -1468,9 +1485,11 @@ class FileService {
     }
   }
 
-  Future<void> removePasswordEntry(String passwordId, {bool isDecoy = false}) async {
+  Future<void> removePasswordEntry(String passwordId,
+      {bool isDecoy = false}) async {
     final files = isDecoy
-        ? (_store.cachedDecoyFiles ??= await _store.loadFileIndex(isDecoy: true))
+        ? (_store.cachedDecoyFiles ??=
+            await _store.loadFileIndex(isDecoy: true))
         : (_store.cachedFiles ??= await _store.loadFileIndex());
 
     files.removeWhere((f) => f.metadata?['passwordId'] == passwordId);

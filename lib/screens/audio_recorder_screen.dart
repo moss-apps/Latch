@@ -88,7 +88,8 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen>
       final appDir = await getApplicationDocumentsDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final ext = _format == AudioFormat.aac ? 'm4a' : 'wav';
-      final path = '${appDir.path}/.locker_vault/temp/recording_$timestamp.$ext';
+      final path =
+          '${appDir.path}/.locker_vault/temp/recording_$timestamp.$ext';
 
       final dir = Directory('${appDir.path}/.locker_vault/temp');
       if (!await dir.exists()) {
@@ -340,9 +341,7 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen>
   Widget _buildFormatChip(AudioFormat format, String label) {
     final isSelected = _format == format;
     return GestureDetector(
-      onTap: _isRecording
-          ? null
-          : () => setState(() => _format = format),
+      onTap: _isRecording ? null : () => setState(() => _format = format),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         decoration: BoxDecoration(
@@ -395,7 +394,8 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen>
             height: barHeight,
             margin: const EdgeInsets.symmetric(horizontal: 1),
             decoration: BoxDecoration(
-              color: context.accentColor.withValues(alpha: 0.4 + _amplitude * 0.6),
+              color:
+                  context.accentColor.withValues(alpha: 0.4 + _amplitude * 0.6),
               borderRadius: BorderRadius.circular(2),
             ),
           );
@@ -622,7 +622,8 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen>
             icon: const Icon(Icons.delete_outline),
             label: const Text(
               'Discard',
-              style: TextStyle(fontFamily: 'ProductSans', fontWeight: FontWeight.w600),
+              style: TextStyle(
+                  fontFamily: 'ProductSans', fontWeight: FontWeight.w600),
             ),
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.red,
@@ -641,7 +642,8 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen>
             icon: const Icon(Icons.lock_outline),
             label: const Text(
               'Hide',
-              style: TextStyle(fontFamily: 'ProductSans', fontWeight: FontWeight.w600),
+              style: TextStyle(
+                  fontFamily: 'ProductSans', fontWeight: FontWeight.w600),
             ),
             style: FilledButton.styleFrom(
               backgroundColor: context.accentColor,

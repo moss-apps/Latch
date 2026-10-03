@@ -2683,8 +2683,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
         ),
       );
 
-      final result =
-          await ref.read(vaultNotifierProvider.notifier).deleteFiles(
+      final result = await ref.read(vaultNotifierProvider.notifier).deleteFiles(
         selectedFiles.toList(),
         onProgress: (current, total, {int? currentSize, int? totalSize}) {
           progressState.value = progressState.value.copyWith(

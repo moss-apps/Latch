@@ -91,10 +91,10 @@ void main() {
 
     test('deriveKeyFromPassword is deterministic given explicit salt', () {
       final salt = Uint8List.fromList(List.generate(16, (i) => i));
-      final k1 =
-          KeyDerivation.deriveKeyFromPassword('pw', salt: salt, iterations: 500);
-      final k2 =
-          KeyDerivation.deriveKeyFromPassword('pw', salt: salt, iterations: 500);
+      final k1 = KeyDerivation.deriveKeyFromPassword('pw',
+          salt: salt, iterations: 500);
+      final k2 = KeyDerivation.deriveKeyFromPassword('pw',
+          salt: salt, iterations: 500);
       expect(k1, k2);
       expect(k1.length, KeyDerivation.keySize);
     });
@@ -170,7 +170,8 @@ void main() {
     });
 
     test('detectFormat returns unknown for garbage', () {
-      expect(HeaderCodec.detectFormat([0x00, 0x01, 0x02, 0x03]), kFormatUnknown);
+      expect(
+          HeaderCodec.detectFormat([0x00, 0x01, 0x02, 0x03]), kFormatUnknown);
       expect(HeaderCodec.detectFormat([1, 2]), kFormatUnknown);
     });
 

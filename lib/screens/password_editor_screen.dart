@@ -52,9 +52,8 @@ class _PasswordEditorScreenState extends ConsumerState<PasswordEditorScreen> {
   Future<void> _loadContent() async {
     if (widget.entry == null) return;
     try {
-      final content = await ref
-          .read(passwordServiceProvider)
-          .decryptContent(widget.entry!);
+      final content =
+          await ref.read(passwordServiceProvider).decryptContent(widget.entry!);
       if (mounted) {
         setState(() {
           _usernameController.text = content.username;
@@ -193,9 +192,7 @@ class _PasswordEditorScreenState extends ConsumerState<PasswordEditorScreen> {
           IconButton(
             icon: Icon(
               _isFavorite ? Icons.star : Icons.star_border,
-              color: _isFavorite
-                  ? context.accentColor
-                  : context.textSecondary,
+              color: _isFavorite ? context.accentColor : context.textSecondary,
             ),
             onPressed: () => setState(() => _isFavorite = !_isFavorite),
             tooltip: 'Favorite',
@@ -219,54 +216,55 @@ class _PasswordEditorScreenState extends ConsumerState<PasswordEditorScreen> {
   Widget _buildForm() {
     return AutofillGroup(
       child: SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildTitleField(),
-          const SizedBox(height: 16),
-          _buildField(
-            controller: _usernameController,
-            label: 'Username',
-            icon: Icons.person_outline,
-            autofillHints: const [AutofillHints.username],
-            suffix: _usernameController.text.isNotEmpty
-                ? IconButton(
-                    icon: Icon(Icons.copy, size: 18, color: context.textTertiary),
-                    onPressed: () =>
-                        _copyField(_usernameController.text, 'Username'),
-                    tooltip: 'Copy username',
-                  )
-                : null,
-          ),
-          const SizedBox(height: 16),
-          _buildPasswordField(),
-          const SizedBox(height: 16),
-          _buildField(
-            controller: _urlController,
-            label: 'URL',
-            icon: Icons.link,
-            keyboardType: TextInputType.url,
-            autofillHints: const [AutofillHints.url],
-          ),
-          const SizedBox(height: 16),
-          _buildField(
-            controller: _notesController,
-            label: 'Notes',
-            icon: Icons.note_outlined,
-            maxLines: 3,
-          ),
-          const SizedBox(height: 16),
-          _buildTagsSection(),
-          if (!isEditing) ...[
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildTitleField(),
             const SizedBox(height: 16),
-            _buildAlgorithmSection(),
+            _buildField(
+              controller: _usernameController,
+              label: 'Username',
+              icon: Icons.person_outline,
+              autofillHints: const [AutofillHints.username],
+              suffix: _usernameController.text.isNotEmpty
+                  ? IconButton(
+                      icon: Icon(Icons.copy,
+                          size: 18, color: context.textTertiary),
+                      onPressed: () =>
+                          _copyField(_usernameController.text, 'Username'),
+                      tooltip: 'Copy username',
+                    )
+                  : null,
+            ),
             const SizedBox(height: 16),
-            _buildKdfSection(),
+            _buildPasswordField(),
+            const SizedBox(height: 16),
+            _buildField(
+              controller: _urlController,
+              label: 'URL',
+              icon: Icons.link,
+              keyboardType: TextInputType.url,
+              autofillHints: const [AutofillHints.url],
+            ),
+            const SizedBox(height: 16),
+            _buildField(
+              controller: _notesController,
+              label: 'Notes',
+              icon: Icons.note_outlined,
+              maxLines: 3,
+            ),
+            const SizedBox(height: 16),
+            _buildTagsSection(),
+            if (!isEditing) ...[
+              const SizedBox(height: 16),
+              _buildAlgorithmSection(),
+              const SizedBox(height: 16),
+              _buildKdfSection(),
+            ],
+            const SizedBox(height: 32),
           ],
-          const SizedBox(height: 32),
-        ],
-      ),
+        ),
       ),
     );
   }
@@ -348,7 +346,9 @@ class _PasswordEditorScreenState extends ConsumerState<PasswordEditorScreen> {
       controller: _passwordController,
       obscureText: _obscurePassword,
       keyboardType: TextInputType.visiblePassword,
-      autofillHints: [isEditing ? AutofillHints.password : AutofillHints.newPassword],
+      autofillHints: [
+        isEditing ? AutofillHints.password : AutofillHints.newPassword
+      ],
       style: TextStyle(
         fontFamily: 'ProductSans',
         fontSize: 15,
@@ -378,7 +378,8 @@ class _PasswordEditorScreenState extends ConsumerState<PasswordEditorScreen> {
                   setState(() => _obscurePassword = !_obscurePassword),
             ),
             IconButton(
-              icon: Icon(Icons.auto_awesome, size: 18, color: context.accentColor),
+              icon: Icon(Icons.auto_awesome,
+                  size: 18, color: context.accentColor),
               onPressed: _showGenerator,
               tooltip: 'Generate',
             ),
@@ -437,7 +438,8 @@ class _PasswordEditorScreenState extends ConsumerState<PasswordEditorScreen> {
                 ),
                 backgroundColor: context.accentColor.withValues(alpha: 0.12),
                 side: BorderSide.none,
-                deleteIcon: Icon(Icons.close, size: 14, color: context.textTertiary),
+                deleteIcon:
+                    Icon(Icons.close, size: 14, color: context.textTertiary),
                 onDeleted: () => setState(() => _tags.remove(tag)),
               );
             }).toList(),

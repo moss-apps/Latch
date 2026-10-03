@@ -482,8 +482,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               _textField(
                 controller: _newController,
                 label: 'New password',
-                helper:
-                    'At least ${AuthService.minPasswordLength} characters',
+                helper: 'At least ${AuthService.minPasswordLength} characters',
                 obscure: _obscureNew,
                 onToggle: () => setState(() => _obscureNew = !_obscureNew),
                 onChanged: _clearError,
@@ -594,7 +593,8 @@ class _ChangePINScreenState extends State<ChangePINScreen> {
 
   bool get _isChange => widget.currentAuthMethod == 'pin';
 
-  static bool _isSixDigits(String value) => RegExp(r'^[0-9]{6}$').hasMatch(value);
+  static bool _isSixDigits(String value) =>
+      RegExp(r'^[0-9]{6}$').hasMatch(value);
 
   @override
   void dispose() {
@@ -727,8 +727,8 @@ class _ChangePINScreenState extends State<ChangePINScreen> {
                             : Icons.visibility_off_outlined,
                         color: context.textTertiary,
                       ),
-                      onPressed: () => setState(() => _obscureCurrentPassword =
-                          !_obscureCurrentPassword),
+                      onPressed: () => setState(() =>
+                          _obscureCurrentPassword = !_obscureCurrentPassword),
                     ),
                   ),
                 )
@@ -866,9 +866,8 @@ class _PinFieldState extends State<_PinField> {
                       color: context.backgroundSecondary,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: filled
-                            ? context.accentColor
-                            : context.borderColor,
+                        color:
+                            filled ? context.accentColor : context.borderColor,
                         width: filled ? 1.5 : 1,
                       ),
                     ),

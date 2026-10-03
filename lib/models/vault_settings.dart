@@ -153,7 +153,8 @@ class VaultSettings {
     return VaultSettings(
       encryptionEnabled: json['encryptionEnabled'] as bool? ?? false,
       encryptionAlgorithm: EncryptionAlgorithm.values.firstWhere(
-        (a) => a.name == (json['encryptionAlgorithm'] as String? ?? 'aes256Gcm'),
+        (a) =>
+            a.name == (json['encryptionAlgorithm'] as String? ?? 'aes256Gcm'),
         orElse: () => EncryptionAlgorithm.aes256Gcm,
       ),
       kdfIterations: json['kdfIterations'] as int? ?? 600000,
@@ -180,8 +181,7 @@ class VaultSettings {
           json['wipeVaultOnMaxFailedAttempts'] as bool? ?? false,
       maxFailedAttemptsBeforeWipe:
           json['maxFailedAttemptsBeforeWipe'] as int? ?? 12,
-      showPermissionWarning:
-          json['showPermissionWarning'] as bool? ?? true,
+      showPermissionWarning: json['showPermissionWarning'] as bool? ?? true,
       tapOpensMedia: json['tapOpensMedia'] as bool? ?? true,
       hideUnencryptedThumbnails:
           json['hideUnencryptedThumbnails'] as bool? ?? false,

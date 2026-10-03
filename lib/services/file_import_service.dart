@@ -133,16 +133,15 @@ class FileImportService {
         debugPrint(
             '[FileImport] Gallery deletion result: $deletedOriginalsCount/$requestedOriginals');
       }
-      final retainedOriginals =
-          (requestedOriginals - deletedOriginalsCount).clamp(0, requestedOriginals);
+      final retainedOriginals = (requestedOriginals - deletedOriginalsCount)
+          .clamp(0, requestedOriginals);
 
       return ImportResult(
         success: true,
         importedFiles: imported,
         message:
             'Imported ${imported.length} image(s)${retainedOriginals > 0 ? " ($retainedOriginals original(s) still on device)" : ""}',
-        deletedOriginals:
-            requestedOriginals > 0 && retainedOriginals == 0,
+        deletedOriginals: requestedOriginals > 0 && retainedOriginals == 0,
         retainedOriginals: retainedOriginals,
         skippedDuplicates: skippedDuplicates.length,
         failedCount: (filesToImport.length - imported.length)
@@ -166,7 +165,8 @@ class FileImportService {
     Function(int current, int total, {int currentSize, int totalSize})?
         onProgress,
     Function(FileProgressInfo)? onFileProgress,
-    Map<String, ({bool encrypt, EncryptionAlgorithm algorithm})>? perFileEncryption,
+    Map<String, ({bool encrypt, EncryptionAlgorithm algorithm})>?
+        perFileEncryption,
   }) async {
     if (assets.isEmpty) {
       return ImportResult(
@@ -333,7 +333,8 @@ class FileImportService {
         if (assetsToDelete.isNotEmpty) {
           debugPrint(
               '[FileImport] Attempting to delete ${assetsToDelete.length} assets from gallery');
-          deletedOriginalsCount = await _deleteAssetsFromGallery(assetsToDelete);
+          deletedOriginalsCount =
+              await _deleteAssetsFromGallery(assetsToDelete);
 
           if (deletedOriginalsCount == requestedOriginals) {
             debugPrint(
@@ -347,8 +348,8 @@ class FileImportService {
         }
       }
 
-      final retainedOriginals =
-          (requestedOriginals - deletedOriginalsCount).clamp(0, requestedOriginals);
+      final retainedOriginals = (requestedOriginals - deletedOriginalsCount)
+          .clamp(0, requestedOriginals);
       final messageSuffix = retainedOriginals > 0
           ? ' ($retainedOriginals original(s) still on device)'
           : '';
@@ -432,8 +433,7 @@ class FileImportService {
         final vaultedFile = entry.value;
         String destPath = '${dcimDir.path}/${vaultedFile.originalName}';
         int counter = 1;
-        while (usedPaths.contains(destPath) ||
-            await File(destPath).exists()) {
+        while (usedPaths.contains(destPath) || await File(destPath).exists()) {
           final extension = vaultedFile.extension;
           final nameWithoutExt =
               vaultedFile.originalName.replaceAll('.$extension', '');
@@ -461,10 +461,8 @@ class FileImportService {
               destPath,
               isDecoy: isDecoy,
               onProgress: (processed, total) {
-                final safeTotal =
-                    total > 0 ? total : vaultedFile.fileSize;
-                fileProgress[index] =
-                    processed.clamp(0, safeTotal).toInt();
+                final safeTotal = total > 0 ? total : vaultedFile.fileSize;
+                fileProgress[index] = processed.clamp(0, safeTotal).toInt();
                 final totalProcessed =
                     fileProgress.values.fold(0, (a, b) => a + b);
                 onProgress?.call(
@@ -477,7 +475,8 @@ class FileImportService {
             );
             exportResults[index] = exported;
           } catch (e) {
-            debugPrint('[FileImport] Error exporting ${vaultedFile.originalName}: $e');
+            debugPrint(
+                '[FileImport] Error exporting ${vaultedFile.originalName}: $e');
             exportResults[index] = null;
           }
         }),
@@ -672,8 +671,8 @@ class FileImportService {
         debugPrint(
             '[FileImport] Gallery deletion result: $deletedOriginalsCount/$requestedOriginals');
       }
-      final retainedOriginals =
-          (requestedOriginals - deletedOriginalsCount).clamp(0, requestedOriginals);
+      final retainedOriginals = (requestedOriginals - deletedOriginalsCount)
+          .clamp(0, requestedOriginals);
 
       return ImportResult(
         success: true,
@@ -889,8 +888,7 @@ class FileImportService {
 
       // `FileService` deletes the source when requested, but never reports
       // the outcome; confirm on disk before claiming the original is gone.
-      final originalRetained =
-          deleteOriginal && await File(filePath).exists();
+      final originalRetained = deleteOriginal && await File(filePath).exists();
       return ImportResult(
         success: true,
         importedFiles: [imported],
@@ -977,8 +975,8 @@ class FileImportService {
         requestedOriginals = pathsToDelete.length;
         deletedOriginalsCount = await _deleteFiles(pathsToDelete);
       }
-      final retainedOriginals =
-          (requestedOriginals - deletedOriginalsCount).clamp(0, requestedOriginals);
+      final retainedOriginals = (requestedOriginals - deletedOriginalsCount)
+          .clamp(0, requestedOriginals);
 
       return ImportResult(
         success: true,
@@ -1005,7 +1003,8 @@ class FileImportService {
     required List<String> filePaths,
     bool deleteOriginals = true,
     Function(int current, int total)? onProgress,
-    Map<String, ({bool encrypt, EncryptionAlgorithm algorithm})>? perFileEncryption,
+    Map<String, ({bool encrypt, EncryptionAlgorithm algorithm})>?
+        perFileEncryption,
   }) async {
     if (filePaths.isEmpty) {
       return ImportResult(
@@ -1091,8 +1090,8 @@ class FileImportService {
         requestedOriginals = deletablePaths.length;
         deletedOriginalsCount = await _deleteFiles(deletablePaths);
       }
-      final retainedOriginals =
-          (requestedOriginals - deletedOriginalsCount).clamp(0, requestedOriginals);
+      final retainedOriginals = (requestedOriginals - deletedOriginalsCount)
+          .clamp(0, requestedOriginals);
 
       return ImportResult(
         success: true,
@@ -1126,7 +1125,8 @@ class FileImportService {
     Function(int current, int total)? onProgress,
     Function(FileProgressInfo)? onFileProgress,
     Function(String message)? onStatusUpdate,
-    Map<String, ({bool encrypt, EncryptionAlgorithm algorithm})>? perFileEncryption,
+    Map<String, ({bool encrypt, EncryptionAlgorithm algorithm})>?
+        perFileEncryption,
   }) async {
     if (filePaths.isEmpty) {
       return OfficeImportResult(
@@ -1250,7 +1250,8 @@ class FileImportService {
               encryptionAlgorithm: perFileConfig?.algorithm,
             ));
 
-            pathsToDelete.add((path: officeFile.path, name: officeFile.fileName));
+            pathsToDelete
+                .add((path: officeFile.path, name: officeFile.fileName));
             processed++;
             onProgress?.call(processed, totalFiles);
             onFileProgress?.call(FileProgressInfo(
@@ -1332,7 +1333,8 @@ class FileImportService {
               encryptionAlgorithm: perFileConfig?.algorithm,
             ));
 
-            pathsToDelete.add((path: officeFile.path, name: officeFile.fileName));
+            pathsToDelete
+                .add((path: officeFile.path, name: officeFile.fileName));
             // Don't add to convertedFiles, maybe add to a 'fallback' list or just implicitly handled
           }
 
@@ -1343,7 +1345,9 @@ class FileImportService {
             total: totalFiles,
             fileName: officeFile.fileName,
             fileSize: 0,
-            status: result.success ? 'Converted' : 'Conversion failed, using original',
+            status: result.success
+                ? 'Converted'
+                : 'Conversion failed, using original',
           ));
         } catch (e) {
           debugPrint(
@@ -1361,7 +1365,8 @@ class FileImportService {
               encrypt: perFileConfig?.encrypt,
               encryptionAlgorithm: perFileConfig?.algorithm,
             ));
-            pathsToDelete.add((path: officeFile.path, name: officeFile.fileName));
+            pathsToDelete
+                .add((path: officeFile.path, name: officeFile.fileName));
           } catch (e2) {
             skippedFiles.add(officeFile.fileName);
           }
@@ -1426,10 +1431,9 @@ class FileImportService {
         deletedOriginalsCount =
             await _deleteFiles(deletablePaths.map((p) => p.path).toList());
       }
-      final retainedOriginals =
-          (requestedOriginals - deletedOriginalsCount).clamp(0, requestedOriginals);
-      final deletedOriginals =
-          requestedOriginals > 0 && retainedOriginals == 0;
+      final retainedOriginals = (requestedOriginals - deletedOriginalsCount)
+          .clamp(0, requestedOriginals);
+      final deletedOriginals = requestedOriginals > 0 && retainedOriginals == 0;
 
       final messageBuilder =
           StringBuffer('Imported ${imported.length} document(s)');
@@ -1442,8 +1446,8 @@ class FileImportService {
       if (deletedOriginals) {
         messageBuilder.write(' and removed originals');
       } else if (retainedOriginals > 0) {
-        messageBuilder.write(
-            ' ($retainedOriginals original(s) still on device)');
+        messageBuilder
+            .write(' ($retainedOriginals original(s) still on device)');
       }
 
       return OfficeImportResult(
@@ -1454,8 +1458,7 @@ class FileImportService {
         message: messageBuilder.toString(),
         deletedOriginals: deletedOriginals,
         retainedOriginals: retainedOriginals,
-        failedCount:
-            (totalFiles - imported.length).clamp(0, totalFiles),
+        failedCount: (totalFiles - imported.length).clamp(0, totalFiles),
       );
     } catch (e, stackTrace) {
       debugPrint('[FileImport] Error importing documents with conversion: $e');
@@ -1475,7 +1478,8 @@ class FileImportService {
   Future<ImportResult> importAnyFiles({
     bool deleteOriginals = true,
     Function(int current, int total)? onProgress,
-    Map<String, ({bool encrypt, EncryptionAlgorithm algorithm})>? perFileEncryption,
+    Map<String, ({bool encrypt, EncryptionAlgorithm algorithm})>?
+        perFileEncryption,
   }) async {
     try {
       // Pick any files
@@ -1592,8 +1596,8 @@ class FileImportService {
         }
       }
 
-      final retainedOriginals =
-          (requestedOriginals - deletedOriginalsCount).clamp(0, requestedOriginals);
+      final retainedOriginals = (requestedOriginals - deletedOriginalsCount)
+          .clamp(0, requestedOriginals);
 
       return ImportResult(
         success: true,
@@ -1728,8 +1732,8 @@ class FileImportService {
         debugPrint(
             '[FileImport] Gallery deletion result: $deletedOriginalsCount/$requestedOriginals');
       }
-      final retainedOriginals =
-          (requestedOriginals - deletedOriginalsCount).clamp(0, requestedOriginals);
+      final retainedOriginals = (requestedOriginals - deletedOriginalsCount)
+          .clamp(0, requestedOriginals);
 
       return ImportResult(
         success: true,
@@ -2030,7 +2034,8 @@ class FileImportService {
         rootFolder: result.rootFolder,
         importedFiles: [],
         importedFolders: [],
-        message: 'Imported ${result.filesImported} file(s) into ${result.foldersCreated} folder(s)',
+        message:
+            'Imported ${result.filesImported} file(s) into ${result.foldersCreated} folder(s)',
       );
     } catch (e, stackTrace) {
       debugPrint('[FileImport] Error importing folder: $e');

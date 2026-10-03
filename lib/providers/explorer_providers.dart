@@ -68,7 +68,8 @@ final explorerFilesProvider = FutureProvider<List<VaultedFile>>((ref) async {
 });
 
 /// Provider for subfolders to display in the current explorer folder
-final explorerSubfoldersProvider = FutureProvider<List<VaultFolder>>((ref) async {
+final explorerSubfoldersProvider =
+    FutureProvider<List<VaultFolder>>((ref) async {
   final folderId = ref.watch(explorerCurrentFolderIdProvider);
   if (folderId == null) {
     return ref.watch(rootFoldersProvider.future);

@@ -54,7 +54,8 @@ class VaultedFile {
   final DateTime dateAdded;
   final DateTime? dateModified;
   final String? thumbnailPath;
-  final String? thumbnailIv; // IV for encrypted thumbnail (mirrors encryptionIv)
+  final String?
+      thumbnailIv; // IV for encrypted thumbnail (mirrors encryptionIv)
   final Map<String, dynamic>? metadata;
 
   // New fields for organization

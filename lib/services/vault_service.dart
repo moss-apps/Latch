@@ -204,7 +204,8 @@ class VaultService {
         cancelToken: cancelToken,
       );
 
-  Future<Uint8List?> getDecryptedFileData(String fileId, {bool isDecoy = false}) =>
+  Future<Uint8List?> getDecryptedFileData(String fileId,
+          {bool isDecoy = false}) =>
       _files.getDecryptedFileData(fileId, isDecoy: isDecoy);
 
   Future<File?> exportFile(
@@ -326,8 +327,7 @@ class VaultService {
 
   Future<List<Album>> getAllAlbums() => _albums.getAllAlbums();
 
-  Future<Album?> getAlbumById(String albumId) =>
-      _albums.getAlbumById(albumId);
+  Future<Album?> getAlbumById(String albumId) => _albums.getAlbumById(albumId);
 
   Future<Album?> createAlbum({
     required String name,

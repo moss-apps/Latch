@@ -7,14 +7,14 @@ class _Pbkdf2Args {
   final Uint8List salt;
   final int iterations;
   final int keyLength;
-  const _Pbkdf2Args(this.credential, this.salt, this.iterations, this.keyLength);
+  const _Pbkdf2Args(
+      this.credential, this.salt, this.iterations, this.keyLength);
 }
 
 String _computePbkdf2(_Pbkdf2Args args) {
   final pbkdf2 = PBKDF2KeyDerivator(HMac(SHA256Digest(), 64))
     ..init(Pbkdf2Parameters(args.salt, args.iterations, args.keyLength));
-  final hash =
-      pbkdf2.process(Uint8List.fromList(utf8.encode(args.credential)));
+  final hash = pbkdf2.process(Uint8List.fromList(utf8.encode(args.credential)));
   return base64Encode(hash);
 }
 

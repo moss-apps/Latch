@@ -149,7 +149,8 @@ class _LocalBackupScreenState extends ConsumerState<LocalBackupScreen> {
     final result = await _backupService.createBackup(
       destinationDirPath,
       files: _backupSelectedFilesOnly ? _selectedFiles : null,
-      onProgress: (current, total) => _progress.value = (current: current, total: total),
+      onProgress: (current, total) =>
+          _progress.value = (current: current, total: total),
     );
 
     if (mounted) Navigator.of(context).pop();
@@ -251,15 +252,13 @@ class _LocalBackupScreenState extends ConsumerState<LocalBackupScreen> {
           _sectionTitle('Summary'),
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading:
-                Icon(Icons.archive_outlined, color: context.accentColor),
+            leading: Icon(Icons.archive_outlined, color: context.accentColor),
             title: const Text('Ready to backup'),
             subtitle: Text(
               _allFilesLoaded
                   ? '$count ${count == 1 ? 'file' : 'files'} • ~$size'
                   : 'Counting files...',
-              style:
-                  TextStyle(fontSize: 12, color: context.textTertiary),
+              style: TextStyle(fontSize: 12, color: context.textTertiary),
             ),
           ),
           const SizedBox(height: 24),

@@ -22,8 +22,8 @@ class PermissionWarningBanner extends ConsumerStatefulWidget {
       _PermissionWarningBannerState();
 }
 
-class _PermissionWarningBannerState extends ConsumerState<PermissionWarningBanner>
-    with WidgetsBindingObserver {
+class _PermissionWarningBannerState
+    extends ConsumerState<PermissionWarningBanner> with WidgetsBindingObserver {
   bool _hasPermission = true;
   bool _isLoading = true;
   bool _isDismissed = false;
@@ -101,7 +101,8 @@ class _PermissionWarningBannerState extends ConsumerState<PermissionWarningBanne
     if (_hasPermission || _isDismissed) return const SizedBox.shrink();
 
     // Respect user preference to hide permission warning
-    final showWarning = ref.watch(vaultSettingsProvider).value?.showPermissionWarning ?? true;
+    final showWarning =
+        ref.watch(vaultSettingsProvider).value?.showPermissionWarning ?? true;
     if (!showWarning) return const SizedBox.shrink();
 
     return Container(

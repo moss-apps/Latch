@@ -9,10 +9,12 @@ import 'package:video_player/video_player.dart';
 Rect holdPreviewRect(Offset finger, Size screen, Size card) {
   const margin = 12.0;
 
-  final left = (finger.dx - card.width / 2).clamp(
-    margin,
-    (screen.width - card.width - margin).clamp(margin, double.infinity),
-  ).toDouble();
+  final left = (finger.dx - card.width / 2)
+      .clamp(
+        margin,
+        (screen.width - card.width - margin).clamp(margin, double.infinity),
+      )
+      .toDouble();
   var top = finger.dy - card.height - 56;
   if (top < margin) top = finger.dy + 56;
   top = top.clamp(
@@ -29,7 +31,8 @@ class HoldPreviewCard extends StatelessWidget {
   final ValueListenable<AssetEntity?> asset;
   final ValueListenable<Offset> position;
 
-  const HoldPreviewCard({super.key, required this.asset, required this.position});
+  const HoldPreviewCard(
+      {super.key, required this.asset, required this.position});
 
   @override
   Widget build(BuildContext context) {
@@ -201,8 +204,8 @@ class _VideoPreviewState extends State<_VideoPreview> {
               children: [
                 Image.memory(bytes, fit: BoxFit.contain),
                 const Center(
-                  child: Icon(Icons.play_arrow,
-                      size: 48, color: Colors.white70),
+                  child:
+                      Icon(Icons.play_arrow, size: 48, color: Colors.white70),
                 ),
               ],
             );
@@ -214,10 +217,9 @@ class _VideoPreviewState extends State<_VideoPreview> {
 
     return Center(
       child: AspectRatio(
-        aspectRatio:
-            controller.value.aspectRatio == 0
-                ? 1
-                : controller.value.aspectRatio,
+        aspectRatio: controller.value.aspectRatio == 0
+            ? 1
+            : controller.value.aspectRatio,
         child: VideoPlayer(controller),
       ),
     );

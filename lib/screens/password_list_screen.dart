@@ -13,8 +13,7 @@ class PasswordListScreen extends ConsumerStatefulWidget {
   const PasswordListScreen({super.key});
 
   @override
-  ConsumerState<PasswordListScreen> createState() =>
-      _PasswordListScreenState();
+  ConsumerState<PasswordListScreen> createState() => _PasswordListScreenState();
 }
 
 class _PasswordListScreenState extends ConsumerState<PasswordListScreen> {
@@ -191,8 +190,7 @@ class _PasswordListScreenState extends ConsumerState<PasswordListScreen> {
                   },
                 );
               },
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, _) => Center(
                 child: Text(
                   'Error loading passwords',
@@ -380,7 +378,9 @@ class _PasswordListScreenState extends ConsumerState<PasswordListScreen> {
       entriesAsync.whenData((entries) async {
         final toDelete =
             entries.where((e) => _selectedIds.contains(e.id)).toList();
-        await ref.read(passwordsNotifierProvider.notifier).deletePasswords(toDelete);
+        await ref
+            .read(passwordsNotifierProvider.notifier)
+            .deletePasswords(toDelete);
         if (mounted) {
           setState(() {
             _isSelectionMode = false;

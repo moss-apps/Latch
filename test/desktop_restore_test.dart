@@ -160,7 +160,8 @@ void main() {
   // from a test vault, wipe the vault, restore via pre-vault pull, unlock
   // with the original password, index matches.
   test('desktop backup restore end-to-end', () async {
-    const secureChannel = MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
+    const secureChannel =
+        MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
     const pathChannel = MethodChannel('plugins.flutter.io/path_provider');
     final storage = <String, String>{};
     final tmpDir = Directory.systemTemp.createTempSync('locker_restore_e2e');
@@ -231,8 +232,8 @@ void main() {
     ];
     for (var i = 0; i < specs.length; i++) {
       final (name, type, mime, size) = specs[i];
-      final content =
-          Uint8List.fromList(List<int>.generate(size, (n) => (n + i * 7) % 251));
+      final content = Uint8List.fromList(
+          List<int>.generate(size, (n) => (n + i * 7) % 251));
       final sha = sha256.convert(content).toString();
       blobs[sha] = content;
       entries.add(ManifestEntry(
@@ -293,8 +294,8 @@ void main() {
     expect(info.blobCount, 3);
 
     // 5. Pre-vault pull: wrong password cannot unwrap — nothing installed.
-    final fetchedKb = await restoreClient.fetchKeybundle(
-        base: stub.base, token: stub.token);
+    final fetchedKb =
+        await restoreClient.fetchKeybundle(base: stub.base, token: stub.token);
     expect(fetchedKb, isNotNull);
     await expectLater(
       crypto.installRestoredKeybundle(fetchedKb!, 'wrong password'),

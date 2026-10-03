@@ -137,17 +137,15 @@ class FloatingCapsuleBottomBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // hard cap at 5 total slots (feature + up to 4 tabs).
-    final visibleTabs = (tabs.length >= _maxSlots)
-        ? tabs.sublist(0, _maxSlots - 1)
-        : tabs;
+    final visibleTabs =
+        (tabs.length >= _maxSlots) ? tabs.sublist(0, _maxSlots - 1) : tabs;
 
     final slots = visibleTabs.length + (showFeature ? 1 : 0);
     final featureInMiddle = showFeature && slots.isOdd;
 
     final accent = context.accentColor;
-    final totalHeight = featureInMiddle
-        ? _capsuleHeight + _protrusion
-        : _capsuleHeight;
+    final totalHeight =
+        featureInMiddle ? _capsuleHeight + _protrusion : _capsuleHeight;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -218,7 +216,8 @@ class FloatingCapsuleBottomBar extends StatelessWidget {
         border: Border.all(color: context.borderColor.withValues(alpha: 0.5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: context.isDarkMode ? 0.5 : 0.18),
+            color:
+                Colors.black.withValues(alpha: context.isDarkMode ? 0.5 : 0.18),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -254,7 +253,8 @@ class FloatingCapsuleBottomBar extends StatelessWidget {
                   style: TextStyle(
                     fontFamily: 'ProductSans',
                     fontSize: 10,
-                    fontWeight: tab.selected ? FontWeight.w600 : FontWeight.normal,
+                    fontWeight:
+                        tab.selected ? FontWeight.w600 : FontWeight.normal,
                     color: color,
                   ),
                 ),
@@ -273,7 +273,8 @@ class FloatingCapsuleBottomBar extends StatelessWidget {
     );
   }
 
-  Widget _diamond(BuildContext context, Color accent, {required bool elevated}) {
+  Widget _diamond(BuildContext context, Color accent,
+      {required bool elevated}) {
     final size = elevated ? _elevatedDiamond : _inlineDiamond;
     return Tooltip(
       message: feature.label,

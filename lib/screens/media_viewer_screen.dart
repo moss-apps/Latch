@@ -110,9 +110,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   }
 
   Future<void> _loadCurrentMedia() async {
-    if (_files.isEmpty ||
-        _currentIndex < 0 ||
-        _currentIndex >= _files.length) {
+    if (_files.isEmpty || _currentIndex < 0 || _currentIndex >= _files.length) {
       return;
     }
     final file = _files[_currentIndex];
@@ -850,8 +848,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                           onPressed: () => setState(() => _isSlideshow = false),
                           tooltip: 'Close slideshow',
                           padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                              minWidth: 36, minHeight: 36),
+                          constraints:
+                              const BoxConstraints(minWidth: 36, minHeight: 36),
                         ),
                       ],
                     ),
@@ -923,7 +921,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.play_circle_outline, size: 80, color: Colors.white54),
+          const Icon(Icons.play_circle_outline,
+              size: 80, color: Colors.white54),
           const SizedBox(height: 16),
           Text(
             file.originalName,
@@ -1287,50 +1286,50 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                   IconButton(
-                      icon: Icon(
-                        _isLooping ? Icons.repeat_one : Icons.repeat,
-                        color: _isLooping ? AppColors.accent : Colors.white,
-                      ),
-                      tooltip: 'Loop',
-                      onPressed: _toggleLooping,
+                  IconButton(
+                    icon: Icon(
+                      _isLooping ? Icons.repeat_one : Icons.repeat,
+                      color: _isLooping ? AppColors.accent : Colors.white,
                     ),
-                   IconButton(
-                      icon: Icon(
-                        _isMuted ? Icons.volume_off : Icons.volume_up,
-                       color: Colors.white,
-                     ),
-                     tooltip: _isMuted ? 'Unmute' : 'Mute',
-                     onPressed: () {
+                    tooltip: 'Loop',
+                    onPressed: _toggleLooping,
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      _isMuted ? Icons.volume_off : Icons.volume_up,
+                      color: Colors.white,
+                    ),
+                    tooltip: _isMuted ? 'Unmute' : 'Mute',
+                    onPressed: () {
                       setState(() {
                         _isMuted = !_isMuted;
                         _videoController?.setVolume(_isMuted ? 0.0 : 1.0);
                       });
                     },
                   ),
-                   IconButton(
-                     icon: Icon(
-                       _isVideoPlaying
-                           ? Icons.pause_circle_filled
-                           : Icons.play_circle_filled,
-                       color: Colors.white,
-                       size: 48,
-                     ),
-                     tooltip: _isVideoPlaying ? 'Pause' : 'Play',
-                     onPressed: _toggleVideoPlayback,
-                   ),
-                   IconButton(
-                     icon: Text(
-                       '${_playbackSpeed}x',
-                       style: const TextStyle(
-                         color: Colors.white,
-                         fontWeight: FontWeight.bold,
-                         fontSize: 14,
-                         fontFamily: 'ProductSans',
-                       ),
-                     ),
-                     tooltip: 'Playback speed',
-                     onPressed: () {
+                  IconButton(
+                    icon: Icon(
+                      _isVideoPlaying
+                          ? Icons.pause_circle_filled
+                          : Icons.play_circle_filled,
+                      color: Colors.white,
+                      size: 48,
+                    ),
+                    tooltip: _isVideoPlaying ? 'Pause' : 'Play',
+                    onPressed: _toggleVideoPlayback,
+                  ),
+                  IconButton(
+                    icon: Text(
+                      '${_playbackSpeed}x',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        fontFamily: 'ProductSans',
+                      ),
+                    ),
+                    tooltip: 'Playback speed',
+                    onPressed: () {
                       setState(() {
                         if (_playbackSpeed == 1.0) {
                           _playbackSpeed = 1.5;
@@ -1341,32 +1340,30 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                         } else {
                           _playbackSpeed = 1.0;
                         }
-_videoController?.setPlaybackSpeed(_playbackSpeed);
+                        _videoController?.setPlaybackSpeed(_playbackSpeed);
                       });
-                     },
-                   ),
-                    IconButton(
-                      icon: Icon(
-                        _forceLandscape
-                            ? Icons.stay_current_portrait
-                            : Icons.stay_current_landscape,
-                        color: _forceLandscape
-                            ? AppColors.accent
-                            : Colors.white,
-                      ),
-                      tooltip: _forceLandscape
-                          ? 'Play vertically'
-                          : 'Play horizontally',
-                      onPressed: _toggleOrientation,
+                    },
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      _forceLandscape
+                          ? Icons.stay_current_portrait
+                          : Icons.stay_current_landscape,
+                      color: _forceLandscape ? AppColors.accent : Colors.white,
                     ),
-                 ],
-               ),
-             ],
-           ),
-         ),
-       ),
-     );
-   }
+                    tooltip: _forceLandscape
+                        ? 'Play vertically'
+                        : 'Play horizontally',
+                    onPressed: _toggleOrientation,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildImageBottomControls(VaultedFile file) {
     return Positioned(
@@ -1500,7 +1497,8 @@ _videoController?.setPlaybackSpeed(_playbackSpeed);
                   oldController?.removeListener(_onVideoUpdate);
                   oldController?.dispose();
                   _decryptedFileCache.remove(file.id);
-                  final removedIndex = _files.indexWhere((f) => f.id == file.id);
+                  final removedIndex =
+                      _files.indexWhere((f) => f.id == file.id);
                   setState(() {
                     _files.removeWhere((f) => f.id == file.id);
                     if (_currentIndex >= _files.length) {

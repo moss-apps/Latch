@@ -126,8 +126,7 @@ class _FakePBStore implements LocalStore {
   @override
   Future<void> saveAlbums() async {}
   @override
-  Future<List<VaultFolder>> loadFolders({bool forceReload = false}) async =>
-      [];
+  Future<List<VaultFolder>> loadFolders({bool forceReload = false}) async => [];
   @override
   Future<void> saveFolders() async {}
   @override
@@ -207,9 +206,8 @@ void main() {
 
     test('fromJson preserves explicit false for failedUnlockProtectionEnabled',
         () async {
-      storage['vault_settings'] =
-          jsonEncode(const VaultSettings(failedUnlockProtectionEnabled: false)
-              .toJson());
+      storage['vault_settings'] = jsonEncode(
+          const VaultSettings(failedUnlockProtectionEnabled: false).toJson());
       final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
       final s = await vault.getSettings();
       expect(s.failedUnlockProtectionEnabled, false);
@@ -346,8 +344,10 @@ void main() {
       expect(ok, true);
 
       final files = await vault.getAllFiles();
-      expect(files.firstWhere((f) => f.id == 'f1').albumIds, contains(album.id));
-      expect(files.firstWhere((f) => f.id == 'f2').albumIds, contains(album.id));
+      expect(
+          files.firstWhere((f) => f.id == 'f1').albumIds, contains(album.id));
+      expect(
+          files.firstWhere((f) => f.id == 'f2').albumIds, contains(album.id));
 
       final reloaded = await vault.getAlbumById(album.id);
       expect(reloaded!.fileIds, containsAll(['f1', 'f2']));
@@ -377,9 +377,10 @@ void main() {
       await vault.removeFilesFromAlbum(['f1'], album.id);
 
       final files = await vault.getAllFiles();
+      expect(files.firstWhere((f) => f.id == 'f1').albumIds,
+          isNot(contains(album.id)));
       expect(
-          files.firstWhere((f) => f.id == 'f1').albumIds, isNot(contains(album.id)));
-      expect(files.firstWhere((f) => f.id == 'f2').albumIds, contains(album.id));
+          files.firstWhere((f) => f.id == 'f2').albumIds, contains(album.id));
     });
 
     test('favorites album sets isFavorite on file', () async {
@@ -456,12 +457,16 @@ void main() {
 
       await vault.toggleFavorite('f1');
       expect(
-          (await vault.getAllFiles()).firstWhere((f) => f.id == 'f1').isFavorite,
+          (await vault.getAllFiles())
+              .firstWhere((f) => f.id == 'f1')
+              .isFavorite,
           true);
 
       await vault.toggleFavorite('f1');
       expect(
-          (await vault.getAllFiles()).firstWhere((f) => f.id == 'f1').isFavorite,
+          (await vault.getAllFiles())
+              .firstWhere((f) => f.id == 'f1')
+              .isFavorite,
           false);
     });
 
@@ -500,7 +505,11 @@ void main() {
   group('sort', () {
     test('sortFiles by name ascending', () async {
       final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
-      final files = [_makeFile('zebra'), _makeFile('apple'), _makeFile('mango')];
+      final files = [
+        _makeFile('zebra'),
+        _makeFile('apple'),
+        _makeFile('mango')
+      ];
       final sorted = vault.sortFiles(files, SortOption.nameAsc);
       expect(sorted.map((f) => f.id).toList(), ['apple', 'mango', 'zebra']);
     });
@@ -580,7 +589,8 @@ void main() {
       final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
       final survivor = _pbEraFile('survivor', tmpDir); // blob on disk
       final ghost = _makeFile('ghost'); // vaultPath /tmp/ghost.enc, no blob
-      storage['vault_file_index'] = jsonEncode([survivor, ghost].map((f) => f.toJson()).toList());
+      storage['vault_file_index'] =
+          jsonEncode([survivor, ghost].map((f) => f.toJson()).toList());
 
       final pb = _FakePBStore()
         ..loadError = Exception('sidecar down')
@@ -622,8 +632,7 @@ void main() {
       expect(pbSaved.map((f) => f.id).toSet(), {'pbonly', 'newhide'});
     });
 
-    test('healLegacyDivergence resurrects legacy-only rows into PB',
-        () async {
+    test('healLegacyDivergence resurrects legacy-only rows into PB', () async {
       final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
       final lostWhileDown = _pbEraFile('lost', tmpDir);
       storage['vault_file_index'] =

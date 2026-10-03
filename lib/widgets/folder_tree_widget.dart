@@ -89,7 +89,8 @@ class _FolderTreeWidgetState extends ConsumerState<FolderTreeWidget> {
 
                 // Sort root folders alphabetically
                 final sortedRoots = List<VaultFolder>.from(rootFolders)
-                  ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+                  ..sort((a, b) =>
+                      a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
                 return ListView.builder(
                   padding: const EdgeInsets.symmetric(vertical: 8),
@@ -118,7 +119,9 @@ class _FolderTreeWidgetState extends ConsumerState<FolderTreeWidget> {
         ref.read(explorerCurrentFolderIdProvider.notifier).state = null;
       },
       child: Container(
-        color: isSelected ? context.accentColor.withValues(alpha: 0.1) : Colors.transparent,
+        color: isSelected
+            ? context.accentColor.withValues(alpha: 0.1)
+            : Colors.transparent,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
@@ -165,13 +168,16 @@ class _FolderTreeWidgetState extends ConsumerState<FolderTreeWidget> {
         // Folder item itself
         InkWell(
           onTap: () {
-            ref.read(explorerCurrentFolderIdProvider.notifier).state = folder.id;
+            ref.read(explorerCurrentFolderIdProvider.notifier).state =
+                folder.id;
           },
           onLongPress: widget.onFolderLongPress != null
               ? () => widget.onFolderLongPress!(folder)
               : null,
           child: Container(
-            color: isSelected ? context.accentColor.withValues(alpha: 0.1) : Colors.transparent,
+            color: isSelected
+                ? context.accentColor.withValues(alpha: 0.1)
+                : Colors.transparent,
             padding: EdgeInsets.only(
               left: 8.0 + (depth * 16.0),
               right: 16.0,
@@ -185,10 +191,13 @@ class _FolderTreeWidgetState extends ConsumerState<FolderTreeWidget> {
                   onTap: () => _toggleExpand(folder.id),
                   behavior: HitTestBehavior.opaque,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 4.0),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 4.0, vertical: 4.0),
                     child: Icon(
                       folder.subfolderCount > 0
-                          ? (isExpanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_right)
+                          ? (isExpanded
+                              ? Icons.keyboard_arrow_down
+                              : Icons.keyboard_arrow_right)
                           : Icons.fiber_manual_record,
                       size: folder.subfolderCount > 0 ? 18 : 6,
                       color: folder.subfolderCount > 0
@@ -200,7 +209,9 @@ class _FolderTreeWidgetState extends ConsumerState<FolderTreeWidget> {
                 const SizedBox(width: 2),
                 Icon(
                   isExpanded ? Icons.folder_open : Icons.folder,
-                  color: isSelected ? context.accentColor : context.accentColor.withValues(alpha: 0.7),
+                  color: isSelected
+                      ? context.accentColor
+                      : context.accentColor.withValues(alpha: 0.7),
                   size: 18,
                 ),
                 const SizedBox(width: 8),
@@ -209,8 +220,11 @@ class _FolderTreeWidgetState extends ConsumerState<FolderTreeWidget> {
                     folder.name,
                     style: TextStyle(
                       fontFamily: 'ProductSans',
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      color: isSelected ? context.accentColor : context.textPrimary,
+                      fontWeight:
+                          isSelected ? FontWeight.bold : FontWeight.normal,
+                      color: isSelected
+                          ? context.accentColor
+                          : context.textPrimary,
                       fontSize: 13,
                     ),
                     maxLines: 1,
@@ -219,7 +233,8 @@ class _FolderTreeWidgetState extends ConsumerState<FolderTreeWidget> {
                 ),
                 if (folder.fileCount > 0)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: context.backgroundSecondary,
                       borderRadius: BorderRadius.circular(10),
@@ -246,7 +261,8 @@ class _FolderTreeWidgetState extends ConsumerState<FolderTreeWidget> {
 
               return subfoldersAsync.when(
                 loading: () => Padding(
-                  padding: EdgeInsets.only(left: 24.0 + (depth * 16.0), top: 4.0, bottom: 4.0),
+                  padding: EdgeInsets.only(
+                      left: 24.0 + (depth * 16.0), top: 4.0, bottom: 4.0),
                   child: const SizedBox(
                     width: 12,
                     height: 12,
@@ -259,7 +275,8 @@ class _FolderTreeWidgetState extends ConsumerState<FolderTreeWidget> {
 
                   // Sort subfolders alphabetically
                   final sortedSubfolders = List<VaultFolder>.from(subfolders)
-                    ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+                    ..sort((a, b) =>
+                        a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
                   return Column(
                     children: sortedSubfolders.map((subfolder) {

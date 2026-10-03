@@ -82,8 +82,7 @@ class _AddTagsSheetState extends ConsumerState<AddTagsSheet> {
         ),
         decoration: BoxDecoration(
           color: context.backgroundColor,
-          borderRadius:
-              const BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -169,8 +168,7 @@ class _AddTagsSheetState extends ConsumerState<AddTagsSheet> {
                         child: SizedBox(
                           width: 20,
                           height: 20,
-                          child:
-                              CircularProgressIndicator(strokeWidth: 2),
+                          child: CircularProgressIndicator(strokeWidth: 2),
                         ),
                       ),
                     ),
@@ -184,8 +182,7 @@ class _AddTagsSheetState extends ConsumerState<AddTagsSheet> {
                     data: (tags) {
                       if (tags.isEmpty) {
                         return Padding(
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
                           child: Center(
                             child: Text(
                               'No tags yet. Create one above!',
