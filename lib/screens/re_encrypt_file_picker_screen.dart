@@ -87,8 +87,7 @@ class _ReEncryptFilePickerScreenState
             TextButton(
               onPressed: () {
                 setState(() {
-                  final filteredIds =
-                      filteredFiles.map((f) => f.id).toSet();
+                  final filteredIds = filteredFiles.map((f) => f.id).toSet();
                   if (filteredIds.every((id) => _selectedIds.contains(id))) {
                     _selectedIds.removeAll(filteredIds);
                   } else {
@@ -154,7 +153,8 @@ class _ReEncryptFilePickerScreenState
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline, color: context.accentColor, size: 20),
+                    Icon(Icons.info_outline,
+                        color: context.accentColor, size: 20),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -188,7 +188,8 @@ class _ReEncryptFilePickerScreenState
                     prefixIcon: Icon(Icons.search, color: context.textTertiary),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
-                            icon: Icon(Icons.clear, color: context.textTertiary),
+                            icon:
+                                Icon(Icons.clear, color: context.textTertiary),
                             onPressed: () => _setSearchQuery(''),
                           )
                         : null,
@@ -229,15 +230,16 @@ class _ReEncryptFilePickerScreenState
                         itemBuilder: (context, index) {
                           final file = filteredFiles[index];
                           final isSelected = _selectedIds.contains(file.id);
-                          final needsReEncrypt =
-                              file.encryptionAlgorithm != widget.targetAlgorithm;
+                          final needsReEncrypt = file.encryptionAlgorithm !=
+                              widget.targetAlgorithm;
 
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 8),
                             child: Container(
                               decoration: BoxDecoration(
                                 color: isSelected
-                                    ? context.accentColor.withValues(alpha: 0.08)
+                                    ? context.accentColor
+                                        .withValues(alpha: 0.08)
                                     : context.surfaceColor,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
@@ -265,8 +267,10 @@ class _ReEncryptFilePickerScreenState
                                 ),
                                 subtitle: Row(
                                   children: [
-                                    if (file.fileSize > _largeFileThresholdBytes) ...[
-                                      Icon(Icons.warning_amber, size: 14, color: Colors.orange),
+                                    if (file.fileSize >
+                                        _largeFileThresholdBytes) ...[
+                                      Icon(Icons.warning_amber,
+                                          size: 14, color: Colors.orange),
                                       const SizedBox(width: 4),
                                     ],
                                     Expanded(
@@ -363,7 +367,9 @@ class _ReEncryptFilePickerScreenState
   Future<void> _startReEncrypt() async {
     final encryptedFiles = _encryptedFiles(ref.read(vaultNotifierProvider));
     final largeFiles = encryptedFiles
-        .where((f) => _selectedIds.contains(f.id) && f.fileSize > _largeFileThresholdBytes)
+        .where((f) =>
+            _selectedIds.contains(f.id) &&
+            f.fileSize > _largeFileThresholdBytes)
         .toList();
 
     if (largeFiles.isNotEmpty) {
@@ -400,16 +406,16 @@ class _ReEncryptFilePickerScreenState
               ),
               const SizedBox(height: 12),
               ...largeFiles.take(5).map((f) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  '• ${f.originalName} (${_formatSize(f.fileSize)})',
-                  style: TextStyle(
-                    fontFamily: 'ProductSans',
-                    fontSize: 12,
-                    color: context.textTertiary,
-                  ),
-                ),
-              )),
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      '• ${f.originalName} (${_formatSize(f.fileSize)})',
+                      style: TextStyle(
+                        fontFamily: 'ProductSans',
+                        fontSize: 12,
+                        color: context.textTertiary,
+                      ),
+                    ),
+                  )),
               if (largeFiles.length > 5)
                 Text(
                   '...and ${largeFiles.length - 5} more',
@@ -465,7 +471,11 @@ class _ReEncryptFilePickerScreenState
     }
 
     void onProgress(
-      int current, int total, String name, int processed, int totalBytes,
+      int current,
+      int total,
+      String name,
+      int processed,
+      int totalBytes,
     ) {
       progressState.value = progressState.value.copyWith(
         totalFiles: total,

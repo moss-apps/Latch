@@ -17,7 +17,12 @@ class EncryptionSettingsScreen extends ConsumerStatefulWidget {
 
 class _EncryptionSettingsScreenState
     extends ConsumerState<EncryptionSettingsScreen> {
-  static const List<int> _kdfIterationOptions = [100000, 300000, 600000, 1000000];
+  static const List<int> _kdfIterationOptions = [
+    100000,
+    300000,
+    600000,
+    1000000
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -75,7 +80,8 @@ class _EncryptionSettingsScreenState
                 icon: Icons.lock_outline,
                 title: 'Encrypt',
                 subtitle: 'Encrypt files that are stored as plaintext',
-                onTap: () => _pushManage(settings, VaultEncryptionAction.encrypt),
+                onTap: () =>
+                    _pushManage(settings, VaultEncryptionAction.encrypt),
               ),
               _tile(
                 icon: Icons.lock_open,
@@ -95,7 +101,8 @@ class _EncryptionSettingsScreenState
               const SizedBox(height: 24),
               _sectionTitle('Current Configuration'),
               _infoTile('Algorithm', settings.encryptionAlgorithm.displayName),
-              _infoTile('KDF Iterations', settings.kdfIterations.toLocaleString()),
+              _infoTile(
+                  'KDF Iterations', settings.kdfIterations.toLocaleString()),
               _infoTile(
                 'New imports',
                 settings.encryptionEnabled

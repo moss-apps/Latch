@@ -34,7 +34,8 @@ class EncryptionService {
   // migrateOnAlgorithmChange ensures existing data is automatically migrated
   static const _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(),
-    iOptions: IOSOptions(accessibility: KeychainAccessibility.unlocked_this_device),
+    iOptions:
+        IOSOptions(accessibility: KeychainAccessibility.unlocked_this_device),
   );
 
   static const String _masterKeyKey = 'vault_master_key';
@@ -46,7 +47,8 @@ class EncryptionService {
   static const String _kwkSaltKey = 'vault_kwk_salt';
   static const String _kwkIvKey = 'vault_kwk_iv';
   static const String _biometricKwkKey = 'vault_biometric_kwk';
-  static const String _biometricWrappedKeyKey = 'vault_master_key_wrapped_biometric';
+  static const String _biometricWrappedKeyKey =
+      'vault_master_key_wrapped_biometric';
   static const String _biometricIvKey = 'vault_biometric_iv';
 
   // H1: Key wrapping storage keys (decoy vault)
@@ -88,7 +90,8 @@ class EncryptionService {
   /// After a desktop-backup restore the key is still wrapped with the ORIGINAL
   /// vault password; the first non-decoy credential set here re-wraps it with
   /// this device's credential (one-shot).
-  Future<void> setPendingCredential(String credential, {bool isDecoy = false}) async {
+  Future<void> setPendingCredential(String credential,
+      {bool isDecoy = false}) async {
     if (isDecoy) {
       _pendingDecoyCredential = credential;
       return;
@@ -102,7 +105,8 @@ class EncryptionService {
 
   /// Unlock master key using user credential (PIN/password).
   /// Handles first-time key creation, legacy migration, and normal unwrap.
-  Future<Uint8List> unlockMasterKey(String credential, {bool isDecoy = false}) async {
+  Future<Uint8List> unlockMasterKey(String credential,
+      {bool isDecoy = false}) async {
     final cached = isDecoy ? _cachedDecoyKey : _cachedMasterKey;
     if (cached != null) return cached;
 
@@ -123,8 +127,10 @@ class EncryptionService {
         throw StateError('Wrapped key data incomplete');
       }
 
-      final kwk = await KeyDerivation.argon2id(credential, base64Decode(saltB64));
-      final masterKey = KeyWrap.unwrap(base64Decode(wrappedKeyB64), kwk, base64Decode(ivB64));
+      final kwk =
+          await KeyDerivation.argon2id(credential, base64Decode(saltB64));
+      final masterKey =
+          KeyWrap.unwrap(base64Decode(wrappedKeyB64), kwk, base64Decode(ivB64));
 
       if (isDecoy) {
         _cachedDecoyKey = masterKey;
@@ -147,7 +153,8 @@ class EncryptionService {
       } else {
         _cachedMasterKey = masterKey;
       }
-      debugPrint('[Encryption] Migrated ${isDecoy ? 'decoy' : 'master'} key to wrapped form');
+      debugPrint(
+          '[Encryption] Migrated ${isDecoy ? 'decoy' : 'master'} key to wrapped form');
       return masterKey;
     }
 
@@ -180,8 +187,8 @@ class EncryptionService {
         throw StateError('Biometric key data incomplete');
       }
 
-      final masterKey =
-          KeyWrap.unwrap(base64Decode(wrappedKeyB64), base64Decode(biometricKwkB64), base64Decode(ivB64));
+      final masterKey = KeyWrap.unwrap(base64Decode(wrappedKeyB64),
+          base64Decode(biometricKwkB64), base64Decode(ivB64));
       _cachedMasterKey = masterKey;
       return masterKey;
     }
@@ -194,7 +201,8 @@ class EncryptionService {
       await _storage.delete(key: _masterKeyKey);
       await _storage.write(key: _keyVersionKey, value: '1');
       _cachedMasterKey = masterKey;
-      debugPrint('[Encryption] Migrated master key to wrapped form (biometric)');
+      debugPrint(
+          '[Encryption] Migrated master key to wrapped form (biometric)');
       return masterKey;
     }
 
@@ -215,9 +223,11 @@ class EncryptionService {
       final version = await _storage.read(key: _keyVersionKey);
       if (version == null) {
         _cachedMasterKey = KeyDerivation.randomBytes(_keySize);
-        await _storage.write(key: _masterKeyKey, value: base64Encode(_cachedMasterKey!));
+        await _storage.write(
+            key: _masterKeyKey, value: base64Encode(_cachedMasterKey!));
       } else {
-        throw StateError('Master key not unlocked. Call unlockMasterKey first.');
+        throw StateError(
+            'Master key not unlocked. Call unlockMasterKey first.');
       }
     }
 
@@ -267,8 +277,10 @@ class EncryptionService {
     final iv = generateIV();
     final wrappedKey = KeyWrap.wrap(masterKey, biometricKwk, iv);
 
-    await _storage.write(key: _biometricKwkKey, value: base64Encode(biometricKwk));
-    await _storage.write(key: _biometricWrappedKeyKey, value: base64Encode(wrappedKey));
+    await _storage.write(
+        key: _biometricKwkKey, value: base64Encode(biometricKwk));
+    await _storage.write(
+        key: _biometricWrappedKeyKey, value: base64Encode(wrappedKey));
     await _storage.write(key: _biometricIvKey, value: base64Encode(iv));
   }
 
@@ -293,7 +305,8 @@ class EncryptionService {
 
     _cachedMasterKey = KeyDerivation.randomBytes(_keySize);
     if (_pendingCredential != null) {
-      await _wrapAndStoreKey(_cachedMasterKey!, _pendingCredential!, isDecoy: false);
+      await _wrapAndStoreKey(_cachedMasterKey!, _pendingCredential!,
+          isDecoy: false);
       await _storage.write(key: _keyVersionKey, value: '1');
       _pendingCredential = null;
     } else {
@@ -349,12 +362,16 @@ class EncryptionService {
     final saltB64 = bundle['wrapSalt'] as String?;
     final ivB64 = bundle['wrapIv'] as String?;
     final params = bundle['argon2'] as Map<String, dynamic>?;
-    if (wrappedB64 == null || saltB64 == null || ivB64 == null || params == null) {
+    if (wrappedB64 == null ||
+        saltB64 == null ||
+        ivB64 == null ||
+        params == null) {
       throw StateError('Malformed keybundle');
     }
 
     final t = (params['t'] as num?)?.toInt() ?? KeyDerivation.argon2Iterations;
-    final m = (params['m'] as num?)?.toInt() ?? (1 << KeyDerivation.argon2MemoryPowerOf2);
+    final m = (params['m'] as num?)?.toInt() ??
+        (1 << KeyDerivation.argon2MemoryPowerOf2);
     final p = (params['p'] as num?)?.toInt() ?? KeyDerivation.argon2Lanes;
     final memoryPowerOf2 = (log(m) / log(2)).round();
 
@@ -365,7 +382,8 @@ class EncryptionService {
       memoryPowerOf2: memoryPowerOf2,
       lanes: p,
     );
-    final masterKey = KeyWrap.unwrap(base64Decode(wrappedB64), kwk, base64Decode(ivB64));
+    final masterKey =
+        KeyWrap.unwrap(base64Decode(wrappedB64), kwk, base64Decode(ivB64));
 
     await _storage.write(key: _keyVersionKey, value: '1');
     await _storage.write(key: _wrappedKeyKey, value: wrappedB64);
@@ -386,7 +404,8 @@ class EncryptionService {
 
     final version = await _storage.read(key: _decoyKeyVersionKey);
     if (version == '1') {
-      throw StateError('Decoy key is wrapped. Call unlockMasterKey(isDecoy: true) first.');
+      throw StateError(
+          'Decoy key is wrapped. Call unlockMasterKey(isDecoy: true) first.');
     }
 
     try {
@@ -401,7 +420,8 @@ class EncryptionService {
 
     _cachedDecoyKey = KeyDerivation.randomBytes(_keySize);
     if (_pendingDecoyCredential != null) {
-      await _wrapAndStoreKey(_cachedDecoyKey!, _pendingDecoyCredential!, isDecoy: true);
+      await _wrapAndStoreKey(_cachedDecoyKey!, _pendingDecoyCredential!,
+          isDecoy: true);
       await _storage.write(key: _decoyKeyVersionKey, value: '1');
       _pendingDecoyCredential = null;
     } else {
@@ -418,7 +438,8 @@ class EncryptionService {
   Uint8List generateFileSalt() => KeyDerivation.generateFileSalt();
 
   /// Derive a per-file encryption key from the master key + salt using PBKDF2
-  Uint8List deriveFileKey(Uint8List masterKey, Uint8List salt, int iterations) =>
+  Uint8List deriveFileKey(
+          Uint8List masterKey, Uint8List salt, int iterations) =>
       KeyDerivation.deriveFileKey(masterKey, salt, iterations);
 
   Future<Uint8List> deriveFileKeyAsync(
@@ -460,7 +481,8 @@ class EncryptionService {
     return cipher;
   }
 
-  Future<Uint8List> _resolveKey({bool isDecoy = false, Uint8List? derivedKey}) async {
+  Future<Uint8List> _resolveKey(
+      {bool isDecoy = false, Uint8List? derivedKey}) async {
     if (derivedKey != null) return derivedKey;
     return isDecoy ? await _ensureDecoyKey() : await _ensureMasterKey();
   }
@@ -469,7 +491,8 @@ class EncryptionService {
     return input.transform(_ChunkedStreamTransformer(_streamChunkSize));
   }
 
-  int detectEncryptionFormat(List<int> bytes) => HeaderCodec.detectFormat(bytes);
+  int detectEncryptionFormat(List<int> bytes) =>
+      HeaderCodec.detectFormat(bytes);
 
   /// Decrypt data using AES-256-CBC
   Future<DecryptionResult> decryptData(
@@ -490,7 +513,8 @@ class EncryptionService {
       if (encryptedData.length % 16 != 0) {
         return DecryptionResult(
           success: false,
-          error: 'Invalid data length ${encryptedData.length} (not multiple of 16). File may be corrupted.',
+          error:
+              'Invalid data length ${encryptedData.length} (not multiple of 16). File may be corrupted.',
         );
       }
 
@@ -715,7 +739,8 @@ class EncryptionService {
           header[2] == 0x52 &&
           (header[3] == 0x47 || header[3] == 0x32)) {
         // GCM-encrypted file (v1 legacy or v2 authenticated)
-        debugPrint('[Encryption] Using GCM format for decryptFile (byte3=0x${header[3].toRadixString(16)})');
+        debugPrint(
+            '[Encryption] Using GCM format for decryptFile (byte3=0x${header[3].toRadixString(16)})');
         onProgress?.call(1, 3);
 
         final result = await decryptStreamedFileToMemoryGcm(
@@ -773,7 +798,8 @@ class EncryptionService {
             header[2] == 0x52 &&
             header[3] == 0x44) {
           // CBC with header - skip the 8-byte header
-          debugPrint('[Encryption] Using CBC-with-header format for decryptFile');
+          debugPrint(
+              '[Encryption] Using CBC-with-header format for decryptFile');
           final raf2 = await encryptedFile.open();
           await raf2.setPosition(8);
           encryptedData = Uint8List.fromList(
@@ -874,15 +900,22 @@ class EncryptionService {
         await raf.read(1);
         headerSize = kV2HeaderSize;
         final sizeBytes = await raf.read(4);
-        originalSize = sizeBytes[0] | (sizeBytes[1] << 8) | (sizeBytes[2] << 16) | (sizeBytes[3] << 24);
+        originalSize = sizeBytes[0] |
+            (sizeBytes[1] << 8) |
+            (sizeBytes[2] << 16) |
+            (sizeBytes[3] << 24);
       } else {
         headerSize = 8;
-        originalSize = header[4] | (header[5] << 8) | (header[6] << 16) | (header[7] << 24);
+        originalSize = header[4] |
+            (header[5] << 8) |
+            (header[6] << 16) |
+            (header[7] << 24);
       }
 
       await raf.close();
 
-      final totalBytes = encryptedSize - headerSize - (isGcmV2 ? kGcmTagSize : 0);
+      final totalBytes =
+          encryptedSize - headerSize - (isGcmV2 ? kGcmTagSize : 0);
       int bytesProcessed = 0;
 
       onProgress?.call(0, totalBytes);
@@ -894,7 +927,8 @@ class EncryptionService {
 
         final ctr = AesCtrCipher.cipher(key, iv, false);
 
-        final inputStream = _createChunkedStream(encryptedFile.openRead(headerSize));
+        final inputStream =
+            _createChunkedStream(encryptedFile.openRead(headerSize));
 
         try {
           await for (final chunk in inputStream) {
@@ -905,7 +939,9 @@ class EncryptionService {
         } catch (e) {
           await sink.flush();
           await sink.close();
-          try { await tempCtrFile.delete(); } catch (_) {}
+          try {
+            await tempCtrFile.delete();
+          } catch (_) {}
           rethrow;
         }
 
@@ -930,7 +966,8 @@ class EncryptionService {
       final gcm = GCMBlockCipher(AESEngine())
         ..init(false, AEADParameters(KeyParameter(key), 128, iv, Uint8List(0)));
 
-      final inputStream = _createChunkedStream(encryptedFile.openRead(headerSize));
+      final inputStream =
+          _createChunkedStream(encryptedFile.openRead(headerSize));
       final outBuf = Uint8List(_streamChunkSize + 16);
       bool authFailed = false;
 
@@ -938,7 +975,8 @@ class EncryptionService {
         await for (final chunk in inputStream) {
           final outLen = gcm.processBytes(chunk, 0, chunk.length, outBuf, 0);
           if (outLen > 0) {
-            sink.add(Uint8List.fromList(Uint8List.view(outBuf.buffer, 0, outLen)));
+            sink.add(
+                Uint8List.fromList(Uint8List.view(outBuf.buffer, 0, outLen)));
           }
           bytesProcessed += chunk.length;
           onProgress?.call(bytesProcessed, totalBytes);
@@ -957,10 +995,13 @@ class EncryptionService {
       await sink.close();
 
       if (authFailed) {
-        try { await tempFile.delete(); } catch (_) {}
+        try {
+          await tempFile.delete();
+        } catch (_) {}
         return FileDecryptionResult(
           success: false,
-          error: 'GCM authentication failed — file may be tampered or encrypted with a legacy broken implementation',
+          error:
+              'GCM authentication failed — file may be tampered or encrypted with a legacy broken implementation',
         );
       }
 
@@ -1013,7 +1054,8 @@ class EncryptionService {
           header[2] == 0x52 &&
           (header[3] == 0x47 || header[3] == 0x32)) {
         // GCM-encrypted streamed file (v1 legacy or v2 authenticated)
-        debugPrint('[Encryption] Detected GCM format (byte3=0x${header[3].toRadixString(16)})');
+        debugPrint(
+            '[Encryption] Detected GCM format (byte3=0x${header[3].toRadixString(16)})');
         return await decryptStreamedFileToMemoryGcm(
           encryptedPath,
           ivBase64,
@@ -1192,14 +1234,17 @@ class EncryptionService {
       if (isV2) {
         final rest = await raf.read(5);
         headerSize = kV2HeaderSize;
-        originalSize = rest[1] | (rest[2] << 8) | (rest[3] << 16) | (rest[4] << 24);
+        originalSize =
+            rest[1] | (rest[2] << 8) | (rest[3] << 16) | (rest[4] << 24);
       } else {
         final rest = await raf.read(4);
         headerSize = 8;
-        originalSize = rest[0] | (rest[1] << 8) | (rest[2] << 16) | (rest[3] << 24);
+        originalSize =
+            rest[0] | (rest[1] << 8) | (rest[2] << 16) | (rest[3] << 24);
       }
 
-      final encryptedData = await raf.read(await encryptedFile.length() - headerSize);
+      final encryptedData =
+          await raf.read(await encryptedFile.length() - headerSize);
       await raf.close();
 
       onProgress?.call(1, 2);
@@ -1275,7 +1320,8 @@ class EncryptionService {
       await for (final chunk in inputStream) {
         final outLen = gcm.processBytes(chunk, 0, chunk.length, outBuf, 0);
         if (outLen > 0) {
-          sink.add(Uint8List.fromList(Uint8List.view(outBuf.buffer, 0, outLen)));
+          sink.add(
+              Uint8List.fromList(Uint8List.view(outBuf.buffer, 0, outLen)));
         }
 
         bytesProcessed += chunk.length;
@@ -1349,7 +1395,8 @@ class EncryptionService {
         ..init(false, AEADParameters(KeyParameter(key), 128, iv, Uint8List(0)));
 
       final outBuf = Uint8List(dataLen);
-      final outLen = gcm.processBytes(encryptedData, 0, encryptedData.length, outBuf, 0);
+      final outLen =
+          gcm.processBytes(encryptedData, 0, encryptedData.length, outBuf, 0);
 
       try {
         final finalBuf = Uint8List(32);
@@ -1369,7 +1416,8 @@ class EncryptionService {
       } on InvalidCipherTextException {
         return DecryptionResult(
           success: false,
-          error: 'GCM authentication failed — file may be tampered or encrypted with a legacy broken implementation',
+          error:
+              'GCM authentication failed — file may be tampered or encrypted with a legacy broken implementation',
           needsMigration: true,
         );
       }
@@ -1600,7 +1648,8 @@ class EncryptionService {
     bool isDecoy = false,
     Uint8List? oldDerivedKey,
     Uint8List? newDerivedKey,
-    void Function(int bytesProcessed, int totalBytes, bool isEncrypt)? onProgress,
+    void Function(int bytesProcessed, int totalBytes, bool isEncrypt)?
+        onProgress,
   }) async {
     final isLegacyCbc = _isLegacyCbcFile(filePath);
 
@@ -1609,12 +1658,16 @@ class EncryptionService {
     final tempDecPath = '${tempDir.path}/decrypted';
 
     try {
-      try { await File('$filePath.tmp').delete(); } catch (_) {}
+      try {
+        await File('$filePath.tmp').delete();
+      } catch (_) {}
 
       if (isLegacyCbc) {
-        final decrypted = await decryptFileToMemory(filePath, oldIvBase64, isDecoy: isDecoy, derivedKey: oldDerivedKey);
+        final decrypted = await decryptFileToMemory(filePath, oldIvBase64,
+            isDecoy: isDecoy, derivedKey: oldDerivedKey);
         if (!decrypted.success || decrypted.data == null) {
-          throw Exception('Failed to decrypt CBC file for re-encryption: ${decrypted.error}');
+          throw Exception(
+              'Failed to decrypt CBC file for re-encryption: ${decrypted.error}');
         }
         await File(tempDecPath).writeAsBytes(decrypted.data!);
       } else {
@@ -1623,26 +1676,26 @@ class EncryptionService {
           destinationPath: tempDecPath,
           key: key,
           ivBase64: oldIvBase64,
-          onProgress: onProgress == null
-              ? null
-              : (p, t) => onProgress(p, t, false),
+          onProgress:
+              onProgress == null ? null : (p, t) => onProgress(p, t, false),
         );
         final decResult = await decJob.future;
         if (decResult.needsMigration) {
-          debugPrint('reEncryptFile: v1 GCM decrypted (will be upgraded to v2)');
+          debugPrint(
+              'reEncryptFile: v1 GCM decrypted (will be upgraded to v2)');
         }
       }
 
-      final newKey = await _resolveKey(isDecoy: isDecoy, derivedKey: newDerivedKey);
+      final newKey =
+          await _resolveKey(isDecoy: isDecoy, derivedKey: newDerivedKey);
       final useGcm = targetAlgorithm == EncryptionAlgorithm.aes256Gcm;
       final encJob = _pool!.encryptFile(
         sourcePath: tempDecPath,
         destinationPath: filePath,
         key: newKey,
         useGcm: useGcm,
-        onProgress: onProgress == null
-            ? null
-            : (p, t) => onProgress(p, t, true),
+        onProgress:
+            onProgress == null ? null : (p, t) => onProgress(p, t, true),
       );
       final encResult = await encJob.future;
 
@@ -1653,8 +1706,12 @@ class EncryptionService {
 
       return encResult.ivBase64!;
     } finally {
-      try { await secureDelete(tempDecPath); } catch (_) {}
-      try { await tempDir.delete(recursive: true); } catch (_) {}
+      try {
+        await secureDelete(tempDecPath);
+      } catch (_) {}
+      try {
+        await tempDir.delete(recursive: true);
+      } catch (_) {}
     }
   }
 
@@ -1671,7 +1728,9 @@ class EncryptionService {
     final tempDir = await _createAppPrivateTemp('lkr_encrypt_');
     final tempEncPath = '${tempDir.path}/encrypted';
     try {
-      try { await File('$filePath.tmp').delete(); } catch (_) {}
+      try {
+        await File('$filePath.tmp').delete();
+      } catch (_) {}
 
       final key = await _resolveKey(isDecoy: isDecoy, derivedKey: derivedKey);
       final encJob = _pool!.encryptFile(
@@ -1687,7 +1746,9 @@ class EncryptionService {
       await File(tempEncPath).rename(filePath);
       return encResult.ivBase64!;
     } finally {
-      try { await tempDir.delete(recursive: true); } catch (_) {}
+      try {
+        await tempDir.delete(recursive: true);
+      } catch (_) {}
     }
   }
 
@@ -1705,12 +1766,16 @@ class EncryptionService {
     final tempDir = await _createAppPrivateTemp('lkr_decrypt_');
     final tempDecPath = '${tempDir.path}/decrypted';
     try {
-      try { await File('$filePath.tmp').delete(); } catch (_) {}
+      try {
+        await File('$filePath.tmp').delete();
+      } catch (_) {}
 
       if (isLegacyCbc) {
         final decrypted = await decryptFileToMemory(
-          filePath, ivBase64,
-          isDecoy: isDecoy, derivedKey: derivedKey,
+          filePath,
+          ivBase64,
+          isDecoy: isDecoy,
+          derivedKey: derivedKey,
         );
         if (!decrypted.success || decrypted.data == null) {
           throw Exception('Failed to decrypt CBC file: ${decrypted.error}');
@@ -1730,13 +1795,16 @@ class EncryptionService {
 
       await File(tempDecPath).rename(filePath);
     } finally {
-      try { await tempDir.delete(recursive: true); } catch (_) {}
+      try {
+        await tempDir.delete(recursive: true);
+      } catch (_) {}
     }
   }
 
   /// Check what encryption format a file uses
   /// Returns: 0=unknown/legacy CBC, 1=GCM, 2=CTR, 3=CBC with header
-  int detectFileFormat(String filePath) => HeaderCodec.detectFormatFromFile(filePath);
+  int detectFileFormat(String filePath) =>
+      HeaderCodec.detectFormatFromFile(filePath);
 
   // direct magic-byte check; single read, no format-int indirection on the hot path.
   bool _isLegacyCbcFile(String path) {
@@ -1773,7 +1841,8 @@ class EncryptionService {
       final newKey = await _ensureMasterKey();
       final files = (journal['files'] as List).cast<String>();
       final doneSet = (journal['done'] as List).cast<String>().toSet();
-      final ivs = (journal['ivs'] as Map<String, dynamic>).cast<String, String>();
+      final ivs =
+          (journal['ivs'] as Map<String, dynamic>).cast<String, String>();
 
       final tempDir = await _createAppPrivateTemp('lkr_rot_recovery_');
       try {
@@ -1819,10 +1888,14 @@ class EncryptionService {
           );
           await encJob.future;
 
-          try { await secureDelete(tempDecPath); } catch (_) {}
+          try {
+            await secureDelete(tempDecPath);
+          } catch (_) {}
         }
       } finally {
-        try { await tempDir.delete(recursive: true); } catch (_) {}
+        try {
+          await tempDir.delete(recursive: true);
+        } catch (_) {}
       }
 
       await _storage.delete(key: _oldMasterKeyKey);
@@ -1867,7 +1940,8 @@ class EncryptionService {
         'ivs': ivMap,
         'done': <String>[],
       };
-      await _storage.write(key: _rotationJournalKey, value: jsonEncode(journal));
+      await _storage.write(
+          key: _rotationJournalKey, value: jsonEncode(journal));
 
       final tempDir = await _createAppPrivateTemp('lkr_rotate_');
       try {
@@ -1924,13 +1998,18 @@ class EncryptionService {
           final encResult = await encJob.future;
           newIvs.add(encResult.ivBase64!);
 
-          try { await secureDelete(tempDecPath); } catch (_) {}
+          try {
+            await secureDelete(tempDecPath);
+          } catch (_) {}
 
           journal['done'] = encryptedFilePaths.sublist(0, i + 1);
-          await _storage.write(key: _rotationJournalKey, value: jsonEncode(journal));
+          await _storage.write(
+              key: _rotationJournalKey, value: jsonEncode(journal));
         }
       } finally {
-        try { await tempDir.delete(recursive: true); } catch (_) {}
+        try {
+          await tempDir.delete(recursive: true);
+        } catch (_) {}
       }
 
       await _storage.delete(key: _oldMasterKeyKey);

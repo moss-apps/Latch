@@ -28,7 +28,18 @@ class DesktopBackupScreen extends ConsumerStatefulWidget {
       _DesktopBackupScreenState();
 }
 
-enum _Mode { choose, scan, manual, usb, checking, confirm, preparing, sending, done, error }
+enum _Mode {
+  choose,
+  scan,
+  manual,
+  usb,
+  checking,
+  confirm,
+  preparing,
+  sending,
+  done,
+  error
+}
 
 enum _Flow { push, restore }
 
@@ -162,7 +173,8 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
 
   void _note(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _acceptCode(String raw) {
@@ -194,8 +206,8 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
         .where((v) => v.startsWith('http'))
         .firstOrNull;
     if (raw == null || raw.isEmpty) return;
-    final recent = DateTime.now().difference(_lastCodeAt) <
-        const Duration(seconds: 3);
+    final recent =
+        DateTime.now().difference(_lastCodeAt) < const Duration(seconds: 3);
     if (recent && raw == _lastCode) return;
     _lastCode = raw;
     _lastCodeAt = DateTime.now();
@@ -599,7 +611,8 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
         ),
       ),
       const SizedBox(height: 8),
-      _textAction(label: 'Type the address and code instead', onTap: _enterManual),
+      _textAction(
+          label: 'Type the address and code instead', onTap: _enterManual),
     ];
   }
 
@@ -638,7 +651,8 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
         onSubmitted: (_) => _submitManual(),
       ),
       const SizedBox(height: 16),
-      _primaryButton(label: 'Connect', icon: Icons.link, onPressed: _submitManual),
+      _primaryButton(
+          label: 'Connect', icon: Icons.link, onPressed: _submitManual),
       _textAction(label: 'Scan the QR code instead', onTap: _enterScan),
     ];
   }
@@ -648,9 +662,7 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
   void _submitManual() {
     FocusManager.instance.primaryFocus?.unfocus();
     var addr = _addrCtrl.text.trim();
-    final code = _codeCtrl.text
-        .replaceAll(RegExp(r'[\s\-]'), '')
-        .toLowerCase();
+    final code = _codeCtrl.text.replaceAll(RegExp(r'[\s\-]'), '').toLowerCase();
     if (addr.isEmpty) {
       _note('Type the address shown on the computer, like 192.168.1.24:39371.');
       return;
@@ -775,8 +787,7 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
       _kv('Computer', '${_base!.host}:${_base!.port}${_computerName()}'),
       _kv(
         'On the computer',
-        switch ((receiver?.hasManifest ?? false,
-            receiver?.blobCount ?? 0)) {
+        switch ((receiver?.hasManifest ?? false, receiver?.blobCount ?? 0)) {
           (false, 0) => 'no backup yet, this is the first one',
           (true, var n) => 'an earlier backup exists '
               '($n encrypted files stored)',
@@ -791,7 +802,8 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
         'the backup without your vault password.',
       ),
       const SizedBox(height: 16),
-      _primaryButton(label: 'Send backup', icon: Icons.backup, onPressed: _send),
+      _primaryButton(
+          label: 'Send backup', icon: Icons.backup, onPressed: _send),
       _textAction(label: 'Cancel', onTap: _reset),
     ];
   }
@@ -1017,8 +1029,7 @@ class _ScannerError extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.no_photography,
-                size: 32, color: context.textTertiary),
+            Icon(Icons.no_photography, size: 32, color: context.textTertiary),
             const SizedBox(height: 8),
             Text(
               'Camera unavailable ($message).',

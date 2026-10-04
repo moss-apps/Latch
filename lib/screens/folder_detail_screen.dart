@@ -547,7 +547,8 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
   }
 
   Widget _buildFilePlaceholder(VaultedFile file) {
-    final color = FileTypeColors.colorForType(file.type, accent: context.accentColor);
+    final color =
+        FileTypeColors.colorForType(file.type, accent: context.accentColor);
     final icon = FileTypeColors.iconForType(file.type);
     return Container(
       color: color.withValues(alpha: 0.1),

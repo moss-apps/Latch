@@ -834,10 +834,9 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
     );
 
     if (confirmed == true) {
-      final result =
-          await ref.read(vaultNotifierProvider.notifier).deleteFiles(
-                _selectedFiles.toList(),
-              );
+      final result = await ref.read(vaultNotifierProvider.notifier).deleteFiles(
+            _selectedFiles.toList(),
+          );
 
       if (!mounted) return;
       if (result.allSucceeded) {
@@ -1216,7 +1215,8 @@ class _AddFilesToAlbumSheetState extends ConsumerState<_AddFilesToAlbumSheet> {
             Container(
               color: Colors.black26,
               child: const Center(
-                child: Icon(Icons.play_circle_outline, size: 32, color: Colors.white70),
+                child: Icon(Icons.play_circle_outline,
+                    size: 32, color: Colors.white70),
               ),
             ),
           ],

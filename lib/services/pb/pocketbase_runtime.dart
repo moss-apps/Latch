@@ -113,7 +113,8 @@ class PocketBaseRuntime {
 
       await ready.future.timeout(
         const Duration(seconds: 15),
-        onTimeout: () => throw TimeoutException('no READY handshake within 15s'),
+        onTimeout: () =>
+            throw TimeoutException('no READY handshake within 15s'),
       );
 
       final client = PbClient(port: parser.port!, token: parser.token!);
@@ -122,7 +123,8 @@ class PocketBaseRuntime {
       await File('$pbDir/$_pidFileName').writeAsString('${proc.pid}');
       _process = proc;
       _client = client;
-      _lifecycleListener ??= AppLifecycleListener(onDetach: () => unawaited(stop()));
+      _lifecycleListener ??=
+          AppLifecycleListener(onDetach: () => unawaited(stop()));
       debugPrint('[PB] sidecar up: pid=${proc.pid} port=${parser.port}');
     } catch (e) {
       _client = null;

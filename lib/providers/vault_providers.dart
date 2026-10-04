@@ -313,8 +313,7 @@ class VaultNotifier extends Notifier<AsyncValue<List<VaultedFile>>> {
   }
 
   Future<bool> removeFromAlbum(List<String> fileIds, String albumId) async {
-    final success =
-        await _vaultService.removeFilesFromAlbum(fileIds, albumId);
+    final success = await _vaultService.removeFilesFromAlbum(fileIds, albumId);
     if (success) {
       await loadFiles();
     }
@@ -463,8 +462,10 @@ class FoldersNotifier extends Notifier<AsyncValue<List<VaultFolder>>> {
     return updated;
   }
 
-  Future<bool> deleteFolder(String folderId, {bool deleteContents = false}) async {
-    final deleted = await _vaultService.deleteFolder(folderId, deleteContents: deleteContents);
+  Future<bool> deleteFolder(String folderId,
+      {bool deleteContents = false}) async {
+    final deleted = await _vaultService.deleteFolder(folderId,
+        deleteContents: deleteContents);
     if (deleted) {
       await loadFolders();
     }

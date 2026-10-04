@@ -15,7 +15,8 @@ class AesCtrCipher {
     bool forEncryption,
   ) {
     return CTRStreamCipher(AESEngine())
-      ..init(forEncryption, ParametersWithIV<KeyParameter>(KeyParameter(key), iv));
+      ..init(
+          forEncryption, ParametersWithIV<KeyParameter>(KeyParameter(key), iv));
   }
 
   /// Encrypt or decrypt a buffer in one shot (its own inverse).

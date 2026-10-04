@@ -21,8 +21,7 @@ void main() {
     final leftEdge = holdPreviewRect(const Offset(5, 600), screen, card);
     expect(leftEdge.left, 12);
 
-    final rightEdge = holdPreviewRect(
-        const Offset(395, 600), screen, card);
+    final rightEdge = holdPreviewRect(const Offset(395, 600), screen, card);
     expect(rightEdge.right, 388);
 
     // Finger at very bottom: card sits above the finger, still fully visible.
@@ -32,8 +31,8 @@ void main() {
   });
 
   test('tiny screen never produces negative offsets', () {
-    final rect = holdPreviewRect(
-        const Offset(10, 10), const Size(100, 100), card);
+    final rect =
+        holdPreviewRect(const Offset(10, 10), const Size(100, 100), card);
     expect(rect.left, greaterThanOrEqualTo(12));
     expect(rect.top, greaterThanOrEqualTo(12));
   });

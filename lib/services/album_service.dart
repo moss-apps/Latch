@@ -68,7 +68,8 @@ class AlbumService {
 
       if (index == -1) return null;
 
-      _store.cachedAlbums![index] = updatedAlbum.copyWith(updatedAt: DateTime.now());
+      _store.cachedAlbums![index] =
+          updatedAlbum.copyWith(updatedAt: DateTime.now());
       await _store.saveAlbums();
 
       return _store.cachedAlbums![index];
@@ -117,7 +118,8 @@ class AlbumService {
       final albumIndex = albums.indexWhere((a) => a.id == albumId);
       if (albumIndex == -1) return false;
 
-      _store.cachedAlbums![albumIndex] = _store.cachedAlbums![albumIndex].addFile(fileId);
+      _store.cachedAlbums![albumIndex] =
+          _store.cachedAlbums![albumIndex].addFile(fileId);
       await _store.saveAlbums();
 
       VaultedFile updatedFile = file.addToAlbum(albumId);
@@ -146,7 +148,8 @@ class AlbumService {
         final fileIdx = files.indexWhere((f) => f.id == fileId);
         if (fileIdx == -1) continue;
 
-        _store.cachedAlbums![albumIndex] = _store.cachedAlbums![albumIndex].addFile(fileId);
+        _store.cachedAlbums![albumIndex] =
+            _store.cachedAlbums![albumIndex].addFile(fileId);
 
         VaultedFile updatedFile = files[fileIdx].addToAlbum(albumId);
         if (albumId == 'favorites') {
@@ -167,7 +170,8 @@ class AlbumService {
     }
   }
 
-  Future<bool> removeFilesFromAlbum(List<String> fileIds, String albumId) async {
+  Future<bool> removeFilesFromAlbum(
+      List<String> fileIds, String albumId) async {
     try {
       final albums = await _store.loadAlbums();
       final albumIndex = albums.indexWhere((a) => a.id == albumId);
@@ -177,7 +181,8 @@ class AlbumService {
       bool changed = false;
 
       for (final fileId in fileIds) {
-        _store.cachedAlbums![albumIndex] = _store.cachedAlbums![albumIndex].removeFile(fileId);
+        _store.cachedAlbums![albumIndex] =
+            _store.cachedAlbums![albumIndex].removeFile(fileId);
 
         final fileIdx = files.indexWhere((f) => f.id == fileId);
         if (fileIdx != -1) {
@@ -207,7 +212,8 @@ class AlbumService {
       final albumIndex = albums.indexWhere((a) => a.id == albumId);
       if (albumIndex == -1) return false;
 
-      _store.cachedAlbums![albumIndex] = _store.cachedAlbums![albumIndex].removeFile(fileId);
+      _store.cachedAlbums![albumIndex] =
+          _store.cachedAlbums![albumIndex].removeFile(fileId);
       await _store.saveAlbums();
 
       final file = await _fileService.getFileById(fileId);

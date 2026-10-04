@@ -33,11 +33,16 @@ class _AuthMethodSelectionScreenState extends State<AuthMethodSelectionScreen>
 
   // Assemble + glow: no layout dependency, so build the curves once.
   late final Animation<double> _assemble = CurvedAnimation(
-      parent: _controller, curve: const Interval(0.0, 0.40, curve: Curves.easeOut));
+      parent: _controller,
+      curve: const Interval(0.0, 0.40, curve: Curves.easeOut));
   late final Animation<double> _glowFade = Tween(begin: 0.0, end: 0.6).animate(
-      CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.30, curve: Curves.easeOut)));
+      CurvedAnimation(
+          parent: _controller,
+          curve: const Interval(0.0, 0.30, curve: Curves.easeOut)));
   late final Animation<double> _glowScale = Tween(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.30, curve: Curves.easeOut)));
+      CurvedAnimation(
+          parent: _controller,
+          curve: const Interval(0.0, 0.30, curve: Curves.easeOut)));
 
   // Lift: needs screen height, so it's built in didChangeDependencies.
   late Animation<double> _liftTranslate;
@@ -59,9 +64,11 @@ class _AuthMethodSelectionScreenState extends State<AuthMethodSelectionScreen>
       final logoCenterY = mq.padding.top + 24.0 + 32.0 + _logoSize / 2;
       final delta = mq.size.height / 2 - logoCenterY;
       _liftTranslate = Tween(begin: delta, end: 0.0).animate(CurvedAnimation(
-          parent: _controller, curve: const Interval(0.32, 0.58, curve: Curves.easeInOutCubic)));
+          parent: _controller,
+          curve: const Interval(0.32, 0.58, curve: Curves.easeInOutCubic)));
       _liftScale = Tween(begin: 1.3, end: 1.0).animate(CurvedAnimation(
-          parent: _controller, curve: const Interval(0.32, 0.58, curve: Curves.easeInOutCubic)));
+          parent: _controller,
+          curve: const Interval(0.32, 0.58, curve: Curves.easeInOutCubic)));
     }
     if (!_launched) {
       _launched = true;
@@ -86,8 +93,8 @@ class _AuthMethodSelectionScreenState extends State<AuthMethodSelectionScreen>
   }
 
   Animation<double> _fadeIn(double a, double b, [Curve c = Curves.easeOut]) =>
-      Tween(begin: 0.0, end: 1.0).animate(
-          CurvedAnimation(parent: _controller, curve: Interval(a, b, curve: c)));
+      Tween(begin: 0.0, end: 1.0).animate(CurvedAnimation(
+          parent: _controller, curve: Interval(a, b, curve: c)));
 
   Widget _entrance({
     required double a,
@@ -236,7 +243,8 @@ class _AuthMethodSelectionScreenState extends State<AuthMethodSelectionScreen>
                                   SnackBar(
                                     content: Text(
                                       'Biometric authentication is not available on this device',
-                                      style: TextStyle(fontFamily: 'ProductSans'),
+                                      style:
+                                          TextStyle(fontFamily: 'ProductSans'),
                                     ),
                                     backgroundColor: AppColors.error,
                                   ),
@@ -252,7 +260,8 @@ class _AuthMethodSelectionScreenState extends State<AuthMethodSelectionScreen>
                       child: AuthMethodCard(
                         icon: Icons.settings_backup_restore,
                         title: 'Restore from desktop backup',
-                        description: 'Pull an existing backup from your computer',
+                        description:
+                            'Pull an existing backup from your computer',
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(

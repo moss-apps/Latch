@@ -346,7 +346,8 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
             Container(
               color: Colors.black26,
               child: const Center(
-                child: Icon(Icons.play_circle_outline, size: 48, color: Colors.white70),
+                child: Icon(Icons.play_circle_outline,
+                    size: 48, color: Colors.white70),
               ),
             ),
           ],

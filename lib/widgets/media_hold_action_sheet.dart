@@ -166,8 +166,9 @@ class MediaHoldActionSheet extends ConsumerWidget {
                   ),
                 if (onFavorite != null)
                   _HeaderIconButton(
-                    icon:
-                        file.isFavorite ? Icons.favorite : Icons.favorite_outline,
+                    icon: file.isFavorite
+                        ? Icons.favorite
+                        : Icons.favorite_outline,
                     tooltip: file.isFavorite ? 'Unfavorite' : 'Favorite',
                     color: file.isFavorite ? Colors.red : null,
                     onTap: onFavorite,
@@ -231,8 +232,8 @@ class MediaHoldActionSheet extends ConsumerWidget {
   }
 
   Widget _buildFallbackPreview(BuildContext context) {
-    final color = FileTypeColors.colorForType(file.type,
-        accent: context.accentColor);
+    final color =
+        FileTypeColors.colorForType(file.type, accent: context.accentColor);
     return Container(
       width: 56,
       height: 56,
@@ -240,8 +241,8 @@ class MediaHoldActionSheet extends ConsumerWidget {
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Icon(FileTypeColors.iconForType(file.type),
-          size: 24, color: color),
+      child:
+          Icon(FileTypeColors.iconForType(file.type), size: 24, color: color),
     );
   }
 }

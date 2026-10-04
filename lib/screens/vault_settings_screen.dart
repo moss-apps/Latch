@@ -416,8 +416,8 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                 contentPadding: EdgeInsets.zero,
               ),
               ListTile(
-                leading:
-                    Icon(Icons.desktop_windows_outlined, color: context.accentColor),
+                leading: Icon(Icons.desktop_windows_outlined,
+                    color: context.accentColor),
                 title: const Text(
                   'Desktop Backup',
                   style: TextStyle(fontFamily: 'ProductSans'),

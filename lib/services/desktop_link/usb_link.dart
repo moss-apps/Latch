@@ -229,7 +229,8 @@ class UsbLink {
 }
 
 class _Hello {
-  const _Hello({required this.base, required this.status, this.token, this.error});
+  const _Hello(
+      {required this.base, required this.status, this.token, this.error});
 
   static const approved = 'approved';
   static const pending = 'pending';

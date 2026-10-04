@@ -42,9 +42,12 @@ class ExplorerToolbar extends ConsumerWidget {
                     if (folder == null) return const SizedBox.shrink();
                     return TextButton.icon(
                       onPressed: () {
-                        ref.read(explorerCurrentFolderIdProvider.notifier).state = folder.parentId;
+                        ref
+                            .read(explorerCurrentFolderIdProvider.notifier)
+                            .state = folder.parentId;
                       },
-                      icon: Icon(Icons.arrow_upward, size: 16, color: context.accentColor),
+                      icon: Icon(Icons.arrow_upward,
+                          size: 16, color: context.accentColor),
                       label: Text(
                         'Up',
                         style: TextStyle(
@@ -55,7 +58,8 @@ class ExplorerToolbar extends ConsumerWidget {
                         ),
                       ),
                       style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
@@ -114,15 +118,21 @@ class ExplorerToolbar extends ConsumerWidget {
                         Icon(
                           _getSortIcon(option),
                           size: 16,
-                          color: isSelected ? context.accentColor : context.textSecondary,
+                          color: isSelected
+                              ? context.accentColor
+                              : context.textSecondary,
                         ),
                         const SizedBox(width: 12),
                         Text(
                           option.displayName,
                           style: TextStyle(
                             fontFamily: 'ProductSans',
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                            color: isSelected ? context.accentColor : context.textPrimary,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: isSelected
+                                ? context.accentColor
+                                : context.textPrimary,
                             fontSize: 13,
                           ),
                         ),

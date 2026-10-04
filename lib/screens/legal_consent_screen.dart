@@ -26,7 +26,8 @@ class _LegalConsentScreenState extends State<LegalConsentScreen>
     ('Privacy Policy', 'legal/privacy.md'),
   ];
 
-  late final TabController _tabs = TabController(length: _docs.length, vsync: this);
+  late final TabController _tabs =
+      TabController(length: _docs.length, vsync: this);
   String? _markdown;
   bool _accepting = false;
 
@@ -123,7 +124,9 @@ class _LegalConsentScreenState extends State<LegalConsentScreen>
                 child: Container(
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF5F5F5),
+                    color: isDark
+                        ? const Color(0xFF1E1E1E)
+                        : const Color(0xFFF5F5F5),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: context.borderColor),
                   ),

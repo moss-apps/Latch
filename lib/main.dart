@@ -111,8 +111,7 @@ class _AppInitializerState extends ConsumerState<AppInitializer> {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor:
-            Theme.of(dialogContext).scaffoldBackgroundColor,
+        backgroundColor: Theme.of(dialogContext).scaffoldBackgroundColor,
         title: const Text('Update Available',
             style: TextStyle(fontFamily: 'ProductSans')),
         content: Text(

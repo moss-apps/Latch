@@ -15,8 +15,7 @@ Future<bool> migrateLegacyIndex(
   PocketBaseStore store, {
   FlutterSecureStorage? storage,
 }) async {
-  final s =
-      storage ?? const FlutterSecureStorage(aOptions: AndroidOptions());
+  final s = storage ?? const FlutterSecureStorage(aOptions: AndroidOptions());
   if (await s.read(key: _migrationFlagKey) != null) return false;
 
   final legacy = VaultStore();

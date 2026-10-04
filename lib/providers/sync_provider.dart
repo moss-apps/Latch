@@ -19,6 +19,7 @@ class SyncState {
   final DateTime? lastSync;
   final String? error;
   final SyncProgress? progress;
+
   /// Human summary of the last completed run (e.g. "2 pushed · 1 pulled"),
   /// including a conflict count if both sides changed. Cleared on the next run.
   final String? message;
@@ -138,7 +139,8 @@ class SyncNotifier extends Notifier<SyncState> {
         duration: sw.elapsed,
       );
     } catch (e) {
-      state = SyncState(status: SyncStatus.error, error: describeServerError(e));
+      state =
+          SyncState(status: SyncStatus.error, error: describeServerError(e));
     }
   }
 
@@ -167,7 +169,6 @@ final syncProvider =
 
 /// All stored sync profiles (for the settings screen list). Refreshed by
 /// invalidating after a save/delete.
-final syncProfilesProvider =
-    FutureProvider<List<SyncProfile>>((ref) async {
+final syncProfilesProvider = FutureProvider<List<SyncProfile>>((ref) async {
   return SyncProfileService.instance.listProfiles();
 });
