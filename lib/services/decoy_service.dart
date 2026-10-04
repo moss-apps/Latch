@@ -17,7 +17,8 @@ class DecoyService {
 
   static const _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(),
-    iOptions: IOSOptions(accessibility: KeychainAccessibility.unlocked_this_device),
+    iOptions:
+        IOSOptions(accessibility: KeychainAccessibility.unlocked_this_device),
   );
 
   static const String _decoyEnabledKey = 'decoy_mode_enabled';
@@ -123,7 +124,8 @@ class DecoyService {
       if (pin.isEmpty || pin.length != 6) return false;
       if (!RegExp(r'^[0-9]{6}$').hasMatch(pin)) return false;
 
-      await _createHashedCredential(pin, _decoyPinSaltKey, _decoyPinKey, _decoyPinIterationsKey);
+      await _createHashedCredential(
+          pin, _decoyPinSaltKey, _decoyPinKey, _decoyPinIterationsKey);
       await EncryptionService.instance.setPendingCredential(pin, isDecoy: true);
 
       _cachedSettings = (_cachedSettings ?? const DecoySettings()).copyWith(
@@ -143,8 +145,10 @@ class DecoyService {
     try {
       if (password.isEmpty) return false;
 
-      await _createHashedCredential(password, _decoyPasswordSaltKey, _decoyPasswordKey, _decoyPasswordIterationsKey);
-      await EncryptionService.instance.setPendingCredential(password, isDecoy: true);
+      await _createHashedCredential(password, _decoyPasswordSaltKey,
+          _decoyPasswordKey, _decoyPasswordIterationsKey);
+      await EncryptionService.instance
+          .setPendingCredential(password, isDecoy: true);
 
       _cachedSettings = (_cachedSettings ?? const DecoySettings()).copyWith(
         hasPasswordSet: true,
@@ -160,15 +164,22 @@ class DecoyService {
 
   /// Verify decoy PIN
   Future<bool> verifyDecoyPin(String pin) async {
-    final result = await _verifyCredential(pin, _decoyPinKey, _decoyPinSaltKey, _decoyPinIterationsKey);
-    if (result) await EncryptionService.instance.setPendingCredential(pin, isDecoy: true);
+    final result = await _verifyCredential(
+        pin, _decoyPinKey, _decoyPinSaltKey, _decoyPinIterationsKey);
+    if (result) {
+      await EncryptionService.instance.setPendingCredential(pin, isDecoy: true);
+    }
     return result;
   }
 
   /// Verify decoy password
   Future<bool> verifyDecoyPassword(String password) async {
-    final result = await _verifyCredential(password, _decoyPasswordKey, _decoyPasswordSaltKey, _decoyPasswordIterationsKey);
-    if (result) await EncryptionService.instance.setPendingCredential(password, isDecoy: true);
+    final result = await _verifyCredential(password, _decoyPasswordKey,
+        _decoyPasswordSaltKey, _decoyPasswordIterationsKey);
+    if (result) {
+      await EncryptionService.instance
+          .setPendingCredential(password, isDecoy: true);
+    }
     return result;
   }
 
@@ -264,17 +275,20 @@ class DecoyService {
     return digest.toString();
   }
 
-  Future<String> _createHashedCredential(String credential, String saltKey, String hashKey, String iterationsKey) async {
+  Future<String> _createHashedCredential(String credential, String saltKey,
+      String hashKey, String iterationsKey) async {
     final salt = _generateSalt();
     final iterations = await _getCurrentKdfIterations();
-    final hash = await computePbkdf2Hash(credential, salt, iterations: iterations);
+    final hash =
+        await computePbkdf2Hash(credential, salt, iterations: iterations);
     await _storage.write(key: saltKey, value: base64Encode(salt));
     await _storage.write(key: hashKey, value: hash);
     await _storage.write(key: iterationsKey, value: iterations.toString());
     return hash;
   }
 
-  Future<bool> _verifyCredential(String credential, String hashKey, String saltKey, String iterationsKey) async {
+  Future<bool> _verifyCredential(String credential, String hashKey,
+      String saltKey, String iterationsKey) async {
     try {
       final storedHash = await _storage.read(key: hashKey);
       final storedSalt = await _storage.read(key: saltKey);
@@ -285,15 +299,17 @@ class DecoyService {
         final legacyHash = _hashCredentialLegacy(credential);
         // Pad the legacy path with dummy KDF work so verify time does not
         // reveal that this is a legacy (plain SHA-256) account.
-        await computePbkdf2Hash(
-            credential, _generateSalt(), iterations: _defaultKdfIterations);
+        await computePbkdf2Hash(credential, _generateSalt(),
+            iterations: _defaultKdfIterations);
         if (constantTimeEquals(legacyHash, storedHash)) {
           final salt = _generateSalt();
           final iterations = await _getCurrentKdfIterations();
-          final newHash = await computePbkdf2Hash(credential, salt, iterations: iterations);
+          final newHash =
+              await computePbkdf2Hash(credential, salt, iterations: iterations);
           await _storage.write(key: saltKey, value: base64Encode(salt));
           await _storage.write(key: hashKey, value: newHash);
-          await _storage.write(key: iterationsKey, value: iterations.toString());
+          await _storage.write(
+              key: iterationsKey, value: iterations.toString());
           return true;
         }
         return false;
@@ -305,14 +321,17 @@ class DecoyService {
           : _defaultKdfIterations;
 
       final salt = base64Decode(storedSalt);
-      final computedHash = await computePbkdf2Hash(credential, salt, iterations: storedIterations);
+      final computedHash = await computePbkdf2Hash(credential, salt,
+          iterations: storedIterations);
       if (!constantTimeEquals(computedHash, storedHash)) return false;
 
       final currentIterations = await _getCurrentKdfIterations();
       if (currentIterations != storedIterations) {
-        final newHash = await computePbkdf2Hash(credential, salt, iterations: currentIterations);
+        final newHash = await computePbkdf2Hash(credential, salt,
+            iterations: currentIterations);
         await _storage.write(key: hashKey, value: newHash);
-        await _storage.write(key: iterationsKey, value: currentIterations.toString());
+        await _storage.write(
+            key: iterationsKey, value: currentIterations.toString());
       }
 
       return true;

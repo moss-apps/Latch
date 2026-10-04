@@ -24,7 +24,17 @@ class RestoreSetupScreen extends StatefulWidget {
   State<RestoreSetupScreen> createState() => _RestoreSetupScreenState();
 }
 
-enum _Mode { choose, scan, manual, usb, checking, confirm, restoring, done, error }
+enum _Mode {
+  choose,
+  scan,
+  manual,
+  usb,
+  checking,
+  confirm,
+  restoring,
+  done,
+  error
+}
 
 class _RestoreSetupScreenState extends State<RestoreSetupScreen> {
   _Mode _mode = _Mode.choose;
@@ -143,7 +153,8 @@ class _RestoreSetupScreenState extends State<RestoreSetupScreen> {
 
   void _note(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _acceptCode(String raw) {
@@ -175,8 +186,8 @@ class _RestoreSetupScreenState extends State<RestoreSetupScreen> {
         .where((v) => v.startsWith('http'))
         .firstOrNull;
     if (raw == null || raw.isEmpty) return;
-    final recent = DateTime.now().difference(_lastCodeAt) <
-        const Duration(seconds: 3);
+    final recent =
+        DateTime.now().difference(_lastCodeAt) < const Duration(seconds: 3);
     if (recent && raw == _lastCode) return;
     _lastCode = raw;
     _lastCodeAt = DateTime.now();
@@ -501,7 +512,8 @@ class _RestoreSetupScreenState extends State<RestoreSetupScreen> {
         ),
       ),
       const SizedBox(height: 8),
-      _textAction(label: 'Type the address and code instead', onTap: _enterManual),
+      _textAction(
+          label: 'Type the address and code instead', onTap: _enterManual),
     ];
   }
 
@@ -540,7 +552,8 @@ class _RestoreSetupScreenState extends State<RestoreSetupScreen> {
         onSubmitted: (_) => _submitManual(),
       ),
       const SizedBox(height: 16),
-      _primaryButton(label: 'Connect', icon: Icons.link, onPressed: _submitManual),
+      _primaryButton(
+          label: 'Connect', icon: Icons.link, onPressed: _submitManual),
       _textAction(label: 'Scan the QR code instead', onTap: _enterScan),
     ];
   }
@@ -550,9 +563,7 @@ class _RestoreSetupScreenState extends State<RestoreSetupScreen> {
   void _submitManual() {
     FocusManager.instance.primaryFocus?.unfocus();
     var addr = _addrCtrl.text.trim();
-    final code = _codeCtrl.text
-        .replaceAll(RegExp(r'[\s\-]'), '')
-        .toLowerCase();
+    final code = _codeCtrl.text.replaceAll(RegExp(r'[\s\-]'), '').toLowerCase();
     if (addr.isEmpty) {
       _note('Type the address shown on the computer, like 192.168.1.24:39371.');
       return;
@@ -814,8 +825,7 @@ class _ScannerError extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.no_photography,
-                size: 32, color: context.textTertiary),
+            Icon(Icons.no_photography, size: 32, color: context.textTertiary),
             const SizedBox(height: 8),
             Text(
               'Camera unavailable ($message).',

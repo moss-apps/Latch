@@ -273,7 +273,8 @@ class OfficeConverterService {
       }
 
       // Create PDF with extracted content
-      final pdfData = await _createPdfFromContent([content], fileName, fontBytes);
+      final pdfData =
+          await _createPdfFromContent([content], fileName, fontBytes);
 
       return ConversionResult(
         success: true,
@@ -439,8 +440,8 @@ class OfficeConverterService {
       bodyFont = PdfTrueTypeFont(fontBytes, 11);
       usingStandardFont = false;
     } else {
-      titleFont =
-          PdfStandardFont(PdfFontFamily.helvetica, 14, style: PdfFontStyle.bold);
+      titleFont = PdfStandardFont(PdfFontFamily.helvetica, 14,
+          style: PdfFontStyle.bold);
       bodyFont = PdfStandardFont(PdfFontFamily.helvetica, 11);
     }
 

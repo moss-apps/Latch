@@ -30,7 +30,8 @@ void main() {
 
   group('transport paths', () {
     test('manifest blob path resolves under the profile base path', () {
-      final store = WebDAVStore(baseUrl: 'https://nas.local/dav', basePath: '/locker');
+      final store =
+          WebDAVStore(baseUrl: 'https://nas.local/dav', basePath: '/locker');
       // joinPath is public; _path is private, so assert the same contract the
       // WebDAV client will receive: absolute server path for the manifest.
       expect(WebDAVStore.joinPath(store.basePath, RemoteStore.manifestName),

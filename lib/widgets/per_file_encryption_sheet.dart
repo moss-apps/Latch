@@ -316,7 +316,8 @@ class _PerFileEncryptionSheetState extends State<PerFileEncryptionSheet> {
                       Row(
                         children: [
                           if (file.fileSize > 50 * 1024 * 1024) ...[
-                            Icon(Icons.warning_amber, size: 14, color: Colors.orange),
+                            Icon(Icons.warning_amber,
+                                size: 14, color: Colors.orange),
                             const SizedBox(width: 4),
                           ],
                           Text(
@@ -377,8 +378,8 @@ class _PerFileEncryptionSheetState extends State<PerFileEncryptionSheet> {
                           if (file.algorithm == EncryptionAlgorithm.aes256Ctr)
                             Padding(
                               padding: const EdgeInsets.only(right: 4),
-                              child: Icon(Icons.check, size: 14,
-                                  color: context.accentColor),
+                              child: Icon(Icons.check,
+                                  size: 14, color: context.accentColor),
                             ),
                           const Text(
                             'CTR',
@@ -411,8 +412,8 @@ class _PerFileEncryptionSheetState extends State<PerFileEncryptionSheet> {
                           if (file.algorithm == EncryptionAlgorithm.aes256Gcm)
                             Padding(
                               padding: const EdgeInsets.only(right: 4),
-                              child: Icon(Icons.check, size: 14,
-                                  color: context.accentColor),
+                              child: Icon(Icons.check,
+                                  size: 14, color: context.accentColor),
                             ),
                           const Text(
                             'GCM',

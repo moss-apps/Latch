@@ -125,7 +125,8 @@ class _MemRemote implements RemoteStore {
 void main() {
   final key = Uint8List.fromList(List.filled(32, 7));
 
-  test('P4.4 e2e: seed vault → PB rows appear → runSync pushes blobs + '
+  test(
+      'P4.4 e2e: seed vault → PB rows appear → runSync pushes blobs + '
       'encrypted manifest', () async {
     final pb = _FakePb();
     final port = await pb.start();
@@ -174,15 +175,15 @@ void main() {
     );
     expect(result.blobsPushed, 1);
     expect(remote.blobs.length, 1);
-    final manifest =
-        SyncService.decryptManifest(remote.manifest!, key);
+    final manifest = SyncService.decryptManifest(remote.manifest!, key);
     expect(manifest.entries.single.id, file.id);
     expect(manifest.entries.single.originalName, 'passport.jpg');
 
     // A fresh read (cache-free) round-trips through PB.
     store.cachedFiles = null;
     expect(
-      jsonEncode((await store.loadFileIndex(forceReload: true)).single.toJson()),
+      jsonEncode(
+          (await store.loadFileIndex(forceReload: true)).single.toJson()),
       jsonEncode(file.toJson()),
     );
   });

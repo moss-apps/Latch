@@ -10,8 +10,7 @@ void main() {
   group('legal consent versioning', () {
     test('current version is accepted, older is not', () {
       expect(
-          LegalConsentService.versionAccepted(
-              LegalConsentService.legalVersion),
+          LegalConsentService.versionAccepted(LegalConsentService.legalVersion),
           isTrue);
       expect(
           LegalConsentService.versionAccepted(
@@ -24,8 +23,7 @@ void main() {
     });
 
     test('canonical version.txt matches the service version', () {
-      final raw =
-          File('legal/version.txt').readAsStringSync().trim();
+      final raw = File('legal/version.txt').readAsStringSync().trim();
       expect(int.parse(raw), LegalConsentService.legalVersion);
     });
 

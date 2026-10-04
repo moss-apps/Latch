@@ -146,7 +146,8 @@ class NoteService {
   Future<Uint8List> _deriveKey(Note note, {bool isDecoy = false}) async {
     final masterKey = await _encryptionService.getMasterKey(isDecoy: isDecoy);
     final salt = base64Decode(note.keyDerivationSalt);
-    return _encryptionService.deriveFileKeyAsync(masterKey, salt, note.kdfIterations);
+    return _encryptionService.deriveFileKeyAsync(
+        masterKey, salt, note.kdfIterations);
   }
 
   Future<Note> createNote({
@@ -314,7 +315,8 @@ class NoteService {
 
     if (content != null) {
       if (updated.isEncrypted) {
-        final masterKey = await _encryptionService.getMasterKey(isDecoy: isDecoy);
+        final masterKey =
+            await _encryptionService.getMasterKey(isDecoy: isDecoy);
         final salt = _encryptionService.generateFileSalt();
         final derivedKey = await _encryptionService.deriveFileKeyAsync(
           masterKey,
@@ -470,9 +472,7 @@ class NoteService {
   }
 
   List<Note> getNotesInFolder(String? folderId) {
-    return _notesCache[false]
-            ?.where((n) => n.folderId == folderId)
-            .toList() ??
+    return _notesCache[false]?.where((n) => n.folderId == folderId).toList() ??
         [];
   }
 
@@ -480,9 +480,7 @@ class NoteService {
     final notes = _notesCache[false];
     if (notes == null) return [];
     final lower = query.toLowerCase();
-    return notes
-        .where((n) => n.title.toLowerCase().contains(lower))
-        .toList();
+    return notes.where((n) => n.title.toLowerCase().contains(lower)).toList();
   }
 
   void clearCache() {

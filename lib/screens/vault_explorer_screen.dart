@@ -121,7 +121,8 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
   PreferredSizeWidget _buildSelectionAppBar(Set<String> selectedFiles) {
     final filesAsync = ref.watch(explorerFilesProvider);
     final files = filesAsync.value ?? [];
-    final allSelected = files.isNotEmpty && files.every((f) => selectedFiles.contains(f.id));
+    final allSelected =
+        files.isNotEmpty && files.every((f) => selectedFiles.contains(f.id));
 
     return AppBar(
       backgroundColor: context.accentColor,
@@ -139,7 +140,8 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
             onPressed: _toggleSelectAll,
             child: Text(
               allSelected ? 'Deselect All' : 'Select All',
-              style: const TextStyle(color: Colors.white, fontFamily: 'ProductSans'),
+              style: const TextStyle(
+                  color: Colors.white, fontFamily: 'ProductSans'),
             ),
           ),
         if (selectedFiles.isNotEmpty)
@@ -176,7 +178,8 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
   void _toggleSelectAll() {
     final files = ref.read(explorerFilesProvider).value ?? <VaultedFile>[];
     final selected = ref.read(selectedFilesProvider);
-    final allSelected = files.isNotEmpty && files.every((f) => selected.contains(f.id));
+    final allSelected =
+        files.isNotEmpty && files.every((f) => selected.contains(f.id));
 
     if (allSelected) {
       final newSelection = Set<String>.from(selected)
@@ -231,7 +234,8 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
 
       final destinationPath = '${downloadsDir.path}/${file.originalName}';
       final vaultService = ref.read(vaultServiceProvider);
-      final exportedFile = await vaultService.exportFile(file.id, destinationPath);
+      final exportedFile =
+          await vaultService.exportFile(file.id, destinationPath);
 
       if (exportedFile != null) {
         ToastUtils.showSuccess('Exported ${file.originalName}');
@@ -325,17 +329,17 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
     );
 
     final result = await ref.read(vaultNotifierProvider.notifier).deleteFiles(
-          selectedFiles.toList(),
-          onProgress: (current, total, {int? currentSize, int? totalSize}) {
-            progressState.value = progressState.value.copyWith(
-              totalFiles: total,
-              currentFile: current,
-              totalSizeBytes: totalSize ?? 0,
-              processedSizeBytes: currentSize ?? 0,
-              statusMessage: 'Processing file $current of $total...',
-            );
-          },
+      selectedFiles.toList(),
+      onProgress: (current, total, {int? currentSize, int? totalSize}) {
+        progressState.value = progressState.value.copyWith(
+          totalFiles: total,
+          currentFile: current,
+          totalSizeBytes: totalSize ?? 0,
+          processedSizeBytes: currentSize ?? 0,
+          statusMessage: 'Processing file $current of $total...',
         );
+      },
+    );
 
     if (!mounted) return;
 
@@ -365,7 +369,8 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
           return Container(
             decoration: BoxDecoration(
               color: ctx.backgroundColor,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(24)),
             ),
             child: SingleChildScrollView(
               child: Column(
@@ -396,11 +401,14 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
                         ),
                         const SizedBox(height: 16),
                         albumsAsync.when(
-                          loading: () => const Center(child: CircularProgressIndicator()),
+                          loading: () =>
+                              const Center(child: CircularProgressIndicator()),
                           error: (_, __) => const Text('Failed to load albums'),
                           data: (albums) => Column(
                             children: albums
-                                .where((a) => !a.isDefault || a.type == AlbumType.favorites)
+                                .where((a) =>
+                                    !a.isDefault ||
+                                    a.type == AlbumType.favorites)
                                 .map((album) => ListTile(
                                       leading: Icon(
                                         Icons.folder_outlined,
@@ -408,7 +416,8 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
                                       ),
                                       title: Text(
                                         album.name,
-                                        style: const TextStyle(fontFamily: 'ProductSans'),
+                                        style: const TextStyle(
+                                            fontFamily: 'ProductSans'),
                                       ),
                                       subtitle: Text(
                                         '${album.fileCount} items',
@@ -421,17 +430,20 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
                                       onTap: () async {
                                         Navigator.pop(ctx);
                                         final success = await ref
-                                            .read(vaultNotifierProvider.notifier)
+                                            .read(
+                                                vaultNotifierProvider.notifier)
                                             .addToAlbum(
                                               selectedFiles.toList(),
                                               album.id,
                                             );
                                         if (success) {
-                                          ToastUtils.showSuccess('Added to ${album.name}');
+                                          ToastUtils.showSuccess(
+                                              'Added to ${album.name}');
                                           _exitSelectionMode();
                                           _invalidateExplorerProviders();
                                         } else {
-                                          ToastUtils.showError('Failed to add to album');
+                                          ToastUtils.showError(
+                                              'Failed to add to album');
                                         }
                                       },
                                       contentPadding: EdgeInsets.zero,
@@ -597,7 +609,8 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         title: Text(
           currentFolderId != null ? 'Create Subfolder' : 'Create Folder',
-          style: TextStyle(fontFamily: 'ProductSans', color: context.textPrimary),
+          style:
+              TextStyle(fontFamily: 'ProductSans', color: context.textPrimary),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -606,9 +619,11 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
               controller: _nameController,
               decoration: InputDecoration(
                 labelText: 'Folder Name',
-                labelStyle:
-                    TextStyle(fontFamily: 'ProductSans', color: this.context.textSecondary),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                labelStyle: TextStyle(
+                    fontFamily: 'ProductSans',
+                    color: this.context.textSecondary),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(color: this.context.accentColor),
@@ -621,9 +636,11 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
               controller: _descController,
               decoration: InputDecoration(
                 labelText: 'Description (optional)',
-                labelStyle:
-                    TextStyle(fontFamily: 'ProductSans', color: this.context.textSecondary),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                labelStyle: TextStyle(
+                    fontFamily: 'ProductSans',
+                    color: this.context.textSecondary),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(color: this.context.accentColor),
@@ -638,7 +655,8 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
             onPressed: () => Navigator.pop(context),
             child: Text(
               'Cancel',
-              style: TextStyle(fontFamily: 'ProductSans', color: this.context.textSecondary),
+              style: TextStyle(
+                  fontFamily: 'ProductSans', color: this.context.textSecondary),
             ),
           ),
           ElevatedButton(
@@ -649,12 +667,14 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
                 return;
               }
 
-              final folder = await ref.read(foldersNotifierProvider.notifier).createFolder(
-                    name: name,
-                    parentId: currentFolderId,
-                    description:
-                        _descController.text.trim().isEmpty ? null : _descController.text.trim(),
-                  );
+              final folder =
+                  await ref.read(foldersNotifierProvider.notifier).createFolder(
+                        name: name,
+                        parentId: currentFolderId,
+                        description: _descController.text.trim().isEmpty
+                            ? null
+                            : _descController.text.trim(),
+                      );
 
               if (!context.mounted) return;
               Navigator.pop(context);
@@ -669,7 +689,8 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
               backgroundColor: this.context.accentColor,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Create', style: TextStyle(fontFamily: 'ProductSans')),
+            child: const Text('Create',
+                style: TextStyle(fontFamily: 'ProductSans')),
           ),
         ],
       ),
@@ -682,7 +703,8 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) => Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.6),
+        constraints:
+            BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.6),
         decoration: BoxDecoration(
           color: Theme.of(context).scaffoldBackgroundColor,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -728,7 +750,9 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
                       label: 'Add Subfolder',
                       onTap: () {
                         Navigator.pop(context);
-                        ref.read(explorerCurrentFolderIdProvider.notifier).state = folder.id;
+                        ref
+                            .read(explorerCurrentFolderIdProvider.notifier)
+                            .state = folder.id;
                         _showCreateFolderDialog();
                       },
                     ),
@@ -760,13 +784,14 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
       builder: (context) => AlertDialog(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         title: Text('Rename Folder',
-            style: TextStyle(fontFamily: 'ProductSans', color: this.context.textPrimary)),
+            style: TextStyle(
+                fontFamily: 'ProductSans', color: this.context.textPrimary)),
         content: TextField(
           controller: controller,
           decoration: InputDecoration(
             labelText: 'Folder Name',
-            labelStyle:
-                TextStyle(fontFamily: 'ProductSans', color: this.context.textSecondary),
+            labelStyle: TextStyle(
+                fontFamily: 'ProductSans', color: this.context.textSecondary),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -779,7 +804,9 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text('Cancel',
-                style: TextStyle(fontFamily: 'ProductSans', color: this.context.textSecondary)),
+                style: TextStyle(
+                    fontFamily: 'ProductSans',
+                    color: this.context.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -789,8 +816,9 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
                 return;
               }
               final updated = folder.copyWith(name: name);
-              final result =
-                  await ref.read(foldersNotifierProvider.notifier).updateFolder(updated);
+              final result = await ref
+                  .read(foldersNotifierProvider.notifier)
+                  .updateFolder(updated);
               if (!context.mounted) return;
               Navigator.pop(context);
               if (result != null) {
@@ -805,7 +833,8 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
               backgroundColor: this.context.accentColor,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Rename', style: TextStyle(fontFamily: 'ProductSans')),
+            child: const Text('Rename',
+                style: TextStyle(fontFamily: 'ProductSans')),
           ),
         ],
       ),
@@ -818,28 +847,34 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
       builder: (context) => AlertDialog(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         title: Text('Delete Folder',
-            style: TextStyle(fontFamily: 'ProductSans', color: this.context.textPrimary)),
+            style: TextStyle(
+                fontFamily: 'ProductSans', color: this.context.textPrimary)),
         content: Text(
           'Are you sure you want to delete "${folder.name}"? Files in this folder will not be deleted from the vault.',
-          style: TextStyle(fontFamily: 'ProductSans', color: this.context.textSecondary),
+          style: TextStyle(
+              fontFamily: 'ProductSans', color: this.context.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text('Cancel',
-                style: TextStyle(fontFamily: 'ProductSans', color: this.context.textSecondary)),
+                style: TextStyle(
+                    fontFamily: 'ProductSans',
+                    color: this.context.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () async {
-              final deleted =
-                  await ref.read(foldersNotifierProvider.notifier).deleteFolder(folder.id);
+              final deleted = await ref
+                  .read(foldersNotifierProvider.notifier)
+                  .deleteFolder(folder.id);
               if (!context.mounted) return;
               Navigator.pop(context);
               if (deleted) {
                 ToastUtils.showSuccess('Folder deleted');
                 final currentId = ref.read(explorerCurrentFolderIdProvider);
                 if (currentId == folder.id) {
-                  ref.read(explorerCurrentFolderIdProvider.notifier).state = folder.parentId;
+                  ref.read(explorerCurrentFolderIdProvider.notifier).state =
+                      folder.parentId;
                 }
                 ref.invalidate(explorerSubfoldersProvider);
                 ref.invalidate(explorerCurrentFolderProvider);
@@ -851,7 +886,8 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
               backgroundColor: AppColors.error,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Delete', style: TextStyle(fontFamily: 'ProductSans')),
+            child: const Text('Delete',
+                style: TextStyle(fontFamily: 'ProductSans')),
           ),
         ],
       ),
@@ -869,12 +905,17 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
       leading: Icon(icon, color: color ?? context.textPrimary, size: 22),
       title: Text(
         label,
-        style: TextStyle(fontFamily: 'ProductSans', color: color ?? context.textPrimary, fontSize: 14),
+        style: TextStyle(
+            fontFamily: 'ProductSans',
+            color: color ?? context.textPrimary,
+            fontSize: 14),
       ),
       subtitle: subtitle != null
           ? Text(subtitle,
-              style:
-                  TextStyle(fontFamily: 'ProductSans', color: context.textTertiary, fontSize: 12))
+              style: TextStyle(
+                  fontFamily: 'ProductSans',
+                  color: context.textTertiary,
+                  fontSize: 12))
           : null,
       onTap: onTap,
       contentPadding: EdgeInsets.zero,

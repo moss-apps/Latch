@@ -356,8 +356,7 @@ class VaultStore implements LocalStore {
       if (jsonList.isEmpty) {
         final existing = await _storage.read(key: key);
         if (existing != null && existing.isNotEmpty) {
-          final existingCount =
-              (jsonDecode(existing) as List<dynamic>).length;
+          final existingCount = (jsonDecode(existing) as List<dynamic>).length;
           if (existingCount > 0) {
             debugPrint(
               'WARNING: Attempted to save empty index over $existingCount existing entries. Aborting save.',

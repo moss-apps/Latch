@@ -51,7 +51,8 @@ class AccentColorPickerScreen extends ConsumerWidget {
                   const SizedBox(height: 24),
                   Expanded(
                     child: GridView.builder(
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2,
                         crossAxisSpacing: 16,
                         mainAxisSpacing: 16,
@@ -109,8 +110,10 @@ class AccentColorPickerScreen extends ConsumerWidget {
     bool isSelected,
     bool isDarkMode,
   ) {
-    final displayColor = color.getColor(isDarkMode ? Brightness.dark : Brightness.light);
-    final variantColor = color.getVariantColor(isDarkMode ? Brightness.dark : Brightness.light);
+    final displayColor =
+        color.getColor(isDarkMode ? Brightness.dark : Brightness.light);
+    final variantColor =
+        color.getVariantColor(isDarkMode ? Brightness.dark : Brightness.light);
 
     return InkWell(
       onTap: () async {

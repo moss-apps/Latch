@@ -17,8 +17,6 @@ photos, videos, and documents behind PIN/password/biometric auth, encrypts
 them with AES-256, and removes itself from the recents list when you leave
 (auto-kill).
 
-> Renamed from Locker to Latch. The repo directory is still `Locker`, but
-> the app and all user-facing references are **Latch**.
 > On Google Play: [Download Latch](https://play.google.com/store/apps/details?id=com.mossapps.locker).
 
 ## Features
@@ -195,8 +193,8 @@ All sensitive data (PINs, passwords, keys) goes through
 
 ## Contributing
 
-Fork → feature branch → `flutter analyze` + pass tests → pull request.
-Follow the Dart style guide.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, checks, and invariants.
+Security issues go through [SECURITY.md](SECURITY.md) — never a public issue.
 
 ## License
 

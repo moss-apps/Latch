@@ -51,8 +51,8 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
       return;
     }
     final random = Random.secure();
-    final values =
-        List<int>.generate(_length.round(), (_) => random.nextInt(charset.length));
+    final values = List<int>.generate(
+        _length.round(), (_) => random.nextInt(charset.length));
     setState(() {
       _generated = String.fromCharCodes(
         values.map((i) => charset.codeUnitAt(i)),
@@ -131,8 +131,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
             setState(() => _useSymbols = v);
             _generate();
           }),
-          _buildToggleRow('Exclude ambiguous (Il1O0o)',
-              _excludeAmbiguous, (v) {
+          _buildToggleRow('Exclude ambiguous (Il1O0o)', _excludeAmbiguous, (v) {
             setState(() => _excludeAmbiguous = v);
             _generate();
           }),

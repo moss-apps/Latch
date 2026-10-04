@@ -518,10 +518,8 @@ class _MediaPickerScreenState extends State<MediaPickerScreen> {
     final selectionIndex = _selectedAssets.toList().indexOf(asset);
 
     return GestureDetector(
-      onLongPressStart: (details) =>
-          _beginHold(asset, details.globalPosition),
-      onLongPressMoveUpdate: (details) =>
-          _updateHold(details.globalPosition),
+      onLongPressStart: (details) => _beginHold(asset, details.globalPosition),
+      onLongPressMoveUpdate: (details) => _updateHold(details.globalPosition),
       onLongPressEnd: (_) => _endHold(),
       onLongPressCancel: _endHold,
       onTap: () => _toggleSelection(asset),

@@ -150,9 +150,7 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
       ref.invalidate(syncProfilesProvider);
       if (mounted) {
         setState(() {});
-        _snack(isNew
-            ? 'Server added and activated'
-            : 'Saved');
+        _snack(isNew ? 'Server added and activated' : 'Saved');
       }
       return true;
     } catch (_) {
@@ -196,8 +194,7 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
             content: Text(
               'Delete the profile for ${_hostOf(p.serverUrl)}? '
               'Encrypted blobs already on the server are left in place.',
-              style:
-                  _subStyle(ctx).copyWith(color: context.textSecondary),
+              style: _subStyle(ctx).copyWith(color: context.textSecondary),
             ),
             actions: [
               TextButton(
@@ -330,8 +327,7 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
         _sectionTitle('Status'),
         ListTile(
           contentPadding: EdgeInsets.zero,
-          leading:
-              Icon(Icons.cloud_off_outlined, color: context.textTertiary),
+          leading: Icon(Icons.cloud_off_outlined, color: context.textTertiary),
           title: const Text('No active server'),
           subtitle: Text(
             'Add a server to get started — it becomes the sync target.',
@@ -484,8 +480,7 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-                color:
-                    isActive ? context.accentColor : context.textPrimary,
+                color: isActive ? context.accentColor : context.textPrimary,
               ),
             ),
           ),
@@ -494,9 +489,7 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
       ),
       subtitle: Text(
         '${p.direction == SyncDirection.twoWay ? 'Two-way' : 'Backup'} · '
-        '${p.lastSyncedAt == null
-            ? (p.basePath.isEmpty ? '/locker' : p.basePath)
-            : 'Synced ${_formatDate(p.lastSyncedAt!)}'}',
+        '${p.lastSyncedAt == null ? (p.basePath.isEmpty ? '/locker' : p.basePath) : 'Synced ${_formatDate(p.lastSyncedAt!)}'}',
         style: _subStyle(context),
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
@@ -571,9 +564,7 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
                 )
               : const Icon(Icons.sync),
           label: Text(syncState.isSyncing ? 'Syncing…' : 'Sync Now'),
-          onPressed: syncState.isSyncing ||
-                  _activeId == null ||
-                  !_masterEnabled
+          onPressed: syncState.isSyncing || _activeId == null || !_masterEnabled
               ? null
               : _syncNow,
         ),
@@ -643,8 +634,8 @@ class _ServerSheet extends StatefulWidget {
   const _ServerSheet({required this.profile, required this.onSave});
 
   final SyncProfile? profile;
-  final Future<bool> Function(
-      SyncProfile profile, String password, bool isNew) onSave;
+  final Future<bool> Function(SyncProfile profile, String password, bool isNew)
+      onSave;
 
   @override
   State<_ServerSheet> createState() => _ServerSheetState();
@@ -689,7 +680,8 @@ class _ServerSheetState extends State<_ServerSheet> {
       return false;
     }
     if (Uri.tryParse(url)?.host.isEmpty != false) {
-      setState(() => _urlError = 'Enter a full URL, e.g. https://nas.local/dav');
+      setState(
+          () => _urlError = 'Enter a full URL, e.g. https://nas.local/dav');
       return false;
     }
     if (_urlError != null) setState(() => _urlError = null);
@@ -837,8 +829,7 @@ class _ServerSheetState extends State<_ServerSheet> {
               ],
               selected: {_direction},
               showSelectedIcon: false,
-              onSelectionChanged: (s) =>
-                  setState(() => _direction = s.first),
+              onSelectionChanged: (s) => setState(() => _direction = s.first),
             ),
             const SizedBox(height: 8),
             SwitchListTile(
@@ -861,8 +852,7 @@ class _ServerSheetState extends State<_ServerSheet> {
                             width: 16,
                             height: 16,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: context.accentColor),
+                                strokeWidth: 2, color: context.accentColor),
                           )
                         : const Icon(Icons.network_check, size: 18),
                     label: const Text('Test'),
@@ -878,8 +868,7 @@ class _ServerSheetState extends State<_ServerSheet> {
                             width: 16,
                             height: 16,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: context.backgroundColor),
+                                strokeWidth: 2, color: context.backgroundColor),
                           )
                         : Text(isNew ? 'Add server' : 'Save'),
                   ),
@@ -908,8 +897,7 @@ class _ServerSheetState extends State<_ServerSheet> {
         child: Text(
           'This URL is unencrypted. Credentials and data travel in plain text '
           'over the network. Only use on a trusted LAN.',
-          style:
-              TextStyle(fontSize: 12, color: AppColors.error),
+          style: TextStyle(fontSize: 12, color: AppColors.error),
         ),
       );
 
@@ -929,9 +917,7 @@ class _ServerSheetState extends State<_ServerSheet> {
   InputDecoration _fieldDecoration({String? hint, Widget? suffixIcon}) =>
       InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(
-            fontSize: 13,
-            color: context.textSecondary),
+        hintStyle: TextStyle(fontSize: 13, color: context.textSecondary),
         suffixIcon: suffixIcon,
         filled: true,
         fillColor: context.textPrimary.withValues(alpha: 0.03),

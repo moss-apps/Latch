@@ -44,7 +44,8 @@ class CipherCodec {
 
   /// json columns carry the envelope wrapped in an object — the only json
   /// shape PB normalizes identically in both directions.
-  Map<String, dynamic> sealJson(Object? value) => {'env': seal(jsonEncode(value))};
+  Map<String, dynamic> sealJson(Object? value) =>
+      {'env': seal(jsonEncode(value))};
 
   Object? openJson(Map<String, dynamic> envelope) =>
       jsonDecode(open(envelope['env'] as String));

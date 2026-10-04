@@ -117,8 +117,7 @@ class ExplorerFileGrid extends ConsumerWidget {
                           )
                         : GridView.builder(
                             padding: const EdgeInsets.all(12),
-                            gridDelegate:
-                                ResponsiveGridDelegate.responsive(
+                            gridDelegate: ResponsiveGridDelegate.responsive(
                               context,
                               compact: 3,
                               medium: 4,
@@ -443,8 +442,7 @@ class ExplorerFileGrid extends ConsumerWidget {
                     ),
                     padding: const EdgeInsets.all(2),
                     child: isSelected
-                        ? const Icon(Icons.check,
-                            size: 12, color: Colors.white)
+                        ? const Icon(Icons.check, size: 12, color: Colors.white)
                         : const SizedBox(width: 12, height: 12),
                   ),
                 ),

@@ -79,8 +79,7 @@ class PasswordService {
     PasswordEntry entry, {
     bool isDecoy = false,
   }) async {
-    final masterKey =
-        await _encryptionService.getMasterKey(isDecoy: isDecoy);
+    final masterKey = await _encryptionService.getMasterKey(isDecoy: isDecoy);
     final salt = base64Decode(entry.keyDerivationSalt);
     return _encryptionService.deriveFileKeyAsync(
         masterKey, salt, entry.kdfIterations);
@@ -105,8 +104,7 @@ class PasswordService {
 
     onProgress?.call('Encrypting...', isEncrypting: true);
     final filePath = '$dir/$id.enc';
-    final masterKey =
-        await _encryptionService.getMasterKey(isDecoy: isDecoy);
+    final masterKey = await _encryptionService.getMasterKey(isDecoy: isDecoy);
     final saltBytes = _encryptionService.generateFileSalt();
     final derivedKey = await _encryptionService.deriveFileKeyAsync(
       masterKey,
@@ -213,8 +211,7 @@ class PasswordService {
     );
 
     if (content != null) {
-      final masterKey =
-          await _encryptionService.getMasterKey(isDecoy: isDecoy);
+      final masterKey = await _encryptionService.getMasterKey(isDecoy: isDecoy);
       final salt = _encryptionService.generateFileSalt();
       final derivedKey = await _encryptionService.deriveFileKeyAsync(
         masterKey,
@@ -294,7 +291,8 @@ class PasswordService {
     _caches[isDecoy]!.removeWhere((e) => ids.contains(e.id));
     await _save(isDecoy: isDecoy);
     for (final entry in entries) {
-      await VaultService.instance.removePasswordEntry(entry.id, isDecoy: isDecoy);
+      await VaultService.instance
+          .removePasswordEntry(entry.id, isDecoy: isDecoy);
     }
   }
 

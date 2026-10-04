@@ -36,7 +36,8 @@ VaultedFile _file({
 void main() {
   group('blobNameFor', () {
     test('shards by first 4 hex chars into ab/cd/ paths', () {
-      const hash = 'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789';
+      const hash =
+          'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789';
       expect(SyncService.blobNameFor(hash), 'ab/cd/$hash.enc');
     });
 
@@ -208,7 +209,8 @@ void main() {
         generatedAt: t,
         entries: [ManifestEntry(id: 'a', contentHash: 'h1', modifiedAt: t)],
       );
-      expect(SyncService.reconcile(local: local, remote: remote).isEmpty, isTrue);
+      expect(
+          SyncService.reconcile(local: local, remote: remote).isEmpty, isTrue);
     });
 
     test('conflict: local newer AND remote diverged since last sync', () {
@@ -416,9 +418,8 @@ void main() {
         now: DateTime.utc(2024, 6, 1),
       );
       expect(manifest.version, 2);
-      final e = RemoteManifest.fromJsonString(manifest.toJsonString())
-          .entries
-          .single;
+      final e =
+          RemoteManifest.fromJsonString(manifest.toJsonString()).entries.single;
       expect(e.originalName, 'a.jpg');
       expect(e.type, 'image');
       expect(e.mimeType, 'image/jpeg');
@@ -444,7 +445,8 @@ void main() {
   });
 
   group('runSync', () {
-    test('push-only: every local file gets a remote blob + manifest lists it, '
+    test(
+        'push-only: every local file gets a remote blob + manifest lists it, '
         'and re-running is idempotent', () async {
       final dir = await Directory.systemTemp.createTemp('locker_sync_');
       final payloads = [
@@ -838,8 +840,7 @@ void main() {
       expect(await File(onB.vaultPath).exists(), isTrue);
 
       // A deletes (tombstone) + pushes; blob reaped.
-      final tombstoned =
-          rA.refreshedLocal.first.copyWith(syncedDeleted: true);
+      final tombstoned = rA.refreshedLocal.first.copyWith(syncedDeleted: true);
       await SyncService.runSync(
         local: [tombstoned],
         masterKey: masterKey,
@@ -871,7 +872,8 @@ void main() {
 
     test('manifest read failure aborts without committing or replacing it',
         () async {
-      final dir = await Directory.systemTemp.createTemp('locker_sync_readfail_');
+      final dir =
+          await Directory.systemTemp.createTemp('locker_sync_readfail_');
       final path = '${dir.path}/blob.enc';
       await File(path).writeAsBytes(Uint8List.fromList([1, 2, 3]));
 

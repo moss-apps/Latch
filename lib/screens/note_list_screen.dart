@@ -52,8 +52,8 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
               ),
               actions: [
                 IconButton(
-                  icon: Icon(Icons.folder_outlined,
-                      color: context.textSecondary),
+                  icon:
+                      Icon(Icons.folder_outlined, color: context.textSecondary),
                   tooltip: 'Folders',
                   onPressed: () => Navigator.push(
                     context,
@@ -287,9 +287,8 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
     }
     if (searchQuery.isNotEmpty) {
       final query = searchQuery.toLowerCase();
-      filtered = filtered
-          .where((n) => n.title.toLowerCase().contains(query))
-          .toList();
+      filtered =
+          filtered.where((n) => n.title.toLowerCase().contains(query)).toList();
     }
     filtered.sort((a, b) {
       if (a.isPinned && !b.isPinned) return -1;
