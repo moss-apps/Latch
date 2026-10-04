@@ -16,8 +16,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: '1.26.x'
           cache-dependency-path: latchd/go.sum
@@ -34,8 +34,8 @@ jobs:
           - { goos: linux, goarch: arm64 }
           - { goos: windows, goarch: amd64 }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: '1.26.x'
           cache-dependency-path: latchd/go.sum
@@ -51,7 +51,7 @@ jobs:
           if [ "$GOOS" = windows ]; then ext=".exe"; fi
           go build -trimpath -ldflags "-s -w -X main.version=$version" \
             -o "../latchd-$GOOS-$GOARCH$ext" ./cmd/latchd
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: latchd-${{ matrix.goos }}-${{ matrix.goarch }}
           path: latchd-*
@@ -60,8 +60,8 @@ jobs:
     needs: build
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           name: latchd-windows-amd64
           path: dist
@@ -72,7 +72,7 @@ jobs:
           python latchd/windows-setup/build-license.py
           & "${env:ProgramFiles(x86)}\Inno Setup 6\iscc.exe" latchd/windows-setup/latch.iss /DMyAppVersion="${{ github.ref_name }}"
           Get-ChildItem dist/Latch-Setup-*.exe
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: latchd-windows-setup
           path: dist/Latch-Setup-*.exe
@@ -83,14 +83,14 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
       - name: Checksums
         run: cd dist && sha256sum latchd-* Latch-Setup-*.exe > SHA256SUMS
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           name: v${{ github.ref_name }}
           files: dist/*
