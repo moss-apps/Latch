@@ -370,10 +370,12 @@ extension AppColorsExtension on BuildContext {
   Color get accentColorVariant => Theme.of(this).colorScheme.primaryContainer;
 
   /// Glass background color (adapts to theme)
-  Color get glassBg => isDarkMode ? AppColors.glassDarkBg : AppColors.glassLightBg;
+  Color get glassBg =>
+      isDarkMode ? AppColors.glassDarkBg : AppColors.glassLightBg;
 
   /// Glass border color (adapts to theme)
-  Color get glassBorder => isDarkMode ? AppColors.glassDarkBorder : AppColors.glassLightBorder;
+  Color get glassBorder =>
+      isDarkMode ? AppColors.glassDarkBorder : AppColors.glassLightBorder;
 
   /// Glass highlight color
   Color get glassHighlight => AppColors.glassHighlight;

@@ -50,7 +50,8 @@ class PasswordContent {
   String toJsonString() => jsonEncode(toJson());
 
   factory PasswordContent.fromJsonString(String jsonString) {
-    return PasswordContent.fromJson(jsonDecode(jsonString) as Map<String, dynamic>);
+    return PasswordContent.fromJson(
+        jsonDecode(jsonString) as Map<String, dynamic>);
   }
 }
 
@@ -155,10 +156,9 @@ class PasswordEntry {
       iv: json['iv'] as String,
       keyDerivationSalt: json['keyDerivationSalt'] as String,
       kdfIterations: json['kdfIterations'] as int? ?? 100000,
-      tags: (json['tags'] as List<dynamic>?)
-              ?.map((e) => e as String)
-              .toList() ??
-          const [],
+      tags:
+          (json['tags'] as List<dynamic>?)?.map((e) => e as String).toList() ??
+              const [],
       isFavorite: json['isFavorite'] as bool? ?? false,
       isEncrypted: json['isEncrypted'] as bool? ?? false,
       encryptionAlgorithm: json['encryptionAlgorithm'] != null
@@ -175,7 +175,8 @@ class PasswordEntry {
   String toJsonString() => jsonEncode(toJson());
 
   factory PasswordEntry.fromJsonString(String jsonString) {
-    return PasswordEntry.fromJson(jsonDecode(jsonString) as Map<String, dynamic>);
+    return PasswordEntry.fromJson(
+        jsonDecode(jsonString) as Map<String, dynamic>);
   }
 
   @override

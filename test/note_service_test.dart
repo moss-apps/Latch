@@ -81,8 +81,7 @@ void main() {
   test('legacy shared index splits into real and decoy indexes', () async {
     storage['locker_notes_index'] = jsonEncode([
       _noteJson('real1'),
-      _noteJson('decoy1',
-          path: '/tmp/x/.locker_decoy/notes/decoy1.enc'),
+      _noteJson('decoy1', path: '/tmp/x/.locker_decoy/notes/decoy1.enc'),
     ]);
 
     final real = await NoteService.instance.loadNotes(isDecoy: false);

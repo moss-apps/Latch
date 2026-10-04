@@ -22,7 +22,8 @@ class PbClient {
 
   Map<String, String> get _headers => {tokenHeader: _token};
 
-  Future<Map<String, dynamic>> get(String path, {Map<String, String>? query}) async {
+  Future<Map<String, dynamic>> get(String path,
+      {Map<String, String>? query}) async {
     final res = await _http.get(_uri(path, query: query), headers: _headers);
     return _decode(res);
   }
@@ -65,10 +66,12 @@ class PbClient {
 
   /// True once the sidecar answers /api/health with 200 (i.e. token accepted).
   Future<bool> health() async {
-    final res = await _http.get(
-      _uri('/api/health'),
-      headers: _headers,
-    ).timeout(const Duration(seconds: 2));
+    final res = await _http
+        .get(
+          _uri('/api/health'),
+          headers: _headers,
+        )
+        .timeout(const Duration(seconds: 2));
     return res.statusCode == 200;
   }
 
@@ -81,7 +84,9 @@ class PbClient {
       );
     }
     final body = res.body;
-    return body.isEmpty ? <String, dynamic>{} : jsonDecode(body) as Map<String, dynamic>;
+    return body.isEmpty
+        ? <String, dynamic>{}
+        : jsonDecode(body) as Map<String, dynamic>;
   }
 
   void close() => _http.close();

@@ -17,7 +17,8 @@ class AesGcmCipher {
     bool forEncryption,
   ) {
     final c = GCMBlockCipher(AESEngine())
-      ..init(forEncryption, AEADParameters(KeyParameter(key), tagBits, iv, Uint8List(0)));
+      ..init(forEncryption,
+          AEADParameters(KeyParameter(key), tagBits, iv, Uint8List(0)));
     return c;
   }
 

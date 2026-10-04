@@ -13,7 +13,8 @@ void main() {
         contains('certificate'));
     expect(describeServerError(Exception('Connection closed before status')),
         contains('dropped'));
-    expect(describeServerError(Exception('SocketException: failed host lookup')),
+    expect(
+        describeServerError(Exception('SocketException: failed host lookup')),
         contains('Network error'));
     expect(
         describeServerError(const FormatException('Manifest blob too short')),

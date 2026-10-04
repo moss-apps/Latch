@@ -34,8 +34,7 @@ void main() {
     expect(parser.port, 41235);
   });
 
-  test('PbHandshakeParser stays incomplete when required lines are absent',
-      () {
+  test('PbHandshakeParser stays incomplete when required lines are absent', () {
     final parser = PbHandshakeParser()
       ..feed('LOCKER_PB_PORT=1')
       ..feed('LOCKER_PB_TOKEN=${'b' * 64}');

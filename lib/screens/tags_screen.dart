@@ -589,7 +589,8 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
             Container(
               color: Colors.black26,
               child: const Center(
-                child: Icon(Icons.play_circle_outline, size: 48, color: Colors.white70),
+                child: Icon(Icons.play_circle_outline,
+                    size: 48, color: Colors.white70),
               ),
             ),
           ],
@@ -611,7 +612,8 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
   }
 
   Widget _buildPlaceholder(VaultedFile file) {
-    final color = FileTypeColors.colorForType(file.type, accent: context.accentColor);
+    final color =
+        FileTypeColors.colorForType(file.type, accent: context.accentColor);
     final icon = FileTypeColors.iconForType(file.type);
 
     return Container(

@@ -67,8 +67,7 @@ class NoteCard extends StatelessWidget {
               color: isSelected ? context.accentColor : context.textTertiary,
             )
           : note.isEncrypted
-              ? Icon(Icons.lock_outline,
-                  size: 15, color: context.textTertiary)
+              ? Icon(Icons.lock_outline, size: 15, color: context.textTertiary)
               : note.isMarkdown
                   ? Icon(Icons.text_snippet,
                       size: 15, color: context.textTertiary)

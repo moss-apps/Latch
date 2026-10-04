@@ -113,9 +113,7 @@ class FolderBreadcrumbWidget extends ConsumerWidget {
             fontFamily: 'ProductSans',
             fontSize: 13,
             fontWeight: isLast ? FontWeight.bold : FontWeight.w500,
-            color: isLast
-                ? context.textPrimary
-                : context.accentColor,
+            color: isLast ? context.textPrimary : context.accentColor,
           ),
         ),
       ),

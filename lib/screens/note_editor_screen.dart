@@ -202,8 +202,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                         onPressed: () => setState(() => _folderId = null),
                         tooltip: 'Clear folder',
                         padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                            minWidth: 36, minHeight: 36),
+                        constraints:
+                            const BoxConstraints(minWidth: 36, minHeight: 36),
                       ),
                     ],
                   ),

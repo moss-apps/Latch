@@ -63,7 +63,8 @@ class FolderService {
       _store.cachedFolders!.add(folder);
 
       if (parentId != null) {
-        final parentIndex = _store.cachedFolders!.indexWhere((f) => f.id == parentId);
+        final parentIndex =
+            _store.cachedFolders!.indexWhere((f) => f.id == parentId);
         if (parentIndex != -1) {
           _store.cachedFolders![parentIndex] =
               _store.cachedFolders![parentIndex].addSubfolder(id);
@@ -86,7 +87,8 @@ class FolderService {
 
       if (index == -1) return null;
 
-      _store.cachedFolders![index] = updatedFolder.copyWith(updatedAt: DateTime.now());
+      _store.cachedFolders![index] =
+          updatedFolder.copyWith(updatedAt: DateTime.now());
       await _store.saveFolders();
 
       return _store.cachedFolders![index];
@@ -96,7 +98,8 @@ class FolderService {
     }
   }
 
-  Future<bool> deleteFolder(String folderId, {bool deleteContents = false}) async {
+  Future<bool> deleteFolder(String folderId,
+      {bool deleteContents = false}) async {
     try {
       final folders = await _store.loadFolders();
       final folder = folders.firstWhere(
@@ -125,10 +128,12 @@ class FolderService {
           if (subfolder != null) {
             await updateFolder(subfolder.copyWith(parentId: folder.parentId));
             if (folder.parentId != null) {
-              final parentIndex = _store.cachedFolders!.indexWhere((f) => f.id == folder.parentId);
+              final parentIndex = _store.cachedFolders!
+                  .indexWhere((f) => f.id == folder.parentId);
               if (parentIndex != -1) {
-                _store.cachedFolders![parentIndex] =
-                    _store.cachedFolders![parentIndex].addSubfolder(subfolderId);
+                _store.cachedFolders![parentIndex] = _store
+                    .cachedFolders![parentIndex]
+                    .addSubfolder(subfolderId);
               }
             }
           }
@@ -136,7 +141,8 @@ class FolderService {
       }
 
       if (folder.parentId != null) {
-        final parentIndex = _store.cachedFolders!.indexWhere((f) => f.id == folder.parentId);
+        final parentIndex =
+            _store.cachedFolders!.indexWhere((f) => f.id == folder.parentId);
         if (parentIndex != -1) {
           _store.cachedFolders![parentIndex] =
               _store.cachedFolders![parentIndex].removeSubfolder(folderId);
@@ -163,14 +169,16 @@ class FolderService {
       if (folderIndex == -1) return false;
 
       if (file.folderId != null && file.folderId != folderId) {
-        final oldFolderIndex = _store.cachedFolders!.indexWhere((f) => f.id == file.folderId);
+        final oldFolderIndex =
+            _store.cachedFolders!.indexWhere((f) => f.id == file.folderId);
         if (oldFolderIndex != -1) {
           _store.cachedFolders![oldFolderIndex] =
               _store.cachedFolders![oldFolderIndex].removeFile(fileId);
         }
       }
 
-      _store.cachedFolders![folderIndex] = _store.cachedFolders![folderIndex].addFile(fileId);
+      _store.cachedFolders![folderIndex] =
+          _store.cachedFolders![folderIndex].addFile(fileId);
       await _store.saveFolders();
 
       final updatedFile = file.addToFolder(folderId);
@@ -189,7 +197,8 @@ class FolderService {
       final folderIndex = folders.indexWhere((f) => f.id == folderId);
       if (folderIndex == -1) return false;
 
-      _store.cachedFolders![folderIndex] = _store.cachedFolders![folderIndex].removeFile(fileId);
+      _store.cachedFolders![folderIndex] =
+          _store.cachedFolders![folderIndex].removeFile(fileId);
       await _store.saveFolders();
 
       final file = await _fileService.getFileById(fileId);
@@ -224,13 +233,20 @@ class FolderService {
   }) async {
     final deviceDir = Directory(deviceFolderPath);
     if (!await deviceDir.exists()) {
-      return FolderImportResult(foldersCreated: 0, filesImported: 0, errors: ['Directory does not exist: $deviceFolderPath']);
+      return FolderImportResult(
+          foldersCreated: 0,
+          filesImported: 0,
+          errors: ['Directory does not exist: $deviceFolderPath']);
     }
 
     final folderName = deviceDir.path.split('/').last;
-    final folder = await createFolder(name: folderName, parentId: parentFolderId);
+    final folder =
+        await createFolder(name: folderName, parentId: parentFolderId);
     if (folder == null) {
-      return FolderImportResult(foldersCreated: 0, filesImported: 0, errors: ['Failed to create folder']);
+      return FolderImportResult(
+          foldersCreated: 0,
+          filesImported: 0,
+          errors: ['Failed to create folder']);
     }
 
     int foldersCreated = 1;
@@ -328,20 +344,39 @@ class FolderService {
 
   String _getMimeTypeFromExtension(String extension) {
     const mimeMap = {
-      'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png',
-      'gif': 'image/gif', 'webp': 'image/webp', 'bmp': 'image/bmp',
-      'heic': 'image/heic', 'heif': 'image/heif',
-      'mp4': 'video/mp4', 'mov': 'video/quicktime', 'avi': 'video/x-msvideo',
-      'mkv': 'video/x-matroska', 'webm': 'video/webm',
-      'mp3': 'audio/mpeg', 'wav': 'audio/wav', 'flac': 'audio/flac',
-      'aac': 'audio/aac', 'ogg': 'audio/ogg', 'm4a': 'audio/mp4',
-      'pdf': 'application/pdf', 'doc': 'application/msword',
-      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'txt': 'text/plain', 'rtf': 'application/rtf',
-      'zip': 'application/zip', 'rar': 'application/x-rar-compressed',
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
+      'gif': 'image/gif',
+      'webp': 'image/webp',
+      'bmp': 'image/bmp',
+      'heic': 'image/heic',
+      'heif': 'image/heif',
+      'mp4': 'video/mp4',
+      'mov': 'video/quicktime',
+      'avi': 'video/x-msvideo',
+      'mkv': 'video/x-matroska',
+      'webm': 'video/webm',
+      'mp3': 'audio/mpeg',
+      'wav': 'audio/wav',
+      'flac': 'audio/flac',
+      'aac': 'audio/aac',
+      'ogg': 'audio/ogg',
+      'm4a': 'audio/mp4',
+      'pdf': 'application/pdf',
+      'doc': 'application/msword',
+      'docx':
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'txt': 'text/plain',
+      'rtf': 'application/rtf',
+      'zip': 'application/zip',
+      'rar': 'application/x-rar-compressed',
       '7z': 'application/x-7z-compressed',
-      'json': 'application/json', 'xml': 'application/xml',
-      'csv': 'text/csv', 'html': 'text/html', 'htm': 'text/html',
+      'json': 'application/json',
+      'xml': 'application/xml',
+      'csv': 'text/csv',
+      'html': 'text/html',
+      'htm': 'text/html',
     };
     return mimeMap[extension.toLowerCase()] ?? 'application/octet-stream';
   }

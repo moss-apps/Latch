@@ -127,13 +127,13 @@ class SyncService {
     final masterKey = await _crypto.getMasterKey();
     // Isolate.run keeps file+hash I/O off the UI thread; per-file progress dropped (SendPort if needed).
     return Isolate.run(() => runSync(
-      local: local,
-      masterKey: masterKey,
-      remote: remote,
-      deviceId: deviceId,
-      vaultRoot: dir.path,
-      direction: profile.direction,
-    ));
+          local: local,
+          masterKey: masterKey,
+          remote: remote,
+          deviceId: deviceId,
+          vaultRoot: dir.path,
+          direction: profile.direction,
+        ));
   }
 
   /// Core sync engine. Fetches + decrypts the remote manifest, reconciles,
@@ -165,9 +165,8 @@ class SyncService {
 
     onProgress?.call(const SyncProgress(phase: SyncPhase.connecting));
     final remoteBytes = await remote.getManifest();
-    final remoteManifest = remoteBytes == null
-        ? null
-        : decryptManifest(remoteBytes, masterKey);
+    final remoteManifest =
+        remoteBytes == null ? null : decryptManifest(remoteBytes, masterKey);
 
     // First sync (no remote manifest) → everything non-deleted is a push.
     final plan = remoteManifest == null
@@ -177,7 +176,9 @@ class SyncService {
         : reconcile(local: local, remote: remoteManifest);
 
     final pushIds = <String>{for (final p in plan.toPush) p.id};
-    final tombstoneLocalIds = <String>{for (final id in plan.toTombstoneLocal) id};
+    final tombstoneLocalIds = <String>{
+      for (final id in plan.toTombstoneLocal) id
+    };
     final refreshed = <VaultedFile>[];
     var pushed = 0;
     var skipped = 0;
@@ -564,7 +565,8 @@ class SyncService {
 
   /// Encrypt a manifest with the vault master key. Wire format:
   /// `[16-byte IV][ciphertext+GCM tag]`. Reuses AesGcmCipher — no new crypto.
-  static Uint8List encryptManifest(RemoteManifest manifest, Uint8List masterKey) {
+  static Uint8List encryptManifest(
+      RemoteManifest manifest, Uint8List masterKey) {
     final iv = KeyDerivation.generateIV();
     final ct = AesGcmCipher.process(
       masterKey,
