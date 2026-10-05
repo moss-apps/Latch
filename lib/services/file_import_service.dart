@@ -1297,7 +1297,8 @@ class FileImportService {
             // Save converted PDF to temp location
             final pdfFileName =
                 '${officeFile.fileName.replaceAll(RegExp(r'\.[^.]+$'), '')}.pdf';
-            final tempPdfPath = '${tempDir.path}/$pdfFileName';
+            final tempPdfPath =
+                '${tempDir.path}/lkr_office_${DateTime.now().microsecondsSinceEpoch}.pdf';
             await File(tempPdfPath).writeAsBytes(result.pdfData!);
 
             final perFileConfig = perFileEncryption?[officeFile.path];

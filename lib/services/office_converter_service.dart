@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:isolate';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -7,6 +6,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:archive/archive.dart';
 import 'package:xml/xml.dart' as xml;
+import 'encryption_service.dart';
+import 'sensitive_isolate.dart';
 
 /// Result of an Office document conversion
 class ConversionResult {
@@ -150,6 +151,8 @@ class OfficeConverterService {
     String fileName,
     String extension,
   ) async {
+    final crypto = EncryptionService.instance;
+    final generation = crypto.cacheGeneration;
     final fileType = getFileType(extension);
 
     if (fileType == OfficeFileType.unknown) {
@@ -175,8 +178,11 @@ class OfficeConverterService {
 
     try {
       final fontBytes = await _loadFontBytes();
+      if (!crypto.isCurrentSession(generation)) {
+        throw StateError('Vault session changed');
+      }
       // pure-Dart conversion in an isolate, off the UI thread; statics avoid `this` capture.
-      return await Isolate.run(() async {
+      final result = await SensitiveIsolate.run(() async {
         switch (fileType) {
           case OfficeFileType.docx:
             return await _convertDocxToPdf(fileData, fileName, fontBytes);
@@ -189,6 +195,11 @@ class OfficeConverterService {
                 success: false, error: 'Unsupported file format');
         }
       });
+      if (!crypto.isCurrentSession(generation)) {
+        result.pdfData?.fillRange(0, result.pdfData!.length, 0);
+        throw StateError('Vault session changed');
+      }
+      return result;
     } catch (e) {
       debugPrint('Error converting document: $e');
       return ConversionResult(
@@ -544,11 +555,21 @@ class OfficeConverterService {
   /// Save PDF data to a temporary file
   Future<String> savePdfToTemp(
       Uint8List pdfData, String originalFileName) async {
+    final crypto = EncryptionService.instance;
+    final generation = crypto.cacheGeneration;
     final tempDir = await getTemporaryDirectory();
+    if (!crypto.isCurrentSession(generation)) {
+      throw StateError('Vault session changed');
+    }
     final pdfFileName =
         '${originalFileName.replaceAll(RegExp(r'\.[^.]+$'), '')}_converted.pdf';
-    final pdfFile = File('${tempDir.path}/$pdfFileName');
+    final previewDir = await tempDir.createTemp('lkr_preview_');
+    final pdfFile = File('${previewDir.path}/$pdfFileName');
     await pdfFile.writeAsBytes(pdfData);
+    if (!crypto.isCurrentSession(generation)) {
+      if (await previewDir.exists()) await previewDir.delete(recursive: true);
+      throw StateError('Vault session changed');
+    }
     return pdfFile.path;
   }
 }

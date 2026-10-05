@@ -24,6 +24,7 @@ class PasswordService {
   static const int _defaultKdfIterations = 100000;
 
   final Map<bool, List<PasswordEntry>> _caches = {};
+  int _cacheGeneration = 0;
 
   List<String> _normalizedTags(List<String> tags) => tags
       .map((t) => t.toLowerCase().trim())
@@ -45,11 +46,15 @@ class PasswordService {
   }
 
   Future<List<PasswordEntry>> loadPasswords({bool isDecoy = false}) async {
+    final generation = _cacheGeneration;
     final cached = _caches[isDecoy];
     if (cached != null) return cached;
     final json = await _secureStorage.read(
       key: isDecoy ? _decoyIndexKey : _indexKey,
     );
+    if (generation != _cacheGeneration) {
+      throw StateError('Passwords session changed');
+    }
     if (json == null || json.isEmpty) {
       return _caches[isDecoy] = [];
     }
@@ -309,6 +314,7 @@ class PasswordService {
   }
 
   void clearCache() {
+    _cacheGeneration++;
     _caches.clear();
   }
 }

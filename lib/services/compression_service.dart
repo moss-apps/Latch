@@ -2,27 +2,45 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bicubic_resize/flutter_bicubic_resize.dart';
 import 'package:path_provider/path_provider.dart';
+import 'encryption_service.dart';
 
 class CompressionService {
   CompressionService._();
   static final CompressionService instance = CompressionService._();
 
   static const int _jpegQuality = 95;
+  final Set<Process> _processes = {};
+
+  void clearSensitiveState() {
+    for (final process in _processes) {
+      process.kill(ProcessSignal.sigkill);
+    }
+    _processes.clear();
+  }
 
   Future<String?> compressImage(String sourcePath) async {
+    final crypto = EncryptionService.instance;
+    final generation = crypto.cacheGeneration;
     final compressedBytes = await compressImageToBytes(sourcePath);
     if (compressedBytes == null) return null;
 
     final extension = sourcePath.split('.').last.toLowerCase();
     final tempDir = await getTemporaryDirectory();
     final compressedPath =
-        '${tempDir.path}/compressed_${DateTime.now().millisecondsSinceEpoch}.$extension';
+        '${tempDir.path}/lkr_compressed_${DateTime.now().millisecondsSinceEpoch}.$extension';
     final compressedFile = File(compressedPath);
+    if (!crypto.isCurrentSession(generation)) return null;
     await compressedFile.writeAsBytes(compressedBytes);
+    if (!crypto.isCurrentSession(generation)) {
+      if (await compressedFile.exists()) await compressedFile.delete();
+      return null;
+    }
     return compressedPath;
   }
 
   Future<Uint8List?> compressImageToBytes(String sourcePath) async {
+    final crypto = EncryptionService.instance;
+    final generation = crypto.cacheGeneration;
     try {
       final sourceFile = File(sourcePath);
       if (!await sourceFile.exists()) {
@@ -45,6 +63,10 @@ class CompressionService {
 
       if (compressedBytes == null) {
         debugPrint('[Compression] Failed to compress image: $sourcePath');
+        return null;
+      }
+      if (!crypto.isCurrentSession(generation)) {
+        compressedBytes.fillRange(0, compressedBytes.length, 0);
         return null;
       }
 
@@ -74,6 +96,8 @@ class CompressionService {
   }
 
   Future<String?> compressVideo(String sourcePath) async {
+    final crypto = EncryptionService.instance;
+    final generation = crypto.cacheGeneration;
     try {
       final sourceFile = File(sourcePath);
       if (!await sourceFile.exists()) {
@@ -84,7 +108,7 @@ class CompressionService {
       final tempDir = await getTemporaryDirectory();
 
       final outputPath =
-          '${tempDir.path}/compressed_${DateTime.now().millisecondsSinceEpoch}.mp4';
+          '${tempDir.path}/lkr_compressed_${DateTime.now().millisecondsSinceEpoch}.mp4';
 
       debugPrint(
           '[Compression] Compressing video: $sourcePath (preserving original resolution)');
@@ -110,8 +134,21 @@ class CompressionService {
           outputPath,
         ],
       );
-
-      final exitCode = await process.exitCode;
+      _processes.add(process);
+      if (!crypto.isCurrentSession(generation)) {
+        process.kill(ProcessSignal.sigkill);
+      }
+      final int exitCode;
+      try {
+        exitCode = await process.exitCode;
+      } finally {
+        _processes.remove(process);
+      }
+      if (!crypto.isCurrentSession(generation)) {
+        final output = File(outputPath);
+        if (await output.exists()) await output.delete();
+        return null;
+      }
 
       if (exitCode == 0) {
         final outputFile = File(outputPath);

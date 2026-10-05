@@ -17,11 +17,22 @@ import 'pb_client.dart';
 /// sidecar, so `isDecoy: true` is a routing bug and throws. Settings stay in
 /// FlutterSecureStorage.
 class PocketBaseStore implements LocalStore {
-  PocketBaseStore({required PbClient client, required Uint8List masterKey})
+  PocketBaseStore(
+      {required PbClient client,
+      required Uint8List masterKey,
+      bool Function()? isSessionValid})
       : fileDao = VaultFileDao(client, masterKey),
         albumDao = AlbumDao(client, masterKey),
         folderDao = FolderDao(client, masterKey),
-        tagDao = TagDao(client, masterKey);
+        tagDao = TagDao(client, masterKey),
+        _isSessionValid = isSessionValid {
+    fileDao.isSessionValid = isSessionValid;
+    albumDao.isSessionValid = isSessionValid;
+    folderDao.isSessionValid = isSessionValid;
+    tagDao.isSessionValid = isSessionValid;
+  }
+
+  final bool Function()? _isSessionValid;
 
   final VaultFileDao fileDao;
   final AlbumDao albumDao;
@@ -38,6 +49,9 @@ class PocketBaseStore implements LocalStore {
   List<TagInfo>? cachedTags;
 
   void _noDecoy(bool isDecoy) {
+    if (_isSessionValid?.call() == false) {
+      throw StateError('PocketBase session is locked');
+    }
     if (isDecoy) {
       throw ArgumentError('decoy vault never starts the PocketBase sidecar');
     }

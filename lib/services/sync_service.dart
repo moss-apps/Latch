@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:isolate';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -14,6 +13,7 @@ import '../models/remote_manifest.dart';
 import '../models/sync_profile.dart';
 import '../models/vaulted_file.dart';
 import 'encryption_service.dart';
+import 'sensitive_isolate.dart';
 import 'remote/remote_store.dart';
 import 'remote/webdav_store.dart';
 import 'vault_store.dart';
@@ -115,6 +115,7 @@ class SyncService {
     required String password,
     required String deviceId,
   }) async {
+    final generation = _crypto.cacheGeneration;
     final remote = WebDAVStore(
       baseUrl: profile.serverUrl,
       username: profile.username ?? '',
@@ -125,14 +126,17 @@ class SyncService {
     // Ensure the vault dir + subdirs exist before a two-way pull writes into it.
     final dir = await _store.ensureVaultDirectory();
     final masterKey = await _crypto.getMasterKey();
-    // Isolate.run keeps file+hash I/O off the UI thread; per-file progress dropped (SendPort if needed).
-    return Isolate.run(() => runSync(
+    if (!_crypto.isCurrentSession(generation)) {
+      throw StateError('Vault session expired');
+    }
+    final direction = profile.direction;
+    return SensitiveIsolate.run(() => runSync(
           local: local,
           masterKey: masterKey,
           remote: remote,
           deviceId: deviceId,
           vaultRoot: dir.path,
-          direction: profile.direction,
+          direction: direction,
         ));
   }
 

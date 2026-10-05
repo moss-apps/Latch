@@ -12,11 +12,21 @@ abstract class PbDao<T> {
 
   final PbClient client;
   final Uint8List masterKey;
+  bool Function()? isSessionValid;
+
+  void _requireSession() {
+    if (isSessionValid?.call() == false) {
+      throw StateError('PocketBase session is locked');
+    }
+  }
 
   String get collection;
   String get path => '/api/collections/$collection/records';
 
-  CipherCodec get codec => CipherCodec(masterKey);
+  CipherCodec get codec {
+    _requireSession();
+    return CipherCodec(masterKey);
+  }
 
   /// Full row for a model, `id` = pbRecordId(...) of the app id.
   Map<String, dynamic> toRow(T model);
@@ -27,6 +37,7 @@ abstract class PbDao<T> {
   String appIdOf(T model);
 
   Future<List<T>> list() async {
+    _requireSession();
     final out = <T>[];
     for (final row in await _rows(null)) {
       try {
@@ -41,10 +52,12 @@ abstract class PbDao<T> {
   /// Upsert: create, fall back to patch when the id already exists.
   /// 2 calls on the rare update path; batch API if it ever matters.
   Future<void> put(T model) async {
+    _requireSession();
     final row = toRow(model);
     try {
       await client.post(path, body: row);
     } on http.ClientException {
+      _requireSession();
       await client.patch('$path/${row['id']}', body: row..remove('id'));
     }
   }
@@ -74,6 +87,7 @@ abstract class PbDao<T> {
         'perPage': '200',
         if (fields != null) 'fields': fields,
       });
+      _requireSession();
       final items =
           (res['items'] as List<dynamic>).cast<Map<String, dynamic>>();
       rows.addAll(items);
@@ -84,6 +98,7 @@ abstract class PbDao<T> {
   }
 
   Future<void> _deleteRecordId(String recordId) async {
+    _requireSession();
     try {
       await client.delete('$path/$recordId');
     } on http.ClientException {
