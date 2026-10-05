@@ -11,6 +11,7 @@ import '../providers/vault_providers.dart';
 import '../services/auth_service.dart';
 import '../services/legal_consent_service.dart';
 import '../services/auto_kill_service.dart';
+import '../services/session_service.dart';
 import '../services/screenshot_protection_service.dart';
 import '../services/update_service.dart';
 import '../models/vault_settings.dart';
@@ -258,6 +259,69 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                 activeThumbColor: context.accentColor,
                 contentPadding: EdgeInsets.zero,
               ),
+              ListTile(
+                leading: Icon(Icons.lock_outline, color: context.accentColor),
+                title: const Text('Lock now'),
+                onTap: () => SessionService.instance.lock(),
+                contentPadding: EdgeInsets.zero,
+              ),
+              _buildSecurityOptionDropdown(
+                context: context,
+                title: 'Lock after inactivity',
+                subtitle: 'Touch, scrolling, and keyboard use reset the timer',
+                value: settings.inactivityLockSeconds,
+                options: const [0, 30, 60, 300, 600, 1800],
+                labelBuilder: (seconds) => seconds == 0
+                    ? 'Never'
+                    : seconds < 60
+                        ? '$seconds seconds'
+                        : '${seconds ~/ 60} minutes',
+                onChanged: (value) async {
+                  if (value == null) return;
+                  await _saveVaultSettings(
+                      settings.copyWith(inactivityLockSeconds: value));
+                },
+              ),
+              _buildSecurityOptionDropdown(
+                context: context,
+                title: 'Lock in background',
+                subtitle:
+                    'Pickers, biometrics, and files opened from Latch are exempt until you return. Inactivity still applies otherwise.',
+                value: settings.backgroundLockDelaySeconds,
+                options: const [-1, 0, 5, 30, 60, 300],
+                labelBuilder: (seconds) => seconds == -1
+                    ? 'Never'
+                    : seconds == 0
+                        ? 'Immediately'
+                        : seconds < 60
+                            ? 'After $seconds seconds'
+                            : 'After ${seconds ~/ 60} minutes',
+                onChanged: (value) async {
+                  if (value == null) return;
+                  await _saveVaultSettings(
+                      settings.copyWith(backgroundLockDelaySeconds: value));
+                },
+              ),
+              if (autoKillSupported)
+                SwitchListTile(
+                  title: const Text(
+                    'Close app in background',
+                    style: TextStyle(fontFamily: 'ProductSans'),
+                  ),
+                  subtitle: Text(
+                    'Android auto-kill closes Latch independently of session locking. Turn off to relock without closing.',
+                    style: TextStyle(
+                      fontFamily: 'ProductSans',
+                      fontSize: 12,
+                      color: context.textTertiary,
+                    ),
+                  ),
+                  value: settings.autoKillEnabled,
+                  contentPadding: EdgeInsets.zero,
+                  activeThumbColor: context.accentColor,
+                  onChanged: (value) => _saveVaultSettings(
+                      settings.copyWith(autoKillEnabled: value)),
+                ),
               _buildSecurityOptionDropdown(
                 context: context,
                 title: 'Auto-Kill Delay',
@@ -267,7 +331,7 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                 value: settings.autoKillDelaySeconds,
                 options: _autoKillDelayOptions,
                 labelBuilder: _autoKillDelayLabel,
-                enabled: autoKillSupported,
+                enabled: autoKillSupported && settings.autoKillEnabled,
                 onChanged: (value) async {
                   if (value == null) return;
                   await _saveVaultSettings(
@@ -910,11 +974,13 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
 
   Future<void> _saveVaultSettings(VaultSettings settings) async {
     await ref.read(vaultServiceProvider).updateSettings(settings);
+    SessionService.instance.configure(settings);
+    await AutoKillService.configure(enabled: settings.autoKillEnabled);
     await AutoKillService.setDelaySeconds(settings.autoKillDelaySeconds);
     await ScreenshotProtectionService.setEnabled(
       settings.screenshotProtectionEnabled,
     );
-    ref.invalidate(vaultSettingsProvider);
+    if (mounted) ref.invalidate(vaultSettingsProvider);
   }
 
   Future<void> _saveUnlockProtectionSettings(VaultSettings settings) async {

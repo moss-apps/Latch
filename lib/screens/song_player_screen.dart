@@ -32,31 +32,24 @@ class SongPlayerScreen extends ConsumerStatefulWidget {
   ConsumerState<SongPlayerScreen> createState() => _SongPlayerScreenState();
 }
 
-class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
-    with WidgetsBindingObserver {
+class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen> {
   final AudioPlayer _player = AudioPlayer();
 
   bool _isLoading = true;
   bool _isCheckingFlick = true;
   bool _isFlickAvailable = false;
-  bool _reenableAutoKillOnResume = false;
   String? _error;
   File? _playbackFile;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     _loadSong();
     _loadFlickAvailability();
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    if (_reenableAutoKillOnResume) {
-      AutoKillService.setEnabled(true);
-    }
     _player.dispose();
     // Clean up temp decrypted files to prevent disk leaks
     _cleanupTempFiles();
@@ -68,14 +61,6 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
       VaultService.instance.cleanupTemp();
     } catch (e) {
       debugPrint('Error cleaning up temp files: $e');
-    }
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && _reenableAutoKillOnResume) {
-      _reenableAutoKillOnResume = false;
-      AutoKillService.setEnabled(true);
     }
   }
 
@@ -235,7 +220,8 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
 
       if (decryptedFile != null && await decryptedFile.exists()) {
         final result = await AutoKillService.runSafe(
-            () => OpenFilex.open(decryptedFile.path));
+            () => OpenFilex.open(decryptedFile.path),
+            waitForResume: true);
         if (result.type != ResultType.done) {
           ToastUtils.showError('No app found to open this file type');
         }
@@ -256,17 +242,13 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
     }
 
     try {
-      await AutoKillService.setEnabled(false);
-      _reenableAutoKillOnResume = true;
-
-      await FlickIntegrationService.openAudioFile(
-        filePath: playbackFile.path,
-        mimeType: widget.file.mimeType,
-      );
+      await AutoKillService.runSafe(
+          () => FlickIntegrationService.openAudioFile(
+                filePath: playbackFile.path,
+                mimeType: widget.file.mimeType,
+              ),
+          waitForResume: true);
     } on PlatformException catch (e) {
-      _reenableAutoKillOnResume = false;
-      await AutoKillService.setEnabled(true);
-
       final message = switch (e.code) {
         'FLICK_NOT_INSTALLED' => 'Flick is not installed',
         'FLICK_UNAVAILABLE' => 'Flick cannot open this song',
@@ -275,8 +257,6 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen>
       };
       ToastUtils.showError(message);
     } catch (e) {
-      _reenableAutoKillOnResume = false;
-      await AutoKillService.setEnabled(true);
       ToastUtils.showError('Failed to open Flick');
     }
   }

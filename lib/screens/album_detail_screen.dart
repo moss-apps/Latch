@@ -706,7 +706,8 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
 
       if (decryptedFile != null && await decryptedFile.exists()) {
         final result = await AutoKillService.runSafe(
-            () => OpenFilex.open(decryptedFile.path));
+            () => OpenFilex.open(decryptedFile.path),
+            waitForResume: true);
         if (result.type != ResultType.done) {
           ToastUtils.showError('No app found to open this file type');
         }

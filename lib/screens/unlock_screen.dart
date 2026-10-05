@@ -2,15 +2,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../themes/app_colors.dart';
-import '../providers/vault_providers.dart';
 import '../services/auth_service.dart';
 import '../services/decoy_service.dart';
 import '../services/encryption_service.dart';
-import '../services/pb/pocketbase_runtime.dart';
-import '../services/vault_service.dart';
+import '../services/session_service.dart';
 import '../widgets/adaptive_logo.dart';
 import '../widgets/pin_input_widget.dart';
-import 'gallery_vault_screen.dart';
 
 // Unlock screen for returning users.
 class UnlockScreen extends ConsumerStatefulWidget {
@@ -37,6 +34,7 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
   Timer? _lockoutTimer;
 
   static const _fast = Duration(milliseconds: 200);
+  bool _cleanupFailed = false;
 
   @override
   void initState() {
@@ -52,6 +50,20 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
   }
 
   Future<void> _initializeUnlockState() async {
+    try {
+      await SessionService.instance.readyToAuthenticate;
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _cleanupFailed = true;
+          _isLoading = false;
+          _errorMessage =
+              'Could not clear temporary vault content. Retry to unlock.';
+        });
+      }
+      return;
+    }
+    if (!mounted) return;
     final method = await _authService.getAuthMethod();
     final unlockState = await _authService.getUnlockSecurityState();
     final backupMethod = await _authService.getBackupAuthMethod();
@@ -70,7 +82,9 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
     _syncLockoutTimer();
 
     // Auto-trigger biometric if that's the method
-    if (method == 'biometric' && !unlockState.isLockedOut) {
+    if (method == 'biometric' &&
+        !unlockState.isLockedOut &&
+        !SessionService.instance.hasAuthenticated) {
       _handleBiometricAuth(showError: false);
     }
   }
@@ -98,36 +112,12 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
       await _decoyService.activateDecoyMode();
     } else {
       await _decoyService.deactivateDecoyMode();
-      // Capture the notifier while still mounted; the provider is app-scoped
-      // so the instance stays valid after this screen is replaced.
-      final vaultNotifier = ref.read(vaultNotifierProvider.notifier);
-      unawaited(_startPocketBase(vaultNotifier));
     }
     await _authService.resetUnlockAttempts();
 
     if (!mounted) return;
 
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (context) => const GalleryVaultScreen(),
-      ),
-    );
-  }
-
-  // PB holds only ciphertext, so it can't be used until the key exists — but
-  // starting it must never block or fail the unlock. Recovery UI is P5.
-  Future<void> _startPocketBase(VaultNotifier vaultNotifier) async {
-    try {
-      final settings = await VaultService.instance.getSettings();
-      if (!settings.pbEnabled) return;
-      await PocketBaseRuntime.instance.start();
-      await VaultService.instance.activatePocketBase();
-      // The gallery already rendered from the legacy index while PB was
-      // starting; reload now that PB data backs the cache.
-      await vaultNotifier.loadFiles();
-    } catch (e) {
-      debugPrint('[PB] activation failed, staying on legacy store: $e');
-    }
+    SessionService.instance.unlock();
   }
 
   Future<void> _handleFailedUnlock(String defaultMessage) async {
@@ -434,6 +424,23 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
   }
 
   Widget _buildAuthWidget() {
+    if (_cleanupFailed) {
+      return FilledButton(
+        onPressed: () async {
+          setState(() {
+            _isLoading = true;
+            _cleanupFailed = false;
+            _errorMessage = null;
+          });
+          final cleanup = SessionService.instance.retryCleanup();
+          try {
+            await cleanup;
+          } catch (_) {}
+          if (mounted) await _initializeUnlockState();
+        },
+        child: const Text('Retry cleanup'),
+      );
+    }
     if (_authMethod == 'biometric' && _showingBackupAuth) {
       return _wrapAutofill(_buildBackupAuthWidget());
     }

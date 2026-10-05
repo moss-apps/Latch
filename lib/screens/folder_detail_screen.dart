@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:open_filex/open_filex.dart';
+import '../services/auto_kill_service.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/album.dart';
 import '../models/vault_folder.dart';
@@ -757,7 +758,8 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
 
   Future<void> _openFileExternally(VaultedFile file) async {
     try {
-      await OpenFilex.open(file.vaultPath);
+      await AutoKillService.runSafe(() => OpenFilex.open(file.vaultPath),
+          waitForResume: true);
     } catch (e) {
       if (mounted) {
         ToastUtils.showError('Failed to open file');

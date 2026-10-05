@@ -4,7 +4,7 @@ import '../themes/app_colors.dart';
 import '../widgets/adaptive_logo.dart';
 import '../widgets/pin_input_widget.dart';
 import '../services/auth_service.dart';
-import 'gallery_vault_screen.dart';
+import '../services/session_service.dart';
 
 class PinSetupScreen extends StatefulWidget {
   const PinSetupScreen({super.key});
@@ -37,12 +37,7 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
         final success = await _authService.createPIN(pin);
 
         if (success && mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(
-              builder: (context) => const GalleryVaultScreen(),
-            ),
-            (route) => false,
-          );
+          SessionService.instance.unlock();
         } else if (mounted) {
           setState(() {
             _isLoading = false;
