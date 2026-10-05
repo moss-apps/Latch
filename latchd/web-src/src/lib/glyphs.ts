@@ -37,6 +37,7 @@ export const GLYPHS = {
   zoom_in: 0xe6fd,
   zoom_out: 0xe6fe,
   settings: 0xe57f,
+  menu: 0xe3dc,
 } as const
 
 export type GlyphName = keyof typeof GLYPHS

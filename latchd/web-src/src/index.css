@@ -248,4 +248,53 @@ html.viewer-open {
   html {
     @apply font-sans;
   }
+  button:focus-visible, summary:focus-visible, a:focus-visible {
+    outline: 2px solid var(--foreground);
+    outline-offset: 3px;
+  }
+  [hidden] {
+    display: none !important;
+  }
+}
+
+.nav-row {
+  @apply flex min-h-11 w-full items-center gap-3 rounded-xl px-4 text-sm text-text2 transition-colors hover:bg-surface;
+}
+.nav-row[aria-current="page"] {
+  @apply bg-brand/10 font-bold text-foreground;
+}
+.utility-page {
+  @apply mx-auto w-full px-5 py-6 sm:px-8 sm:py-8 lg:px-10;
+}
+.settings-section {
+  @apply mb-9;
+}
+.settings-row {
+  @apply grid grid-cols-1 items-start gap-3 border-b border-divider py-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:gap-8;
+}
+.settings-row:last-child {
+  border-bottom: 0;
+}
+.navigation-drawer[data-state="open"] {
+  animation: drawer-enter 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.connection-details summary {
+  @apply flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 py-3 text-sm font-bold text-text2 hover:text-foreground;
+}
+.connection-details summary::-webkit-details-marker {
+  display: none;
+}
+.connection-details[open] .disclosure-chevron {
+  transform: rotate(90deg);
+}
+@keyframes drawer-enter {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
