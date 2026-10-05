@@ -9,6 +9,9 @@ class VaultSettings {
   final bool secureDelete;
   final bool screenshotProtectionEnabled;
   final int autoKillDelaySeconds;
+  final bool autoKillEnabled;
+  final int inactivityLockSeconds;
+  final int backgroundLockDelaySeconds;
   final SortOption defaultSort;
   final bool showHiddenFiles;
   final bool autoBackup;
@@ -40,6 +43,9 @@ class VaultSettings {
     this.secureDelete = true,
     this.screenshotProtectionEnabled = false,
     this.autoKillDelaySeconds = 0,
+    this.autoKillEnabled = true,
+    this.inactivityLockSeconds = 300,
+    this.backgroundLockDelaySeconds = 0,
     this.defaultSort = SortOption.dateAddedNewest,
     this.showHiddenFiles = false,
     this.autoBackup = false,
@@ -67,6 +73,9 @@ class VaultSettings {
     bool? secureDelete,
     bool? screenshotProtectionEnabled,
     int? autoKillDelaySeconds,
+    bool? autoKillEnabled,
+    int? inactivityLockSeconds,
+    int? backgroundLockDelaySeconds,
     SortOption? defaultSort,
     bool? showHiddenFiles,
     bool? autoBackup,
@@ -94,6 +103,11 @@ class VaultSettings {
       screenshotProtectionEnabled:
           screenshotProtectionEnabled ?? this.screenshotProtectionEnabled,
       autoKillDelaySeconds: autoKillDelaySeconds ?? this.autoKillDelaySeconds,
+      autoKillEnabled: autoKillEnabled ?? this.autoKillEnabled,
+      inactivityLockSeconds:
+          inactivityLockSeconds ?? this.inactivityLockSeconds,
+      backgroundLockDelaySeconds:
+          backgroundLockDelaySeconds ?? this.backgroundLockDelaySeconds,
       defaultSort: defaultSort ?? this.defaultSort,
       showHiddenFiles: showHiddenFiles ?? this.showHiddenFiles,
       autoBackup: autoBackup ?? this.autoBackup,
@@ -129,6 +143,9 @@ class VaultSettings {
         'secureDelete': secureDelete,
         'screenshotProtectionEnabled': screenshotProtectionEnabled,
         'autoKillDelaySeconds': autoKillDelaySeconds,
+        'autoKillEnabled': autoKillEnabled,
+        'inactivityLockSeconds': inactivityLockSeconds,
+        'backgroundLockDelaySeconds': backgroundLockDelaySeconds,
         'defaultSort': defaultSort.name,
         'showHiddenFiles': showHiddenFiles,
         'autoBackup': autoBackup,
@@ -162,6 +179,10 @@ class VaultSettings {
       screenshotProtectionEnabled:
           json['screenshotProtectionEnabled'] as bool? ?? false,
       autoKillDelaySeconds: json['autoKillDelaySeconds'] as int? ?? 0,
+      autoKillEnabled: json['autoKillEnabled'] as bool? ?? true,
+      inactivityLockSeconds: json['inactivityLockSeconds'] as int? ?? 300,
+      backgroundLockDelaySeconds:
+          json['backgroundLockDelaySeconds'] as int? ?? 0,
       defaultSort: SortOption.values.firstWhere(
         (s) => s.name == (json['defaultSort'] as String? ?? 'dateAddedNewest'),
         orElse: () => SortOption.dateAddedNewest,
