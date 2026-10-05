@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
+import { Dialog as Drawer } from "radix-ui"
 import { Mi } from "@/components/Mi"
-import { SettingsDialog } from "@/components/SettingsDialog"
 import type { FileEntry } from "@/lib/api"
 import { VIEWS, viewFilter } from "@/lib/views"
 
@@ -8,74 +8,47 @@ interface SidebarProps {
   files: FileEntry[]
   activeView: string
   onViewChange: (view: string) => void
-  stats: { files: number; dir: string; lastBackup: string | null }
   unlocked: boolean
-  onPairAgain: () => void
+  onNavigate: (screen: "files" | "settings" | "pair") => void
+  navOpen: boolean
+  onNavClose: () => void
 }
 
-export function Sidebar({
-  files,
-  activeView,
-  onViewChange,
-  stats,
-  unlocked,
-  onPairAgain,
-}: SidebarProps) {
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const counts = useMemo(() => {
-    const c: Record<string, number> = { all: files.length }
-    for (const v of VIEWS) {
-      if (v.id !== "all") c[v.id] = files.filter((f) => viewFilter(v.id, f)).length
-    }
-    return c
-  }, [files])
+export function Sidebar({ files, activeView, onViewChange, unlocked, onNavigate, navOpen, onNavClose }: SidebarProps) {
+  const counts = useMemo(() => Object.fromEntries(VIEWS.map((v) => [v.id, files.filter((f) => viewFilter(v.id, f)).length])), [files])
 
-  return (
-    <aside className="flex shrink-0 flex-col border-b border-divider md:w-[264px] md:border-b-0 md:border-r">
-      <div className="min-h-0 flex-1 overflow-x-auto p-3 md:overflow-y-auto md:p-4">
-        <nav className="flex w-max min-w-full gap-1 md:w-full md:flex-col" aria-label="Views">
-          {VIEWS.map((v) => {
-            const active = v.id === activeView
-            const n = counts[v.id] ?? 0
-            return (
-              <button
-                key={v.id}
-                type="button"
-                onClick={() => onViewChange(v.id)}
-                className={`flex h-10 shrink-0 items-center gap-2.5 rounded-[10px] px-3 text-sm transition-colors md:w-full ${
-                  active
-                    ? "bg-brand/10 font-medium text-brand"
-                    : "text-text2 hover:bg-bg2 hover:text-text"
-                }`}
-                aria-current={active ? "page" : undefined}
-              >
-                <Mi n={v.icon} className="text-[18px]" />
-                <span className="flex-1 truncate text-left">{v.label}</span>
-                {n > 0 && <span className="text-xs text-text3">{n}</span>}
-              </button>
-            )
-          })}
-        </nav>
-      </div>
+  const navigation = <nav aria-label="Backup navigation" className="flex flex-col gap-1 p-3">
+    {VIEWS.map((v) => <button key={v.id} type="button" onClick={() => onViewChange(v.id)} aria-current={activeView === v.id ? "page" : undefined} className="nav-row">
+      <Mi n={v.icon} className="text-[20px]" />
+      <span className="flex-1 text-left">{v.label}</span>
+      {unlocked && counts[v.id] > 0 && <span className="text-xs tabular-nums opacity-80">{counts[v.id]}</span>}
+    </button>)}
+    <div className="mx-3 my-3 border-t border-divider" />
+    <button type="button" className="nav-row" aria-current={activeView === "pair" ? "page" : undefined} onClick={() => onNavigate("pair")}>
+      <Mi n="smartphone" className="text-[20px]" />Phone backup
+    </button>
+    <button type="button" className="nav-row" aria-current={activeView === "settings" ? "page" : undefined} onClick={() => onNavigate("settings")}>
+      <Mi n="settings" className="text-[20px]" />Settings
+    </button>
+  </nav>
 
-      <div className="shrink-0 border-t border-divider p-2 md:p-3">
-        <button
-          type="button"
-          onClick={() => setSettingsOpen(true)}
-          className="flex h-10 w-full items-center gap-2.5 rounded-[10px] px-3 text-sm text-text2 transition-colors hover:bg-bg2 hover:text-text"
-        >
-          <Mi n="settings" className="text-[18px]" />
-          <span>Settings</span>
-        </button>
-      </div>
-
-      <SettingsDialog
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        stats={stats}
-        unlocked={unlocked}
-        onPairAgain={onPairAgain}
-      />
+  return <>
+    <aside className="hidden w-[232px] shrink-0 flex-col overflow-y-auto md:flex">
+      {navigation}
+      <p className="mt-auto flex items-center gap-2 px-6 py-6 text-xs text-text2"><Mi n="lock" className="text-[16px]" />Stored on this computer</p>
     </aside>
-  )
+    <Drawer.Root open={navOpen} onOpenChange={(open) => { if (!open) onNavClose() }}>
+      <Drawer.Portal>
+        <Drawer.Overlay className="fixed inset-0 z-40 bg-black/40" />
+        <Drawer.Content id="mobile-navigation" aria-describedby={undefined} onCloseAutoFocus={(e) => { e.preventDefault(); document.getElementById("navigation-toggle")?.focus() }} className="navigation-drawer fixed inset-y-0 left-0 z-50 w-[min(300px,calc(100vw-40px))] overflow-y-auto bg-bg2">
+          <div className="flex h-16 items-center justify-between px-6">
+            <Drawer.Title className="text-lg font-bold">Latch</Drawer.Title>
+            <Drawer.Close aria-label="Close navigation" className="grid size-11 place-items-center rounded-lg text-text2 hover:bg-surface"><Mi n="close" className="text-[22px]" /></Drawer.Close>
+          </div>
+          {navigation}
+          <p className="px-6 py-6 text-xs text-text2">Stored on this computer</p>
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
+  </>
 }
