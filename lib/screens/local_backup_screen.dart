@@ -2,8 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
 import '../models/vaulted_file.dart';
 import '../services/backup_service.dart';
 import '../services/vault_service.dart';
@@ -37,6 +37,9 @@ class _LocalBackupScreenState extends ConsumerState<LocalBackupScreen> {
   bool _backupSelectedFilesOnly = false;
   List<VaultedFile> _selectedFiles = const [];
 
+  String? _lastError;
+  String? _lastDiagnosticId;
+
   List<VaultedFile> _allFiles = const [];
   bool _allFilesLoaded = false;
 
@@ -50,13 +53,6 @@ class _LocalBackupScreenState extends ConsumerState<LocalBackupScreen> {
           resolvePath: () async {
             final d = await PathUtils.getDownloadsDirectory();
             return d?.path;
-          },
-        ),
-        SaveLocation(
-          name: 'App documents',
-          resolvePath: () async {
-            final d = await getApplicationDocumentsDirectory();
-            return d.path;
           },
         ),
       ];
@@ -159,6 +155,8 @@ class _LocalBackupScreenState extends ConsumerState<LocalBackupScreen> {
       setState(() {
         _isBackingUp = false;
         _progress.value = null;
+        _lastError = result.success ? null : (result.error ?? 'Backup failed');
+        _lastDiagnosticId = result.success ? null : result.diagnosticId;
       });
     }
 
@@ -262,6 +260,37 @@ class _LocalBackupScreenState extends ConsumerState<LocalBackupScreen> {
             ),
           ),
           const SizedBox(height: 24),
+          if (_lastError != null) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.error.withValues(alpha: 0.18)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _lastError!,
+                    style: TextStyle(fontSize: 14, height: 1.4, color: context.textPrimary),
+                  ),
+                  if (_lastDiagnosticId != null)
+                    TextButton.icon(
+                      onPressed: () async {
+                        await Clipboard.setData(ClipboardData(
+                            text: 'Latch backup error $_lastDiagnosticId\n$_lastError'));
+                        if (mounted) ToastUtils.showInfo('Error reference copied');
+                      },
+                      icon: const Icon(Icons.copy_outlined, size: 18),
+                      label: const Text('Copy error reference'),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
           _sectionTitle('Files to include'),
           Wrap(
             spacing: 8,

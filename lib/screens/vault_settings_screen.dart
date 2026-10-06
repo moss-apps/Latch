@@ -429,6 +429,16 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
               Divider(color: context.borderColor),
               const SizedBox(height: 20),
               _buildSectionTitle(context, 'Storage'),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  'Before uninstalling, reinstalling, or clearing app data, keep a backup outside Latch. '
+                  'Desktop Backup can restore the vault with your original password or PIN. '
+                  'Local Backup saves readable files to a folder you choose. '
+                  'Server sync alone does not save the recovery key.',
+                  style: TextStyle(fontSize: 14, height: 1.5, color: context.textSecondary),
+                ),
+              ),
               ListTile(
                 leading:
                     Icon(Icons.backup_outlined, color: context.accentColor),
