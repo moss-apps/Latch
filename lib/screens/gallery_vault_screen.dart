@@ -11,9 +11,11 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/path_utils.dart';
 import '../models/encryption_algorithm.dart';
+import '../models/vault_file_filter.dart';
 import '../models/vaulted_file.dart';
 import '../models/album.dart';
 import '../providers/vault_providers.dart';
+import '../providers/smart_collection_providers.dart';
 import '../services/auto_kill_service.dart';
 import '../services/session_service.dart';
 import '../services/pb/pocketbase_runtime.dart';
@@ -30,6 +32,7 @@ import '../widgets/per_file_encryption_sheet.dart';
 import '../widgets/add_tags_sheet.dart';
 import 'albums_screen.dart';
 import 'favorites_screen.dart';
+import 'smart_collections_screen.dart';
 import 'tags_screen.dart';
 import 'folders_screen.dart';
 import 'vault_explorer_screen.dart';
@@ -48,6 +51,7 @@ import '../providers/password_providers.dart';
 import '../widgets/operation_progress_sheet.dart';
 import '../widgets/media_hold_action_sheet.dart';
 import '../widgets/media_multi_select_action_sheet.dart';
+import '../widgets/vault_filter_sheet.dart';
 import '../widgets/whats_new_bottom_sheet.dart';
 
 /// Categories shown in the gallery bottom bar.
@@ -184,11 +188,12 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
     final filesAsync = ref.watch(vaultNotifierProvider);
     final isSelectionMode = ref.watch(isSelectionModeProvider);
     final selectedFiles = ref.watch(selectedFilesProvider);
+    final activeFilter = ref.watch(fileFilterProvider);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       extendBody: true,
-      appBar: _buildAppBar(isSelectionMode, selectedFiles),
+      appBar: _buildAppBar(isSelectionMode, selectedFiles, activeFilter),
       body: Column(
         children: [
           // Permission warning banner for All Files Access
@@ -203,6 +208,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
             secondChild: const SizedBox(height: 0, width: double.infinity),
             sizeCurve: Curves.easeInOut,
           ),
+          if (activeFilter.hasActiveFilters) _buildActiveFilterBar(activeFilter),
           Expanded(
             child: PageView(
               controller: _pageController,
@@ -220,8 +226,8 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
     );
   }
 
-  PreferredSizeWidget _buildAppBar(
-      bool isSelectionMode, Set<String> selectedFiles) {
+  PreferredSizeWidget _buildAppBar(bool isSelectionMode, Set<String> selectedFiles,
+      VaultFileFilter activeFilter) {
     if (isSelectionMode) {
       final visibleFiles = _getVisibleFiles();
       final allSelected = visibleFiles.isNotEmpty &&
@@ -273,6 +279,40 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       elevation: 0,
       actions: [
+        IconButton(
+          tooltip: 'Filter',
+          onPressed: _openFilterSheet,
+          icon: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Icon(Icons.tune, color: context.textPrimary),
+              if (activeFilter.activeFilterCount > 0)
+                Positioned(
+                  right: -6,
+                  top: -6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 4, vertical: 1),
+                    constraints: const BoxConstraints(minWidth: 16),
+                    decoration: BoxDecoration(
+                      color: context.accentColor,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '${activeFilter.activeFilterCount}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: Colors.white,
+                        fontFamily: 'ProductSans',
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
         PopupMenuButton<String>(
           tooltip: 'More options',
           icon: Icon(Icons.more_vert, color: context.textPrimary),
@@ -406,8 +446,73 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
     );
   }
 
-  Widget _buildImportProgress() {
+  Future<void> _openFilterSheet() async {
+    final result = await VaultFilterSheet.show(
+      context,
+      initialFilter: ref.read(fileFilterProvider),
+      allowSaveSearch: true,
+    );
+    if (result == null || !mounted) return;
+    ref.read(fileFilterProvider.notifier).state = result.filter;
+    if (result.action == VaultFilterAction.saveSearch) {
+      await _saveFilterAsCollection(result.filter);
+    }
+  }
+
+  Future<void> _saveFilterAsCollection(VaultFileFilter filter) async {
+    final name = await showSmartCollectionNameDialog(context);
+    if (name == null || !mounted) return;
+    final created = await ref.read(smartCollectionsProvider.notifier).create(
+          name: name,
+          filter: filter,
+        );
+    if (!mounted) return;
+    if (created != null) {
+      ToastUtils.showSuccess('Saved "${created.name}"');
+    } else {
+      ToastUtils.showError('Could not save collection');
+    }
+  }
+
+  void _clearFilters() {
+    ref.read(fileFilterProvider.notifier).state = const VaultFileFilter();
+  }
+
+  Widget _buildActiveFilterBar(VaultFileFilter filter) {
     return Container(
+      padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
+      child: Row(
+        children: [
+          Icon(Icons.filter_alt, size: 16, color: context.accentColor),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              filter.activeFilterCount == 1
+                  ? '1 filter active'
+                  : '${filter.activeFilterCount} filters active',
+              style: TextStyle(
+                fontSize: 13,
+                color: context.textSecondary,
+                fontFamily: 'ProductSans',
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: _clearFilters,
+            child: Text(
+              'Clear',
+              style: TextStyle(
+                color: context.accentColor,
+                fontFamily: 'ProductSans',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImportProgress() {    return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: context.accentColor.withValues(alpha: 0.1),
       child: Row(
@@ -769,6 +874,12 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                   .toLowerCase()
                   .contains(searchQuery.toLowerCase()))
               .toList();
+        }
+
+        // Apply structured filter (tags, dates, size, ...)
+        final activeFilter = ref.watch(fileFilterProvider);
+        if (activeFilter.hasActiveFilters) {
+          files = files.where(activeFilter.matches).toList();
         }
 
         // Apply sorting
@@ -2064,6 +2175,22 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                       context,
                       MaterialPageRoute(
                           builder: (context) => const TagsScreen()),
+                    );
+                  },
+                ),
+                _buildCountedDrawerItem(
+                  icon: Icons.auto_awesome_outlined,
+                  title: 'Smart Collections',
+                  countOf: (ref) => ref
+                      .watch(smartCollectionsProvider)
+                      .maybeWhen(data: (l) => l.length, orElse: () => null),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) =>
+                              const SmartCollectionsScreen()),
                     );
                   },
                 ),
