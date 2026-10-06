@@ -43,6 +43,7 @@ class MainActivity: FlutterFragmentActivity() {
         }
     }
     private var isAutoKillEnabled = true
+    private var isStopped = false
     private var autoKillDelayMillis = 0L
     private var mediaRecorder: MediaRecorder? = null
     private var currentRecordingPath: String? = null
@@ -407,6 +408,8 @@ class MainActivity: FlutterFragmentActivity() {
         isAutoKillEnabled = enabled
         if (!enabled) {
             cancelAutoKill()
+        } else if (isStopped && !isChangingConfigurations) {
+            scheduleAutoKill()
         }
     }
 
@@ -483,11 +486,13 @@ class MainActivity: FlutterFragmentActivity() {
     
     override fun onStart() {
         super.onStart()
+        isStopped = false
         cancelAutoKill()
     }
 
     override fun onStop() {
         super.onStop()
+        isStopped = true
         if (isAutoKillEnabled && !isChangingConfigurations) {
             scheduleAutoKill()
         }

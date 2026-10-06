@@ -33,6 +33,8 @@ class ThumbnailService {
   Future<void> _genLock = Future.value();
 
   Future<Uint8List?> getThumbnailBytes(VaultedFile file) async {
+    final generation = _encryptionService.cacheGeneration;
+    if (!_encryptionService.isCurrentSession(generation)) return null;
     if (!file.isEncrypted) return null;
     final cached = _cache[file.id];
     if (cached != null) return cached;
@@ -42,10 +44,14 @@ class ThumbnailService {
     _inFlight[file.id] = fut;
     try {
       final bytes = await fut;
+      if (!_encryptionService.isCurrentSession(generation)) {
+        bytes?.fillRange(0, bytes.length, 0);
+        return null;
+      }
       if (bytes != null) _cacheThumbnail(file.id, bytes);
       return bytes;
     } finally {
-      _inFlight.remove(file.id);
+      if (identical(_inFlight[file.id], fut)) _inFlight.remove(file.id);
     }
   }
 
@@ -57,8 +63,12 @@ class ThumbnailService {
   }
 
   Future<Uint8List?> _loadOrRegenerateThumbnail(VaultedFile file) {
+    final generation = _encryptionService.cacheGeneration;
     final prev = _genLock;
-    final result = prev.then((_) => _loadOrRegenerateThumbnailLocked(file));
+    final result = prev.then((_) =>
+        _encryptionService.isCurrentSession(generation)
+            ? _loadOrRegenerateThumbnailLocked(file)
+            : null);
     _genLock = result.then((_) {}, onError: (_) {});
     return result;
   }
@@ -177,6 +187,9 @@ class ThumbnailService {
   }
 
   void clearCache() {
+    for (final bytes in _cache.values) {
+      bytes.fillRange(0, bytes.length, 0);
+    }
     _cache.clear();
     _inFlight.clear();
   }

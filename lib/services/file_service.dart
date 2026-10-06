@@ -853,22 +853,28 @@ class FileService {
     Function(int processed, int total)? onProgress,
     CancelToken? cancelToken,
   }) async {
+    final generation = _encryptionService.cacheGeneration;
+    if (!_encryptionService.isCurrentSession(generation)) return null;
     final vaultedFile = await getFileById(fileId, isDecoy: isDecoy);
     if (vaultedFile == null) return null;
 
     final file = File(vaultedFile.vaultPath);
     if (!await file.exists()) return null;
+    if (!_encryptionService.isCurrentSession(generation)) return null;
 
     if (vaultedFile.isEncrypted && vaultedFile.encryptionIv != null) {
       final tempDir = await _store.ensureVaultDirectory();
       final tempPath =
-          '${tempDir.path}/temp/${vaultedFile.id}_${vaultedFile.originalName}';
+          '${tempDir.path}/temp/${vaultedFile.id}_${generation}_${vaultedFile.originalName}';
 
       final format = _encryptionService.detectFileFormat(vaultedFile.vaultPath);
       final isLegacyCbc = (format == 0 || format == 3);
       final derivedKey = await deriveKeyForFile(vaultedFile, isDecoy: isDecoy);
 
-      if (cancelToken?.isCancelled == true) return null;
+      if (cancelToken?.isCancelled == true ||
+          !_encryptionService.isCurrentSession(generation)) {
+        return null;
+      }
 
       FileDecryptionResult result;
       if (isLegacyCbc) {
@@ -899,6 +905,11 @@ class FileService {
         );
       }
 
+      if (!_encryptionService.isCurrentSession(generation)) {
+        await _store.deleteFileIfExists(tempPath);
+        await _store.deleteFileIfExists('$tempPath.tmp');
+        return null;
+      }
       if (cancelToken?.isCancelled == true) return null;
 
       if (result.success && result.decryptedPath != null) {
@@ -912,6 +923,8 @@ class FileService {
 
   Future<Uint8List?> getDecryptedFileData(String fileId,
       {bool isDecoy = false}) async {
+    final generation = _encryptionService.cacheGeneration;
+    if (!_encryptionService.isCurrentSession(generation)) return null;
     final vaultedFile = await getFileById(fileId, isDecoy: isDecoy);
     if (vaultedFile == null) return null;
 
@@ -926,6 +939,10 @@ class FileService {
 
       if (result.success && result.data != null) {
         await updateFile(vaultedFile.markViewed());
+        if (!_encryptionService.isCurrentSession(generation)) {
+          result.data!.fillRange(0, result.data!.length, 0);
+          return null;
+        }
         return result.data;
       }
       return null;
@@ -935,7 +952,12 @@ class FileService {
     if (!await file.exists()) return null;
 
     await updateFile(vaultedFile.markViewed());
-    return await file.readAsBytes();
+    final bytes = await file.readAsBytes();
+    if (!_encryptionService.isCurrentSession(generation)) {
+      bytes.fillRange(0, bytes.length, 0);
+      return null;
+    }
+    return bytes;
   }
 
   Future<File?> exportFile(
@@ -1350,7 +1372,7 @@ class FileService {
     }
   }
 
-  Future<void> cleanupTemp() async {
+  Future<void> cleanupTemp({bool throwOnError = false}) async {
     try {
       final vaultDir = await _store.ensureVaultDirectory();
       final tempDir = Directory('${vaultDir.path}/temp');
@@ -1361,6 +1383,7 @@ class FileService {
       }
     } catch (e) {
       debugPrint('Error cleaning temp: $e');
+      if (throwOnError) rethrow;
     }
   }
 

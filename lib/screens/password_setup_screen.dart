@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../themes/app_colors.dart';
 import '../services/auth_service.dart';
 import '../widgets/adaptive_logo.dart';
-import 'gallery_vault_screen.dart';
+import '../services/session_service.dart';
 
 class PasswordSetupScreen extends StatefulWidget {
   const PasswordSetupScreen({super.key});
@@ -64,12 +64,7 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
       final success = await _authService.createPassword(password);
 
       if (success && mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(
-            builder: (context) => const GalleryVaultScreen(),
-          ),
-          (route) => false,
-        );
+        SessionService.instance.unlock();
       } else if (mounted) {
         setState(() {
           _isLoading = false;

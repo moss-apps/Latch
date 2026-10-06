@@ -15,6 +15,8 @@ import '../models/vaulted_file.dart';
 import '../models/album.dart';
 import '../providers/vault_providers.dart';
 import '../services/auto_kill_service.dart';
+import '../services/session_service.dart';
+import '../services/pb/pocketbase_runtime.dart';
 import '../services/file_import_service.dart';
 import '../services/whats_new_service.dart';
 import '../themes/app_colors.dart';
@@ -124,15 +126,38 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
   }
 
   Future<void> _initializeVault() async {
-    await ref.read(vaultServiceProvider).initialize();
+    try {
+      await ref.read(vaultServiceProvider).initialize();
+    } catch (e) {
+      if (mounted) debugPrint('[Vault] initialization failed: $e');
+      return;
+    }
+    if (!mounted) return;
     ref.read(isDecoyModeProvider.notifier).state =
         ref.read(decoyServiceProvider).isDecoyModeActive;
     ref.read(vaultNotifierProvider.notifier).loadFiles();
+    if (!ref.read(isDecoyModeProvider)) unawaited(_startPocketBase());
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       WhatsNewService.instance.startRemoteRefresh();
       _maybeShowWhatsNew();
     });
+  }
+
+  Future<void> _startPocketBase() async {
+    try {
+      final vault = ref.read(vaultServiceProvider);
+      final settings = await vault.getSettings();
+      if (!settings.pbEnabled || !mounted) return;
+      await PocketBaseRuntime.instance.start();
+      if (!mounted) return;
+      await vault.activatePocketBase();
+      if (!mounted) return;
+      await ref.read(vaultNotifierProvider.notifier).loadFiles();
+    } catch (e) {
+      debugPrint('[PB] activation failed, staying on legacy store: $e');
+    }
   }
 
   Future<void> _maybeShowWhatsNew() async {
@@ -1737,7 +1762,8 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
 
       if (decryptedFile != null && await decryptedFile.exists()) {
         final result = await AutoKillService.runSafe(
-            () => OpenFilex.open(decryptedFile.path));
+            () => OpenFilex.open(decryptedFile.path),
+            waitForResume: true);
         if (result.type != ResultType.done) {
           ToastUtils.showError('No app found to open this file type');
         }
@@ -2042,6 +2068,11 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                   },
                 ),
                 _buildDrawerSection('Security'),
+                _buildDrawerItem(
+                  icon: Icons.lock_outline,
+                  title: 'Lock now',
+                  onTap: () => SessionService.instance.lock(),
+                ),
                 _buildDrawerItem(
                   icon: Icons.security,
                   title: 'Security Settings',

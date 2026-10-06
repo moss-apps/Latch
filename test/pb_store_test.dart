@@ -15,6 +15,7 @@ class _FakePb {
   final token = 'f' * 64;
   final db = <String, Map<String, Map<String, dynamic>>>{};
   HttpServer? _server;
+  void Function()? beforeRead;
 
   Future<int> start() async {
     _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -60,6 +61,7 @@ class _FakePb {
             _json(res, 204, {});
           }
         case 'GET':
+          beforeRead?.call();
           if (id != null) {
             final row = rows[id];
             row == null
@@ -175,5 +177,33 @@ void main() {
 
     expect((await store.loadAlbums()).map((a) => a.id), contains('favorites'));
     expect(pb.db['albums']!.length, 2);
+  });
+
+  test(
+      'invalidated session rejects late reads and never seals with evicted keys',
+      () async {
+    final pb = _FakePb();
+    final port = await pb.start();
+    addTearDown(pb.stop);
+    final sessionKey = Uint8List.fromList(key);
+    var valid = true;
+    final store = PocketBaseStore(
+      client: PbClient(port: port, token: pb.token),
+      masterKey: sessionKey,
+      isSessionValid: () => valid,
+    );
+    final file = _file('keep.jpg');
+    store.cachedFiles = [file];
+    await store.saveFileIndex();
+    final persisted = jsonEncode(pb.db);
+    pb.beforeRead = () {
+      valid = false;
+      sessionKey.fillRange(0, sessionKey.length, 0);
+    };
+    await expectLater(store.loadFileIndex(forceReload: true), throwsStateError);
+    expect(store.cachedFiles, [file]);
+    await expectLater(store.fileDao.put(_file('late.jpg')), throwsStateError);
+    await expectLater(store.saveFileIndex(), throwsStateError);
+    expect(jsonEncode(pb.db), persisted);
   });
 }

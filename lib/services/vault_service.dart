@@ -85,11 +85,16 @@ class VaultService {
   /// No-op when the sidecar isn't running. Call only after the vault is
   /// unlocked (the DAOs need the master key).
   Future<void> activatePocketBase() async {
+    final generation = _encryptionService.cacheGeneration;
     final client = PocketBaseRuntime.instance.client;
     if (client == null) return;
     final masterKey = await _encryptionService.getMasterKey();
-    final pb = PocketBaseStore(client: client, masterKey: masterKey);
+    final pb = PocketBaseStore(
+        client: client,
+        masterKey: masterKey,
+        isSessionValid: () => _encryptionService.isCurrentSession(generation));
     await migrateLegacyIndex(pb);
+    if (!_encryptionService.isCurrentSession(generation)) return;
     _store.pbStore = pb;
     // Resurrect legacy-only entries (written while the sidecar was down in
     // an earlier session) before PB becomes the load source — otherwise
@@ -264,7 +269,13 @@ class VaultService {
         fileFilter: fileFilter,
       );
 
-  Future<void> cleanupTemp() => _files.cleanupTemp();
+  Future<void> cleanupTemp({bool throwOnError = false}) =>
+      _files.cleanupTemp(throwOnError: throwOnError);
+
+  void detachSessionStore() {
+    _store.pbStore = null;
+    clearThumbnailCache();
+  }
 
   Future<void> registerNoteEntry({
     required String noteId,

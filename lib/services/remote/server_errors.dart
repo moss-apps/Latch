@@ -45,7 +45,9 @@ String describeServerError(Object e) {
     return 'Network error — wrong address, firewall, or device not on the '
         'same LAN as the server.';
   }
-  if (e is FormatException || s.contains('invalid ciphertext')) {
+  if (e is FormatException ||
+      s.contains('invalid ciphertext') ||
+      s.contains('invalidciphertextexception')) {
     return "The data on the server couldn't be read — it may be corrupt or "
         'belong to a different vault.';
   }

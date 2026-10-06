@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-05T19:26:01Z",
+  "title": "Design System: Latch Desktop Backup",
+  "extensions": {
+    "colorMeta": {
+      "latch-accent": { "role": "primary", "displayName": "Ocean Blue (default; saved choice overrides)" },
+      "latch-accent-dark": { "role": "primary", "displayName": "Ocean Blue, dark theme" },
+      "bg": { "role": "neutral", "displayName": "Page ground" },
+      "bg-dark": { "role": "neutral", "displayName": "Dark page ground" },
+      "bg2": { "role": "neutral", "displayName": "Shell and secondary ground" },
+      "bg2-dark": { "role": "neutral", "displayName": "Dark shell and secondary ground" },
+      "text": { "role": "neutral", "displayName": "Foreground" },
+      "text2": { "role": "neutral", "displayName": "Explanatory text" },
+      "text3": { "role": "neutral", "displayName": "Metadata" },
+      "ok-text": { "displayName": "Readable success text" },
+      "err-text": { "displayName": "Readable error text" },
+      "favorite": { "displayName": "Favorite star" }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Utility task title", "purpose": "Settings and Phone backup titles." },
+      "title": { "displayName": "Browser context title", "purpose": "Current file category or Search results." },
+      "section-title": { "displayName": "Settings group", "purpose": "Backup & export, Appearance, and Legal headings." },
+      "body": { "displayName": "Compact body", "purpose": "Explanations and navigation; long explanations use relaxed line height." },
+      "label": { "displayName": "Setting label", "purpose": "Bold row labels and selected navigation text." },
+      "table-label": { "displayName": "Table header", "purpose": "Uppercase sortable column labels, not ordinary form labels." },
+      "code": { "displayName": "Credentials and preview code", "purpose": "Selectable wrapping connection data and text previews." }
+    },
+    "shadows": [
+      { "name": "control-focus-ring", "value": "0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent)", "purpose": "Accent focus ring on shared buttons, inputs, and switches; not ambient elevation." }
+    ],
+    "motion": [
+      { "name": "control-transition", "value": "150ms cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Tailwind default transition timing for shared control state changes." },
+      { "name": "drawer-enter", "value": "220ms cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Clip-path inset(0 100% 0 0) to inset(0) when the mobile drawer opens." },
+      { "name": "reduced-motion", "value": "0.01ms", "purpose": "Global reduced-motion animation and transition duration; animations run once." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary utility action",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Filled accent action at the 44px utility-page size, as used for USB Allow once.",
+      "html": "<button type=\"button\" class=\"ds-primary\">Allow once</button>",
+      "css": ".ds-primary{display:inline-flex;align-items:center;justify-content:center;height:44px;padding:0 16px;border:1px solid transparent;border-radius:var(--radius);background:var(--primary);color:var(--primary-foreground);font-family:var(--font-sans);font-size:14px;font-weight:500;line-height:20px;white-space:nowrap;cursor:pointer;transition:all 150ms cubic-bezier(.4,0,.2,1)}.ds-primary:hover{background:color-mix(in oklab,var(--primary) 80%,transparent)}.ds-primary:focus-visible{border-color:var(--ring);box-shadow:0 0 0 3px color-mix(in oklab,var(--ring) 50%,transparent);outline:2px solid var(--foreground);outline-offset:3px}.ds-primary:active{transform:translateY(1px)}.ds-primary:disabled{pointer-events:none;opacity:.5}@media(prefers-reduced-motion:reduce){.ds-primary{transition-duration:.01ms}}"
+    },
+    {
+      "name": "Outline utility action",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Neutral verification/export action; the dark-theme branch follows the shared Button's input-role surface.",
+      "html": "<button type=\"button\" class=\"ds-outline\">Verify backup</button>",
+      "css": ".ds-outline{display:inline-flex;align-items:center;justify-content:center;height:44px;padding:0 16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--background);color:var(--foreground);font-family:var(--font-sans);font-size:14px;font-weight:500;line-height:20px;white-space:nowrap;cursor:pointer;transition:all 150ms cubic-bezier(.4,0,.2,1)}.ds-outline:hover,.ds-outline[aria-expanded=true]{background:var(--muted);color:var(--foreground)}:host-context(.dark) .ds-outline{border-color:var(--input);background:color-mix(in oklab,var(--input) 30%,transparent)}:host-context(.dark) .ds-outline:hover{background:color-mix(in oklab,var(--input) 50%,transparent)}.ds-outline:focus-visible{border-color:var(--ring);box-shadow:0 0 0 3px color-mix(in oklab,var(--ring) 50%,transparent);outline:2px solid var(--foreground);outline-offset:3px}.ds-outline:active{transform:translateY(1px)}.ds-outline:disabled{pointer-events:none;opacity:.5}@media(prefers-reduced-motion:reduce){.ds-outline{transition-duration:.01ms}}"
+    },
+    {
+      "name": "Ghost utility action",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Low-emphasis New code action with neutral hover, visible keyboard focus, and a subtle press state.",
+      "html": "<button type=\"button\" class=\"ds-ghost\">New code</button>",
+      "css": ".ds-ghost{display:inline-flex;align-items:center;justify-content:center;height:44px;padding:0 12px;border:1px solid transparent;border-radius:var(--radius);background:transparent;color:var(--foreground);font-family:var(--font-sans);font-size:14px;font-weight:500;line-height:20px;white-space:nowrap;cursor:pointer;transition:all 150ms cubic-bezier(.4,0,.2,1)}.ds-ghost:hover,.ds-ghost[aria-expanded=true]{background:var(--muted);color:var(--foreground)}:host-context(.dark) .ds-ghost:hover{background:color-mix(in oklab,var(--muted) 50%,transparent)}.ds-ghost:focus-visible{border-color:var(--ring);box-shadow:0 0 0 3px color-mix(in oklab,var(--ring) 50%,transparent);outline:2px solid var(--foreground);outline-offset:3px}.ds-ghost:active{transform:translateY(1px)}.ds-ghost:disabled{pointer-events:none;opacity:.5}@media(prefers-reduced-motion:reduce){.ds-ghost{transition-duration:.01ms}}"
+    },
+    {
+      "name": "Export folder field",
+      "kind": "input",
+      "refersTo": "input-export",
+      "description": "Labeled export input with explicit foreground value text; destination explanation wraps beneath it.",
+      "html": "<div class=\"ds-export\"><label class=\"ds-export-label\" for=\"ds-export-folder\">Export folder name</label><input class=\"ds-export-input\" id=\"ds-export-folder\" value=\"latch-export\" spellcheck=\"false\" autocomplete=\"off\"><p class=\"ds-export-note\">Destination: <code>~/latchd-exports/latch-export</code></p></div>",
+      "css": ".ds-export{min-width:0;font-family:var(--font-sans)}.ds-export-label{display:block;margin-bottom:8px;font-size:14px;line-height:20px;color:var(--text2)}.ds-export-input{box-sizing:border-box;display:block;height:44px;width:100%;min-width:0;padding:4px 10px;border:1px solid var(--input);border-radius:var(--radius);background:transparent;color:var(--foreground);font-family:var(--font-sans);font-size:16px;outline:none;transition:color 150ms cubic-bezier(.4,0,.2,1),border-color 150ms cubic-bezier(.4,0,.2,1),background-color 150ms cubic-bezier(.4,0,.2,1)}:host-context(.dark) .ds-export-input{background:color-mix(in oklab,var(--input) 30%,transparent)}.ds-export-input::placeholder{color:var(--muted-foreground)}.ds-export-input:focus-visible{border-color:var(--ring);box-shadow:0 0 0 3px color-mix(in oklab,var(--ring) 50%,transparent)}.ds-export-input:disabled{pointer-events:none;cursor:not-allowed;background:color-mix(in oklab,var(--input) 50%,transparent);opacity:.5}:host-context(.dark) .ds-export-input:disabled{background:color-mix(in oklab,var(--input) 80%,transparent)}.ds-export-input[aria-invalid=true]{border-color:var(--destructive);box-shadow:0 0 0 3px color-mix(in oklab,var(--destructive) 20%,transparent)}.ds-export-note{margin:8px 0 0;font-size:12px;line-height:1.625;color:var(--text2);word-break:break-all}.ds-export-note code{font-family:var(--font-mono)}@media(min-width:768px){.ds-export-input{font-size:14px}}@media(prefers-reduced-motion:reduce){.ds-export-input{transition-duration:.01ms}}"
+    },
+    {
+      "name": "Destination navigation",
+      "kind": "nav",
+      "refersTo": "navigation-row",
+      "description": "Current file destination with a Material folder outline converted directly from the shipped font; count is shown for an unlocked positive count.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Backup navigation\"><button type=\"button\" class=\"ds-nav-row\" aria-current=\"page\"><svg class=\"ds-nav-icon\" viewBox=\"0 0 512 512\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"currentColor\" transform=\"translate(0 512) scale(1 -1)\" d=\"M213 427H85C62 427 43 407 43 384V128C43 105 62 85 85 85H427C450 85 469 105 469 128V341C469 365 450 384 427 384H256L213 427Z\"/></svg><span class=\"ds-nav-label\">All files</span><span class=\"ds-nav-count\">24</span></button></nav>",
+      "css": ".ds-nav{padding:12px;background:var(--bg2);font-family:var(--font-sans)}.ds-nav-row{display:flex;align-items:center;gap:12px;min-height:44px;width:100%;padding:0 16px;border:0;border-radius:var(--radius);background:transparent;color:var(--text2);font-family:var(--font-sans);font-size:14px;line-height:20px;cursor:pointer;transition:background-color 150ms cubic-bezier(.4,0,.2,1),color 150ms cubic-bezier(.4,0,.2,1)}.ds-nav-row:hover{background:var(--surface)}.ds-nav-row[aria-current=page]{background:color-mix(in oklab,var(--latch-accent) 10%,transparent);color:var(--foreground);font-weight:700}.ds-nav-row:focus-visible{outline:2px solid var(--foreground);outline-offset:3px}.ds-nav-icon{width:20px;height:20px;flex-shrink:0}.ds-nav-label{flex:1;text-align:left}.ds-nav-count{font-size:12px;line-height:16px;font-variant-numeric:tabular-nums;opacity:.8}@media(prefers-reduced-motion:reduce){.ds-nav-row{transition-duration:.01ms}}"
+    },
+    {
+      "name": "Settings switch touch area",
+      "kind": "custom",
+      "refersTo": "settings-switch",
+      "description": "Native checkbox preview of the checked/unchecked switch appearance, preserving the 32×18.4px visible track, 56×46.4px hit area, and 48px wrapper without a Radix runtime.",
+      "html": "<div class=\"ds-switch-wrap\"><label class=\"ds-switch-target\"><input class=\"ds-switch-input\" type=\"checkbox\" role=\"switch\" aria-label=\"Dark mode\" checked><span class=\"ds-switch-track\" aria-hidden=\"true\"><span class=\"ds-switch-thumb\"></span></span></label></div>",
+      "css": ".ds-switch-wrap{display:flex;align-items:center;min-height:48px;padding:0 12px}.ds-switch-target{position:relative;display:inline-flex;align-items:center;width:32px;height:18.4px;cursor:pointer}.ds-switch-input{position:absolute;left:-12px;top:-14px;width:56px;height:46.4px;margin:0;opacity:0;cursor:pointer}.ds-switch-track{display:inline-flex;align-items:center;width:30px;height:16.4px;border:1px solid transparent;border-radius:9999px;background:var(--input);pointer-events:none;transition:all 150ms cubic-bezier(.4,0,.2,1)}.ds-switch-thumb{display:block;flex-shrink:0;width:16px;height:16px;border-radius:9999px;background:var(--background);transform:translateX(0);transition:transform 150ms cubic-bezier(.4,0,.2,1)}.ds-switch-input:checked+.ds-switch-track{background:var(--primary)}.ds-switch-input:checked+.ds-switch-track .ds-switch-thumb{transform:translateX(14px)}.ds-switch-input:focus-visible+.ds-switch-track{border-color:var(--ring);box-shadow:0 0 0 3px color-mix(in oklab,var(--ring) 50%,transparent);outline:2px solid var(--foreground);outline-offset:3px}.ds-switch-input:disabled{cursor:not-allowed}.ds-switch-input:disabled+.ds-switch-track{opacity:.5}:host-context(.dark) .ds-switch-input:not(:checked)+.ds-switch-track{background:color-mix(in oklab,var(--input) 80%,transparent)}:host-context(.dark) .ds-switch-input:not(:checked)+.ds-switch-track .ds-switch-thumb{background:var(--foreground)}:host-context(.dark) .ds-switch-input:checked+.ds-switch-track .ds-switch-thumb{background:var(--primary-foreground)}@media(min-width:640px){.ds-switch-wrap{justify-content:flex-end}}@media(prefers-reduced-motion:reduce){.ds-switch-track,.ds-switch-thumb{transition-duration:.01ms}}"
+    },
+    {
+      "name": "Selected accent radio",
+      "kind": "chip",
+      "refersTo": "accent-choice",
+      "description": "Representative selected saved-accent swatch: 28px circle inside a 44px native radio target with the source-font check glyph.",
+      "html": "<fieldset class=\"ds-accent\"><legend class=\"ds-accent-name\">Ocean Blue</legend><label class=\"ds-accent-target\" title=\"Ocean Blue\"><input class=\"ds-accent-radio\" type=\"radio\" name=\"ds-accent-choice\" value=\"blue\" aria-label=\"Ocean Blue\" checked><span class=\"ds-accent-swatch\"><span class=\"ds-accent-check\"><svg viewBox=\"0 0 512 512\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"currentColor\" transform=\"translate(0 512) scale(1 -1)\" d=\"M256 469C138 469 43 374 43 256C43 138 138 43 256 43C374 43 469 138 469 256C469 374 374 469 256 469ZM213 149 107 256 137 286 213 210 375 372 405 341 213 149Z\"/></svg></span></span></label></fieldset>",
+      "css": ".ds-accent{margin:0;padding:0;border:0;font-family:var(--font-sans)}.ds-accent-name{margin-bottom:8px;color:var(--text2);font-size:14px;line-height:20px}.ds-accent-target{position:relative;display:grid;place-items:center;width:44px;height:44px;cursor:pointer}.ds-accent-radio{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}.ds-accent-swatch{display:grid;place-items:center;width:26px;height:26px;border:1px solid color-mix(in oklab,var(--foreground) 20%,transparent);border-radius:9999px;background:var(--latch-accent)}.ds-accent-check{display:none;place-items:center;width:16px;height:16px;border-radius:9999px;background:white;color:#121212}.ds-accent-check svg{width:16px;height:16px}.ds-accent-radio:checked+.ds-accent-swatch .ds-accent-check{display:grid}.ds-accent-radio:focus-visible+.ds-accent-swatch{outline:2px solid var(--foreground);outline-offset:4px}"
+    },
+    {
+      "name": "Concrete utility panel",
+      "kind": "card",
+      "refersTo": "utility-panel",
+      "description": "Neutral USB approval request panel; device name is illustrative preview content, and actions demonstrate grouped controls rather than routine setting cards.",
+      "html": "<section class=\"ds-panel\" role=\"alert\"><h3 class=\"ds-panel-title\">Your phone wants to connect over USB</h3><p class=\"ds-panel-copy\">Allow this if you just tapped <strong>Connect via USB</strong> on your phone.</p><div class=\"ds-panel-actions\"><button class=\"ds-panel-allow\" type=\"button\">Allow once</button><button class=\"ds-panel-deny\" type=\"button\">Deny</button></div></section>",
+      "css": ".ds-panel{padding:16px;border-radius:var(--radius);background:var(--bg2);color:var(--foreground);font-family:var(--font-sans)}.ds-panel-title{margin:0;font-size:14px;font-weight:700;line-height:20px}.ds-panel-copy{margin:8px 0 0;color:var(--text2);font-size:14px;line-height:1.625}.ds-panel-actions{display:flex;gap:8px;margin-top:12px}.ds-panel-allow,.ds-panel-deny{display:inline-flex;align-items:center;justify-content:center;height:44px;padding:0 16px;border:1px solid transparent;border-radius:var(--radius);font-family:var(--font-sans);font-size:14px;font-weight:500;line-height:20px;cursor:pointer;transition:all 150ms cubic-bezier(.4,0,.2,1)}.ds-panel-allow{background:var(--primary);color:var(--primary-foreground)}.ds-panel-allow:hover{background:color-mix(in oklab,var(--primary) 80%,transparent)}.ds-panel-deny{border-color:var(--border);background:var(--background);color:var(--foreground)}.ds-panel-deny:hover{background:var(--muted)}:host-context(.dark) .ds-panel-deny{border-color:var(--input);background:color-mix(in oklab,var(--input) 30%,transparent)}:host-context(.dark) .ds-panel-deny:hover{background:color-mix(in oklab,var(--input) 50%,transparent)}.ds-panel-allow:focus-visible,.ds-panel-deny:focus-visible{border-color:var(--ring);box-shadow:0 0 0 3px color-mix(in oklab,var(--ring) 50%,transparent);outline:2px solid var(--foreground);outline-offset:3px}.ds-panel-allow:active,.ds-panel-deny:active{transform:translateY(1px)}.ds-panel-allow:disabled,.ds-panel-deny:disabled{pointer-events:none;opacity:.5}@media(prefers-reduced-motion:reduce){.ds-panel-allow,.ds-panel-deny{transition-duration:.01ms}}"
+    },
+    {
+      "name": "Pairing mode tabs",
+      "kind": "nav",
+      "description": "Visual selected/unselected tab states with native button focus; session switching and roving keyboard behavior remain application responsibilities.",
+      "html": "<div class=\"ds-tabs\" role=\"tablist\" aria-label=\"Session mode\"><button class=\"ds-tab\" type=\"button\" role=\"tab\" aria-selected=\"true\">Receive backup</button><button class=\"ds-tab\" type=\"button\" role=\"tab\" aria-selected=\"false\" tabindex=\"-1\">Restore to phone</button></div>",
+      "css": ".ds-tabs{display:flex;border-bottom:1px solid var(--divider);font-family:var(--font-sans)}.ds-tab{position:relative;flex:1;min-height:48px;padding:0 8px;border:0;background:transparent;color:var(--text2);font-family:var(--font-sans);font-size:14px;line-height:20px;cursor:pointer;transition:background-color 150ms cubic-bezier(.4,0,.2,1),color 150ms cubic-bezier(.4,0,.2,1)}.ds-tab:hover{background:var(--bg2)}.ds-tab[aria-selected=true]{color:var(--foreground);font-weight:700}.ds-tab[aria-selected=true]:hover{background:transparent}.ds-tab[aria-selected=true]::after{position:absolute;content:'';left:12px;right:12px;bottom:0;height:2px;background:var(--foreground)}.ds-tab:focus-visible{outline:2px solid var(--foreground);outline-offset:3px}.ds-tab:disabled{opacity:.5}@media(min-width:640px){.ds-tab{flex:none;padding:0 20px}}@media(prefers-reduced-motion:reduce){.ds-tab{transition-duration:.01ms}}"
+    },
+    {
+      "name": "Manual connection disclosure",
+      "kind": "custom",
+      "description": "Native expandable connection details with the shipped chevron glyph converted to SVG; specimen address is illustrative and no live session is created.",
+      "html": "<details class=\"ds-details\"><summary class=\"ds-summary\"><span>Connect manually</span><svg class=\"ds-chevron\" viewBox=\"0 0 512 512\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"currentColor\" transform=\"translate(0 512) scale(1 -1)\" d=\"M213 384 183 354 281 256 183 158 213 128 341 256 213 384Z\"/></svg></summary><div class=\"ds-details-body\"><p class=\"ds-details-copy\">Enter these in Desktop Backup on your phone. Keep the pairing code private.</p><h3 class=\"ds-details-label\">Address</h3><p class=\"ds-details-code\">192.168.1.20:7800</p></div></details>",
+      "css": ".ds-details{border-top:1px solid var(--divider);font-family:var(--font-sans);color:var(--foreground)}.ds-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:24px;padding:12px 0;list-style:none;cursor:pointer;color:var(--text2);font-size:14px;font-weight:700;line-height:20px}.ds-summary::-webkit-details-marker{display:none}.ds-summary:hover{color:var(--foreground)}.ds-summary:focus-visible{outline:2px solid var(--foreground);outline-offset:3px}.ds-chevron{width:20px;height:20px;flex-shrink:0}.ds-details[open] .ds-chevron{transform:rotate(90deg)}.ds-details-body{padding-bottom:20px;font-size:14px}.ds-details-copy{margin:0 0 16px;line-height:1.625;color:var(--text2)}.ds-details-label{margin:0 0 8px;font-size:14px;font-weight:700;line-height:20px}.ds-details-code{margin:0 0 8px;padding:12px;border-radius:calc(var(--radius)*1);background:var(--bg2);color:var(--foreground);font-family:var(--font-mono);font-size:13px;word-break:break-all;user-select:all}"
+    }
+  ],
+  "narrative": {
+    "northStar": "A coherent, calm local file-management app",
+    "overview": "Latch uses familiar Google Drive navigation and Proton's restrained utility-panel treatment with Latch's own logo, palette, ProductSans, and Material icons. The world is flat, real application UI: files, settings, and phone backup are useful destinations, with task titles and controls in the first viewport rather than an oversized brand presentation. There are no physical decorative materials in this approved direction.\n\nThe redesign boundary is the shared shell, full-page settings, phone pairing, and responsive browser layout. The incumbent table/grid browser and viewer remain the functional reference. Settings uses grouped rows; pairing places a scannable QR beside phone instructions with manual and USB disclosures. These are expressions of the confirmed direction, not composition requirements for every future screen.",
+    "keyCharacteristics": [
+      "Familiar destination navigation with retained file-view state.",
+      "Flat tonal surfaces, hairline dividers, and restrained utility panels.",
+      "Latch identity with saved light/dark and accent preferences.",
+      "Readable task titles, controls, credentials, and recovery states."
+    ],
+    "rules": [
+      { "name": "The Live Latch Palette Rule", "body": "Use the existing CSS roles and saved accent choices; derive identity values from Latch's source tokens rather than estimating replacement colors.", "section": "colors" },
+      { "name": "The Task Title Rule", "body": "Lead utility pages with their task title and useful controls; keep the Latch mark at shared-shell scale.", "section": "typography" },
+      { "name": "The Destination Continuity Rule", "body": "Moving between files, settings, and phone backup preserves file-view selection and mounted operation state; navigation closes the viewer, and returning to pairing adopts the current session.", "section": "layout" },
+      { "name": "The Flat Utility Rule", "body": "Use tonal grounds and row dividers for routine settings; reserve a separate panel for a concrete grouped interaction such as USB approval.", "section": "elevation" }
+    ],
+    "dos": [
+      "**Do** retain Latch's logo, ProductSans, codepoint Material icons, and saved light/dark and accent choices.",
+      "**Do** use live CSS variables for themed controls, including explicit foreground text in the export input.",
+      "**Do** keep files, settings, and phone backup as shared-shell destinations with retained file-view and operation state.",
+      "**Do** stack settings controls and pairing content on narrow screens, use the mobile drawer, and allow full credentials to wrap.",
+      "**Do** preserve contain-fit file imagery, sorting, per-view layouts, incremental rendering, and viewer behavior.",
+      "**Do** retain visible keyboard focus, the enlarged settings-switch touch area, and textual status/recovery alongside indicators."
+    ],
+    "donts": [
+      "**Don't** replace the confirmed Latch assets or estimate new brand colors.",
+      "**Don't** introduce physical decorative materials or oversized logo presentations into the approved utility surfaces.",
+      "**Don't** move settings controls back into the navigation sidebar or make Settings a dialog.",
+      "**Don't** carry forward the obsolete horizontal mobile navigation, QR-right pairing layout, or click-to-copy credential-row account.",
+      "**Don't** crop file previews or truncate pairing credentials to fit the redesigned shell."
+    ]
+  }
+}

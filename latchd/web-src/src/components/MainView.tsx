@@ -3,6 +3,8 @@ import type { FileEntry, StatusInfo } from "@/lib/api"
 import { getJSON } from "@/lib/api"
 import { BrowserPane } from "@/components/BrowserPane"
 import { Sidebar } from "@/components/Sidebar"
+import { SettingsView } from "@/components/SettingsView"
+import { PairingView } from "@/components/PairingView"
 import { DEFAULT_UNLOCK_SUB, UnlockPane } from "@/components/UnlockPane"
 import { Viewer } from "@/components/Viewer"
 import {
@@ -21,7 +23,14 @@ interface MainViewProps {
   unlockNote: string
   searchTerm: string
   onUnlock: () => void
-  onPairAgain: () => void
+  screen: "files" | "settings" | "pair"
+  onNavigate: (screen: "files" | "settings" | "pair") => void
+  hasLocal: boolean
+  revision: number
+  pairOrigin: "files" | "settings"
+  onEnterMain: (unlocked: boolean, note?: string) => void
+  navOpen: boolean
+  onNavClose: () => void
 }
 
 export function MainView({
@@ -29,7 +38,7 @@ export function MainView({
   unlockNote,
   searchTerm,
   onUnlock,
-  onPairAgain,
+  screen, onNavigate, hasLocal, revision, pairOrigin, onEnterMain, navOpen, onNavClose,
 }: MainViewProps) {
   const [files, setFiles] = useState<FileEntry[]>([])
   const [stats, setStats] = useState<{ files: number; dir: string; lastBackup: string | null }>(
@@ -45,29 +54,37 @@ export function MainView({
     }
   })
   const [viewerIndex, setViewerIndex] = useState<number | null>(null)
+  const [pairVisited, setPairVisited] = useState(screen === "pair")
+
+  if (screen === "pair" && !pairVisited) setPairVisited(true)
+
+  function navigate(next: "files" | "settings" | "pair") {
+    setViewerIndex(null)
+    onNavigate(next)
+  }
 
   const search = useDeferredValue(searchTerm)
   const searching = search.trim().length > 0
 
   useEffect(() => {
+    let cancelled = false
+    getJSON<StatusInfo>("/api/status")
+      .then((d) => {
+        if (!cancelled) setStats({ files: d.files ?? 0, dir: d.dir ?? "", lastBackup: d.lastBackup ?? null })
+      })
+      .catch(() => {})
     if (!unlocked) {
       setFiles([])
       setViewerIndex(null)
-      return
+      return () => { cancelled = true }
     }
     getJSON<{ files?: FileEntry[] }>("/api/browse")
-      .then((d) => setFiles(d.files ?? []))
+      .then((d) => { if (!cancelled) setFiles(d.files ?? []) })
       .catch(() => {
         /* locked or latchd gone; panes already gated */
       })
-    getJSON<StatusInfo>("/api/status")
-      .then((d) =>
-        setStats({ files: d.files ?? 0, dir: d.dir ?? "", lastBackup: d.lastBackup ?? null }),
-      )
-      .catch(() => {
-        /* keep last known */
-      })
-  }, [unlocked])
+    return () => { cancelled = true }
+  }, [unlocked, revision])
 
   const list = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -93,22 +110,24 @@ export function MainView({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col md:flex-row">
+    <div className="flex h-full min-h-0 bg-bg2">
       <Sidebar
         files={files}
-        activeView={activeView}
+        activeView={screen === "files" ? activeView : screen}
         onViewChange={(v) => {
           setActiveView(v)
           setViewerIndex(null)
+          onNavigate("files")
         }}
-        stats={stats}
         unlocked={unlocked}
-        onPairAgain={onPairAgain}
+        onNavigate={navigate}
+        navOpen={navOpen}
+        onNavClose={onNavClose}
       />
 
-      <section className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+      <section aria-label="Backup contents" hidden={screen !== "files"} className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-background md:mr-4 md:mb-4 md:rounded-2xl">
         {!unlocked ? (
-          <UnlockPane note={unlockNote || DEFAULT_UNLOCK_SUB} onUnlocked={onUnlock} onPair={onPairAgain} />
+          <UnlockPane note={unlockNote || DEFAULT_UNLOCK_SUB} onUnlocked={onUnlock} onPair={() => navigate("pair")} />
         ) : (
           <div className="px-4 pb-10 md:px-6">
             <BrowserPane
@@ -132,7 +151,14 @@ export function MainView({
         )}
       </section>
 
-      {viewerIndex !== null && list[viewerIndex] && (
+      <section aria-label="Settings" hidden={screen !== "settings"} className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-background md:mr-4 md:mb-4 md:rounded-2xl">
+        <SettingsView stats={stats} unlocked={unlocked} hasLocal={hasLocal} onPairAgain={() => navigate("pair")} onUnlock={() => navigate("files")} />
+      </section>
+      {(pairVisited || screen === "pair") && <section aria-label="Phone backup" hidden={screen !== "pair"} className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-background md:mr-4 md:mb-4 md:rounded-2xl">
+        <PairingView hasLocal={hasLocal} unlocked={unlocked} visible={screen === "pair"} onEnterMain={onEnterMain} backLabel={pairOrigin === "settings" ? "Back to Settings" : "Back to files"} />
+      </section>}
+
+      {screen === "files" && viewerIndex !== null && list[viewerIndex] && (
         <Viewer
           list={list}
           index={viewerIndex}

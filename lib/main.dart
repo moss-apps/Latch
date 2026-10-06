@@ -1,11 +1,16 @@
 import 'dart:async';
+import 'dart:ui' show PlatformDispatcher;
 
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_update/in_app_update.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'services/auto_kill_service.dart';
+import 'services/session_service.dart';
+import 'widgets/session_host.dart';
+import 'screens/gallery_vault_screen.dart';
 import 'services/screenshot_protection_service.dart';
 import 'services/update_service.dart';
 import 'services/vault_service.dart';
@@ -25,6 +30,20 @@ import 'utils/performance_config.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    if (kReleaseMode) {
+      debugPrint('[Fatal] ${details.exceptionAsString()}');
+      final stack = details.stack;
+      if (stack != null) debugPrint('$stack');
+    }
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('[Uncaught] $error');
+    debugPrint('$stack');
+    return true;
+  };
+
   PerformanceConfig.configureHighFrameRate();
   PerformanceConfig.optimizeImageCache();
 
@@ -36,6 +55,8 @@ Future<void> main() async {
   ]);
 
   final settings = await VaultService.instance.getSettings();
+  SessionService.instance.configure(settings);
+  await AutoKillService.configure(enabled: settings.autoKillEnabled);
   await AutoKillService.setDelaySeconds(settings.autoKillDelaySeconds);
   await ScreenshotProtectionService.setEnabled(
     settings.screenshotProtectionEnabled,
@@ -43,7 +64,10 @@ Future<void> main() async {
 
   UpdateService.instance.start();
 
-  runApp(const ProviderScope(child: LatchApp()));
+  runApp(SessionHost(
+    session: SessionService.instance,
+    builder: (_) => const ProviderScope(child: LatchApp()),
+  ));
 }
 
 class LatchApp extends ConsumerWidget {
@@ -61,7 +85,11 @@ class LatchApp extends ConsumerWidget {
       theme: AppTheme.getLightTheme(accentColor),
       darkTheme: AppTheme.getDarkTheme(accentColor),
       themeMode: themeMode,
-      home: const AppInitializer(),
+      home: SessionService.instance.isUnlocked
+          ? const GalleryVaultScreen()
+          : SessionService.instance.hasAuthenticated
+              ? const UnlockScreen()
+              : const AppInitializer(),
     );
   }
 }

@@ -22,6 +22,11 @@ class CryptoIsolatePool {
     if (_initialized || _disposed) return;
     for (int i = 0; i < _kPoolSize; i++) {
       final worker = await _PoolWorker.spawn();
+      if (_disposed) {
+        worker.isolate.kill(priority: Isolate.immediate);
+        worker.initPort.close();
+        return;
+      }
       _attachExitListener(worker);
       _workers.add(worker);
     }
@@ -135,6 +140,11 @@ class CryptoIsolatePool {
         worker.initPort.close();
         worker.exitPort?.close();
         final newWorker = await _PoolWorker.spawn();
+        if (_disposed) {
+          newWorker.isolate.kill(priority: Isolate.immediate);
+          newWorker.initPort.close();
+          return;
+        }
         _attachExitListener(newWorker);
         _workers[i] = newWorker;
         _dispatchNext();
@@ -288,6 +298,11 @@ class CryptoIsolatePool {
       final idx = _workers.indexOf(worker);
       if (idx >= 0) {
         _PoolWorker.spawn().then((newWorker) {
+          if (_disposed || idx >= _workers.length) {
+            newWorker.isolate.kill(priority: Isolate.immediate);
+            newWorker.initPort.close();
+            return;
+          }
           _attachExitListener(newWorker);
           _workers[idx] = newWorker;
           _dispatchNext();

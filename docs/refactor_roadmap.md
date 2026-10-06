@@ -33,18 +33,20 @@ Week 4:   Phase 4 (Riverpod) — cheap once services are split
 |---|---|---|---|
 | 0.1 | Default `failedUnlockProtectionEnabled = true` (new installs only) | `services/vault_service.dart:3093`, `:3197` | **Done** |
 | 0.3 | Fix stale doc comment "AES-256-CBC with PKCS7" → GCM/CTR | `services/encryption_service.dart:23-24` | **Done** |
-| 0.2 | ~~`evictCachedKeys()` wired to lock/logout~~ | — | **Dropped** |
+| 0.2 | `evictCachedKeys()` wired to session lock | `services/encryption_service.dart`, `services/session_cleanup.dart` | **Done** |
 | 0.4 | ~~Dispose dialog `TextEditingController`s~~ | — | **Dropped** |
 
-**Why 0.2 was dropped:** there is **no in-session lock flow**. The app
-unlocks once at `UnlockScreen`, stays unlocked for the process, and
-"auto-kill" = the OS kills the whole process on background (memory
-reclaimed automatically). There is no "lock now" button, no
-relock-on-background, no relock timer — so `evictCachedKeys()` would have
-**no caller** (YAGNI). `resetKeys()` (`encryption_service.dart:1873`)
-remains the nuclear wipe path. **Re-add `evictCachedKeys()` only when an
-in-session lock/relock feature lands** (lock-now button, app-inactive
-timer, or relock-on-background).
+**0.2 implemented 2026-10-06:** product roadmap Phase 2 supplies the
+previously missing caller: manual, inactivity, and background session locks
+run `clearSensitiveSession()`. Non-destructive `evictCachedKeys()` zeroes
+master/decoy/per-file key buffers, clears pending credentials, and disposes
+crypto workers. Session generations invalidate late results; sync/conversion
+workers, preview caches, and owned plaintext scratch files are also cleared.
+Protected routes and providers are disposed, and authentication waits for
+cleanup before reopening the vault. Tests verify eviction, preservation of
+persisted data, and successful decryption after reauthentication.
+`resetKeys()` remains the destructive wipe path. The earlier deferral is
+resolved now that the in-session lock/relock flow exists.
 
 **Why 0.4 was dropped:** the flagged controllers are **local ephemeral**
 variables inside dialog methods, not fields. When the dialog closes and

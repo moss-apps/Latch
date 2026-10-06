@@ -5,7 +5,7 @@
 //   manifest envelope: [16-byte IV][AES-256-GCM ciphertext+16B tag]
 //   keybundle.json: {wrappedKey, wrapSalt, wrapIv (base64),
 //     argon2:{t,m,p}} — KWK = Argon2id(credential, wrapSalt, t, m KiB, p)
-//   file blobs: GCM v2 magic "LKR2"+ver(1)+LE size(4), GCM v1 "LKRG"+LE size,
+//   file blobs: GCM v2 magic "LKR2"+ver(2)+LE size(4), GCM v1 "LKRG"+LE size,
 //     CTR legacy "LKRS"+LE size (AES-CTR, full-16B big-endian counter),
 //     per-file key = PBKDF2-HMAC-SHA256(masterKey, salt, iterations, 32B).
 package cryptoutil
@@ -101,8 +101,8 @@ func DecryptFileBlob(blob []byte, masterKey []byte, ivB64, saltB64 string, itera
 		if len(blob) < 9 {
 			return nil, fmt.Errorf("v2 blob too short")
 		}
-		if blob[4] != 1 {
-			return nil, fmt.Errorf("unsupported blob version %d", blob[4])
+		if v := blob[4]; v != 1 && v != 2 {
+			return nil, fmt.Errorf("unsupported blob version %d", v)
 		}
 		size = binary.LittleEndian.Uint32(blob[5:9])
 		pt, err := gcmOpen(fileKey, iv, blob[9:])

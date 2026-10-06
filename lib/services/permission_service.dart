@@ -308,7 +308,8 @@ class PermissionService {
 
   /// Open app settings if permission is permanently denied
   Future<bool> openSettings() async {
-    return await AutoKillService.runSafe(() => openAppSettings());
+    return await AutoKillService.runSafe(() => openAppSettings(),
+        waitForResume: true);
   }
 
   /// Get Android SDK version

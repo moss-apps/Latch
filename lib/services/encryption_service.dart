@@ -70,20 +70,72 @@ class EncryptionService {
   static const int _fileKeyCacheLimit = 100;
 
   CryptoIsolatePool? _pool;
+  Future<void>? _poolReady;
+  int _cacheGeneration = 0;
+  bool _keysEvicted = false;
+
+  int get cacheGeneration => _cacheGeneration;
+  bool isCurrentSession(int generation) =>
+      !_keysEvicted && generation == _cacheGeneration;
+
+  void _requireKeys() {
+    if (_keysEvicted) throw StateError('Vault session is locked');
+  }
+
+  void _cacheUnlockedKey(Uint8List key, bool isDecoy, int generation) {
+    if (generation != _cacheGeneration) {
+      key.fillRange(0, key.length, 0);
+      throw StateError('Authentication belongs to an expired session');
+    }
+    _keysEvicted = false;
+    if (isDecoy) {
+      _cachedDecoyKey = key;
+    } else {
+      _cachedMasterKey = key;
+    }
+  }
+
+  Future<void> evictCachedKeys() {
+    _cacheGeneration++;
+    _keysEvicted = true;
+    for (final key in [
+      _cachedMasterKey,
+      _cachedDecoyKey,
+      ..._fileKeyCache.values,
+    ]) {
+      key?.fillRange(0, key.length, 0);
+    }
+    _cachedMasterKey = null;
+    _cachedDecoyKey = null;
+    _pendingCredential = null;
+    _pendingDecoyCredential = null;
+    _fileKeyCache.clear();
+    final pool = _pool;
+    _pool = null;
+    _poolReady = null;
+    return pool?.dispose() ?? Future.value();
+  }
 
   Future<void> initialize() async {
+    _requireKeys();
+    final generation = _cacheGeneration;
     final version = await _storage.read(key: _keyVersionKey);
     if (version == null) {
       await _ensureMasterKey();
     }
-    _pool = CryptoIsolatePool();
-    await _pool!.initialize();
+    _requireKeys();
+    final pool = _pool ??= CryptoIsolatePool();
+    await (_poolReady ??= pool.initialize());
+    if (!isCurrentSession(generation)) {
+      throw StateError('Vault session expired');
+    }
     await _checkKeyRotationRecovery();
   }
 
   Future<void> dispose() async {
     await _pool?.dispose();
     _pool = null;
+    _poolReady = null;
   }
 
   /// Set pending credential for key unlocking (called by AuthService after verify/create).
@@ -107,6 +159,7 @@ class EncryptionService {
   /// Handles first-time key creation, legacy migration, and normal unwrap.
   Future<Uint8List> unlockMasterKey(String credential,
       {bool isDecoy = false}) async {
+    final generation = _cacheGeneration;
     final cached = isDecoy ? _cachedDecoyKey : _cachedMasterKey;
     if (cached != null) return cached;
 
@@ -132,11 +185,7 @@ class EncryptionService {
       final masterKey =
           KeyWrap.unwrap(base64Decode(wrappedKeyB64), kwk, base64Decode(ivB64));
 
-      if (isDecoy) {
-        _cachedDecoyKey = masterKey;
-      } else {
-        _cachedMasterKey = masterKey;
-      }
+      _cacheUnlockedKey(masterKey, isDecoy, generation);
       return masterKey;
     }
 
@@ -148,11 +197,7 @@ class EncryptionService {
       await _storage.delete(key: rawKeyKey);
       await _storage.write(key: versionKey, value: '1');
 
-      if (isDecoy) {
-        _cachedDecoyKey = masterKey;
-      } else {
-        _cachedMasterKey = masterKey;
-      }
+      _cacheUnlockedKey(masterKey, isDecoy, generation);
       debugPrint(
           '[Encryption] Migrated ${isDecoy ? 'decoy' : 'master'} key to wrapped form');
       return masterKey;
@@ -163,16 +208,13 @@ class EncryptionService {
     await _wrapAndStoreKey(masterKey, credential, isDecoy: isDecoy);
     await _storage.write(key: versionKey, value: '1');
 
-    if (isDecoy) {
-      _cachedDecoyKey = masterKey;
-    } else {
-      _cachedMasterKey = masterKey;
-    }
+    _cacheUnlockedKey(masterKey, isDecoy, generation);
     return masterKey;
   }
 
   /// Unlock master key using biometric KWK (stored in secure storage).
   Future<Uint8List> unlockMasterKeyWithBiometric({bool isDecoy = false}) async {
+    final generation = _cacheGeneration;
     if (isDecoy) throw StateError('Decoy biometric unlock not supported');
     if (_cachedMasterKey != null) return _cachedMasterKey!;
 
@@ -189,7 +231,7 @@ class EncryptionService {
 
       final masterKey = KeyWrap.unwrap(base64Decode(wrappedKeyB64),
           base64Decode(biometricKwkB64), base64Decode(ivB64));
-      _cachedMasterKey = masterKey;
+      _cacheUnlockedKey(masterKey, false, generation);
       return masterKey;
     }
 
@@ -200,7 +242,7 @@ class EncryptionService {
       await _setupBiometricKwkForKey(masterKey);
       await _storage.delete(key: _masterKeyKey);
       await _storage.write(key: _keyVersionKey, value: '1');
-      _cachedMasterKey = masterKey;
+      _cacheUnlockedKey(masterKey, false, generation);
       debugPrint(
           '[Encryption] Migrated master key to wrapped form (biometric)');
       return masterKey;
@@ -286,15 +328,18 @@ class EncryptionService {
 
   /// Ensure master key exists, create if not
   Future<Uint8List> _ensureMasterKey() async {
+    _requireKeys();
     if (_cachedMasterKey != null) return _cachedMasterKey!;
 
     final version = await _storage.read(key: _keyVersionKey);
+    _requireKeys();
     if (version == '1') {
       throw StateError('Master key is wrapped. Call unlockMasterKey first.');
     }
 
     try {
       final storedKey = await _storage.read(key: _masterKeyKey);
+      _requireKeys();
       if (storedKey != null) {
         _cachedMasterKey = base64Decode(storedKey);
         return _cachedMasterKey!;
@@ -303,6 +348,7 @@ class EncryptionService {
       debugPrint('Error reading master key: $e');
     }
 
+    _requireKeys();
     _cachedMasterKey = KeyDerivation.randomBytes(_keySize);
     if (_pendingCredential != null) {
       await _wrapAndStoreKey(_cachedMasterKey!, _pendingCredential!,
@@ -400,9 +446,11 @@ class EncryptionService {
 
   /// Get or create decoy key (for decoy mode)
   Future<Uint8List> _ensureDecoyKey() async {
+    _requireKeys();
     if (_cachedDecoyKey != null) return _cachedDecoyKey!;
 
     final version = await _storage.read(key: _decoyKeyVersionKey);
+    _requireKeys();
     if (version == '1') {
       throw StateError(
           'Decoy key is wrapped. Call unlockMasterKey(isDecoy: true) first.');
@@ -410,6 +458,7 @@ class EncryptionService {
 
     try {
       final storedKey = await _storage.read(key: _decoyKeyKey);
+      _requireKeys();
       if (storedKey != null) {
         _cachedDecoyKey = base64Decode(storedKey);
         return _cachedDecoyKey!;
@@ -418,6 +467,7 @@ class EncryptionService {
       debugPrint('Error reading decoy key: $e');
     }
 
+    _requireKeys();
     _cachedDecoyKey = KeyDerivation.randomBytes(_keySize);
     if (_pendingDecoyCredential != null) {
       await _wrapAndStoreKey(_cachedDecoyKey!, _pendingDecoyCredential!,
@@ -444,11 +494,17 @@ class EncryptionService {
 
   Future<Uint8List> deriveFileKeyAsync(
       Uint8List masterKey, Uint8List salt, int iterations) async {
+    _requireKeys();
+    final generation = _cacheGeneration;
     final cacheKey = '${base64Encode(salt)}:$iterations';
     final cached = _fileKeyCache[cacheKey];
     if (cached != null) return cached;
     final key =
         await KeyDerivation.deriveFileKeyAsync(masterKey, salt, iterations);
+    if (!isCurrentSession(generation)) {
+      key.fillRange(0, key.length, 0);
+      throw StateError('Vault session expired during key derivation');
+    }
     if (_fileKeyCache.length >= _fileKeyCacheLimit) {
       _fileKeyCache.remove(_fileKeyCache.keys.first);
     }
@@ -483,6 +539,7 @@ class EncryptionService {
 
   Future<Uint8List> _resolveKey(
       {bool isDecoy = false, Uint8List? derivedKey}) async {
+    _requireKeys();
     if (derivedKey != null) return derivedKey;
     return isDecoy ? await _ensureDecoyKey() : await _ensureMasterKey();
   }
@@ -505,8 +562,7 @@ class EncryptionService {
       debugPrint(
           '[Encryption] decryptData called with ${encryptedData.length} bytes');
 
-      final key = customKey ??
-          (isDecoy ? await _ensureDecoyKey() : await _ensureMasterKey());
+      final key = await _resolveKey(isDecoy: isDecoy, derivedKey: customKey);
       final iv = base64Decode(ivBase64);
 
       // Validate input data length for CBC mode
@@ -709,6 +765,29 @@ class EncryptionService {
     }
   }
 
+  void _checkSession(int generation) {
+    if (!isCurrentSession(generation)) {
+      throw StateError('Vault session is locked');
+    }
+  }
+
+  Future<void> _writeDecryptedBytes(
+      Uint8List data, String destinationPath, int generation) async {
+    var started = false;
+    try {
+      _checkSession(generation);
+      started = true;
+      await File(destinationPath).writeAsBytes(data);
+      _checkSession(generation);
+    } finally {
+      data.fillRange(0, data.length, 0);
+      if (started && !isCurrentSession(generation)) {
+        final file = File(destinationPath);
+        if (await file.exists()) await file.delete();
+      }
+    }
+  }
+
   /// Decrypt a file and return the decrypted file path
   /// Automatically detects format (CTR streamed or CBC)
   Future<FileDecryptionResult> decryptFile(
@@ -719,7 +798,9 @@ class EncryptionService {
     Uint8List? derivedKey,
     Function(int current, int total)? onProgress,
   }) async {
+    final generation = _cacheGeneration;
     try {
+      _checkSession(generation);
       final encryptedFile = File(encryptedPath);
       if (!await encryptedFile.exists()) {
         return FileDecryptionResult(
@@ -758,8 +839,7 @@ class EncryptionService {
           );
         }
 
-        final destFile = File(destinationPath);
-        await destFile.writeAsBytes(result.data!);
+        await _writeDecryptedBytes(result.data!, destinationPath, generation);
         onProgress?.call(3, 3);
 
         return FileDecryptionResult(
@@ -825,8 +905,7 @@ class EncryptionService {
           );
         }
 
-        final destFile = File(destinationPath);
-        await destFile.writeAsBytes(result.data!);
+        await _writeDecryptedBytes(result.data!, destinationPath, generation);
         onProgress?.call(3, 3);
 
         return FileDecryptionResult(
@@ -854,7 +933,12 @@ class EncryptionService {
     Uint8List? derivedKey,
     Function(int bytesProcessed, int totalBytes)? onProgress,
   }) async {
+    final generation = _cacheGeneration;
+    IOSink? output;
+    File? temporary;
+    bool renamed = false;
     try {
+      _checkSession(generation);
       final encryptedFile = File(encryptedPath);
       if (!await encryptedFile.exists()) {
         return FileDecryptionResult(
@@ -919,11 +1003,14 @@ class EncryptionService {
       int bytesProcessed = 0;
 
       onProgress?.call(0, totalBytes);
+      _checkSession(generation);
 
       if (isCtr) {
         final tempCtrPath = '$destinationPath.tmp';
         final tempCtrFile = File(tempCtrPath);
         final sink = tempCtrFile.openWrite();
+        output = sink;
+        temporary = tempCtrFile;
 
         final ctr = AesCtrCipher.cipher(key, iv, false);
 
@@ -932,6 +1019,7 @@ class EncryptionService {
 
         try {
           await for (final chunk in inputStream) {
+            _checkSession(generation);
             sink.add(ctr.process(chunk));
             bytesProcessed += chunk.length;
             onProgress?.call(bytesProcessed, totalBytes);
@@ -948,8 +1036,10 @@ class EncryptionService {
         onProgress?.call(totalBytes, totalBytes);
         await sink.flush();
         await sink.close();
-
+        _checkSession(generation);
         await tempCtrFile.rename(destinationPath);
+        renamed = true;
+        _checkSession(generation);
 
         return FileDecryptionResult(
           success: true,
@@ -962,6 +1052,8 @@ class EncryptionService {
       final tempPath = '$destinationPath.tmp';
       final tempFile = File(tempPath);
       final sink = tempFile.openWrite();
+      output = sink;
+      temporary = tempFile;
 
       final gcm = GCMBlockCipher(AESEngine())
         ..init(false, AEADParameters(KeyParameter(key), 128, iv, Uint8List(0)));
@@ -973,6 +1065,7 @@ class EncryptionService {
 
       try {
         await for (final chunk in inputStream) {
+          _checkSession(generation);
           final outLen = gcm.processBytes(chunk, 0, chunk.length, outBuf, 0);
           if (outLen > 0) {
             sink.add(
@@ -983,6 +1076,7 @@ class EncryptionService {
         }
 
         final finalBuf = Uint8List(32);
+        _checkSession(generation);
         final finalLen = gcm.doFinal(finalBuf, 0);
         if (finalLen > 0) {
           sink.add(Uint8List.view(finalBuf.buffer, 0, finalLen));
@@ -993,6 +1087,7 @@ class EncryptionService {
 
       await sink.flush();
       await sink.close();
+      _checkSession(generation);
 
       if (authFailed) {
         try {
@@ -1006,6 +1101,8 @@ class EncryptionService {
       }
 
       await tempFile.rename(destinationPath);
+      renamed = true;
+      _checkSession(generation);
 
       onProgress?.call(totalBytes, totalBytes);
 
@@ -1016,6 +1113,17 @@ class EncryptionService {
         needsMigration: isGcmV1,
       );
     } catch (e) {
+      try {
+        await output?.close();
+      } catch (_) {}
+      try {
+        if (temporary != null && await temporary.exists()) {
+          await temporary.delete();
+        }
+        if (renamed && !isCurrentSession(generation)) {
+          await File(destinationPath).delete();
+        }
+      } catch (_) {}
       debugPrint('File streaming decryption error: $e');
       return FileDecryptionResult(
         success: false,
@@ -1032,7 +1140,9 @@ class EncryptionService {
     bool isDecoy = false,
     Uint8List? derivedKey,
   }) async {
+    final generation = _cacheGeneration;
     try {
+      _checkSession(generation);
       final encryptedFile = File(encryptedPath);
       if (!await encryptedFile.exists()) {
         return DecryptionResult(
@@ -1079,10 +1189,12 @@ class EncryptionService {
         final decryptedBytes = <int>[];
 
         await for (final chunk in inputStream) {
+          _checkSession(generation);
           final decrypted = ctr.process(chunk);
           decryptedBytes.addAll(decrypted);
         }
 
+        _checkSession(generation);
         return DecryptionResult(
           success: true,
           data: Uint8List.fromList(decryptedBytes),
@@ -1174,8 +1286,7 @@ class EncryptionService {
     Uint8List? customKey,
   }) async {
     try {
-      final key = customKey ??
-          (isDecoy ? await _ensureDecoyKey() : await _ensureMasterKey());
+      final key = await _resolveKey(isDecoy: isDecoy, derivedKey: customKey);
       final iv = base64Decode(ivBase64);
 
       final cipher = AesGcmCipher.cipher(key, iv, false);
@@ -1203,7 +1314,9 @@ class EncryptionService {
     bool isDecoy = false,
     Function(int current, int total)? onProgress,
   }) async {
+    final generation = _cacheGeneration;
     try {
+      _checkSession(generation);
       final encryptedFile = File(encryptedPath);
       if (!await encryptedFile.exists()) {
         return FileDecryptionResult(
@@ -1263,9 +1376,7 @@ class EncryptionService {
         );
       }
 
-      final tempPath = '$destinationPath.tmp';
-      await File(tempPath).writeAsBytes(result.data!);
-      await File(tempPath).rename(destinationPath);
+      await _writeDecryptedBytes(result.data!, destinationPath, generation);
 
       return FileDecryptionResult(
         success: true,
@@ -1361,7 +1472,9 @@ class EncryptionService {
     bool isDecoy = false,
     Uint8List? derivedKey,
   }) async {
+    final generation = _cacheGeneration;
     try {
+      _checkSession(generation);
       final encryptedFile = File(encryptedPath);
       if (!await encryptedFile.exists()) {
         return DecryptionResult(
@@ -1390,6 +1503,7 @@ class EncryptionService {
       final dataLen = fileSize - dataOffset;
       final encryptedData = await raf.read(dataLen);
       await raf.close();
+      _checkSession(generation);
 
       final gcm = GCMBlockCipher(AESEngine())
         ..init(false, AEADParameters(KeyParameter(key), 128, iv, Uint8List(0)));

@@ -19,6 +19,10 @@ void main() {
     expect(
         describeServerError(const FormatException('Manifest blob too short')),
         contains("couldn't be read"));
+    expect(
+        describeServerError(StateError(
+            "Sensitive worker failed: Instance of 'InvalidCipherTextException'")),
+        contains("couldn't be read"));
     expect(describeServerError(StateError('Missing blob for remote entry x')),
         'Missing blob for remote entry x');
     expect(describeServerError(Exception('weird unknown failure')),

@@ -30,8 +30,10 @@ class WebDAVStore implements RemoteStore {
     final c = webdav.newClient(baseUrl, user: username, password: password);
     // generous timeouts; .local NAS hosts + cold servers need room.
     c.setConnectTimeout(15000);
-    c.setSendTimeout(30000);
-    c.setReceiveTimeout(30000);
+    // dio's send timeout is wall clock for the whole body; first-sync blobs
+    // are whole media files that can take minutes each over Wi-Fi.
+    c.setSendTimeout(600000);
+    c.setReceiveTimeout(600000);
     _client = c;
     return c;
   }
@@ -62,8 +64,20 @@ class WebDAVStore implements RemoteStore {
 
   @override
   Future<void> putBlob(String name, Uint8List bytes) async {
-    await _ensureParent(_path(name));
-    await _c.write(_path(name), bytes);
+    final path = _path(name);
+    await _ensureParent(path);
+    // write() maps the bytes to a stream of one-byte events; hand over plain
+    // chunks instead or big uploads crawl through the event loop.
+    await _c.c.wdWriteWithStream(_c, path, _chunks(bytes), bytes.length);
+  }
+
+  /// Zero-copy 512 KiB views; mirrors writeFromFile's chunked streaming.
+  static Stream<List<int>> _chunks(Uint8List bytes) async* {
+    const size = 512 * 1024;
+    for (var i = 0; i < bytes.length; i += size) {
+      final end = i + size < bytes.length ? i + size : bytes.length;
+      yield Uint8List.sublistView(bytes, i, end);
+    }
   }
 
   // Spec-strict servers (rclone, mod_dav) 409 a nested PUT whose parent

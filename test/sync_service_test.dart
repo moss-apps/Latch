@@ -536,6 +536,45 @@ void main() {
       await dir.delete(recursive: true);
     });
 
+    test('first sync skips blobs already on the server (resume after crash)',
+        () async {
+      final dir = await Directory.systemTemp.createTemp('locker_sync_resume_');
+      final payload = Uint8List.fromList([9, 8, 7, 6]);
+      final f = File('${dir.path}/blob.enc');
+      await f.writeAsBytes(payload);
+      final hash = SyncService.sha256Hex(payload);
+
+      final local = [
+        VaultedFile(
+          id: 'r',
+          originalName: 'r.jpg',
+          vaultPath: f.path,
+          type: VaultedFileType.image,
+          mimeType: 'image/jpeg',
+          fileSize: 4,
+          dateAdded: DateTime(2024, 1, 1),
+          modifiedAt: DateTime(2024, 1, 1),
+        ),
+      ];
+      final masterKey = Uint8List.fromList(List<int>.generate(32, (i) => i));
+      final remote = _MemStore();
+      remote._blobs[SyncService.blobNameFor(hash)] = payload;
+
+      final result = await SyncService.runSync(
+        local: local,
+        masterKey: masterKey,
+        remote: remote,
+        deviceId: 'dev1',
+        now: DateTime.utc(2024, 6, 1),
+      );
+
+      expect(remote.putBlobCalls, 0);
+      expect(result.blobsPushed, 1);
+      expect(result.refreshedLocal.single.remoteHash, hash);
+
+      await dir.delete(recursive: true);
+    });
+
     test(
         'push-only: a local file whose blob is missing on disk is skipped, '
         'not fatal (e.g. a deleted password shadow entry)', () async {
@@ -922,6 +961,7 @@ class _MemStore implements RemoteStore {
   Uint8List? _manifest;
   Object? manifestReadError;
   int putManifestCalls = 0;
+  int putBlobCalls = 0;
 
   @override
   Future<void> testConnection() async {}
@@ -939,8 +979,10 @@ class _MemStore implements RemoteStore {
   }
 
   @override
-  Future<void> putBlob(String name, Uint8List bytes) async =>
-      _blobs[name] = bytes;
+  Future<void> putBlob(String name, Uint8List bytes) async {
+    putBlobCalls++;
+    _blobs[name] = bytes;
+  }
 
   @override
   Future<Uint8List?> getBlob(String name) async => _blobs[name];

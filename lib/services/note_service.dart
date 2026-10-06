@@ -27,6 +27,7 @@ class NoteService {
   static const int _defaultKdfIterations = 100000;
 
   final Map<bool, List<Note>> _notesCache = {};
+  int _cacheGeneration = 0;
   final Map<bool, List<NoteFolder>> _foldersCache = {};
 
   Future<String> _getNotesDir({bool isDecoy = false}) async {
@@ -43,12 +44,16 @@ class NoteService {
   }
 
   Future<List<Note>> loadNotes({bool isDecoy = false}) async {
+    final generation = _cacheGeneration;
     final cached = _notesCache[isDecoy];
     if (cached != null) return cached;
     if (!isDecoy) await _migrateLegacyNotes();
     final json = await _secureStorage.read(
       key: isDecoy ? _notesIndexDecoyKey : _notesIndexKey,
     );
+    if (generation != _cacheGeneration) {
+      throw StateError('Notes session changed');
+    }
     final notes = <Note>[];
     if (json != null && json.isNotEmpty) {
       try {
@@ -109,11 +114,15 @@ class NoteService {
   }
 
   Future<List<NoteFolder>> loadFolders({bool isDecoy = false}) async {
+    final generation = _cacheGeneration;
     final cached = _foldersCache[isDecoy];
     if (cached != null) return cached;
     final json = await _secureStorage.read(
       key: isDecoy ? _noteFoldersDecoyKey : _noteFoldersKey,
     );
+    if (generation != _cacheGeneration) {
+      throw StateError('Notes session changed');
+    }
     final folders = <NoteFolder>[];
     if (json != null && json.isNotEmpty) {
       try {
@@ -484,6 +493,7 @@ class NoteService {
   }
 
   void clearCache() {
+    _cacheGeneration++;
     _notesCache.clear();
     _foldersCache.clear();
   }

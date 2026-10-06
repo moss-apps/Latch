@@ -86,7 +86,7 @@ class _PermissionWarningBannerState
   }
 
   Future<void> _openSettings() async {
-    await AutoKillService.runSafe(() => openAppSettings());
+    await AutoKillService.runSafe(() => openAppSettings(), waitForResume: true);
   }
 
   @override

@@ -17,7 +17,7 @@ This roadmap turns the product review into phased, actionable work. Phases are o
 |---|---|---|---|
 | 0 | Reliability and data integrity | **Done** | Critical |
 | 1 | Protection defaults and import clarity | **Done** | High |
-| 2 | Session locking | **Not started** | High — recommended next feature |
+| 2 | Session locking | **Done** | High |
 | 3 | Large-vault sync and conflict recovery | **Not started** | High |
 | 4 | Import convenience and discovery | **Not started** | Medium |
 | 5 | Recovery and product polish | **Not started** | Medium |
@@ -59,19 +59,25 @@ Implemented 2026-10-02: The encryption default stays **off** for new installatio
 
 ## Phase 2 — In-session locking
 
-**Status: Not started**
+**Status: Done**
 
-**Recommended next feature.** The existing security model includes PIN/password/biometric authentication and Android auto-kill behavior, but there is no in-session lock, “Lock now” action, or inactivity relock flow. The existing refactor roadmap also identifies session locking as the prerequisite for safely evicting cached keys.
+Implemented 2026-10-06: `SessionService` owns the locked/unlocked state, inactivity and background deadlines, and scoped system-interaction exemptions. “Lock now” is available in the vault drawer and Security settings. Locking replaces the entire protected navigator and provider scope with authentication, disposing open viewers, editors, and dialogs; back navigation cannot restore them. App content is covered while inactive or backgrounded, including during permitted system interactions.
 
-| Item | Work | Acceptance criteria |
-|---|---|---|
-| 2.1 | Add a central locked/unlocked session state and a “Lock now” action. | Locking blocks protected routes and returns the user to authentication without restarting the app. |
-| 2.2 | Add configurable relock triggers. | Users can choose an inactivity timeout and background behavior. Lock timing is predictable when switching to a picker, biometric prompt, or external app. |
-| 2.3 | Clear sensitive in-memory state on lock. | Cached keys and sensitive decrypted temporary content are evicted or invalidated; lock does not delete vault data. |
-| 2.4 | Cover lifecycle and navigation edge cases. | Returning from permitted system interactions does not unexpectedly lock mid-operation or leave protected content visible. Back navigation cannot bypass the lock. |
-| 2.5 | Add security and lifecycle tests. | Tests cover manual lock, timeout, background/foreground, route gating, and an allowed external/system interaction. |
+Relock settings default to **5 minutes of inactivity** and **immediate background locking**, with explicit “Never” options. Touch, scrolling, hardware keys, and soft-keyboard editing count as activity. Returning to the foreground checks wall-clock deadlines even if the OS suspended Dart timers. Pickers, permissions, biometric prompts, and explicitly opened external files suspend automatic relocking until the interaction returns; nested interactions remain exempt until all finish. Inactivity restarts on return, and manual locking revokes any outstanding exemption. Android's existing auto-kill default and saved delay are preserved; the new “Close app in background” switch lets users turn it off to use relocking without process termination.
 
-**Likely areas:** app initialization/lifecycle handling, authentication routing, `lib/services/auto_kill_service.dart`, encryption key/cache ownership, and sensitive viewer/editor routes. Coordinate this work with `docs/refactor_roadmap.md` before implementing key eviction.
+Lock cleanup zeroes cached master, decoy, and per-file key buffers, clears pending credentials, thumbnails, image caches, and note/password caches, detaches the PocketBase session, stops key-holding crypto/sync/conversion workers and video compression, and removes owned decrypted scratch files. Generation checks reject late key derivation, previews, and metadata results, and prevent PocketBase from sealing new records with evicted keys. Authentication waits for cleanup; a cleanup failure keeps the vault locked and offers a retry. Persisted vault files and stored key material are preserved, with a lock → reauthenticate → decrypt round-trip verified.
+
+| Item | Work | Acceptance criteria | Status |
+|---|---|---|---|
+| 2.1 | Add a central locked/unlocked session state and a “Lock now” action. | Locking blocks protected routes and returns the user to authentication without restarting the app. | **Done** |
+| 2.2 | Add configurable relock triggers. | Users can choose an inactivity timeout and background behavior. Lock timing is predictable when switching to a picker, biometric prompt, or external app. | **Done** |
+| 2.3 | Clear sensitive in-memory state on lock. | Cached keys and sensitive decrypted temporary content are evicted or invalidated; lock does not delete vault data. | **Done** |
+| 2.4 | Cover lifecycle and navigation edge cases. | Returning from permitted system interactions does not unexpectedly lock mid-operation or leave protected content visible. Back navigation cannot bypass the lock. | **Done** |
+| 2.5 | Add security and lifecycle tests. | Tests cover manual lock, timeout, background/foreground, route gating, and an allowed external/system interaction. | **Done** |
+
+**Checks:** `flutter test --no-pub`: 193 passing; `flutter analyze --no-pub`: clean; `flutter build apk --debug --no-pub`: successful. Regression coverage includes cleanup failure/retry, route/dialog disposal and back navigation, lifecycle deadlines, nested/system hand-offs, soft-keyboard activity, active worker cancellation, partial plaintext removal, key eviction and reauthentication, and late PocketBase reads/writes. Device-level picker/biometric smoke testing remains a release check; lifecycle behavior was verified with automated tests, not physical-device interaction.
+
+**Key-eviction coordination:** `docs/refactor_roadmap.md` item 0.2 is now implemented. Session cleanup calls the non-destructive `EncryptionService.evictCachedKeys()`; `resetKeys()` remains reserved for destructive vault reset.
 
 ## Phase 3 — Large-vault sync and conflict recovery
 

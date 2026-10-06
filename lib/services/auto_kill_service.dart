@@ -1,16 +1,24 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+import 'session_service.dart';
 
 class AutoKillService {
+  static bool _configuredEnabled = true;
+
+  static Future<void> configure({required bool enabled}) async {
+    _configuredEnabled = enabled;
+    await _applyEnabled();
+  }
+
+  static Future<void> _applyEnabled() => setEnabled(
+      _configuredEnabled && !SessionService.instance.hasSystemInteraction);
   static const MethodChannel _channel =
       MethodChannel('com.mossapps.locker/autokill');
 
   static bool get isSupported =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
-  /// Set whether the auto-kill feature (killing app on pause) is enabled.
-  /// Set to [false] before requesting permissions or launching external intents.
-  /// Set back to [true] immediately after the interaction is complete or the app resumes.
+  /// Apply the native switch; interaction callers should use [runSafe].
   static Future<void> setEnabled(bool enabled) async {
     if (!isSupported) return;
 
@@ -35,21 +43,20 @@ class AutoKillService {
     }
   }
 
-  /// Run a task with auto-kill disabled.
-  /// Re-enables auto-kill after the task completes (even if it throws).
-  static Future<T> runSafe<T>(Future<T> Function() task) async {
-    await setEnabled(false);
+  /// Suspend relocking and auto-kill until the system interaction returns.
+  static Future<T> runSafe<T>(Future<T> Function() task,
+      {bool waitForResume = false}) async {
+    final interaction = SessionService.instance
+        .beginSystemInteraction(waitForResume: waitForResume);
+    interaction.released.then((_) => _applyEnabled());
     try {
-      return await task();
-    } finally {
-      // We re-enable it, but maybe we should wait for onResume?
-      // Actually, if we re-enable it immediately after the await returns,
-      // we might still be paused if the task was "wait for result".
-      // But typically we await the result of the intent.
-      // E.g. await Permission.request() returns AFTER the dialog closes (usually).
-      // However, for some intents, onResume happens before the future completes.
-      // It's safer to re-enable.
-      await setEnabled(true);
+      await _applyEnabled();
+      final result = await task();
+      interaction.complete();
+      return result;
+    } catch (_) {
+      interaction.complete(failed: true);
+      rethrow;
     }
   }
 }
