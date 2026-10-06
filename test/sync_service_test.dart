@@ -536,11 +536,9 @@ void main() {
       await dir.delete(recursive: true);
     });
 
-    test(
-        'first sync skips blobs already on the server (resume after crash)',
+    test('first sync skips blobs already on the server (resume after crash)',
         () async {
-      final dir =
-          await Directory.systemTemp.createTemp('locker_sync_resume_');
+      final dir = await Directory.systemTemp.createTemp('locker_sync_resume_');
       final payload = Uint8List.fromList([9, 8, 7, 6]);
       final f = File('${dir.path}/blob.enc');
       await f.writeAsBytes(payload);
