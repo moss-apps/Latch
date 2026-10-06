@@ -2,345 +2,320 @@
 
 ## Overview
 
-The vault is device-local, with a manual *decrypted* ZIP backup
-(`BackupService`). This document specifies encrypted-at-rest sync to a
-user-chosen server (NAS, home server, or self-hosted cloud), push and pull.
-The server never sees plaintext: it is dumb encrypted blob storage.
+The vault is device-local. This document specifies encrypted-at-rest sync to a
+user-chosen WebDAV server (NAS, home server, self-hosted cloud), push-only or
+two-way. The server never sees plaintext: it is dumb encrypted blob storage.
 
-Status: **Complete (S0–S3)**. S0 (transport + credentials), S1 (manifest
-crypto), S2 (push-only backup: reconcile, `runSync`, provider, connectivity
-guard, UI), and S3 (two-way pull/restore: manifest v2, pull path, conflict
-flagging, tombstone propagation) are implemented and unit-tested. S0.5
-(live-server roundtrip) and S3.4 (two-device two-way roundtrip) are covered
-by the env-gated `test/live_webdav_test.dart` (run against a real server via
-`LOCKER_LIVE_WEBDAV_URL`; skipped otherwise). 102 tests pass in the default
-hermetic `flutter test` run; the gated live suite adds 3 (S0.5 + S3.4)
-against a real server. S0.5 surfaced and fixed a real bug: spec-strict servers
-(rclone, plain mod_dav) return **409 Conflict** on a nested PUT whose parent
-collection doesn't exist — `WebDAVStore` now `MKCOL`s parents idempotently
-before every write (`_ensureParent`); Nextcloud masked the need.
+Status: **Phase 3 complete** (2026-10-06). Streaming transfers, durable
+encrypted sync state, review-first conflict recovery, byte progress, and
+scoped cancellation land on top of the S0–S3 transport/manifest work. Hermetic
+checks: 219 tests passing, `flutter analyze` clean, debug APK builds. The
+env-gated live suite and physical-device hardware pass are user-run; see
+[`docs/local_server_testing.md`](local_server_testing.md) for server setup and
+the Phase 3 hardware guide.
 
 ## Goals
 
-- Push the vault to a user-chosen server and pull it back on a new device
-  or after a wipe.
+- Push the vault to a user-chosen server and pull it back on another device
+  or after a wipe, without losing a version to a race.
 - The server sees opaque encrypted bytes only.
 - Manual sync first; scheduled/background sync later.
-- Reuse the existing encrypted file format and key model — no new crypto.
+- Reuse the existing encrypted file format, manifest schema, and key model —
+  no new crypto, and older manifests stay readable.
 
 ## Non-goals
 
-- Real-time collaborative sync / CRDT (last-write-wins per file suffices).
+- Real-time collaborative sync / CRDT. Diverged files are resolved by explicit
+  user review, not automatic merge.
 - A hosted cloud account; sync is local / self-hosted only.
 - Multiple simultaneous servers (one remote per vault).
 - Streaming media playback from the server (sync, not remote mount).
+- Payload GC / reaping. Superseded and deleted payloads are retained on both
+  sides for recovery; the manifest is the source of truth (see *Retention*).
+- Carrying the vault master key through WebDAV. Key continuity is a separate
+  concern; see *Key continuity and reinstall*.
 
 ## Security model
 
 | Asset | Where | Exposure if server is compromised |
 |---|---|---|
 | Media ciphertext | Server | Safe. AES-256-GCM/CTR, per-file key derived via PBKDF2 from the master key. Server sees blobs only. |
-| Manifest (index, names, tags, albums, folders) | Server, encrypted | Safe if encrypted with the master key before upload. The raw `vault_file_index` JSON must never be uploaded. |
+| Manifest (index, names, tags, albums, folders) | Server, encrypted | Safe: GCM-encrypted with the master key. The raw `vault_file_index` JSON is never uploaded. |
 | Server credentials (URL, user, app password) | `flutter_secure_storage` → Android Keystore | Safe; same path as the PIN/master-key wrap. |
-| Thumbnails | Local only (v1) | Re-derivable on pull from the decrypted blob; not synced. |
+| Sync baseline + write-ahead journal | `<vault>/.sync-state/`, encrypted | Safe: AES-GCM with the master key. Contains manifest entries + hashes, no credentials. |
+| Explicit deletion records | `flutter_secure_storage` (`locker_sync_deletions`) | Safe: platform-encrypted; ids + timestamps only. |
+| Thumbnails | Local only | Re-derivable from the decrypted blob; not synced. |
 
 Hard rules:
 
-- **Plaintext never crosses the network.** The decrypted-ZIP behavior of
-  `BackupService` stays limited to local export; it is not a sync
-  transport.
-- **The manifest is encrypted** with the vault master key (the same one
-  wrapped by Argon2id on-device). The server holds `manifest.enc`.
-- **Credentials live in `flutter_secure_storage`**, never in
-  `VaultSettings` JSON.
-- **TLS by default**; WebDAV over plain HTTP on the LAN (self-signed
-  certs, `.local` hostnames) is allowed only with an explicit warning, and
-  never by silent downgrade.
-- **No implicit trust of server state.** Pull verifies GCM auth tags on
-  every blob before trusting it.
-- **Decoy vault is out of scope for sync** (leaks its existence, doubles
-  the surface). Main vault only.
+- **Plaintext never crosses the network.** `BackupService`'s decrypted ZIP
+  stays a local export; it is not a sync transport.
+- **The manifest and local sync state are encrypted** with the vault master
+  key. The server holds `manifest.enc` plus content-addressed blobs.
+- **Credentials live in `flutter_secure_storage`**, never in `VaultSettings`
+  JSON or the profile JSON.
+- **TLS by default**; WebDAV over plain HTTP on the LAN (self-signed certs,
+  `.local` hostnames) is allowed only with an explicit warning, never by
+  silent downgrade.
+- **No implicit trust in the server.** Pulls verify sha256 of the ciphertext
+  against the authenticated manifest before anything enters the vault.
+- **No silent unsafe publication.** If the server does not actually honor
+  revision preconditions, sync stops with a plain-language error instead of
+  risking a lost update.
+- **Decoy vault is out of scope** (it leaks its existence, doubles the
+  surface). Main vault only.
 
 ## Architecture
 
 ```
-UI ── Riverpod ── SyncProvider (Notifier: status idle/uploading/downloading/error, lastSync)
+UI ── Riverpod ── SyncProvider (idle · syncing · cancelling · cancelled · success · needsReview · error)
                      │
                      ▼
-               SyncService
-               reconcile(): diff local vs remote manifest → plan → execute
-               • push encrypted blobs (new/changed local)
-               • pull encrypted blobs (new/changed remote)
-               • tombstone deletes
-               • write encrypted manifest last (commit point)
-        ┌──────────┴───────────┐
-        ▼                      ▼
-  VaultStore             RemoteStore
-  (local files,          (WebDAV transport)
-   local index)          getManifest / putManifest /
-                         getBlob / putBlob / deleteBlob / listBlobs
-                                 │ HTTP
-                                 ▼
-                          WebDAV server (NAS / cloud)
+              SyncService  (instance glue: journal recovery, worker lifecycle,
+              │             applying results, persisting baseline/conflicts)
+              │  _workerTask (primitive-only capture) → SensitiveIsolate
+              ▼
+         SyncEngine.run  (three-way reconcile)
+         • hash local payloads as streams
+         • verify/reuse remote blobs; upload via staging + verify + MOVE
+         • pull to temp file + hash verify + atomic move into vault
+         • publish encrypted manifest last, with revision precondition
+              ┌──────────┴───────────┐
+              ▼                      ▼
+        VaultStore              StreamingRemoteStore
+        local files + index     WebDAVStore (streamed PUT/GET, ETag + MOVE)
 ```
 
-`SyncService` is the brain; `RemoteStore` is a thin transport abstraction
-(one interface, one WebDAV implementation) so SFTP/SMB can slot in later
-behind the same `SyncService`.
+`SyncEngine` is pure/param-driven and testable with a fake store.
+`SyncService` owns persistence and UI-facing orchestration; `SyncProvider`
+owns status/progress and cancellation. The legacy byte-array `RemoteStore`
+interface remains for older callers/tests; production sync uses
+`StreamingRemoteStore`.
 
 ### Server layout
 
 ```
 <basePath>/                     # SyncProfile.basePath, default /locker
   manifest.enc                  # encrypted index + metadata + tombstones
-  ab/cd/abcd1234…enc            # content-addressed encrypted media (sha256 of ciphertext)
-  ef/01/ef019876…enc
+  ab/cd/<64-hex>.enc            # content-addressed encrypted media (sha256 of ciphertext)
+  ef/01/<64-hex>.enc
 ```
 
-Blobs are content-addressed by hash of the **ciphertext**: dedupe
-(identical ciphertext across devices), easy diff (manifest lists hashes,
-not paths), and trivial rename/move (metadata-only change). GCM tags
-already authenticate the manifest; a separate signature is YAGNI for v1.
+Blobs stay content-addressed by ciphertext hash: dedupe across devices, easy
+diff (the manifest lists hashes, not paths), and renames/moves are
+metadata-only. Transfers temporarily add `<name>.<uuid>.partial` staging
+objects between the canonical paths; a compatible server never exposes a
+partial body at a canonical name.
 
-## Protocol
+### Local layout
 
-| Protocol | Verdict | Rationale |
-|---|---|---|
-| **WebDAV** | **v1** | Plain HTTP; every NAS/Nextcloud/Synology/ownCloud/Seafile exposes it; one package. `MKCOL`/`PUT`/`GET`/`DELETE`/`PROPFIND` is the whole API. |
-| SFTP | Deferred | Heavy SSH client package (`dartssh2`), key management. Add only if asked. |
-| SMB | Deferred | jCIFS on Android is fragile. |
-| Custom HTTP server | Rejected | Server stays dumb. |
+```
+<vaultRoot>/.sync-state/<targetId>.state     # encrypted baseline + saved conflict choices
+<vaultRoot>/.sync-state/<targetId>.journal   # encrypted write-ahead record of a pending commit
+```
 
-Dependency: `webdav_client` (pub.dev), v1.2.2. Falls back to raw
-`package:http` + `PROPFIND` if its API is awkward.
+`targetId = sha256(serverUrl | basePath | username)` (trailing slashes
+normalized). Editing or replacing the server/profile resets the baseline
+cleanly. Local payload paths are per-file-id
+(`<type>/<sha256(id)>_<contentHash>.<ext>`), so two vault entries can never
+share one file and deleting a copy cannot break another.
+
+## Protocol and publication safety
+
+WebDAV remains the only transport. Before the first read/publish on a profile,
+`WebDAVStore` probes the server (probe objects only — never live vault files):
+
+1. `OPTIONS` must answer `DAV:`; parents are created with idempotent `MKCOL`.
+2. A probe file must expose a **strong ETag** (weak/absent is rejected).
+3. A `MOVE` must **honor `Overwrite: F`** (collision fails 412/423) — the
+   atomic first-creation guard for both publication modes.
+4. The server must pass **one** of two guarding probes:
+   - **ETag preconditions**: a tagged `MOVE` with the matching
+     `If: <etag>` succeeds **and** a mismatched `If` fails 412/423; or
+   - **Exclusive locks**: an exclusive `LOCK` excludes a token-less `MOVE`
+     (423) and authorizes a token-tagged one. Publication then serializes as
+     `LOCK → re-read ETag → guarded MOVE → UNLOCK`, with a 60 s lock timeout
+     so a crashed client clears itself.
+
+The manifest is then published as `PUT <temp>` followed by `MOVE` to the
+canonical name: `Overwrite: F` for first creation; on replacement the
+matching ETag-`If` guard, or the lock guard above. Anything else raises
+`UnsafeRemotePublication` (with a safe reason like `missing-dav-capability`,
+`missing-strong-etag`, `ignored-publication-precondition`,
+`unsupported-publication-guard`) or `RemoteRevisionChanged` on a genuine
+race. `readManifest` rejects a manifest with no strong ETag, and only a
+confirmed 404 is treated as "no manifest yet"; transport/auth/server errors
+propagate instead of being mistaken for a first sync.
+
+rclone — and every Go `x/net/webdav` server — never honors ETag `If`
+conditions: it parses bracketed conditions as lock tokens and 412s them. The
+probe catches this (the matching-ETag test fails) and falls back to the
+verified lock path. If a `LOCK` materializes an empty stub because the
+manifest vanished mid-sync, the stub is deleted under the lock before the
+sync reports the revision race.
 
 ## Sync model
 
-**Last-write-wins per file; manifest as commit point.**
+**Three-way, fingerprint-based. The manifest is the commit point.**
 
-- Each `VaultedFile` has a UUID `id` plus `modifiedAt` / `syncRev`.
-  The manifest maps `id → {hash, modifiedAt, deleted}`.
-- **Reconcile** compares local vs remote manifest by id:
-  - remote has id, local doesn't, not tombstoned → pull
-  - local has id, remote doesn't → push
-  - both have it, hashes differ → newer `modifiedAt` wins; loser is
-    overwritten (no three-way merge in v1; a conflict note is flagged in
-    the UI if both sides changed since last sync)
-  - either side tombstoned → propagate delete
-- **Manifest is the commit point.** Blobs are uploaded/downloaded first;
-  the manifest write (PUT replaces the whole file) commits. A mid-sync
-  crash leaves the old manifest describing a consistent older state; the
-  next run resumes. Re-running sync is idempotent.
-- **No partial-file sync.** Files are atomic units; an encrypted video is
-  fully re-pushed on change (no delta possible).
+- Each side is a map `id → entry` (v2 metadata, including `contentHash` and
+  `deleted` tombstones). The encrypted baseline holds the last state both
+  sides agreed on.
+- Entries are compared by a **content fingerprint** (sha256 of the canonical
+  entry JSON, excluding `id`/`modifiedAt`/`dateModified`; tombstones are
+  `"deleted"`). Wall-clock timestamps never decide an outcome, so clock skew
+  cannot silently pick a winner.
+- Reconcile per id:
+  - unchanged vs baseline, one side changed → take the changed side
+    (push, pull, or tombstone).
+  - both sides changed identically → agree.
+  - both sides changed differently → **conflict**, nothing written for that
+    id until the user resolves it.
+  - unknown id only on remote → pull (two-way) / preserve untouched
+    (push-only backup).
+  - local id missing **and** a recorded deletion exists → push tombstone.
+    A missing file with no recorded deletion is *not* a deletion; the remote
+    entry (and payload) is preserved.
+- **Push-only backup mode** never deletes or overwrites remote-only content:
+  remote-only and remotely-changed entries are preserved, and local
+  additions/changes are pushed. It is additive backup, not a merge.
+- **Conflicts are review-first.** A conflict stores both fingerprints and is
+  shown with local/remote metadata and previews. Choices:
+  - **Local wins** → push the local version.
+  - **Remote wins** → pull the remote version.
+  - **Keep both** (only when both sides are live) → the remote version stays
+    at the original id; the local bytes are copied, hash-verified, into a
+    separate per-id path and a new entry gets a deterministic UUIDv5 derived
+    from `id:local-fingerprint:remote-fingerprint` and a `(local copy)` name.
+  - **Later** → leave unresolved; the next run reports it again.
+  A saved choice is honored only if both current fingerprints still match the
+  ones recorded at decision time; otherwise the conflict is re-raised.
+- **Deletion recording.** A successful delete in the vault registers the id
+  in `locker_sync_deletions` before the index entry is removed. Failed
+  deletions keep their entry (Phase 0 behavior) and register nothing.
+- **Commit ordering and recovery.** Every transfer finishes before commit;
+  the journal (with the checkpoint, affected local/refreshed entries, and the
+  expected manifest hash) is encrypted to disk, then `manifest.enc` is
+  published with the revision guard. The local index is applied
+  snapshot-aware and saved **strictly**: if the index write fails, the
+  baseline is not advanced and the journal stays. On the next `syncNow`, if
+  the remote manifest still matches the journal's hash, the journal is
+  replayed exactly; otherwise the journal is left until the next worker run
+  rewrites it, and the conservative baseline plus retained payloads keep
+  both versions safe.
+- **Cancellation** is cooperative between files and mid-transfer (network
+  token + hash/stream checks). Cancel is ignored only during the brief commit
+  step; locking the vault still hard-kills the worker. A cancelled or killed
+  run leaves the previous manifest and every payload intact; a retry resumes
+  and reuses already-verified blobs. Download scratch lives under
+  `<vault>/temp` and is cleaned up; vault lock clears leftover scratch too.
 
-Direction is a setting: **push-only** (backup, recommended default) or
-**two-way** (enable after push-only is proven).
+### Progress
 
-## Data & config changes
+`SyncProgress` carries the phase, current file name, per-file and overall byte
+counts (or `-1` when the server does not report a length), and file counts.
+The UI renders a per-file bar or a file ratio, whichever the server supports,
+and shows "checking files" / "finishing safely" for hash and commit phases.
 
-- **`SyncProfile`** (URL, username, base path, lastSyncAt, syncDirection,
-  wifiOnly) — stored in `flutter_secure_storage` as JSON, kept out of
-  `VaultSettings`. Done, plus `SyncProfileService` CRUD with per-profile
-  password keys (`sync_profile_pw_<id>`); passwords never live in the
-  profile JSON.
-- **`VaultSettings` additions:** `syncEnabled` (bool, default false),
-  `syncProfileId` (String?). Done.
-- **`VaultedFile` additions:** `modifiedAt`, `remoteHash`, `syncedDeleted`
-  (tombstone flag). Done. No load-time migration: `runSync` backfills
-  `modifiedAt` lazily (sync completion time when missing);
-  `buildManifest` falls back to `dateModified` → `dateAdded`.
-- **`RemoteManifest`** model (`version`, `deviceId`, `generatedAt`,
-  `entries: [{id, contentHash, modifiedAt, deleted}]`). Done.
-- **`SyncService`** is Riverpod-native: instance ctor
-  `SyncService(VaultStore, EncryptionService)` via `syncServiceProvider`
-  (no singleton). Pure diff/manifest logic is static; `runSync` is static
-  and param-driven (testable with a fake `RemoteStore`); `syncNow` is the
-  thin instance glue. S3 bumped the manifest to **v2**: `ManifestEntry`
-  now carries the full per-file metadata (name, type, mime, size, dates,
-  encryption fields, tags, favorite, album/folder ids) so a fresh device
-  can restore files. v1 manifests still deserialize (missing keys default).
+### Retention
 
-## Phased plan
+Superseded blobs and tombstones keep their payloads on both sides. Remote
+deletes are logical (manifest tombstones); local deletes remove the index
+entry but the file is only removed by an explicit user delete. Nothing in the
+sync path calls `DELETE` on a canonical blob. This is a deliberate
+data-recovery trade-off; reclaiming space is out of scope until a safe GC
+design exists.
 
-### S0 — Transport + credentials (1–2 days)
+## Key continuity and reinstall
 
-| # | Task | Location | Status |
-|---|---|---|---|
-| S0.1 | Add `webdav_client` dep (1.2.2) | `pubspec.yaml` | Done |
-| S0.2 | `RemoteStore` interface + WebDAV impl: `ping`, `getManifest`, `putManifest`, `getBlob`, `putBlob`, `deleteBlob`, `listBlobs` | `lib/services/remote/` | Done |
-| S0.3 | `SyncProfile` model + secure-storage CRUD | `lib/models/sync_profile.dart`, `lib/services/sync_profile_service.dart` | Done |
-| S0.4 | Connection settings UI: URL/user/password, "Test connection", TLS warning for plain HTTP | `lib/screens/sync_settings_screen.dart` | Done |
-| S0.5 | Live-server roundtrip: connect to a real WebDAV URL, put/get a tiny blob, assert roundtrip | `test/live_webdav_test.dart` (env-gated) | Done — also surfaced+fixed the nested-PUT 409 bug |
+The vault master key is random per device and is **not** uploaded by WebDAV.
+The PIN/password only wraps it. Therefore:
 
-**Verify:** connect to a real WebDAV server (Nextcloud demo or
-`rclone serve webdav`), roundtrip a blob; credentials persist across
-restart. — Covered by `test/live_webdav_test.dart` (env-gated; see
-"Running the live tests" below).
-
-### S1 — Encrypted manifest (1–2 days)
-
-| # | Task | Location | Status |
-|---|---|---|---|
-| S1.1 | `RemoteManifest` model + JSON (de)serialize | `lib/models/remote_manifest.dart` | Done |
-| S1.2 | Build manifest from `VaultStore` index; encrypt with master key; decrypt on read | `SyncService.buildManifest` / `runSync` | Done |
-| S1.3 | Content-addressed blob naming (sha256 of ciphertext, sharded `ab/cd/`) | `SyncService.blobNameFor` | Done |
-| S1.4 | Push/pull manifest only (no blobs yet) — proves crypto + transport glue | extends S0 | Done |
-
-**Verify:** upload encrypted manifest, wipe local, pull manifest back,
-decrypt, assert it equals the original index; inspect the server to
-confirm no plaintext left the device.
-
-### S2 — Push-only backup (2–3 days)
-
-| # | Task | Location | Status |
-|---|---|---|---|
-| S2.1 | `reconcile()` diff engine (local vs remote manifest) → plan (push/pull/delete lists), covers tombstone deletion and two-way pull cases | `SyncService.reconcile` | Done |
-| S2.2 | Execute push plan: upload new/changed blobs, then commit manifest (static `runSync`, manifest last, idempotent) | `SyncService.runSync` | Done |
-| S2.3 | `SyncProvider` (Riverpod Notifier): status enum, progress, `syncNow()` | `lib/providers/sync_provider.dart` | Done |
-| S2.4 | `connectivity_plus` guard (wifiOnly / connected) in `SyncNotifier.syncNow()`; keeps `runSync` pure | `SyncNotifier` | Done |
-| S2.5 | UI: status card + "Sync now" in settings, progress reporting, drawer entry via vault settings "Server Sync" | `sync_settings_screen.dart`, `vault_settings_screen.dart` | Done |
-| S2.6 | Behavioral test: seed vault, sync, assert every local file has a remote blob and the manifest lists it; plus tombstone reaping and idempotent re-run (`_MemStore` fake `RemoteStore`) | `test/sync_service_test.dart` | Done |
-
-**Verify:** fill vault, push to server, inspect server (all opaque `.enc`),
-wipe app data, reinstall → pull restores the vault intact (decrypt +
-auth-tag verify per file).
-
-### S3 — Two-way sync (2–3 days)
-
-| # | Task | Location | Status |
-|---|---|---|---|
-| S3.1 | Pull path: download missing/changed blobs, verify GCM auth tag, import into `VaultStore` | `SyncService` pull branch | Done |
-| S3.2 | Last-write-wins resolution + conflict UI note when both sides changed | `reconcile` | Done |
-| S3.3 | Tombstone propagation (delete on one device → delete on other, with confirmation) | `reconcile` + UI | Done |
-| S3.4 | Two-device roundtrip test | `test/live_webdav_test.dart` (env-gated, two-way) | Done |
-
-**Verify:** device A adds files → sync → device B pulls them; device B
-edits → sync → device A sees the edit; delete on A propagates to B.
-Covered by simulated two-device tests in `test/sync_service_test.dart`
-(in-memory `RemoteStore`) **and** the live two-device run in
-`test/live_webdav_test.dart` (env-gated, real server). The live suite
-also asserts pull rejects a tampered blob (sha256 mismatch → `StateError`).
-
-**S3 ceilings (deliberate simplifications):**
-
-- **Pull integrity** is satisfied transitively: the manifest is
-  GCM-authenticated (root of trust) and each pulled blob's sha256 must
-  equal the manifest's `contentHash`. A tampered/swapped blob breaks the
-  hash. A full decrypt-to-verify-the-tag is redundant (pushed files are
-  always decryptable); add it only if a non-vault blob could enter the
-  store.
-- **Conflict detection** flags only the local-newer-and-remote-diverged
-  case. The remote-newer direction can't be detected without hashing
-  local content, so a stale local edit overwritten by a pull is silent.
-  LWW still resolves both; three-way merge is an explicit non-goal.
-- **Tombstones** propagate automatically under LWW (no blocking
-  confirmation dialog); the reaped/deleted count is surfaced in the sync
-  summary. A pre-delete confirmation prompt is S4 polish.
-- **Albums/folders** collection definitions are not synced (S4); file-
-  level `albumIds`/`folderId` are carried, and the UI already tolerates
-  dangling references.
-- **Orphan blob GC** is deferred. When a file's content changes, the new
-  blob is uploaded and the manifest points at it, but the *old* blob is
-  left on the server (the manifest no longer references it, so nothing
-  reaps it). `runSync` never calls `listBlobs`; there is no GC pass yet.
-  Add one (reconcile server blobs vs manifest hashes) only if storage
-  growth from superseded blobs becomes a real complaint.
-
-### S4 — Polish / scheduling (optional, deferred)
-
-Background sync via WorkManager, conflict-resolution UX, per-album sync
-filters, restore-from-server onboarding. Ship S3 first; build S4 only if
-the feature gets used.
+- **The server alone cannot restore the vault to a fresh device.** Two
+  devices with the same password still have different master keys.
+- To use sync on a new device, restore key continuity first with **Restore
+  from desktop** (the desktop snapshot carries a key bundle; the *original*
+  vault credential unlocks it) or port the vault via a Desktop backup.
+  After the key is installed, server sync pulls and decrypts normally.
+- **Uninstall / "clear app data" is controlled by the OS and cannot be
+  blocked by the app.** It deletes the app-private vault, the wrapped key in
+  secure storage, and the local sync baseline. The safety net is an external
+  copy — Desktop backup/restore, a local ZIP backup kept outside app-private
+  storage, and the encrypted server copy — plus the original credential.
+  Settings → Storage and Settings → Server sync repeat this guidance, and the
+  app steers backups away from app-private directories.
 
 ## Running the live tests
 
-`test/live_webdav_test.dart` covers S0.5 (raw transport: ping, manifest,
-nested sharded blob roundtrip, delete, list) and S3.4 (full two-device
-two-way `runSync` against the real server, plus tampered-blob rejection).
-It is **skipped by default** — it only runs when `LOCKER_LIVE_WEBDAV_URL`
-is set, so the normal `flutter test` suite stays hermetic.
+`test/live_webdav_test.dart` covers the raw transport roundtrip and the full
+two-device two-way run against a real server, including retained payloads,
+manifest tombstones, and tampered-blob rejection. It is **skipped by
+default**; it runs only when `LOCKER_LIVE_WEBDAV_URL` is set, so the normal
+`flutter test` suite stays hermetic. Server setup, expected behavior, and the
+Phase 3 hardware guide live in
+[`docs/local_server_testing.md`](local_server_testing.md).
 
-To set up a local server (rclone, on all interfaces for physical-device
-testing) and the full expected-output reference, see
-[`docs/local_server_testing.md`](local_server_testing.md). Quick run against
-its canonical `:8080` server:
-
-```sh
-LOCKER_LIVE_WEBDAV_URL=http://127.0.0.1:8080 \
-LOCKER_LIVE_WEBDAV_USER=locker \
-LOCKER_LIVE_WEBDAV_PASS=locker \
-flutter test test/live_webdav_test.dart
-```
-
-Each run uses a unique `basePath` (`/locker-live-<micros>`) for isolation
-and best-effort deletes its blobs after. The `Not Found` debug lines during
-the run are expected (absent-blob → null, and the first-sync "no remote
-manifest yet" path). A plain `flutter test` (no env) reports the suite
-skipped. Expected green run + full per-test breakdown live in
-`local_server_testing.md` → *Automated two-way verification (S3.4)*.
+A clean run prints `[Latch] {...}` JSON diagnostics for sync commits; any
+failure prints `[Latch][<error-id>] ...` lines that can be copied for a bug
+report. Credentials, URLs, and filenames are never logged.
 
 ## Files
 
-New:
+Core sync path (Phase 3 additions marked **new**):
 
 ```
-lib/models/sync_profile.dart            sync profile (creds in secure storage)    [done]
-lib/models/remote_manifest.dart         encrypted manifest schema                 [done]
-lib/services/remote/remote_store.dart   transport interface                       [done]
-lib/services/remote/webdav_store.dart   WebDAV impl (MKCOLs parent dirs on write) [done]
-lib/services/sync_profile_service.dart  secure-storage CRUD for profiles          [done]
-lib/services/sync_service.dart          reconcile + runSync (push + two-way pull) [done]
-lib/providers/sync_provider.dart        Riverpod status Notifier                  [done]
-lib/screens/sync_settings_screen.dart   connection + sync UI                      [done]
-test/sync_service_test.dart             behavioral net (reconcile + manifest crypto, 29 tests) [done]
-test/webdav_store_test.dart             transport path-logic self-check           [done]
-test/live_webdav_test.dart              env-gated live roundtrip: S0.5 + S3.4     [done]
+lib/models/sync_profile.dart                 profile (creds in secure storage)
+lib/models/remote_manifest.dart              manifest schema (v2, v1-compatible)
+lib/models/sync_conflict.dart            new conflict model + fingerprint
+lib/services/remote/remote_store.dart        RemoteStore + StreamingRemoteStore interfaces
+lib/services/remote/webdav_store.dart        WebDAV impl (streaming, ETag/MOVE, capability probe)
+lib/services/remote/server_errors.dart       plain-language error mapping
+lib/services/sync_service.dart               glue: journal recovery, apply, persistence
+lib/services/sync_engine.dart            new three-way reconcile + transfer engine
+lib/services/sync_state_store.dart       new encrypted baseline/journal/deletions
+lib/services/sync_control.dart           new cancellation token wrapper
+lib/services/diagnostics.dart            new copyable, redacted release diagnostics
+lib/services/sync_profile_service.dart       secure-storage CRUD for profiles
+lib/providers/sync_provider.dart             Riverpod status/progress/cancel Notifier
+lib/screens/sync_settings_screen.dart        connection + sync + conflict-review UI
 ```
 
-
-Changed:
+Tests:
 
 ```
-pubspec.yaml                              + webdav_client (1.2.2)                [done]
-lib/models/vault_settings.dart            + syncEnabled, syncProfileId           [done]
-lib/models/vaulted_file.dart              + modifiedAt, remoteHash, syncedDeleted [done]
-lib/services/vault_service.dart           + `store` getter (shares VaultStore w/ Riverpod services) [done]
-lib/providers/sync_provider.dart          wires syncServiceProvider + syncProvider [done]
-lib/screens/vault_settings_screen.dart    + "Server Sync" entry in Storage section [done]
+test/sync_service_test.dart          reconcile + manifest + two-device behavior
+test/phase3_sync_test.dart       new conflict/interruption/recovery/worker coverage
+test/webdav_streaming_test.dart  new loopback WebDAV fixture + full syncNow/worker test
+test/sync_state_store_test.dart  new encrypted state + deletions coverage
+test/webdav_store_test.dart          transport path-logic self-check
+test/live_webdav_test.dart           env-gated live roundtrip + two-device + tamper
 ```
 
 ## Dependencies
 
-- **Add:** `webdav_client` v1.2.2 (done).
-- **Reuse:** `connectivity_plus`, `flutter_secure_storage`, existing
-  `lib/crypto/` — no new crypto code.
+- `webdav_client` v1.2.2 (existing), `dio`, `crypto`, `flutter_secure_storage`,
+  `connectivity_plus` — no new packages, and no new crypto code beyond reusing
+  the existing AES-GCM envelope.
 
 ## Verification discipline
 
-Per the refactor roadmap's test rules: no per-method suites, one happy-path
-test per phase, one failure path for anything security-touching. Each
-phase leaves one runnable check (assert-based self-check or a `test_*.dart`)
-that fails if the phase's logic breaks. The two-device roundtrip acceptance
-test for S3 is `test/live_webdav_test.dart` (env-gated, see above) —
-previously a manual step, now scripted; a human spot-check against the real
-target NAS is still the final sign-off.
+Hermetic coverage is the default: streamed transfers, publication
+preconditions, cancellation, conflict outcomes, journaled recovery, and
+worker isolation are all asserted in `flutter test`. The env-gated
+`test/live_webdav_test.dart` exercises a real server but stays out of the
+default run. A physical-device pass (large files, cancel/retry, lock mid-sync,
+conflict review, real-server capability probing) remains the release sign-off
+and is scripted in `docs/local_server_testing.md`.
 
 ## Open decisions
 
 1. **Protocol scope:** WebDAV only for v1, or SFTP too? WebDAV covers
    ~all NAS/cloud cases; SFTP roughly doubles the transport work.
-2. ~~**Staging:** push-only (S2) before two-way (S3), or two-way as the
-   first deliverable?~~ **Resolved:** push-only shipped first, two-way
-   (S3) layered on top — both now live.
-3. **Decoy vault sync:** excluded in v1; confirm the decoy stays
-   device-local.
-4. **Public WebDAV providers** (e.g. paid WebDAV hosts) allowed, or
-   self-hosted only? Technically identical; a wording call for the
-   settings screen.
-5. **Timing vs. refactor Phase 4:** sync lands Riverpod-native after
-   Phase 4. If needed sooner it ships as a singleton and is migrated in
-   Phase 4 — slightly more churn.
-6. **Orphan blob GC** (new): superseded content blobs linger on the
-   server; add a manifest-vs-`listBlobs` reap pass if storage growth
-   becomes a complaint (see S3 ceilings).
+2. **Public WebDAV providers** (paid hosts) allowed, or self-hosted only?
+   Technically identical; a wording call for the settings screen.
+3. **GC design:** payload retention is intentional. If storage growth
+   becomes a complaint, design a reviewable reap pass (manifest-aware, never
+   touching tombstoned or baseline-referenced blobs) rather than an automatic
+   delete.
+4. **Album/folder collection definitions** are still not synced (file-level
+   ids are carried; dangling references are tolerated).
