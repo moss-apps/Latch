@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'dart:isolate';
 
+import 'package:flutter/foundation.dart';
+
 class SensitiveIsolate {
+  static const _tag = '[SensitiveIsolate]';
   static int _generation = 0;
   static final Map<Isolate, void Function()> _running = {};
 
@@ -9,23 +12,60 @@ class SensitiveIsolate {
     final generation = _generation;
     final port = ReceivePort();
     final result = Completer<T>();
+    Object? workerError;
+    StackTrace? workerStack;
+
+    void logFailure(String detail) {
+      debugPrint('$_tag worker failed: $detail');
+      final stack = workerStack;
+      if (stack != null) {
+        debugPrintStack(label: _tag, stackTrace: stack);
+      }
+    }
+
     final subscription = port.listen((message) {
       if (result.isCompleted) return;
       if (message is List && message.length == 2 && message[0] == 'result') {
         result.complete(message[1] as T);
-      } else {
-        result.completeError(StateError('Sensitive worker failed: $message'));
+        return;
       }
+      if (message == null) {
+        final detail =
+            workerError?.toString() ?? 'exited without returning a result';
+        logFailure(detail);
+        result.completeError(StateError('Sensitive worker failed: $detail'));
+        return;
+      }
+      // Isolate.spawn delivers uncaught errors as [error, stackTrace].
+      if (message is List && message.length == 2) {
+        workerError = message[0];
+        final raw = message[1];
+        workerStack = raw is StackTrace
+            ? raw
+            : raw == null
+                ? null
+                : StackTrace.fromString('$raw');
+      } else {
+        workerError = message;
+      }
+      logFailure('$workerError');
+      result.completeError(StateError('Sensitive worker failed: $workerError'));
     });
     Isolate? isolate;
     try {
-      isolate = await Isolate.spawn(
-        _entry,
-        [port.sendPort, task],
-        onError: port.sendPort,
-        onExit: port.sendPort,
-        errorsAreFatal: true,
-      );
+      try {
+        isolate = await Isolate.spawn(
+          _entry,
+          [port.sendPort, task],
+          onError: port.sendPort,
+          onExit: port.sendPort,
+          errorsAreFatal: true,
+        );
+      } catch (e, st) {
+        debugPrint('$_tag spawn failed: $e');
+        debugPrintStack(label: _tag, stackTrace: st);
+        rethrow;
+      }
       if (generation != _generation) {
         isolate.kill(priority: Isolate.immediate);
         throw StateError('Vault session expired');

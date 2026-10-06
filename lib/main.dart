@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:ui' show PlatformDispatcher;
 
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,6 +29,20 @@ import 'utils/performance_config.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    if (kReleaseMode) {
+      debugPrint('[Fatal] ${details.exceptionAsString()}');
+      final stack = details.stack;
+      if (stack != null) debugPrint('$stack');
+    }
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('[Uncaught] $error');
+    debugPrint('$stack');
+    return true;
+  };
 
   PerformanceConfig.configureHighFrameRate();
   PerformanceConfig.optimizeImageCache();
