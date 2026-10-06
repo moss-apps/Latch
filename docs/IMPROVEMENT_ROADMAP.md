@@ -18,7 +18,7 @@ This roadmap turns the product review into phased, actionable work. Phases are o
 | 0 | Reliability and data integrity | **Done** | Critical |
 | 1 | Protection defaults and import clarity | **Done** | High |
 | 2 | Session locking | **Done** | High |
-| 3 | Large-vault sync and conflict recovery | **Not started** | High |
+| 3 | Large-vault sync and conflict recovery | **Done** | High |
 | 4 | Import convenience and discovery | **Not started** | Medium |
 | 5 | Recovery and product polish | **Not started** | Medium |
 
@@ -81,16 +81,28 @@ Lock cleanup zeroes cached master, decoy, and per-file key buffers, clears pendi
 
 ## Phase 3 — Large-vault sync and conflict recovery
 
-**Status: Not started**
+**Status: Done**
 
-| Item | Work | Acceptance criteria |
-|---|---|---|
-| 3.1 | Stream WebDAV blob transfers and hashes instead of loading whole files into memory. | Large files sync without allocating a full extra in-memory copy; interrupted transfers fail safely and can be retried. |
-| 3.2 | Surface byte-level progress and cancellation. | The user sees current file, transferred bytes, total bytes, and a cancellation action. Cancellation leaves the manifest in a consistent state. |
-| 3.3 | Improve conflict recovery. | Conflicts are inspectable and recoverable; the user's local or remote copy is not silently lost under last-write-wins behavior. |
-| 3.4 | Add tests for interruption and conflict outcomes. | Tests prove retry safety, manifest commit ordering, and preservation of both versions or an explicit user-selected resolution. |
+Implemented 2026-10-06. The rewrite replaces whole-buffer transfers and last-write-wins reconciliation:
 
-**Review findings:** `SyncService` currently reads and uploads complete blobs as byte arrays, and `syncNow` invokes the engine in an isolate without forwarding per-file progress. Conflicts are summarized after last-write-wins reconciliation; the current behavior does not provide a choose/keep-both flow.
+- **Streaming transfers.** Blobs are hashed and uploaded/downloaded as streams through staging files (`PUT` to a temporary name, verify, then `MOVE` into place); pulls write to a `.partial` file, verify sha256, then move into the vault. No full in-memory copy, and interrupted transfers leave the previous canonical blob untouched.
+- **Durable, encrypted sync state.** A per-target baseline and a write-ahead journal live under `<vault>/.sync-state/<targetId>.state|.journal`, AES-GCM-encrypted with the master key; explicit deletions are recorded in secure storage at delete time. Crash, lock-kill, or a failed local index write cannot advance the baseline or drop either version.
+- **Snapshots, not clocks.** Reconcile compares a content fingerprint of each entry against the local view, the remote manifest, and the last agreed baseline; timestamp skew cannot decide an outcome.
+- **Review-first conflicts.** Diverged files become `needsReview` conflicts with local/remote/keep-both/later choices; keep-both writes a hash-verified separate copy with a distinct id. The manifest is never rewritten with a losing version.
+- **Safe publication.** `manifest.enc` publication probes the server (DAV header, strong ETag, honored `Overwrite: F` / `If` preconditions) before trusting it and is rejected with a plain-language error when the server would silently ignore revision guards. No silent fallback.
+- **Progress and cancellation.** The UI shows phase, file name, per-file and overall bytes (unknown totals stay indeterminate); cancel is cooperative mid-transfer, ignored only for the brief commit step, and lock cleanup still hard-kills the worker. A partial transfer leaves the manifest and both payloads intact and retries cleanly.
+- **Payload retention, no GC.** Remote "deletes" are manifest tombstones; superseded and deleted payloads are retained on both sides for recovery. Reclaimed-space GC is deliberately out of scope.
+
+| Item | Work | Acceptance criteria | Status |
+|---|---|---|---|
+| 3.1 | Stream WebDAV blob transfers and hashes instead of loading whole files into memory. | Large files sync without allocating a full extra in-memory copy; interrupted transfers fail safely and can be retried. | **Done** |
+| 3.2 | Surface byte-level progress and cancellation. | The user sees current file, transferred bytes, total bytes, and a cancellation action. Cancellation leaves the manifest in a consistent state. | **Done** |
+| 3.3 | Improve conflict recovery. | Conflicts are inspectable and recoverable; the user's local or remote copy is not silently lost under last-write-wins behavior. | **Done** |
+| 3.4 | Add tests for interruption and conflict outcomes. | Tests prove retry safety, manifest commit ordering, and preservation of both versions or an explicit user-selected resolution. | **Done** |
+
+**Checks:** `flutter test --no-pub`: 219 passing; `flutter analyze --no-pub`: clean; `flutter build apk --debug --no-pub`: successful. Regression coverage includes streamed staging/MOVE transfers over a loopback WebDAV fixture, publication-precondition rejection, mid-body cancellation, stale-ETag races, corrupt-pull rejection, encrypted-journal recovery after a failed index write, backup-mode remote preservation, every conflict direction and resolution, and worker-scoped cancellation. Physical-device verification (1–2 GB transfers, cancel/retry, mid-sync lock, conflict review, real-server capability probing) is user-run; see `docs/local_server_testing.md` → *Phase 3 hardware guide*.
+
+**Remaining limits (documented, not silent):** album/folder definitions still do not sync (file-level ids are carried); payload GC is deferred in favor of retention; and WebDAV sync does not carry the vault master key, so reinstall/new-device recovery requires the Desktop backup/restore key bundle or the original credential (see `docs/local_server_sync.md` → *Key continuity and reinstall*).
 
 ## Phase 4 — Import convenience and discovery
 

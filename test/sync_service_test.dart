@@ -569,7 +569,8 @@ void main() {
       );
 
       expect(remote.putBlobCalls, 0);
-      expect(result.blobsPushed, 1);
+      expect(result.blobsPushed, 0);
+      expect(result.blobsReused, 1);
       expect(result.refreshedLocal.single.remoteHash, hash);
 
       await dir.delete(recursive: true);
@@ -627,7 +628,7 @@ void main() {
       await dir.delete(recursive: true);
     });
 
-    test('tombstone: reaps the remote blob and records a deleted entry',
+    test('tombstone: records a deletion and retains the recoverable blob',
         () async {
       final dir = await Directory.systemTemp.createTemp('locker_sync_tomb_');
       final f = File('${dir.path}/blob.enc');
@@ -660,13 +661,15 @@ void main() {
           .copyWith(syncedDeleted: true, modifiedAt: DateTime(2024, 6, 2));
       final r2 = await SyncService.runSync(
         local: [tombstoned],
+        checkpoint: r1.checkpoint,
         masterKey: masterKey,
         remote: remote,
         deviceId: 'dev1',
         now: DateTime.utc(2024, 6, 3),
       );
-      expect(r2.blobsDeleted, 1);
-      expect((await remote.listBlobs()).length, 0);
+      expect(r2.filesDeleted, 1);
+      expect(r2.blobsDeleted, 0);
+      expect((await remote.listBlobs()).length, 1);
 
       final manifest = SyncService.decryptManifest(
         (await remote.getManifest())!,
@@ -765,7 +768,7 @@ void main() {
         dateAdded: DateTime(2024, 1, 1),
         modifiedAt: DateTime(2024, 1, 1),
       );
-      await SyncService.runSync(
+      final rA1 = await SyncService.runSync(
         local: [seeded],
         masterKey: masterKey,
         remote: remote,
@@ -795,6 +798,7 @@ void main() {
       // B pushes the edit.
       await SyncService.runSync(
         local: [bEdited],
+        checkpoint: rB.checkpoint,
         masterKey: masterKey,
         remote: remote,
         deviceId: 'B',
@@ -805,6 +809,7 @@ void main() {
 
       // A pulls the edit using A's refreshed index from the first push.
       final rA2 = await SyncService.runSync(
+        checkpoint: rA1.checkpoint,
         local: [
           VaultedFile(
             id: 'a',
@@ -878,7 +883,7 @@ void main() {
       final onB = rB.refreshedLocal.single;
       expect(await File(onB.vaultPath).exists(), isTrue);
 
-      // A deletes (tombstone) + pushes; blob reaped.
+      // A deletes; old payloads remain available for recovery.
       final tombstoned = rA.refreshedLocal.first.copyWith(syncedDeleted: true);
       await SyncService.runSync(
         local: [tombstoned],
@@ -888,8 +893,9 @@ void main() {
         vaultRoot: dirA.path,
         direction: SyncDirection.twoWay,
         now: DateTime.utc(2024, 6, 3),
+        checkpoint: rA.checkpoint,
       );
-      expect((await remote.listBlobs()).length, 0);
+      expect((await remote.listBlobs()).length, 1);
 
       // B syncs again → remote tombstone propagates, B's file is deleted.
       final rB2 = await SyncService.runSync(
@@ -900,10 +906,11 @@ void main() {
         vaultRoot: dirB.path,
         direction: SyncDirection.twoWay,
         now: DateTime.utc(2024, 6, 4),
+        checkpoint: rB.checkpoint,
       );
-      final bAfter = rB2.refreshedLocal.single;
-      expect(bAfter.syncedDeleted, isTrue);
-      expect(await File(onB.vaultPath).exists(), isFalse);
+      expect(rB2.refreshedLocal, isEmpty);
+      expect(rB2.plan.toTombstoneLocal, ['a']);
+      expect(await File(onB.vaultPath).exists(), isTrue);
 
       await dirA.delete(recursive: true);
       await dirB.delete(recursive: true);

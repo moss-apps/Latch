@@ -247,12 +247,13 @@ class VaultStore implements LocalStore {
   /// Pull PB rows the cache is missing (outage survivors with their blob
   /// still on disk) back into the cache before a reconciling save, so
   /// reconcile doesn't delete them.
-  Future<void> _healDivergedCache() async {
+  Future<void> _healDivergedCache({Set<String> removedIds = const {}}) async {
     try {
       final pbFiles = await pbStore!.loadFileIndex(forceReload: true);
       final cacheIds = (cachedFiles ?? const []).map((f) => f.id).toSet();
       final missing = <VaultedFile>[];
       for (final f in pbFiles) {
+        if (removedIds.contains(f.id)) continue;
         if (cacheIds.contains(f.id)) continue;
         if (!await File(f.vaultPath).exists()) continue;
         missing.add(f);
@@ -298,14 +299,19 @@ class VaultStore implements LocalStore {
   }
 
   @override
-  Future<void> saveFileIndex({bool isDecoy = false}) async {
+  Future<void> saveFileIndex({bool isDecoy = false, bool strict = false,
+      bool allowEmpty = false, Set<String> removedIds = const {}}) async {
     if (!isDecoy && pbStore != null) {
       if (_nonDecoyDiverged) {
-        await _healDivergedCache();
+        await _healDivergedCache(removedIds: removedIds);
       }
       pbStore!.cachedFiles = cachedFiles ?? const [];
       try {
         await pbStore!.saveFileIndex();
+        if (strict) {
+          await _writeLegacyFileIndex(files: cachedFiles ?? const [], isDecoy: false,
+              strict: true, allowEmpty: allowEmpty, removedIds: removedIds);
+        }
         return;
       } catch (e) {
         debugPrint('[PB] saveFileIndex failed, falling back to legacy: $e');
@@ -314,6 +320,7 @@ class VaultStore implements LocalStore {
           files: cachedFiles ?? const [],
           isDecoy: false,
           unionWithLegacy: true,
+          strict: strict, allowEmpty: allowEmpty, removedIds: removedIds,
         );
         return;
       }
@@ -321,6 +328,7 @@ class VaultStore implements LocalStore {
     await _writeLegacyFileIndex(
       files: (isDecoy ? cachedDecoyFiles : cachedFiles) ?? const [],
       isDecoy: isDecoy,
+      strict: strict, allowEmpty: allowEmpty, removedIds: removedIds,
     );
   }
 
@@ -332,6 +340,9 @@ class VaultStore implements LocalStore {
     required List<VaultedFile> files,
     required bool isDecoy,
     bool unionWithLegacy = false,
+    bool strict = false,
+    bool allowEmpty = false,
+    Set<String> removedIds = const {},
   }) async {
     try {
       var toWrite = files;
@@ -342,6 +353,7 @@ class VaultStore implements LocalStore {
         final fileIds = files.map((f) => f.id).toSet();
         final survivors = <VaultedFile>[];
         for (final f in legacy) {
+          if (removedIds.contains(f.id)) continue;
           if (fileIds.contains(f.id)) continue;
           if (!await File(f.vaultPath).exists()) continue;
           survivors.add(f);
@@ -353,7 +365,7 @@ class VaultStore implements LocalStore {
 
       final jsonList = toWrite.map((file) => file.toJson()).toList();
 
-      if (jsonList.isEmpty) {
+      if (jsonList.isEmpty && !allowEmpty) {
         final existing = await _storage.read(key: key);
         if (existing != null && existing.isNotEmpty) {
           final existingCount = (jsonDecode(existing) as List<dynamic>).length;
@@ -369,6 +381,7 @@ class VaultStore implements LocalStore {
       await _storage.write(key: key, value: jsonEncode(jsonList));
     } catch (e) {
       debugPrint('Error saving vault index: $e');
+      if (strict) rethrow;
     }
   }
 

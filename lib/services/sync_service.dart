@@ -12,36 +12,53 @@ import '../models/encryption_algorithm.dart';
 import '../models/remote_manifest.dart';
 import '../models/sync_profile.dart';
 import '../models/vaulted_file.dart';
+import '../models/sync_conflict.dart';
 import 'encryption_service.dart';
+import 'sync_engine.dart';
+import 'sync_control.dart';
+import 'sync_state_store.dart';
 import 'sensitive_isolate.dart';
 import 'remote/remote_store.dart';
 import 'remote/webdav_store.dart';
 import 'vault_store.dart';
+import 'diagnostics.dart';
 
 /// Phase of an in-flight sync, surfaced to the UI via [SyncProgress].
-enum SyncPhase { connecting, uploading, downloading, committing, done }
+enum SyncPhase { connecting, hashing, uploading, downloading, committing, done }
 
-/// Coarse progress for the UI. [completed]/[total] are file counts.
+/// File and byte progress; -1 means the server did not provide a byte total.
 class SyncProgress {
   final SyncPhase phase;
   final int completed;
   final int total;
+  final String? filename;
+  final int fileBytes;
+  final int fileTotal;
+  final int transferredBytes;
+  final int totalBytes;
 
   const SyncProgress({
     this.phase = SyncPhase.uploading,
     this.completed = 0,
     this.total = 0,
+    this.filename,
+    this.fileBytes = 0,
+    this.fileTotal = -1,
+    this.transferredBytes = 0,
+    this.totalBytes = -1,
   });
 }
 
-/// Outcome of one [SyncService.runSync]. [refreshedLocal] is the local index
-/// with pushed files' `remoteHash`/`modifiedAt` refreshed — the caller persists
-/// it back into [VaultStore] so the next run skips unchanged files.
+/// Apply this result with [SyncService.complete] before reporting success.
 class SyncResult {
   final int blobsPushed;
   final int blobsDeleted;
   final int blobsPulled;
   final int blobsSkipped;
+  final int blobsReused;
+  final int filesDeleted;
+  final List<VaultedFile> originalLocal;
+  final SyncCheckpoint checkpoint;
   final SyncPlan plan;
   final List<VaultedFile> refreshedLocal;
   final DateTime completedAt;
@@ -51,34 +68,34 @@ class SyncResult {
     required this.blobsDeleted,
     required this.blobsPulled,
     this.blobsSkipped = 0,
+    this.blobsReused = 0,
+    this.filesDeleted = 0,
+    this.originalLocal = const [],
+    this.checkpoint = const SyncCheckpoint(),
     required this.plan,
     required this.refreshedLocal,
     required this.completedAt,
   });
 
   bool get didAnything =>
-      blobsPushed > 0 || blobsDeleted > 0 || blobsPulled > 0;
+      blobsPushed > 0 || blobsDeleted > 0 || blobsPulled > 0 || filesDeleted > 0;
 }
 
 /// The result of diffing local vault state against a remote manifest.
 class SyncPlan {
-  /// Local files newer than (or absent from) the remote — upload these.
+  /// Local versions selected for publication.
   final List<VaultedFile> toPush;
 
-  /// Remote entries newer than local, or absent locally — download these.
-  /// Populated only for two-way sync (Phase S3); push-only ignores it.
+  /// Remote versions selected for download.
   final List<ManifestEntry> toPull;
 
-  /// Content-addressed blob names to delete (tombstoned files).
+  /// Logical deletions. Phase 3 retains the payloads for recovery.
   final List<String> toDelete;
 
-  /// Live local ids where both sides changed since the last sync. Last-write-
-  /// wins still resolves the outcome; this is surfaced as a UI note only.
-  /// only local-newer conflicts; remote-newer needs local hashing — three-way merge is a non-goal.
+  /// IDs awaiting review; neither version is replaced automatically.
   final List<String> conflicts;
 
-  /// Live local ids a remote tombstone should delete (two-way only, LWW: the
-  /// tombstone must be at least as new as the local copy).
+  /// IDs removed from the local index after the manifest is committed.
   final List<String> toTombstoneLocal;
 
   const SyncPlan({
@@ -114,7 +131,11 @@ class SyncService {
     required SyncProfile profile,
     required String password,
     required String deviceId,
+    void Function(SyncProgress)? onProgress,
+    SyncControl? control,
   }) async {
+    final cancellation = control ?? SyncControl();
+    cancellation.check();
     final generation = _crypto.cacheGeneration;
     final remote = WebDAVStore(
       baseUrl: profile.serverUrl,
@@ -122,38 +143,120 @@ class SyncService {
       password: password,
       basePath: profile.basePath,
     );
-    final local = await _store.loadFileIndex();
     // Ensure the vault dir + subdirs exist before a two-way pull writes into it.
     final dir = await _store.ensureVaultDirectory();
     final masterKey = await _crypto.getMasterKey();
     if (!_crypto.isCurrentSession(generation)) {
       throw StateError('Vault session expired');
     }
+    final stateStore = SyncStateStore(dir.path, masterKey);
+    final target = SyncStateStore.targetId(profile);
+    final journal = await stateStore.read(target, journal: true);
+    if (journal != null) {
+      cancellation.check();
+      final published = (await remote.readManifest(cancellation)).bytes;
+      if (published != null && sha256Hex(published) == journal['manifestHash']) {
+        final original = (journal['original'] as List).map((f) =>
+            VaultedFile.fromJson(f as Map<String, dynamic>)).toList();
+        final refreshed = (journal['refreshed'] as List).map((f) =>
+            VaultedFile.fromJson(f as Map<String, dynamic>)).toList();
+        await _apply(refreshed, original, (journal['removed'] as List).cast<String>(), generation);
+        await stateStore.save(target, journal['checkpoint'] as Map<String, dynamic>);
+        await stateStore.clearJournal(target);
+        Diagnostics.event('sync.recovered', {});
+      }
+    }
+    final local = List<VaultedFile>.of(await _store.loadFileIndex());
+    final checkpoint = await stateStore.load(target);
+    final deletions = await SyncStateStore.deletions();
+    if (!_crypto.isCurrentSession(generation)) throw StateError('Vault session expired');
+    cancellation.check();
     final direction = profile.direction;
-    return SensitiveIsolate.run(() => runSync(
-          local: local,
-          masterKey: masterKey,
-          remote: remote,
-          deviceId: deviceId,
-          vaultRoot: dir.path,
-          direction: direction,
-        ));
+    final workerRemote = WebDAVStore(baseUrl: profile.serverUrl,
+        username: profile.username ?? '', password: password, basePath: profile.basePath);
+    return _startWorker(local, masterKey, workerRemote, deviceId, dir.path, direction,
+        checkpoint, deletions, target, onProgress, cancellation);
   }
 
-  /// Core sync engine. Fetches + decrypts the remote manifest, reconciles,
-  /// then for two-way sync: uploads new/changed blobs, downloads missing/
-  /// changed blobs, reaps tombstoned remote blobs, applies remote tombstones
-  /// locally, and finally commits the encrypted manifest last (the commit
-  /// point — a crash before this leaves the old manifest describing a
-  /// consistent state, and the next run is idempotent).
-  ///
-  /// Push-only (`direction == pushOnly`, the default) skips the pull and
-  /// local-tombstone phases: it is backup only. [vaultRoot] is the local vault
-  /// directory root; required for two-way pull (where downloaded blobs are
-  /// written). Throws if a blob to pull is missing or its sha256 does not match
-  /// the GCM-authenticated manifest — the caller treats that as a failed sync.
-  /// Content-addressed puts/deletes are idempotent, so a partial run is safe to
-  /// retry (the manifest write is the single commit point).
+  static Future<SyncResult> _startWorker(List<VaultedFile> local, Uint8List key,
+      RemoteStore remote, String deviceId, String root, SyncDirection direction,
+      SyncCheckpoint checkpoint, Map<String, DateTime> deletions, String target,
+      void Function(SyncProgress)? onProgress, SyncControl? control) {
+    return SensitiveIsolate.runWithEvents(_workerTask(local, key, remote,
+        deviceId, root, direction, checkpoint, deletions, target), onEvent: (event) {
+          if (event is SyncProgress) {
+            if (event.phase == SyncPhase.committing) control?.committing = true;
+            onProgress?.call(event);
+          }
+        }, control: control);
+  }
+
+  static Future<SyncResult> Function(SensitiveWorker) _workerTask(
+      List<VaultedFile> local, Uint8List key, RemoteStore remote, String deviceId,
+      String root, SyncDirection direction, SyncCheckpoint checkpoint,
+      Map<String, DateTime> deletions, String target) =>
+      (worker) => runSync(
+          local: local,
+          masterKey: key,
+          remote: remote,
+          deviceId: deviceId,
+          vaultRoot: root,
+          direction: direction,
+          checkpoint: checkpoint,
+          deletions: deletions,
+          control: worker.control,
+          onProgress: worker.emit,
+          stateStore: SyncStateStore(root, key),
+          target: target,
+        );
+
+  Future<List<SyncConflict>> pendingConflicts(SyncProfile profile) async {
+    final generation = _crypto.cacheGeneration;
+    final key = await _crypto.getMasterKey();
+    final dir = await _store.ensureVaultDirectory();
+    if (!_crypto.isCurrentSession(generation)) throw StateError('Vault session expired');
+    return (await SyncStateStore(dir.path, key).load(SyncStateStore.targetId(profile))).conflicts;
+  }
+
+  Future<void> chooseConflict(SyncProfile profile, String id, ConflictChoice choice) async {
+    final generation = _crypto.cacheGeneration;
+    final key = await _crypto.getMasterKey();
+    final dir = await _store.ensureVaultDirectory();
+    final stateStore = SyncStateStore(dir.path, key);
+    final target = SyncStateStore.targetId(profile);
+    final saved = await stateStore.load(target);
+    if (!_crypto.isCurrentSession(generation)) throw StateError('Vault session expired');
+    final conflicts = saved.conflicts.map((c) => c.id == id
+        ? SyncConflict(local: c.local, remote: c.remote, choice: choice) : c).toList();
+    await stateStore.save(target, SyncCheckpoint(baseline: saved.baseline, conflicts: conflicts).toJson());
+  }
+
+  Future<void> complete(SyncProfile profile, SyncResult result, int generation) async {
+    await _apply(result.refreshedLocal, result.originalLocal, result.plan.toTombstoneLocal, generation);
+    final dir = await _store.ensureVaultDirectory();
+    final key = await _crypto.getMasterKey();
+    if (!_crypto.isCurrentSession(generation)) throw StateError('Vault session expired');
+    final stateStore = SyncStateStore(dir.path, key);
+    final target = SyncStateStore.targetId(profile);
+    await stateStore.save(target, result.checkpoint.toJson());
+    await stateStore.clearJournal(target);
+  }
+
+  Future<void> _apply(List<VaultedFile> refreshed, List<VaultedFile> original,
+      List<String> removed, int generation) async {
+    if (!_crypto.isCurrentSession(generation)) throw StateError('Vault session expired');
+    final current = await _store.loadFileIndex();
+    if (!_crypto.isCurrentSession(generation)) throw StateError('Vault session expired');
+    final merged = mergeSyncedIntoCurrent(current, refreshed,
+        original: original, removed: removed, blobExists: (f) => File(f.vaultPath).existsSync());
+    final keptIds = merged.map((f) => f.id).toSet();
+    _store.cachedFiles = merged;
+    await _store.saveFileIndex(strict: true, allowEmpty: true,
+        removedIds: current.where((f) => !keptIds.contains(f.id)).map((f) => f.id).toSet());
+    if (!_crypto.isCurrentSession(generation)) throw StateError('Vault session expired');
+  }
+
+  /// Stream transfers, retain conflicts and publish the manifest last.
   static Future<SyncResult> runSync({
     required List<VaultedFile> local,
     required Uint8List masterKey,
@@ -163,168 +266,15 @@ class SyncService {
     SyncDirection direction = SyncDirection.pushOnly,
     DateTime? now,
     void Function(SyncProgress)? onProgress,
-  }) async {
-    final completedAt = (now ?? DateTime.now()).toUtc();
-    final twoWay = direction == SyncDirection.twoWay;
-
-    onProgress?.call(const SyncProgress(phase: SyncPhase.connecting));
-    final remoteBytes = await remote.getManifest();
-    final remoteManifest =
-        remoteBytes == null ? null : decryptManifest(remoteBytes, masterKey);
-
-    // First sync (no remote manifest) → everything non-deleted is a push.
-    final plan = remoteManifest == null
-        ? SyncPlan(
-            toPush: local.where((f) => !f.syncedDeleted).toList(),
-          )
-        : reconcile(local: local, remote: remoteManifest);
-
-    final pushIds = <String>{for (final p in plan.toPush) p.id};
-    // A first push that died mid-run may have uploaded some blobs already.
-    // Names are content hashes, so a listing match means byte-identical —
-    // skip those PUTs instead of re-sending gigabytes. Best effort only.
-    var remoteBlobNames = const <String>[];
-    if (remoteManifest == null) {
-      try {
-        remoteBlobNames = await remote.listBlobs();
-      } catch (_) {
-        // Listing failed; puts are idempotent, just re-send.
-      }
-    }
-    final tombstoneLocalIds = <String>{
-      for (final id in plan.toTombstoneLocal) id
-    };
-    final refreshed = <VaultedFile>[];
-    var pushed = 0;
-    var skipped = 0;
-    final totalPush = local.where((f) => !f.syncedDeleted).length;
-    var processed = 0;
-
-    // ---- PUSH phase: upload new/changed local blobs ----
-    for (final f in local) {
-      if (f.syncedDeleted) {
-        refreshed.add(f);
-        continue;
-      }
-      if (pushIds.contains(f.id)) {
-        final file = File(f.vaultPath);
-        if (await file.exists()) {
-          final blob = await file.readAsBytes();
-          final hash = sha256Hex(blob);
-          final name = blobNameFor(hash);
-          // listBlobs paths are absolute on WebDAV, relative in tests;
-          // endsWith matches the canonical ab/cd/<hash>.enc suffix either way.
-          if (!remoteBlobNames.any((p) => p.endsWith(name))) {
-            await remote.putBlob(name, blob);
-          }
-          pushed++;
-          refreshed.add(
-            f.copyWith(
-              remoteHash: hash,
-              modifiedAt: f.modifiedAt ?? completedAt,
-            ),
-          );
-        } else {
-          // skip missing on-disk blobs; never silently mutate the index. Root cause tracked separately.
-          skipped++;
-          refreshed.add(f);
-        }
-      } else {
-        refreshed.add(f);
-      }
-      processed++;
-      onProgress?.call(SyncProgress(
-        phase: SyncPhase.uploading,
-        completed: processed,
-        total: totalPush,
-      ));
-    }
-
-    // ---- REMOTE-BLOB DELETE phase: reap tombstoned remote blobs ----
-    for (final name in plan.toDelete) {
-      await remote.deleteBlob(name);
-    }
-
-    var pulled = 0;
-
-    // ---- PULL phase (two-way only) ----
-    // manifest GCM + sha256 match makes decrypt-to-verify redundant; blobs are always our own.
-    if (twoWay && vaultRoot != null && plan.toPull.isNotEmpty) {
-      final totalPull = plan.toPull.length;
-      var done = 0;
-      for (final e in plan.toPull) {
-        final hash = e.contentHash;
-        if (hash == null) {
-          throw StateError('Remote entry ${e.id} has no content hash');
-        }
-        final blob = await remote.getBlob(blobNameFor(hash));
-        if (blob == null) {
-          throw StateError('Missing blob for remote entry ${e.id}');
-        }
-        if (sha256Hex(blob) != hash) {
-          // Blob does not match the authenticated manifest → tamper/corruption.
-          throw StateError('Blob hash mismatch for remote entry ${e.id}');
-        }
-        final vp = vaultPathFor(vaultRoot: vaultRoot, entry: e);
-        await File(vp).parent.create(recursive: true);
-        await File(vp).writeAsBytes(blob);
-        final existingIdx = refreshed.indexWhere((f) => f.id == e.id);
-        if (existingIdx >= 0) {
-          final old = refreshed[existingIdx];
-          if (old.vaultPath != vp) {
-            await _deleteIfExists(old.vaultPath);
-          }
-          refreshed[existingIdx] = vaultedFileFromEntry(e, vaultPath: vp);
-        } else {
-          refreshed.add(vaultedFileFromEntry(e, vaultPath: vp));
-        }
-        pulled++;
-        done++;
-        onProgress?.call(SyncProgress(
-          phase: SyncPhase.downloading,
-          completed: done,
-          total: totalPull,
-        ));
-      }
-    }
-
-    // ---- LOCAL TOMBSTONE phase: remote delete → local (two-way only) ----
-    if (twoWay && tombstoneLocalIds.isNotEmpty) {
-      for (var i = 0; i < refreshed.length; i++) {
-        final f = refreshed[i];
-        if (tombstoneLocalIds.contains(f.id) && !f.syncedDeleted) {
-          await _deleteIfExists(f.vaultPath);
-          refreshed[i] = f.copyWith(
-            syncedDeleted: true,
-            remoteHash: null,
-            modifiedAt: completedAt,
-          );
-        }
-      }
-    }
-
-    // ---- COMMIT manifest (single commit point) ----
-    onProgress?.call(const SyncProgress(phase: SyncPhase.committing));
-    final manifest =
-        buildManifest(refreshed, deviceId: deviceId, now: completedAt);
-    await remote.putManifest(encryptManifest(manifest, masterKey));
-    final grandTotal = totalPush + pulled;
-    onProgress?.call(SyncProgress(
-      phase: SyncPhase.done,
-      completed: grandTotal,
-      total: grandTotal,
-    ));
-
-    return SyncResult(
-      blobsPushed: pushed,
-      blobsDeleted: plan.toDelete.length,
-      blobsPulled: pulled,
-      blobsSkipped: skipped,
-      plan: plan,
-      refreshedLocal: refreshed,
-      completedAt: completedAt,
-    );
-  }
+    SyncControl? control,
+    SyncCheckpoint checkpoint = const SyncCheckpoint(),
+    Map<String, DateTime> deletions = const {},
+    SyncStateStore? stateStore,
+    String? target,
+  }) => SyncEngine.run(local: local, masterKey: masterKey, remote: remote,
+      deviceId: deviceId, vaultRoot: vaultRoot, direction: direction, now: now,
+      onProgress: onProgress, control: control, checkpoint: checkpoint,
+      deletions: deletions, stateStore: stateStore, target: target);
 
   // ---- Pure helpers (no I/O) ----
 
@@ -348,7 +298,7 @@ class SyncService {
 
   /// Snapshot the current synced state of [files] into a manifest. Only files
   /// that carry a [VaultedFile.remoteHash] reference an uploaded blob; entries
-  /// for tombstones keep their last hash so the blob can be reaped. v2 carries
+  /// for tombstones keep their last hash for recovery. v2 carries
   /// the full restore metadata (S3) so a fresh device can reconstruct files.
   static RemoteManifest buildManifest(
     List<VaultedFile> files, {
@@ -389,16 +339,7 @@ class SyncService {
     );
   }
 
-  /// Diff local files against the remote manifest → a [SyncPlan].
-  /// Convergence is last-write-wins by modifiedAt; local/remote null
-  /// modifiedAt falls back to dateModified then dateAdded.
-  ///
-  /// Tombstone policy: a local tombstone reaps a still-live remote blob
-  /// (existing S2 semantics). A remote tombstone deletes the local copy, but
-  /// only when it is at least as new as the local file (LWW) — a strictly newer
-  /// local copy resurrects via push instead. ponytail ceiling: the local→remote
-  /// reap is unconditional, so a delete-then-edit race can lose the resurrected
-  /// edit; symmetric three-way tombstone LWW is deferred.
+  /// Legacy timestamp planner. The production engine uses durable baselines.
   static SyncPlan reconcile({
     required List<VaultedFile> local,
     required RemoteManifest remote,
@@ -468,27 +409,34 @@ class SyncService {
     );
   }
 
-  /// Merge a sync result into the CURRENT cache without clobbering entries
-  /// added/changed/deleted while the sync was running. `refreshedLocal` is
-  /// derived from the pre-sync snapshot, so a wholesale replace would drop
-  /// concurrent hides (and resurrect concurrent deletes).
-  ///
-  /// - id in both: current wins (it carries mutations made during the sync);
-  ///   sync bookkeeping (remoteHash/syncedDeleted) is copied from synced.
-  /// - current-only: kept (added during the sync).
-  /// - synced-only: appended unless `blobExists` reports the blob gone
-  ///   (deleted during the sync — don't resurrect ghosts).
+  /// Apply pulls only to unchanged snapshots and preserve concurrent edits.
   static List<VaultedFile> mergeSyncedIntoCurrent(
     List<VaultedFile> current,
     List<VaultedFile> synced, {
     bool Function(VaultedFile)? blobExists,
+    List<VaultedFile>? original,
+    List<String> removed = const [],
   }) {
     final syncedById = {for (final f in synced) f.id: f};
+    final originalById = {for (final f in original ?? <VaultedFile>[]) f.id: f};
     final out = <VaultedFile>[];
     final seen = <String>{};
     for (final f in current) {
       seen.add(f.id);
       final s = syncedById[f.id];
+      final before = originalById[f.id];
+      if (original != null) {
+        final unchanged = before != null && _sameLocal(f, before);
+        if (removed.contains(f.id) && unchanged) continue;
+        if (s != null && unchanged) {
+          out.add(s.copyWith(viewCount: f.viewCount, lastViewed: f.lastViewed,
+              notes: f.notes, thumbnailPath: s.vaultPath == f.vaultPath ? f.thumbnailPath : null,
+              thumbnailIv: s.vaultPath == f.vaultPath ? f.thumbnailIv : null));
+        } else {
+          out.add(f);
+        }
+        continue;
+      }
       if (s == null ||
           (s.remoteHash == f.remoteHash &&
               s.syncedDeleted == f.syncedDeleted)) {
@@ -502,15 +450,19 @@ class SyncService {
     }
     for (final s in synced) {
       if (seen.contains(s.id)) continue;
+      if (originalById.containsKey(s.id)) continue;
       if (blobExists != null && !blobExists(s)) continue;
       out.add(s);
     }
     return out;
   }
 
-  /// Destination vault path for a pulled blob. subdir by type (mirrors
-  /// VaultStore), filename derived from the content hash (deterministic +
-  /// dedup-friendly) with the original extension preserved.
+  static bool _sameLocal(VaultedFile a, VaultedFile b) =>
+      a.vaultPath == b.vaultPath && a.modifiedAt == b.modifiedAt && a.dateModified == b.dateModified &&
+      syncFingerprint(buildManifest([a], deviceId: '').entries.single) ==
+      syncFingerprint(buildManifest([b], deviceId: '').entries.single);
+
+  /// Separate local payloads by ID; deleting one copy must not break another.
   static String vaultPathFor({
     required String vaultRoot,
     required ManifestEntry entry,
@@ -518,7 +470,10 @@ class SyncService {
     final type = _typeFromName(entry.type);
     final subdir = VaultStore.subdirFor(type);
     final hash = entry.contentHash ?? entry.id;
-    final stem = hash.length >= 16 ? hash.substring(0, 16) : hash;
+    if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(hash)) {
+      throw const FormatException('Invalid blob hash');
+    }
+    final stem = '${sha256.convert(utf8.encode(entry.id))}_$hash';
     final ext = _extOf(entry.originalName);
     final name = ext.isEmpty ? '$stem.enc' : '$stem.$ext';
     return '$vaultRoot/$subdir/$name';
@@ -573,14 +528,8 @@ class SyncService {
     if (originalName == null) return '';
     final dot = originalName.lastIndexOf('.');
     if (dot <= 0 || dot == originalName.length - 1) return '';
-    return originalName.substring(dot + 1).toLowerCase();
-  }
-
-  static Future<void> _deleteIfExists(String path) async {
-    try {
-      final f = File(path);
-      if (await f.exists()) await f.delete();
-    } catch (_) {}
+    final ext = originalName.substring(dot + 1).toLowerCase();
+    return RegExp(r'^[a-z0-9]{1,12}$').hasMatch(ext) ? ext : '';
   }
 
   /// Encrypt a manifest with the vault master key. Wire format:

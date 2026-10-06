@@ -1,55 +1,80 @@
 import 'dart:async';
 import 'dart:isolate';
 
-import 'package:flutter/foundation.dart';
+import 'diagnostics.dart';
+import 'remote/server_errors.dart';
+import 'sync_control.dart';
+
+class SensitiveWorker {
+  SensitiveWorker(this.port, this.control);
+  final SendPort port;
+  final SyncControl control;
+  void emit(Object event) => port.send(['event', event]);
+}
 
 class SensitiveIsolate {
-  static const _tag = '[SensitiveIsolate]';
   static int _generation = 0;
   static final Map<Isolate, void Function()> _running = {};
 
-  static Future<T> run<T>(Future<T> Function() task) async {
+  static Future<T> run<T>(Future<T> Function() task) =>
+      runWithEvents<T>((_) => task());
+
+  static Future<T> runWithEvents<T>(
+    Future<T> Function(SensitiveWorker) task, {
+    void Function(Object)? onEvent,
+    SyncControl? control,
+  }) async {
     final generation = _generation;
     final port = ReceivePort();
     final result = Completer<T>();
-    Object? workerError;
     StackTrace? workerStack;
 
-    void logFailure(String detail) {
-      debugPrint('$_tag worker failed: $detail');
-      final stack = workerStack;
-      if (stack != null) {
-        debugPrintStack(label: _tag, stackTrace: stack);
-      }
+    void failWorker() {
+      final id = Diagnostics.failure('worker.exit',
+          StateError('Worker exited unexpectedly'), workerStack ?? StackTrace.current);
+      result.completeError(SyncWorkerFailure(
+          'The operation stopped unexpectedly. Try again, or copy the error reference for help.', id));
     }
 
     final subscription = port.listen((message) {
       if (result.isCompleted) return;
+      if (message is List && message[0] == 'control') {
+        final send = message[1] as SendPort;
+        control?.onCancel = () => send.send('cancel');
+        if (control?.cancelled == true) send.send('cancel');
+        return;
+      }
+      if (message is List && message[0] == 'event') {
+        onEvent?.call(message[1] as Object);
+        return;
+      }
+      if (message is List && message[0] == 'cancelled') {
+        result.completeError(SyncCancelled());
+        return;
+      }
+      if (message is List && message[0] == 'failure') {
+        result.completeError(SyncWorkerFailure(message[1] as String,
+            message[2] as String));
+        return;
+      }
       if (message is List && message.length == 2 && message[0] == 'result') {
         result.complete(message[1] as T);
         return;
       }
       if (message == null) {
-        final detail =
-            workerError?.toString() ?? 'exited without returning a result';
-        logFailure(detail);
-        result.completeError(StateError('Sensitive worker failed: $detail'));
+        failWorker();
         return;
       }
       // Isolate.spawn delivers uncaught errors as [error, stackTrace].
       if (message is List && message.length == 2) {
-        workerError = message[0];
         final raw = message[1];
         workerStack = raw is StackTrace
             ? raw
             : raw == null
                 ? null
                 : StackTrace.fromString('$raw');
-      } else {
-        workerError = message;
       }
-      logFailure('$workerError');
-      result.completeError(StateError('Sensitive worker failed: $workerError'));
+      failWorker();
     });
     Isolate? isolate;
     try {
@@ -62,9 +87,8 @@ class SensitiveIsolate {
           errorsAreFatal: true,
         );
       } catch (e, st) {
-        debugPrint('$_tag spawn failed: $e');
-        debugPrintStack(label: _tag, stackTrace: st);
-        rethrow;
+        final id = Diagnostics.failure('worker.spawn', e, st);
+        throw SyncWorkerFailure('The operation couldn’t start. Try again, or copy the error reference for help.', id);
       }
       if (generation != _generation) {
         isolate.kill(priority: Isolate.immediate);
@@ -85,6 +109,7 @@ class SensitiveIsolate {
       }
       await subscription.cancel();
       port.close();
+      control?.onCancel = null;
     }
   }
 
@@ -99,7 +124,29 @@ class SensitiveIsolate {
 
   static Future<void> _entry(List<Object> args) async {
     final port = args[0] as SendPort;
-    final task = args[1] as Future<Object?> Function();
-    port.send(['result', await task()]);
+    final task = args[1] as Future<Object?> Function(SensitiveWorker);
+    final commands = ReceivePort();
+    final control = SyncControl();
+    final subscription = commands.listen((_) => control.cancel());
+    port.send(['control', commands.sendPort]);
+    try {
+      port.send(['result', await task(SensitiveWorker(port, control))]);
+    } catch (e, st) {
+      if (e is SyncCancelled || control.cancelled) {
+        port.send(['cancelled']);
+      } else {
+        final id = Diagnostics.failure('worker', e, st);
+        port.send(['failure', describeServerError(e), id]);
+      }
+    } finally {
+      await subscription.cancel();
+      commands.close();
+    }
   }
+}
+
+class SyncWorkerFailure implements Exception {
+  SyncWorkerFailure(this.message, this.diagnosticId);
+  final String message;
+  final String diagnosticId;
 }

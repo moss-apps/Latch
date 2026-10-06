@@ -1,6 +1,6 @@
-// Live WebDAV roundtrip: S0.5 (transport) + S3.4 (two-device two-way).
+// Live WebDAV roundtrip: S0.5 (transport) + Phase 3 two-device two-way.
 // Env-gated — runs only with LOCKER_LIVE_WEBDAV_URL set. See
-// docs/local_server_sync.md → "Running the live tests" for server setup.
+// docs/local_server_testing.md for server setup and the hardware guide.
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -8,10 +8,10 @@ import 'package:flutter_test/flutter_test.dart';
 // import 'package:locker/models/encryption_algorithm.dart';
 import 'package:locker/models/sync_profile.dart';
 import 'package:locker/models/vaulted_file.dart';
-// import 'package:locker/services/remote/remote_store.dart';
+import 'package:locker/services/remote/remote_store.dart';
 import 'package:locker/services/remote/webdav_store.dart';
+import 'package:locker/services/sync_control.dart';
 import 'package:locker/services/sync_service.dart';
-// import 'package:pointycastle/export.dart';
 
 Map<String, String> get _env => Platform.environment;
 
@@ -109,6 +109,30 @@ void main() {
     });
   });
 
+  group('S3.5 — guarded publication over a live server', () {
+    test('publish, replace under the probe, and refuse a stale revision', () async {
+      final store = _store(_basePath);
+      addTearDown(() => _cleanup(store));
+
+      await store.publishManifest(Uint8List.fromList([1, 2, 3]), null, SyncControl());
+      // rclone cannot honor ETag preconditions; the probe must fall back to locks.
+      expect(store.usesLockPublication, isTrue);
+      final first = await store.readManifest(SyncControl());
+      expect(first.bytes, Uint8List.fromList([1, 2, 3]));
+
+      await store.publishManifest(Uint8List.fromList([4, 5, 6]), first.revision, SyncControl());
+      final second = await store.readManifest(SyncControl());
+      expect(second.bytes, Uint8List.fromList([4, 5, 6]));
+
+      // The first revision is stale now; the guard must refuse it.
+      await expectLater(
+        store.publishManifest(Uint8List.fromList([7]), first.revision, SyncControl()),
+        throwsA(isA<RemoteRevisionChanged>()),
+      );
+      expect((await store.readManifest(SyncControl())).bytes, Uint8List.fromList([4, 5, 6]));
+    });
+  });
+
   group('S3.4 — two-device two-way runSync over a live server', () {
     final masterKey = Uint8List(32);
 
@@ -166,10 +190,11 @@ void main() {
       expect(
           await File(onB.vaultPath).readAsBytes(), Uint8List.fromList(blobA));
 
-      // --- B edits, pushes. ---
+      // --- B edits, pushes (baseline from its pull run). ---
       final edited = [99, 98, 97, 96, 95];
       await File(onB.vaultPath).writeAsBytes(edited);
-      await SyncService.runSync(
+      final editHash = SyncService.sha256Hex(Uint8List.fromList(edited));
+      final rB3 = await SyncService.runSync(
         local: [
           onB.copyWith(modifiedAt: DateTime(2024, 6, 3)),
         ],
@@ -178,10 +203,12 @@ void main() {
         deviceId: 'B',
         vaultRoot: dirB.path,
         direction: SyncDirection.twoWay,
+        checkpoint: rB.checkpoint,
         now: DateTime.utc(2024, 6, 3),
       );
+      expect(rB3.blobsPushed, 1);
 
-      // --- A pulls the edit (A carries the original remoteHash). ---
+      // --- A pulls the edit (baseline from A's push run). ---
       final rA2 = await SyncService.runSync(
         local: [
           _file(
@@ -196,31 +223,31 @@ void main() {
         deviceId: 'A',
         vaultRoot: dirA.path,
         direction: SyncDirection.twoWay,
+        checkpoint: rA.checkpoint,
         now: DateTime.utc(2024, 6, 4),
       );
       expect(rA2.blobsPulled, 1);
-      // Pull writes a content-addressed stem path and deletes the old seed path.
+      // Pull writes a content-addressed path; the old seed file is retained.
       final onA = rA2.refreshedLocal.first;
       expect(
           await File(onA.vaultPath).readAsBytes(), Uint8List.fromList(edited));
 
-      // --- A tombstones + pushes; blob reaped server-side. ---
+      // --- A tombstones + pushes; the manifest marks it deleted but the
+      // remote blob is retained for recovery (Phase 3 keeps payloads). ---
       final tomb = rA2.refreshedLocal.first.copyWith(syncedDeleted: true);
-      await SyncService.runSync(
+      final rA3 = await SyncService.runSync(
         local: [tomb],
         masterKey: masterKey,
         remote: remote,
         deviceId: 'A',
         vaultRoot: dirA.path,
         direction: SyncDirection.twoWay,
+        checkpoint: rA2.checkpoint,
         now: DateTime.utc(2024, 6, 5),
       );
-      // Edited blob reaped + manifest marks 'a' deleted. Original seed blob is
-      // now an orphan (no GC pass yet); listBlobs also counts manifest.enc, so
-      // a length==0 assertion would be wrong on both counts.
-      final editHash = SyncService.sha256Hex(Uint8List.fromList(edited));
+      expect(rA3.filesDeleted, 1);
       final listed = await remote.listBlobs();
-      expect(listed.any((p) => p.endsWith('$editHash.enc')), isFalse);
+      expect(listed.any((p) => p.endsWith('$editHash.enc')), isTrue);
       final tombManifest = SyncService.decryptManifest(
         (await remote.getManifest())!,
         masterKey,
@@ -228,20 +255,23 @@ void main() {
       expect(tombManifest.entries.single.id, 'a');
       expect(tombManifest.entries.single.deleted, isTrue);
 
-      // --- B syncs again: remote tombstone propagates, B's file is deleted. ---
+      // --- B syncs again: the remote tombstone drops B's index entry, and
+      // B's payload stays on disk for recovery. ---
       final rB2 = await SyncService.runSync(
         local: [
-          onB.copyWith(remoteHash: rA2.refreshedLocal.first.remoteHash),
+          onB.copyWith(remoteHash: editHash),
         ],
         masterKey: masterKey,
         remote: remote,
         deviceId: 'B',
         vaultRoot: dirB.path,
         direction: SyncDirection.twoWay,
+        checkpoint: rB3.checkpoint,
         now: DateTime.utc(2024, 6, 6),
       );
-      expect(rB2.refreshedLocal.single.syncedDeleted, isTrue);
-      expect(await File(onB.vaultPath).exists(), isFalse);
+      expect(rB2.plan.toTombstoneLocal, contains('a'));
+      expect(rB2.refreshedLocal, isEmpty);
+      expect(await File(onB.vaultPath).exists(), isTrue);
     });
 
     test('pull rejects a tampered blob (hash mismatch)', () async {
@@ -287,7 +317,7 @@ void main() {
           direction: SyncDirection.twoWay,
           now: DateTime.utc(2024, 6, 2),
         ),
-        throwsA(isA<StateError>()),
+        throwsA(isA<FormatException>()),
       );
     });
   });
