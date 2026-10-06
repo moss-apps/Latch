@@ -106,17 +106,24 @@ Implemented 2026-10-06. The rewrite replaces whole-buffer transfers and last-wri
 
 ## Phase 4 — Import convenience and discovery
 
-**Status: Not started**
+**Status: Done**
 
-Deliver focused features that make existing vault content easier to add and find.
+Implemented 2026-10-06:
 
-| Item | Work | Acceptance criteria |
-|---|---|---|
-| 4.1 | Add Android “Share to Latch” intake for one or multiple files. | Latch appears as a share target, accepts supported content types, and routes items through the existing import, encryption, duplicate, and progress flows. |
-| 4.2 | Add saved smart collections. | Users can save useful filters such as Untagged, Unencrypted, Large videos, or Added this month. Results update when vault metadata changes. |
-| 4.3 | Make date-range search boundaries intuitive. | Calendar-based start/end dates include the selected days consistently, with tests for boundary timestamps. |
+- **Share to Latch.** Latch registers `SEND`/`SEND_MULTIPLE` for `*/*` and appears in the Android share sheet for any attached file. A native bridge (`com.mossapps.locker/share_intake`) queues URI references with display name, MIME type, and size for cold and warm launches, then a review screen stages copies into app-private cache, reuses the per-file encryption choice, duplicate pre-filtering, progress, and outcome reporting, and imports through the common vault batch path. Shared text/URLs are not accepted in this phase; only file attachments. Sources are copied, never moved — the originals stay in the sending app.
+- **Resume across locking.** Pending references live outside the provider scope, so they survive the subtree recreation on lock; staging is purged on every lock and the review reopens after unlock with the remaining items. Items already committed are consumed from both sides so a resume cannot replay them. If the process is killed or the granting app revokes read access, the affected items report a per-file failure and must be shared again.
+- **Smart collections.** Saved filter definitions (not membership) are stored per real/decoy namespace in secure storage and evaluated against live vault metadata: presets **Untagged**, **Unencrypted**, **Large Videos** (editable 100 MB threshold), and **Added This Month**, plus custom collections saved from the gallery filter sheet, with rename, filter edit, sort override, delete, and live counts in the drawer and list. The month window recomputes on a local-calendar boundary timer and on app resume. Definitions are local-only; unlike files, they do not sync.
+- **Inclusive date ranges.** `VaultFileFilter` and `searchFilesAdvanced` treat `dateFrom`/`dateTo` as inclusive local calendar days by comparing local day keys and constructing the next day from year/month/day (DST-safe), fixing the previous exclusive-midnight boundary. The filter sheet exposes the range with an explicit "Both days are included" note, and active filters are visible with a count and one-tap clear.
 
-**Review findings:** the Android manifest currently has no `SEND`/`SEND_MULTIPLE` intent filters. Search currently covers filenames, tags, type, dates, favorites, and albums; saved smart filters were not identified.
+| Item | Work | Acceptance criteria | Status |
+|---|---|---|---|
+| 4.1 | Add Android “Share to Latch” intake for one or multiple files. | Latch appears as a share target, accepts supported content types, and routes items through the existing import, encryption, duplicate, and progress flows. | **Done** |
+| 4.2 | Add saved smart collections. | Users can save useful filters such as Untagged, Unencrypted, Large videos, or Added this month. Results update when vault metadata changes. | **Done** |
+| 4.3 | Make date-range search boundaries intuitive. | Calendar-based start/end dates include the selected days consistently, with tests for boundary timestamps. | **Done** |
+
+**Checks:** `flutter test --no-pub`: 273 passing; `flutter analyze --no-pub`: clean; `flutter build apk --debug --no-pub`: successful. New coverage includes inclusive date boundaries (start midnight, end-day evening, next-day exclusion, same-day, open-ended, inverted, month/year, UTC, DST), smart-collection preset merge/corruption recovery, real/decoy isolation, restart persistence, preset-delete refusal, metadata-driven membership refresh, injected-clock month rollover, share queue ordering/dedupe/deferral/consume, staging success and per-item failures, lock purge with in-flight staging, and prepared-import duplicate skipping.
+
+**Remaining limits (documented, not silent):** shared text and URLs are intentionally out of scope; share intake is Android-only; smart collections hold definitions locally and do not sync; and note/password entries can appear in collection results, so opening them falls back to the unsupported-preview path when the respective editor is unavailable. Physical-device smoke (single/multiple/mixed files, cold and warm start, locked and decoy sessions, large files, and shares from gallery, file-manager, and cloud providers) is user-run.
 
 ## Phase 5 — Recovery and product polish
 
@@ -150,7 +157,7 @@ These are already present and should be reused rather than rebuilt:
 2. Resolve the product decision in **Phase 1**, then implement and test its import/security behavior.
 3. Ship **Phase 2 session locking** as the next major user-facing feature.
 4. Prioritize **Phase 3 sync safety/progress** before broadening sync conflict behavior.
-5. Select **Share to Latch** or **smart collections** for Phase 4 based on user demand.
+5. Both **Share to Latch** and **smart collections** are implemented in Phase 4.
 6. Start **Recently Deleted** only after its deletion and sync semantics are agreed.
 
 ## Updating status
