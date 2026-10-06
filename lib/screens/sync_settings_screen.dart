@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/sync_profile.dart';
+import '../models/sync_conflict.dart';
 import '../providers/sync_provider.dart';
 import '../providers/vault_providers.dart';
+import '../services/diagnostics.dart';
 import '../services/remote/server_errors.dart';
 import '../services/remote/webdav_store.dart';
+import '../services/sensitive_isolate.dart' show SyncWorkerFailure;
 import '../services/sync_profile_service.dart';
 import '../services/sync_service.dart' show SyncPhase, SyncProgress;
 import '../themes/app_colors.dart';
@@ -33,16 +37,25 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
   void initState() {
     super.initState();
     _bootstrap();
-    ref.listen<SyncState>(syncProvider, _onSyncStateChanged);
+    ref.listenManual<SyncState>(syncProvider, _onSyncStateChanged);
   }
 
   /// One-shot load of settings + profiles. Reactive updates afterwards come
   // from watching the providers in [build].
   Future<void> _bootstrap() async {
-    final settings = await ref.read(vaultServiceProvider).getSettings();
-    _activeId = settings.syncProfileId;
-    _masterEnabled = settings.syncEnabled;
-    if (mounted) setState(() => _loading = false);
+    try {
+      final settings = await ref.read(vaultServiceProvider).getSettings();
+      _activeId = settings.syncProfileId;
+      _masterEnabled = settings.syncEnabled;
+      if (mounted) setState(() => _loading = false);
+      if (mounted) await ref.read(syncProvider.notifier).loadPending();
+    } catch (e, st) {
+      final id = Diagnostics.failure('sync.bootstrap', e, st);
+      if (mounted) {
+        setState(() => _loading = false);
+        _snack('Couldn’t load sync settings. Try again · reference $id');
+      }
+    }
   }
 
   void _onSyncStateChanged(SyncState? prev, SyncState next) {
@@ -52,6 +65,10 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
       // Profile's lastSyncedAt was persisted by the notifier — refresh the list.
       ref.invalidate(syncProfilesProvider);
       _showSuccessSheet(next);
+    } else if (next.status == SyncStatus.needsReview && prev?.status != SyncStatus.needsReview) {
+      _addLog(next.message ?? 'Some files need review', ok: true);
+    } else if (next.status == SyncStatus.cancelled && prev?.status != SyncStatus.cancelled) {
+      _addLog(next.message ?? 'Sync stopped', ok: true);
     } else if (next.status == SyncStatus.error &&
         prev?.status != SyncStatus.error) {
       _addLog(next.error ?? 'Sync failed', ok: false);
@@ -117,6 +134,7 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
   }
 
   void _openEditor({SyncProfile? profile}) {
+    if (ref.read(syncProvider).isSyncing) return;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -136,6 +154,7 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
   /// so sync works out of the box. Returns whether the sheet may close.
   Future<bool> _saveFromSheet(
       SyncProfile profile, String password, bool isNew) async {
+    if (ref.read(syncProvider).isSyncing) return false;
     try {
       await SyncProfileService.instance.saveProfile(profile);
       if (password.isNotEmpty) {
@@ -153,29 +172,50 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
         _snack(isNew ? 'Server added and activated' : 'Saved');
       }
       return true;
-    } catch (_) {
-      if (mounted) _snack('Couldn\'t save — try again');
+    } catch (e, st) {
+      final id = Diagnostics.failure('sync.saveProfile', e, st);
+      if (mounted) _snack('Couldn’t save — try again · reference $id');
       return false;
     }
   }
 
   Future<void> _activate(SyncProfile p) async {
+    if (ref.read(syncProvider).isSyncing) return;
+    final previousId = _activeId;
     setState(() {
       _activeId = p.id;
       _masterEnabled = true;
     });
-    await _persistActivation(p.id, enabled: true);
-    ref.invalidate(vaultSettingsProvider);
-    _snack('Active server: ${_hostOf(p.serverUrl)}');
+    try {
+      await _persistActivation(p.id, enabled: true);
+      ref.invalidate(vaultSettingsProvider);
+      _snack('Active server: ${_hostOf(p.serverUrl)}');
+      await ref.read(syncProvider.notifier).loadPending();
+    } catch (e, st) {
+      final id = Diagnostics.failure('sync.activate', e, st);
+      if (mounted) {
+        setState(() => _activeId = previousId);
+        _snack('Couldn’t switch servers — try again · reference $id');
+      }
+    }
   }
 
   Future<void> _setMasterEnabled(bool v) async {
+    if (ref.read(syncProvider).isSyncing) return;
     setState(() => _masterEnabled = v);
-    final s = await ref.read(vaultServiceProvider).getSettings();
-    await ref
-        .read(vaultServiceProvider)
-        .updateSettings(s.copyWith(syncEnabled: v));
-    ref.invalidate(vaultSettingsProvider);
+    try {
+      final s = await ref.read(vaultServiceProvider).getSettings();
+      await ref
+          .read(vaultServiceProvider)
+          .updateSettings(s.copyWith(syncEnabled: v));
+      ref.invalidate(vaultSettingsProvider);
+    } catch (e, st) {
+      final id = Diagnostics.failure('sync.toggle', e, st);
+      if (mounted) {
+        setState(() => _masterEnabled = !v);
+        _snack('Couldn’t change the sync setting · reference $id');
+      }
+    }
   }
 
   Future<void> _persistActivation(String id, {required bool enabled}) async {
@@ -186,6 +226,7 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
   }
 
   Future<void> _confirmDelete(SyncProfile p) async {
+    if (ref.read(syncProvider).isSyncing) return;
     final ok = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
@@ -210,18 +251,23 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
           ),
         ) ??
         false;
-    if (!ok) return;
-    await SyncProfileService.instance.deleteProfile(p.id);
-    if (_activeId == p.id) {
-      _activeId = null;
-      final s = await ref.read(vaultServiceProvider).getSettings();
-      await ref
-          .read(vaultServiceProvider)
-          .updateSettings(s.copyWith(syncProfileId: null));
+    if (!ok || !mounted || ref.read(syncProvider).isSyncing) return;
+    try {
+      await SyncProfileService.instance.deleteProfile(p.id);
+      if (_activeId == p.id) {
+        _activeId = null;
+        final s = await ref.read(vaultServiceProvider).getSettings();
+        await ref
+            .read(vaultServiceProvider)
+            .updateSettings(s.copyWith(syncProfileId: null));
+      }
+      ref.invalidate(vaultSettingsProvider);
+      ref.invalidate(syncProfilesProvider);
+      if (mounted) setState(() {});
+    } catch (e, st) {
+      final id = Diagnostics.failure('sync.deleteProfile', e, st);
+      if (mounted) _snack('Couldn’t remove the server · reference $id');
     }
-    ref.invalidate(vaultSettingsProvider);
-    ref.invalidate(syncProfilesProvider);
-    if (mounted) setState(() {});
   }
 
   Future<void> _syncNow() async {
@@ -261,8 +307,21 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
                 ..._statusChildren(syncState, active),
                 const SizedBox(height: 24),
                 ..._serversChildren(profiles),
+                if (profilesAsync.hasError) _profilesErrorTile(profilesAsync.error!),
                 const SizedBox(height: 24),
                 ..._syncChildren(syncState),
+                if (syncState.conflicts.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  ..._conflictChildren(syncState),
+                ],
+                const SizedBox(height: 24),
+                _sectionTitle('Recovery after reinstall'),
+                Text(
+                  'Uninstalling Latch or clearing its data removes the vault on this device. '
+                  'Keep a Desktop Backup with your original password or PIN, or save a Local Backup outside the app. '
+                  'Server sync alone does not back up the key needed after reinstall.',
+                  style: TextStyle(fontSize: 14, height: 1.5, color: context.textSecondary),
+                ),
                 if (_log.isNotEmpty) ...[
                   const SizedBox(height: 24),
                   ..._historyChildren(),
@@ -348,25 +407,29 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
           context.accentColor,
           Icons.cloud_sync_outlined
         ),
+      SyncStatus.cancelling => ('Stopping…', context.textSecondary, Icons.pause_circle_outline),
+      SyncStatus.cancelled => ('Sync stopped', context.textSecondary, Icons.pause_circle_outline),
+      SyncStatus.needsReview => ('Review needed', context.accentColor, Icons.difference_outlined),
       SyncStatus.success => (
           'Up to date',
           Colors.green,
           Icons.cloud_done_outlined
         ),
-      SyncStatus.error => ('Error', AppColors.error, Icons.error_outline),
+      SyncStatus.error => ('Sync couldn’t finish', AppColors.error, Icons.error_outline),
     };
 
     final progress = syncState.progress;
-    final showBar =
-        syncState.isSyncing && progress != null && progress.total > 0;
-    final pct =
-        showBar ? (progress.completed / progress.total).clamp(0.0, 1.0) : 0.0;
+    final showBar = syncState.isSyncing;
+    final pct = progress != null && progress.fileTotal > 0
+        ? (progress.fileBytes / progress.fileTotal).clamp(0.0, 1.0)
+        : progress != null && progress.total > 0
+            ? (progress.completed / progress.total).clamp(0.0, 1.0) : null;
 
     String? detail;
-    if (syncState.isSyncing && progress != null && progress.total > 0) {
-      detail =
-          '${_phaseLabel(progress)} ${progress.completed}/${progress.total}';
-    } else if (syncState.status == SyncStatus.success &&
+    if (syncState.isSyncing && progress != null) {
+      detail = '${_phaseLabel(progress)}'
+          '${progress.total > 0 ? ' · ${progress.completed}/${progress.total} files' : ''}';
+    } else if ((syncState.status == SyncStatus.success || syncState.status == SyncStatus.needsReview || syncState.status == SyncStatus.cancelled) &&
         syncState.message != null) {
       detail = syncState.message;
     } else if (active.lastSyncedAt != null) {
@@ -392,6 +455,16 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (detail != null) Text(detail, style: _subStyle(context)),
+            if (syncState.isSyncing && progress?.filename != null)
+              Text(progress!.filename!, maxLines: 2, overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 14, color: context.textPrimary)),
+            if (syncState.isSyncing && progress != null && progress.fileBytes > 0)
+              Text('${_bytes(progress.fileBytes)}'
+                  '${progress.fileTotal > 0 ? ' / ${_bytes(progress.fileTotal)}' : ''}',
+                  style: _subStyle(context)),
+            if (syncState.isSyncing && progress != null && progress.totalBytes > 0)
+              Text('Overall: ${_bytes(progress.transferredBytes)} / ${_bytes(progress.totalBytes)}',
+                  style: _subStyle(context)),
             Text(
               active.serverUrl,
               maxLines: 1,
@@ -434,11 +507,51 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
     );
   }
 
+  Widget _profilesErrorTile(Object error) {
+    final message = error is SyncWorkerFailure
+        ? error.message
+        : 'Your server settings couldn’t be loaded.';
+    final id = error is SyncWorkerFailure ? error.diagnosticId : null;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(message, style: TextStyle(fontSize: 14, height: 1.4, color: context.textPrimary)),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              TextButton(
+                onPressed: () => ref.invalidate(syncProfilesProvider),
+                child: const Text('Try again'),
+              ),
+              if (id != null)
+                TextButton.icon(
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: 'Latch server settings error $id'));
+                    _snack('Error reference copied');
+                  },
+                  icon: const Icon(Icons.copy_outlined, size: 18),
+                  label: const Text('Copy error reference'),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   List<Widget> _serversChildren(List<SyncProfile> profiles) {
     final addButton = IconButton(
       tooltip: 'Add server',
       icon: Icon(Icons.add, size: 20, color: context.accentColor),
-      onPressed: () => _openEditor(),
+      onPressed: ref.watch(syncProvider).isSyncing ? null : () => _openEditor(),
     );
 
     if (profiles.isEmpty) {
@@ -495,6 +608,7 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
         overflow: TextOverflow.ellipsis,
       ),
       trailing: PopupMenuButton<String>(
+        enabled: !ref.watch(syncProvider).isSyncing,
         icon: Icon(Icons.more_vert, size: 20, color: context.textTertiary),
         itemBuilder: (_) => [
           if (!isActive)
@@ -517,7 +631,7 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
           }
         },
       ),
-      onTap: () => _openEditor(profile: p),
+      onTap: ref.watch(syncProvider).isSyncing ? null : () => _openEditor(profile: p),
     );
   }
 
@@ -528,17 +642,17 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
         contentPadding: EdgeInsets.zero,
         title: const Text('Enable server sync'),
         subtitle: Text(
-          'Master switch for Sync Now and background runs',
+          'Allow manual sync with your active server',
           style: _subStyle(context),
         ),
         value: _masterEnabled,
-        onChanged: _activeId == null ? null : _setMasterEnabled,
+        onChanged: _activeId == null || syncState.isSyncing ? null : _setMasterEnabled,
         activeThumbColor: context.accentColor,
       ),
       Text(
-        'Backup pushes the vault as encrypted blobs to your '
-        'server. Two-way also pulls remote changes and deletions '
-        'onto this device.',
+        'Backup sends your vault files and preserves files already on the server. '
+        'Two-way also brings remote changes and deletions onto this device. '
+        'When both copies change, you choose which to keep.',
         style: _subStyle(context),
       ),
       if (syncState.status == SyncStatus.error && syncState.error != null)
@@ -546,10 +660,19 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
           padding: const EdgeInsets.only(top: 8),
           child: Text(
             syncState.error!,
-            style: TextStyle(fontSize: 12, color: AppColors.error),
+            style: TextStyle(fontSize: 14, height: 1.5, color: AppColors.error),
           ),
         ),
       const SizedBox(height: 16),
+      if (syncState.diagnosticId != null)
+        Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+          icon: const Icon(Icons.copy_outlined),
+          label: const Text('Copy error reference'),
+          onPressed: () async {
+            await Clipboard.setData(ClipboardData(text: 'Latch sync error ${syncState.diagnosticId}\n${syncState.error}'));
+            _snack('Error reference copied');
+          },
+        )),
       SizedBox(
         width: double.infinity,
         child: FilledButton.icon(
@@ -569,7 +692,75 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
               : _syncNow,
         ),
       ),
+      if (syncState.isSyncing && syncState.progress?.phase != SyncPhase.committing && syncState.progress?.phase != SyncPhase.done)
+        TextButton(onPressed: syncState.status == SyncStatus.cancelling
+            ? null : () => ref.read(syncProvider.notifier).cancel(),
+            child: Text(syncState.status == SyncStatus.cancelling ? 'Stopping…' : 'Cancel sync')),
     ];
+  }
+
+  List<Widget> _conflictChildren(SyncState state) => [
+    _sectionTitle('Files to review'),
+    Text('Both copies changed. Other files can sync while these wait for your decision.',
+        style: TextStyle(fontSize: 14, height: 1.5, color: context.textSecondary)),
+    ...state.conflicts.map((conflict) => ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(Icons.difference_outlined, color: context.accentColor),
+      title: Text(conflict.local.originalName ?? conflict.remote.originalName ?? 'File'),
+      subtitle: Text(conflict.local.deleted || conflict.remote.deleted
+          ? 'A deletion conflicts with an edited copy' : 'This device and the server have different copies'),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: state.isSyncing ? null : () => _review(conflict),
+    )),
+  ];
+
+  Future<void> _review(SyncConflict conflict) async {
+    final choice = await showModalBottomSheet<ConflictChoice>(context: context,
+        isScrollControlled: true, showDragHandle: true, useSafeArea: true,
+        builder: (ctx) => SingleChildScrollView(child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text(conflict.local.originalName ?? conflict.remote.originalName ?? 'Review file',
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 20),
+            const Text('On this device', style: TextStyle(fontWeight: FontWeight.w600)),
+            Text(_conflictDetail(conflict, true)),
+            const SizedBox(height: 16),
+            const Text('On the server', style: TextStyle(fontWeight: FontWeight.w600)),
+            Text(_conflictDetail(conflict, false)),
+            const SizedBox(height: 24),
+            Text('Your choice is checked against both copies before it is applied. '
+                'Keeping one copy replaces the other version in the synced vault.',
+                style: TextStyle(fontSize: 14, height: 1.5, color: ctx.textSecondary)),
+            const SizedBox(height: 16),
+            FilledButton(onPressed: () => Navigator.pop(ctx, ConflictChoice.local),
+                child: Text(conflict.local.deleted ? 'Keep this device’s deletion' : 'Keep this device’s copy')),
+            OutlinedButton(onPressed: () => Navigator.pop(ctx, ConflictChoice.remote),
+                child: Text(conflict.remote.deleted ? 'Keep the server’s deletion' : 'Keep the server’s copy')),
+            if (!conflict.local.deleted && !conflict.remote.deleted)
+              OutlinedButton(onPressed: () => Navigator.pop(ctx, ConflictChoice.both), child: const Text('Keep both')),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Decide later')),
+          ]),
+        )));
+    if (choice != null && mounted && !ref.read(syncProvider).isSyncing) {
+      await ref.read(syncProvider.notifier).choose(conflict.id, choice);
+    }
+  }
+
+  String _conflictDetail(SyncConflict conflict, bool local) {
+    final entry = local ? conflict.local : conflict.remote;
+    if (entry.deleted) return 'Deleted · ${_formatDate(entry.modifiedAt)}';
+    return '${_formatDate(entry.modifiedAt)} · ${_bytes(entry.fileSize ?? 0)}\n'
+        'Name: ${entry.originalName ?? 'Unknown'}\n'
+        'Tags: ${entry.tags.isEmpty ? 'None' : entry.tags.join(', ')}\n'
+        'Favorite: ${entry.isFavorite ? 'Yes' : 'No'}';
+  }
+
+  static String _bytes(int value) {
+    if (value < 1024) return '$value B';
+    if (value < 1024 * 1024) return '${(value / 1024).toStringAsFixed(1)} KB';
+    if (value < 1024 * 1024 * 1024) return '${(value / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(value / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 
   List<Widget> _historyChildren() {
@@ -614,9 +805,10 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
 
   static String _phaseLabel(SyncProgress p) => switch (p.phase) {
         SyncPhase.connecting => 'Connecting',
+        SyncPhase.hashing => 'Checking files',
         SyncPhase.uploading => 'Uploading',
         SyncPhase.downloading => 'Downloading',
-        SyncPhase.committing => 'Committing',
+        SyncPhase.committing => 'Finishing safely',
         SyncPhase.done => 'Done',
       };
 }
@@ -713,7 +905,8 @@ class _ServerSheetState extends State<_ServerSheet> {
           const SnackBar(content: Text('Connected ✓')),
         );
       }
-    } catch (e) {
+    } catch (e, st) {
+      Diagnostics.failure('sync.testConnection', e, st);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(describeServerError(e))),
