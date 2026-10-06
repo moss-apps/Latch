@@ -129,7 +129,9 @@ void main() {
     expect(await SensitiveIsolate.run(() async => 42), 42);
     await expectLater(
       SensitiveIsolate.run<Object>(() async => throw StateError('failed')),
-      throwsStateError,
+      throwsA(isA<SyncWorkerFailure>()
+          .having((e) => e.message, 'message', isNotEmpty)
+          .having((e) => e.diagnosticId, 'diagnosticId', isNotEmpty)),
     );
   });
 
