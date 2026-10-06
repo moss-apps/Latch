@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:ui' show PlatformDispatcher;
 
-import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,6 +17,7 @@ import 'themes/app_theme.dart';
 import 'providers/theme_provider.dart';
 import 'providers/vault_providers.dart';
 import 'services/auth_service.dart';
+import 'services/diagnostics.dart';
 import 'services/legal_consent_service.dart';
 import 'screens/auth_method_selection_screen.dart';
 import 'screens/legal_consent_screen.dart';
@@ -32,15 +32,10 @@ Future<void> main() async {
 
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
-    if (kReleaseMode) {
-      debugPrint('[Fatal] ${details.exceptionAsString()}');
-      final stack = details.stack;
-      if (stack != null) debugPrint('$stack');
-    }
+    Diagnostics.failure('flutter.error', details.exception, details.stack ?? StackTrace.current);
   };
   PlatformDispatcher.instance.onError = (error, stack) {
-    debugPrint('[Uncaught] $error');
-    debugPrint('$stack');
+    Diagnostics.failure('platform.error', error, stack);
     return true;
   };
 
