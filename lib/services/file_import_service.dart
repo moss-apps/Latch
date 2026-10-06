@@ -1020,6 +1020,7 @@ class FileImportService {
 
       final filesToVault = <FileToVault>[];
       final pathsToDelete = <String>[];
+      final fileSizesByPath = <String, int>{};
       int processed = 0;
 
       for (final path in filePaths) {
@@ -1043,6 +1044,7 @@ class FileImportService {
             encrypt: perFileConfig?.encrypt,
             encryptionAlgorithm: perFileConfig?.algorithm,
           ));
+          fileSizesByPath[path] = await file.length();
 
           pathsToDelete.add(path);
 
@@ -1063,11 +1065,26 @@ class FileImportService {
         );
       }
 
-      debugPrint('[FileImport] Adding ${filesToVault.length} files to vault');
+      final (filesToImport, skippedDuplicates) =
+          await _filterDuplicates(filesToVault, fileSizesByPath);
+      if (skippedDuplicates.isNotEmpty) {
+        debugPrint(
+            '[FileImport] Skipping ${skippedDuplicates.length} verified duplicates');
+      }
+      if (filesToImport.isEmpty) {
+        return ImportResult(
+          success: false,
+          error: 'All selected files already exist in vault',
+          importedFiles: [],
+          skippedDuplicates: skippedDuplicates.length,
+        );
+      }
+
+      debugPrint('[FileImport] Adding ${filesToImport.length} files to vault');
 
       // Add to vault
       final imported = await _vaultService.addFiles(
-        files: filesToVault,
+        files: filesToImport,
         deleteOriginals: false,
         isDecoy: _decoyService.isDecoyModeActive,
         onProgress: onProgress,
@@ -1100,8 +1117,9 @@ class FileImportService {
             'Imported ${imported.length} file(s)${retainedOriginals > 0 ? " ($retainedOriginals original(s) still on device)" : ""}',
         deletedOriginals: requestedOriginals > 0 && retainedOriginals == 0,
         retainedOriginals: retainedOriginals,
-        failedCount: (filesToVault.length - imported.length)
-            .clamp(0, filesToVault.length),
+        skippedDuplicates: skippedDuplicates.length,
+        failedCount: (filesToImport.length - imported.length)
+            .clamp(0, filesToImport.length),
       );
     } catch (e, stackTrace) {
       debugPrint('[FileImport] Error importing documents from files: $e');
@@ -1476,6 +1494,91 @@ class FileImportService {
   }
 
   /// Import any files from file manager
+  /// Imports already-staged local files with explicit names, types, and MIME
+  /// types. Used by Share to Latch; the sources are throwaway staging copies,
+  /// so they are never deleted here.
+  Future<ImportResult> importPreparedFiles({
+    required List<FileToVault> files,
+    Function(int current, int total)? onProgress,
+    Function(FileProgressInfo)? onFileProgress,
+  }) async {
+    if (files.isEmpty) {
+      return const ImportResult(
+        success: true,
+        importedFiles: [],
+        message: 'No files to import',
+      );
+    }
+
+    try {
+      final accessible = <FileToVault>[];
+      final fileSizesByPath = <String, int>{};
+      for (final file in files) {
+        try {
+          final source = File(file.sourcePath);
+          if (!await source.exists()) {
+            debugPrint('[FileImport] Staged file missing: ${file.sourcePath}');
+            continue;
+          }
+          accessible.add(file);
+          fileSizesByPath[file.sourcePath] = await source.length();
+        } catch (e) {
+          debugPrint(
+              '[FileImport] Error reading staged file ${file.sourcePath}: $e');
+        }
+      }
+
+      if (accessible.isEmpty) {
+        return const ImportResult(
+          success: false,
+          error: 'Could not access any of the shared files',
+          importedFiles: [],
+        );
+      }
+
+      final (filesToImport, skippedDuplicates) =
+          await _filterDuplicates(accessible, fileSizesByPath);
+      if (skippedDuplicates.isNotEmpty) {
+        debugPrint(
+            '[FileImport] Skipping ${skippedDuplicates.length} verified duplicates');
+      }
+      if (filesToImport.isEmpty) {
+        return ImportResult(
+          success: false,
+          error: 'All shared files already exist in vault',
+          importedFiles: [],
+          skippedDuplicates: skippedDuplicates.length,
+        );
+      }
+
+      final imported = await _vaultService.addFiles(
+        files: filesToImport,
+        deleteOriginals: false,
+        isDecoy: _decoyService.isDecoyModeActive,
+        onProgress: onProgress,
+        onFileProgress: onFileProgress,
+      );
+
+      final failed =
+          accessible.length - imported.length - skippedDuplicates.length;
+      return ImportResult(
+        success: true,
+        importedFiles: imported,
+        skippedDuplicates: skippedDuplicates.length,
+        failedCount: failed > 0 ? failed : 0,
+        message: 'Imported ${imported.length} file(s)',
+      );
+    } catch (e, stackTrace) {
+      debugPrint('[FileImport] Error importing shared files: $e');
+      debugPrint('[FileImport] Stack trace: $stackTrace');
+      return ImportResult(
+        success: false,
+        error: 'Failed to import shared files: $e',
+        importedFiles: [],
+      );
+    }
+  }
+
   Future<ImportResult> importAnyFiles({
     bool deleteOriginals = true,
     Function(int current, int total)? onProgress,

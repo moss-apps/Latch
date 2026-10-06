@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import '../models/album.dart';
+import '../models/vault_file_filter.dart';
 import '../models/vault_folder.dart';
 import '../models/vaulted_file.dart';
 import '../models/vault_settings.dart';
@@ -54,18 +55,13 @@ final searchQueryProvider = StateProvider<String>((ref) {
   return '';
 });
 
-/// Provider for selected tags filter
-final selectedTagsProvider = StateProvider<List<String>>((ref) {
-  return [];
+/// Provider for the active structured filter (tags, type, dates, size, ...).
+final fileFilterProvider = StateProvider<VaultFileFilter>((ref) {
+  return const VaultFileFilter();
 });
 
 /// Provider for selected album filter
 final selectedAlbumIdProvider = StateProvider<String?>((ref) {
-  return null;
-});
-
-/// Provider for file type filter
-final fileTypeFilterProvider = StateProvider<VaultedFileType?>((ref) {
   return null;
 });
 
@@ -77,23 +73,17 @@ final filteredFilesProvider = FutureProvider<List<VaultedFile>>((ref) async {
   final sortOption = ref.watch(sortOptionProvider);
   final isDecoy = ref.watch(isDecoyModeProvider);
   final searchQuery = ref.watch(searchQueryProvider);
-  final selectedTags = ref.watch(selectedTagsProvider);
-  final selectedAlbumId = ref.watch(selectedAlbumIdProvider);
-  final fileTypeFilter = ref.watch(fileTypeFilterProvider);
+  final filter = ref.watch(fileFilterProvider);
 
-  // Get files based on filters
-  final files = await vaultService.searchFilesAdvanced(
-    query: searchQuery.isEmpty ? null : searchQuery,
-    tags: selectedTags.isEmpty ? null : selectedTags,
-    albumId: selectedAlbumId,
-    type: fileTypeFilter,
-  );
+  // Search bar text is just the name dimension of the same filter.
+  final combined = searchQuery.isEmpty
+      ? filter
+      : filter.copyWith(nameQuery: searchQuery);
 
-  // Filter out decoy files if not in decoy mode
-  final filteredByDecoy = files.where((f) => f.isDecoy == isDecoy).toList();
+  final files = await vaultService.searchWithFilter(combined, isDecoy: isDecoy);
 
   // Sort files
-  return vaultService.sortFiles(filteredByDecoy, sortOption);
+  return vaultService.sortFiles(files, sortOption);
 });
 
 /// Provider for files by type

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../models/album.dart';
 import '../models/encryption_algorithm.dart';
 import '../models/file_to_vault.dart';
+import '../models/vault_file_filter.dart';
 import '../models/vault_folder.dart';
 import '../models/vault_settings.dart';
 import '../models/vaulted_file.dart';
@@ -18,6 +19,7 @@ import 'pb/pocketbase_runtime.dart';
 import 'pb/pocketbase_store.dart';
 import 'search_service.dart';
 import 'settings_service.dart';
+import 'smart_collection_service.dart';
 import 'stats_service.dart';
 import 'tag_service.dart';
 import 'thumbnail_service.dart';
@@ -512,6 +514,12 @@ class VaultService {
   Future<List<VaultedFile>> searchFiles(String query) =>
       _search.searchFiles(query);
 
+  Future<List<VaultedFile>> searchWithFilter(
+    VaultFileFilter filter, {
+    bool isDecoy = false,
+  }) =>
+      _search.searchWithFilter(filter, isDecoy: isDecoy);
+
   Future<List<VaultedFile>> searchFilesAdvanced({
     String? query,
     List<String>? tags,
@@ -520,6 +528,7 @@ class VaultService {
     DateTime? dateTo,
     bool? isFavorite,
     String? albumId,
+    bool isDecoy = false,
   }) =>
       _search.searchFilesAdvanced(
         query: query,
@@ -529,6 +538,7 @@ class VaultService {
         dateTo: dateTo,
         isFavorite: isFavorite,
         albumId: albumId,
+        isDecoy: isDecoy,
       );
 
   // ---- Settings ----
@@ -549,6 +559,7 @@ class VaultService {
   Future<void> clearVault({bool isDecoy = false}) async {
     try {
       await _store.wipe(isDecoy: isDecoy);
+      await SmartCollectionService.instance.clear(isDecoy: isDecoy);
       clearThumbnailCache();
     } catch (e) {
       debugPrint('Error clearing vault: $e');
