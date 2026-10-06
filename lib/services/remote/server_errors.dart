@@ -1,62 +1,41 @@
-import 'package:flutter/foundation.dart';
+import 'dart:io';
 
-/// Map any server/sync failure to a plain-language, actionable message.
-/// String-matches on toString() so callers don't import transitive dio/webdav.
-String describeServerError(Object e) {
-  final s = e.toString().toLowerCase();
+import 'package:dio/dio.dart';
 
-  if (s.contains('connection timeout') || s.contains('connecttimeout')) {
-    return "Couldn't reach the server (timed out). Check it's running on "
-        'the right port and bound to 0.0.0.0, not localhost.';
-  }
-  if (s.contains('connection refused') ||
-      s.contains('reset') ||
-      s.contains('broken pipe')) {
-    return "Server refused the connection. Wrong port, or the WebDAV "
-        "service isn't running.";
-  }
-  if (s.contains('401') ||
-      s.contains('unauthorized') ||
-      s.contains('403') ||
-      s.contains('forbidden')) {
-    return 'Sign-in failed — check your username and password.';
-  }
-  if (s.contains('certificate') ||
-      s.contains('handshake') ||
-      s.contains('tls')) {
-    return "Secure connection failed — the server's certificate was "
-        'rejected. If you trust it, add the exception in your server '
-        'settings.';
-  }
-  if (s.contains('404') || s.contains('not found')) {
-    return "The server couldn't find that path — check the base path and "
-        'URL in your server settings.';
-  }
-  if (s.contains('receive timeout') ||
-      s.contains('send timeout') ||
-      s.contains('connection closed')) {
-    return 'The connection dropped mid-transfer. Check your network and '
-        'try again.';
-  }
-  if (s.contains('connection error') ||
-      s.contains('socket') ||
-      s.contains('network') ||
-      s.contains('host')) {
-    return 'Network error — wrong address, firewall, or device not on the '
-        'same LAN as the server.';
-  }
-  if (e is FormatException ||
-      s.contains('invalid ciphertext') ||
-      s.contains('invalidciphertextexception')) {
-    return "The data on the server couldn't be read — it may be corrupt or "
-        'belong to a different vault.';
-  }
-  if (s.startsWith('bad state:')) {
-    // SyncService StateErrors are already plain sentences; strip the prefix.
-    return e.toString().replaceFirst(RegExp(r'^Bad state:\s*'), '');
-  }
+import 'remote_store.dart';
 
-  debugPrint('[sync] unrecognized error: $e');
-  return 'Something went wrong while talking to the server. Check your '
-      'connection and try again.';
+String describeServerError(Object error) {
+  final text = error.toString().toLowerCase();
+  final status = error is DioException ? error.response?.statusCode : null;
+  if (error is RemoteRevisionChanged) {
+    return 'Another device updated the backup while you were syncing. Your files are safe. Try syncing again.';
+  }
+  if (error is UnsafeRemotePublication) {
+    return 'This server cannot safely update your backup. Try another server or use Desktop Backup.';
+  }
+  if (status == 401 || status == 403 || text.contains('unauthorized') || text.contains('forbidden')) {
+    return 'Couldn’t sign in to your server. Check the username and password in its settings.';
+  }
+  if (status == 507 || text.contains('no space') || text.contains('errno = 28')) {
+    return 'There isn’t enough free space to finish. Free up space on this device or the server, then try again.';
+  }
+  if (status == 429 || (status != null && status >= 500)) {
+    return 'Your server is busy or unavailable. Wait a moment and try again.';
+  }
+  if (text.contains('session') && (text.contains('locked') || text.contains('expired'))) {
+    return 'Sync stopped when the vault locked. Unlock it and sync again.';
+  }
+  if (text.contains('certificate') || text.contains('handshake') || text.contains('tls')) {
+    return 'A secure connection to your server couldn’t be established. Check its security settings and try again.';
+  }
+  if (error is FormatException || text.contains('invalidcipher') || text.contains('invalid ciphertext')) {
+    return 'This backup couldn’t be verified or belongs to another vault. Your existing files haven’t been replaced. Check the backup and try again.';
+  }
+  if (error is FileSystemException) {
+    return 'A file couldn’t be saved or opened. Check free space and storage access, then try again.';
+  }
+  if (error is DioException || error is SocketException || text.contains('timeout') || text.contains('connection')) {
+    return 'Couldn’t connect to your server or the connection was interrupted. Check your network and server settings, then try again.';
+  }
+  return 'Sync couldn’t finish. Your files are still available. Try again; if it keeps happening, copy the error details for help.';
 }
