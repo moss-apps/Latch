@@ -82,13 +82,13 @@ class _VaultFilterSheetState extends ConsumerState<VaultFilterSheet> {
   }
 
   void _apply() {
-    Navigator.of(context)
-        .pop(VaultFilterSheetResult(VaultFilterAction.apply, _normalizedDraft()));
+    Navigator.of(context).pop(
+        VaultFilterSheetResult(VaultFilterAction.apply, _normalizedDraft()));
   }
 
   void _saveSearch() {
-    Navigator.of(context).pop(
-        VaultFilterSheetResult(VaultFilterAction.saveSearch, _normalizedDraft()));
+    Navigator.of(context).pop(VaultFilterSheetResult(
+        VaultFilterAction.saveSearch, _normalizedDraft()));
   }
 
   Future<void> _pickDate({required bool isFrom}) async {
@@ -175,8 +175,9 @@ class _VaultFilterSheetState extends ConsumerState<VaultFilterSheet> {
                       return FilterChip(
                         label: Text(type.displayName),
                         selected: selected,
-                        onSelected: (_) => _update((f) =>
-                            selected ? f.copyWith(clearType: true) : f.copyWith(type: type)),
+                        onSelected: (_) => _update((f) => selected
+                            ? f.copyWith(clearType: true)
+                            : f.copyWith(type: type)),
                       );
                     }).toList(),
                   ),
@@ -204,16 +205,14 @@ class _VaultFilterSheetState extends ConsumerState<VaultFilterSheet> {
                         label: const Text('Encrypted'),
                         selected: _draft.isEncrypted == true,
                         onSelected: (selected) => _update((f) => f.copyWith(
-                            isEncrypted:
-                                selected ? true : null,
+                            isEncrypted: selected ? true : null,
                             clearIsEncrypted: !selected)),
                       ),
                       ChoiceChip(
                         label: const Text('Unencrypted'),
                         selected: _draft.isEncrypted == false,
                         onSelected: (selected) => _update((f) => f.copyWith(
-                            isEncrypted:
-                                selected ? false : null,
+                            isEncrypted: selected ? false : null,
                             clearIsEncrypted: !selected)),
                       ),
                     ],

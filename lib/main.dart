@@ -34,7 +34,8 @@ Future<void> main() async {
 
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
-    Diagnostics.failure('flutter.error', details.exception, details.stack ?? StackTrace.current);
+    Diagnostics.failure('flutter.error', details.exception,
+        details.stack ?? StackTrace.current);
   };
   PlatformDispatcher.instance.onError = (error, stack) {
     Diagnostics.failure('platform.error', error, stack);

@@ -104,8 +104,9 @@ void main() {
   }
 
   List<String> storedIds({bool isDecoy = false}) {
-    final json = storage[
-        isDecoy ? 'locker_smart_collections_decoy' : 'locker_smart_collections'];
+    final json = storage[isDecoy
+        ? 'locker_smart_collections_decoy'
+        : 'locker_smart_collections'];
     if (json == null) return const [];
     return (jsonDecode(json) as List)
         .map((e) => (e as Map)['id'] as String)
@@ -137,8 +138,7 @@ void main() {
         createdAt: DateTime(2024, 6, 1),
         updatedAt: DateTime(2024, 6, 1),
       );
-      storage['locker_smart_collections'] =
-          jsonEncode([custom.toJson()]);
+      storage['locker_smart_collections'] = jsonEncode([custom.toJson()]);
 
       final collections = await service.load();
 
@@ -162,8 +162,11 @@ void main() {
         createdAt: DateTime(2024, 6, 1),
         updatedAt: DateTime(2024, 6, 1),
       );
-      storage['locker_smart_collections'] =
-          jsonEncode([custom.toJson(), {'id': null}, 'garbage']);
+      storage['locker_smart_collections'] = jsonEncode([
+        custom.toJson(),
+        {'id': null},
+        'garbage'
+      ]);
 
       final collections = await service.load();
       expect(collections.any((c) => c.id == 'custom-2'), isTrue);
@@ -314,18 +317,18 @@ void main() {
       const small = 10 * 1024 * 1024;
 
       expect(
-        preset.matches(makeFile('a',
-            type: VaultedFileType.video, fileSize: big)),
+        preset
+            .matches(makeFile('a', type: VaultedFileType.video, fileSize: big)),
         isTrue,
       );
       expect(
-        preset.matches(makeFile('b',
-            type: VaultedFileType.video, fileSize: small)),
+        preset.matches(
+            makeFile('b', type: VaultedFileType.video, fileSize: small)),
         isFalse,
       );
       expect(
-        preset.matches(makeFile('c',
-            type: VaultedFileType.image, fileSize: big)),
+        preset
+            .matches(makeFile('c', type: VaultedFileType.image, fileSize: big)),
         isFalse,
       );
     });
@@ -459,8 +462,7 @@ void main() {
       expect(presets.length, 4);
       expect(presets.every((c) => c.isPreset), isTrue);
 
-      final videos =
-          presets.firstWhere((c) => c.id == 'preset_large_videos');
+      final videos = presets.firstWhere((c) => c.id == 'preset_large_videos');
       expect(videos.sortOption, SortOption.sizeLargest);
       expect(videos.filter.type, VaultedFileType.video);
       expect(videos.filter.minSizeBytes, 100 * 1024 * 1024);
@@ -528,8 +530,8 @@ void main() {
       );
       expect(created, isNotNull);
 
-      final results =
-          await readFuture(container, smartCollectionResultsProvider(created!.id));
+      final results = await readFuture(
+          container, smartCollectionResultsProvider(created!.id));
       expect(results.map((f) => f.id), ['old']);
 
       final ok = await notifier.deleteCollection(created.id);

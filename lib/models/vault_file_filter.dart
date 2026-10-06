@@ -203,10 +203,9 @@ class VaultFileFilter {
   factory VaultFileFilter.fromJson(Map<String, dynamic> json) {
     return VaultFileFilter(
       nameQuery: json['nameQuery'] as String?,
-      tags: (json['tags'] as List<dynamic>?)
-              ?.map((e) => e as String)
-              .toList() ??
-          const [],
+      tags:
+          (json['tags'] as List<dynamic>?)?.map((e) => e as String).toList() ??
+              const [],
       type: json['type'] != null
           ? VaultedFileType.fromString(json['type'] as String)
           : null,

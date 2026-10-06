@@ -119,8 +119,7 @@ class SmartCollectionsScreen extends ConsumerWidget {
       body: collectionsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => _buildError(context, ref),
-        data: (collections) =>
-            _buildList(context, ref, collections, counts),
+        data: (collections) => _buildList(context, ref, collections, counts),
       ),
     );
   }
@@ -142,7 +141,8 @@ class SmartCollectionsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           ElevatedButton(
-            onPressed: () => ref.read(smartCollectionsProvider.notifier).reload(),
+            onPressed: () =>
+                ref.read(smartCollectionsProvider.notifier).reload(),
             child: const Text('Retry'),
           ),
         ],
@@ -356,7 +356,8 @@ class SmartCollectionsScreen extends ConsumerWidget {
       parts.add('≤ ${_formatBytes(filter.maxSizeBytes!)}');
     }
     if (filter.dateFrom != null || filter.dateTo != null) {
-      final from = filter.dateFrom == null ? 'Any' : _formatDate(filter.dateFrom!);
+      final from =
+          filter.dateFrom == null ? 'Any' : _formatDate(filter.dateFrom!);
       final to = filter.dateTo == null ? 'Any' : _formatDate(filter.dateTo!);
       parts.add('$from – $to');
     }
@@ -451,7 +452,8 @@ class SmartCollectionsScreen extends ConsumerWidget {
                 ),
               if (collection.isCustom)
                 ListTile(
-                  leading: Icon(Icons.edit_outlined, color: context.accentColor),
+                  leading:
+                      Icon(Icons.edit_outlined, color: context.accentColor),
                   title: Text(
                     'Rename',
                     style: TextStyle(
@@ -463,8 +465,8 @@ class SmartCollectionsScreen extends ConsumerWidget {
                 ),
               if (collection.isCustom)
                 ListTile(
-                  leading: const Icon(Icons.delete_outline,
-                      color: AppColors.error),
+                  leading:
+                      const Icon(Icons.delete_outline, color: AppColors.error),
                   title: const Text(
                     'Delete',
                     style: TextStyle(

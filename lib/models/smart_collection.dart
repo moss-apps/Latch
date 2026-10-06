@@ -119,8 +119,8 @@ class SmartCollection {
       ),
       sortOption: _sortOptionFromString(json['sortOption'] as String?),
       isPreset: json['isPreset'] as bool? ?? false,
-      filterVersion: (json['filterVersion'] as num?)?.toInt() ??
-          currentFilterVersion,
+      filterVersion:
+          (json['filterVersion'] as num?)?.toInt() ?? currentFilterVersion,
       createdAt: _parseDate(json['createdAt']) ?? DateTime.now(),
       updatedAt: _parseDate(json['updatedAt']) ?? DateTime.now(),
     );

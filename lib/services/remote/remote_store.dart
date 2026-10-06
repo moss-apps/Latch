@@ -10,6 +10,7 @@ class RemoteManifestSnapshot {
 }
 
 class RemoteRevisionChanged implements Exception {}
+
 class UnsafeRemotePublication implements Exception {
   UnsafeRemotePublication([this.reason = 'missing-dav-capability']);
   final String reason;
@@ -17,11 +18,12 @@ class UnsafeRemotePublication implements Exception {
 
 abstract class StreamingRemoteStore {
   Future<RemoteManifestSnapshot> readManifest(SyncControl control);
-  Future<void> publishManifest(Uint8List bytes, String? revision, SyncControl control);
+  Future<void> publishManifest(
+      Uint8List bytes, String? revision, SyncControl control);
   Future<bool> verifyBlob(String name, String hash, SyncControl control);
   Future<int?> blobLength(String name, SyncControl control);
-  Future<void> uploadFile(String name, File file, String hash, SyncControl control,
-      void Function(int, int) progress);
+  Future<void> uploadFile(String name, File file, String hash,
+      SyncControl control, void Function(int, int) progress);
   Future<bool> downloadFile(String name, File destination, SyncControl control,
       void Function(int, int) progress);
 }

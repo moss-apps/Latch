@@ -122,8 +122,7 @@ class _ShareImportScreenState extends ConsumerState<ShareImportScreen> {
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: Row(
             children: [
-              Icon(Icons.info_outline,
-                  size: 16, color: context.textTertiary),
+              Icon(Icons.info_outline, size: 16, color: context.textTertiary),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -214,9 +213,7 @@ class _ShareImportScreenState extends ConsumerState<ShareImportScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              _resultIsError
-                  ? Icons.error_outline
-                  : Icons.check_circle_outline,
+              _resultIsError ? Icons.error_outline : Icons.check_circle_outline,
               size: 64,
               color: _resultIsError ? errorColor : context.accentColor,
             ),
@@ -286,9 +283,7 @@ class _ShareImportScreenState extends ConsumerState<ShareImportScreen> {
         title: 'Nothing imported',
         message: failed.isEmpty
             ? 'The shared files could not be read.'
-            : failed
-                .map((f) => '${f.name}: ${f.error}')
-                .join('\n'),
+            : failed.map((f) => '${f.name}: ${f.error}').join('\n'),
         isError: true,
       );
       return;

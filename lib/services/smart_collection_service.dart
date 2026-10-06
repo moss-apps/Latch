@@ -117,7 +117,8 @@ class SmartCollectionService {
     return collection;
   }
 
-  Future<void> update(SmartCollection collection, {bool isDecoy = false}) async {
+  Future<void> update(SmartCollection collection,
+      {bool isDecoy = false}) async {
     final current = await load(isDecoy: isDecoy);
     final updated = collection.copyWith(updatedAt: DateTime.now());
     final next = [

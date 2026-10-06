@@ -111,8 +111,8 @@ class _SmartCollectionScreenState extends ConsumerState<SmartCollectionScreen>
               ),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: () => ref
-                    .invalidate(smartCollectionResultsProvider(widget.collectionId)),
+                onPressed: () => ref.invalidate(
+                    smartCollectionResultsProvider(widget.collectionId)),
                 child: const Text('Retry'),
               ),
             ],
@@ -206,9 +206,8 @@ class _SmartCollectionScreenState extends ConsumerState<SmartCollectionScreen>
         IconButton(
           icon: Icon(Icons.sort, color: context.textPrimary),
           tooltip: 'Sort',
-          onPressed: collection == null
-              ? null
-              : () => _showSortOptions(collection),
+          onPressed:
+              collection == null ? null : () => _showSortOptions(collection),
         ),
         if (collection != null)
           PopupMenuButton<String>(
@@ -565,7 +564,9 @@ class _SmartCollectionScreenState extends ConsumerState<SmartCollectionScreen>
   }
 
   void _toggleSelectAll() {
-    final files = ref.read(smartCollectionResultsProvider(widget.collectionId)).value ?? [];
+    final files =
+        ref.read(smartCollectionResultsProvider(widget.collectionId)).value ??
+            [];
     final allSelected =
         files.isNotEmpty && files.every((f) => _selectedFiles.contains(f.id));
 
@@ -688,8 +689,9 @@ class _SmartCollectionScreenState extends ConsumerState<SmartCollectionScreen>
 
     if (confirmed != true) return;
     final selectedList = _selectedFiles.toList();
-    final result =
-        await ref.read(vaultNotifierProvider.notifier).deleteFiles(selectedList);
+    final result = await ref
+        .read(vaultNotifierProvider.notifier)
+        .deleteFiles(selectedList);
     if (!mounted) return;
 
     _exitSelectionMode();

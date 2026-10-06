@@ -30,10 +30,13 @@ class SensitiveIsolate {
     StackTrace? workerStack;
 
     void failWorker() {
-      final id = Diagnostics.failure('worker.exit',
-          StateError('Worker exited unexpectedly'), workerStack ?? StackTrace.current);
+      final id = Diagnostics.failure(
+          'worker.exit',
+          StateError('Worker exited unexpectedly'),
+          workerStack ?? StackTrace.current);
       result.completeError(SyncWorkerFailure(
-          'The operation stopped unexpectedly. Try again, or copy the error reference for help.', id));
+          'The operation stopped unexpectedly. Try again, or copy the error reference for help.',
+          id));
     }
 
     final subscription = port.listen((message) {
@@ -53,8 +56,8 @@ class SensitiveIsolate {
         return;
       }
       if (message is List && message[0] == 'failure') {
-        result.completeError(SyncWorkerFailure(message[1] as String,
-            message[2] as String));
+        result.completeError(
+            SyncWorkerFailure(message[1] as String, message[2] as String));
         return;
       }
       if (message is List && message.length == 2 && message[0] == 'result') {
@@ -88,7 +91,9 @@ class SensitiveIsolate {
         );
       } catch (e, st) {
         final id = Diagnostics.failure('worker.spawn', e, st);
-        throw SyncWorkerFailure('The operation couldn’t start. Try again, or copy the error reference for help.', id);
+        throw SyncWorkerFailure(
+            'The operation couldn’t start. Try again, or copy the error reference for help.',
+            id);
       }
       if (generation != _generation) {
         isolate.kill(priority: Isolate.immediate);

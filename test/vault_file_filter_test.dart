@@ -74,13 +74,10 @@ void main() {
         ).matches(file),
         isTrue,
       );
-      expect(
-          const VaultFileFilter(type: VaultedFileType.image).matches(file),
+      expect(const VaultFileFilter(type: VaultedFileType.image).matches(file),
           isFalse);
-      expect(
-          const VaultFileFilter(isFavorite: false).matches(file), isFalse);
-      expect(
-          const VaultFileFilter(isEncrypted: false).matches(file), isFalse);
+      expect(const VaultFileFilter(isFavorite: false).matches(file), isFalse);
+      expect(const VaultFileFilter(isEncrypted: false).matches(file), isFalse);
       expect(const VaultFileFilter(minSizeBytes: 501).matches(file), isFalse);
       expect(const VaultFileFilter(maxSizeBytes: 499).matches(file), isFalse);
       expect(const VaultFileFilter(albumId: 'a2').matches(file), isFalse);
@@ -136,18 +133,14 @@ void main() {
 
     test('open-ended dateFrom matches everything after the day', () {
       final filter = VaultFileFilter(dateFrom: DateTime(2024, 5, 10));
-      expect(
-          filter.matches(_file(dateAdded: DateTime(2024, 6, 1))), isTrue);
-      expect(
-          filter.matches(_file(dateAdded: DateTime(2024, 5, 1))), isFalse);
+      expect(filter.matches(_file(dateAdded: DateTime(2024, 6, 1))), isTrue);
+      expect(filter.matches(_file(dateAdded: DateTime(2024, 5, 1))), isFalse);
     });
 
     test('open-ended dateTo matches everything before the day', () {
       final filter = VaultFileFilter(dateTo: DateTime(2024, 5, 10));
-      expect(
-          filter.matches(_file(dateAdded: DateTime(2024, 4, 1))), isTrue);
-      expect(
-          filter.matches(_file(dateAdded: DateTime(2024, 5, 11))), isFalse);
+      expect(filter.matches(_file(dateAdded: DateTime(2024, 4, 1))), isTrue);
+      expect(filter.matches(_file(dateAdded: DateTime(2024, 5, 11))), isFalse);
     });
 
     test('inverted range matches nothing', () {
@@ -155,8 +148,7 @@ void main() {
         dateFrom: DateTime(2024, 5, 20),
         dateTo: DateTime(2024, 5, 10),
       );
-      expect(filter.matches(_file(dateAdded: DateTime(2024, 5, 15))),
-          isFalse);
+      expect(filter.matches(_file(dateAdded: DateTime(2024, 5, 15))), isFalse);
     });
 
     test('date-only filtering works across month and year boundaries', () {

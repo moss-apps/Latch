@@ -121,13 +121,21 @@ class ShareIntakeService extends ChangeNotifier {
 
       return [
         for (final ref in refs)
-          staged[ref.id] ?? StagedShareFile.failure(ref, 'File could not be read'),
+          staged[ref.id] ??
+              StagedShareFile.failure(ref, 'File could not be read'),
       ];
     } on MissingPluginException {
-      return [for (final ref in refs) StagedShareFile.failure(ref, 'Sharing is unavailable on this platform')];
+      return [
+        for (final ref in refs)
+          StagedShareFile.failure(
+              ref, 'Sharing is unavailable on this platform')
+      ];
     } catch (error) {
       debugPrint('[ShareIntake] Staging failed: $error');
-      return [for (final ref in refs) StagedShareFile.failure(ref, 'Failed to stage shared file')];
+      return [
+        for (final ref in refs)
+          StagedShareFile.failure(ref, 'Failed to stage shared file')
+      ];
     }
   }
 

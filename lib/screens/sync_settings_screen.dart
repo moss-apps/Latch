@@ -65,9 +65,11 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
       // Profile's lastSyncedAt was persisted by the notifier — refresh the list.
       ref.invalidate(syncProfilesProvider);
       _showSuccessSheet(next);
-    } else if (next.status == SyncStatus.needsReview && prev?.status != SyncStatus.needsReview) {
+    } else if (next.status == SyncStatus.needsReview &&
+        prev?.status != SyncStatus.needsReview) {
       _addLog(next.message ?? 'Some files need review', ok: true);
-    } else if (next.status == SyncStatus.cancelled && prev?.status != SyncStatus.cancelled) {
+    } else if (next.status == SyncStatus.cancelled &&
+        prev?.status != SyncStatus.cancelled) {
       _addLog(next.message ?? 'Sync stopped', ok: true);
     } else if (next.status == SyncStatus.error &&
         prev?.status != SyncStatus.error) {
@@ -307,7 +309,8 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
                 ..._statusChildren(syncState, active),
                 const SizedBox(height: 24),
                 ..._serversChildren(profiles),
-                if (profilesAsync.hasError) _profilesErrorTile(profilesAsync.error!),
+                if (profilesAsync.hasError)
+                  _profilesErrorTile(profilesAsync.error!),
                 const SizedBox(height: 24),
                 ..._syncChildren(syncState),
                 if (syncState.conflicts.isNotEmpty) ...[
@@ -320,7 +323,8 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
                   'Uninstalling Latch or clearing its data removes the vault on this device. '
                   'Keep a Desktop Backup with your original password or PIN, or save a Local Backup outside the app. '
                   'Server sync alone does not back up the key needed after reinstall.',
-                  style: TextStyle(fontSize: 14, height: 1.5, color: context.textSecondary),
+                  style: TextStyle(
+                      fontSize: 14, height: 1.5, color: context.textSecondary),
                 ),
                 if (_log.isNotEmpty) ...[
                   const SizedBox(height: 24),
@@ -407,15 +411,31 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
           context.accentColor,
           Icons.cloud_sync_outlined
         ),
-      SyncStatus.cancelling => ('Stopping…', context.textSecondary, Icons.pause_circle_outline),
-      SyncStatus.cancelled => ('Sync stopped', context.textSecondary, Icons.pause_circle_outline),
-      SyncStatus.needsReview => ('Review needed', context.accentColor, Icons.difference_outlined),
+      SyncStatus.cancelling => (
+          'Stopping…',
+          context.textSecondary,
+          Icons.pause_circle_outline
+        ),
+      SyncStatus.cancelled => (
+          'Sync stopped',
+          context.textSecondary,
+          Icons.pause_circle_outline
+        ),
+      SyncStatus.needsReview => (
+          'Review needed',
+          context.accentColor,
+          Icons.difference_outlined
+        ),
       SyncStatus.success => (
           'Up to date',
           Colors.green,
           Icons.cloud_done_outlined
         ),
-      SyncStatus.error => ('Sync couldn’t finish', AppColors.error, Icons.error_outline),
+      SyncStatus.error => (
+          'Sync couldn’t finish',
+          AppColors.error,
+          Icons.error_outline
+        ),
     };
 
     final progress = syncState.progress;
@@ -423,13 +443,16 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
     final pct = progress != null && progress.fileTotal > 0
         ? (progress.fileBytes / progress.fileTotal).clamp(0.0, 1.0)
         : progress != null && progress.total > 0
-            ? (progress.completed / progress.total).clamp(0.0, 1.0) : null;
+            ? (progress.completed / progress.total).clamp(0.0, 1.0)
+            : null;
 
     String? detail;
     if (syncState.isSyncing && progress != null) {
       detail = '${_phaseLabel(progress)}'
           '${progress.total > 0 ? ' · ${progress.completed}/${progress.total} files' : ''}';
-    } else if ((syncState.status == SyncStatus.success || syncState.status == SyncStatus.needsReview || syncState.status == SyncStatus.cancelled) &&
+    } else if ((syncState.status == SyncStatus.success ||
+            syncState.status == SyncStatus.needsReview ||
+            syncState.status == SyncStatus.cancelled) &&
         syncState.message != null) {
       detail = syncState.message;
     } else if (active.lastSyncedAt != null) {
@@ -456,14 +479,22 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
           children: [
             if (detail != null) Text(detail, style: _subStyle(context)),
             if (syncState.isSyncing && progress?.filename != null)
-              Text(progress!.filename!, maxLines: 2, overflow: TextOverflow.ellipsis,
+              Text(progress!.filename!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 14, color: context.textPrimary)),
-            if (syncState.isSyncing && progress != null && progress.fileBytes > 0)
-              Text('${_bytes(progress.fileBytes)}'
+            if (syncState.isSyncing &&
+                progress != null &&
+                progress.fileBytes > 0)
+              Text(
+                  '${_bytes(progress.fileBytes)}'
                   '${progress.fileTotal > 0 ? ' / ${_bytes(progress.fileTotal)}' : ''}',
                   style: _subStyle(context)),
-            if (syncState.isSyncing && progress != null && progress.totalBytes > 0)
-              Text('Overall: ${_bytes(progress.transferredBytes)} / ${_bytes(progress.totalBytes)}',
+            if (syncState.isSyncing &&
+                progress != null &&
+                progress.totalBytes > 0)
+              Text(
+                  'Overall: ${_bytes(progress.transferredBytes)} / ${_bytes(progress.totalBytes)}',
                   style: _subStyle(context)),
             Text(
               active.serverUrl,
@@ -523,7 +554,9 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(message, style: TextStyle(fontSize: 14, height: 1.4, color: context.textPrimary)),
+          Text(message,
+              style: TextStyle(
+                  fontSize: 14, height: 1.4, color: context.textPrimary)),
           const SizedBox(height: 4),
           Row(
             children: [
@@ -534,7 +567,8 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
               if (id != null)
                 TextButton.icon(
                   onPressed: () async {
-                    await Clipboard.setData(ClipboardData(text: 'Latch server settings error $id'));
+                    await Clipboard.setData(
+                        ClipboardData(text: 'Latch server settings error $id'));
                     _snack('Error reference copied');
                   },
                   icon: const Icon(Icons.copy_outlined, size: 18),
@@ -631,7 +665,9 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
           }
         },
       ),
-      onTap: ref.watch(syncProvider).isSyncing ? null : () => _openEditor(profile: p),
+      onTap: ref.watch(syncProvider).isSyncing
+          ? null
+          : () => _openEditor(profile: p),
     );
   }
 
@@ -646,7 +682,8 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
           style: _subStyle(context),
         ),
         value: _masterEnabled,
-        onChanged: _activeId == null || syncState.isSyncing ? null : _setMasterEnabled,
+        onChanged:
+            _activeId == null || syncState.isSyncing ? null : _setMasterEnabled,
         activeThumbColor: context.accentColor,
       ),
       Text(
@@ -665,14 +702,18 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
         ),
       const SizedBox(height: 16),
       if (syncState.diagnosticId != null)
-        Align(alignment: Alignment.centerLeft, child: TextButton.icon(
-          icon: const Icon(Icons.copy_outlined),
-          label: const Text('Copy error reference'),
-          onPressed: () async {
-            await Clipboard.setData(ClipboardData(text: 'Latch sync error ${syncState.diagnosticId}\n${syncState.error}'));
-            _snack('Error reference copied');
-          },
-        )),
+        Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              icon: const Icon(Icons.copy_outlined),
+              label: const Text('Copy error reference'),
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(
+                    text:
+                        'Latch sync error ${syncState.diagnosticId}\n${syncState.error}'));
+                _snack('Error reference copied');
+              },
+            )),
       SizedBox(
         width: double.infinity,
         child: FilledButton.icon(
@@ -692,56 +733,97 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
               : _syncNow,
         ),
       ),
-      if (syncState.isSyncing && syncState.progress?.phase != SyncPhase.committing && syncState.progress?.phase != SyncPhase.done)
-        TextButton(onPressed: syncState.status == SyncStatus.cancelling
-            ? null : () => ref.read(syncProvider.notifier).cancel(),
-            child: Text(syncState.status == SyncStatus.cancelling ? 'Stopping…' : 'Cancel sync')),
+      if (syncState.isSyncing &&
+          syncState.progress?.phase != SyncPhase.committing &&
+          syncState.progress?.phase != SyncPhase.done)
+        TextButton(
+            onPressed: syncState.status == SyncStatus.cancelling
+                ? null
+                : () => ref.read(syncProvider.notifier).cancel(),
+            child: Text(syncState.status == SyncStatus.cancelling
+                ? 'Stopping…'
+                : 'Cancel sync')),
     ];
   }
 
   List<Widget> _conflictChildren(SyncState state) => [
-    _sectionTitle('Files to review'),
-    Text('Both copies changed. Other files can sync while these wait for your decision.',
-        style: TextStyle(fontSize: 14, height: 1.5, color: context.textSecondary)),
-    ...state.conflicts.map((conflict) => ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(Icons.difference_outlined, color: context.accentColor),
-      title: Text(conflict.local.originalName ?? conflict.remote.originalName ?? 'File'),
-      subtitle: Text(conflict.local.deleted || conflict.remote.deleted
-          ? 'A deletion conflicts with an edited copy' : 'This device and the server have different copies'),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: state.isSyncing ? null : () => _review(conflict),
-    )),
-  ];
+        _sectionTitle('Files to review'),
+        Text(
+            'Both copies changed. Other files can sync while these wait for your decision.',
+            style: TextStyle(
+                fontSize: 14, height: 1.5, color: context.textSecondary)),
+        ...state.conflicts.map((conflict) => ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading:
+                  Icon(Icons.difference_outlined, color: context.accentColor),
+              title: Text(conflict.local.originalName ??
+                  conflict.remote.originalName ??
+                  'File'),
+              subtitle: Text(conflict.local.deleted || conflict.remote.deleted
+                  ? 'A deletion conflicts with an edited copy'
+                  : 'This device and the server have different copies'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: state.isSyncing ? null : () => _review(conflict),
+            )),
+      ];
 
   Future<void> _review(SyncConflict conflict) async {
-    final choice = await showModalBottomSheet<ConflictChoice>(context: context,
-        isScrollControlled: true, showDragHandle: true, useSafeArea: true,
-        builder: (ctx) => SingleChildScrollView(child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text(conflict.local.originalName ?? conflict.remote.originalName ?? 'Review file',
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 20),
-            const Text('On this device', style: TextStyle(fontWeight: FontWeight.w600)),
-            Text(_conflictDetail(conflict, true)),
-            const SizedBox(height: 16),
-            const Text('On the server', style: TextStyle(fontWeight: FontWeight.w600)),
-            Text(_conflictDetail(conflict, false)),
-            const SizedBox(height: 24),
-            Text('Your choice is checked against both copies before it is applied. '
-                'Keeping one copy replaces the other version in the synced vault.',
-                style: TextStyle(fontSize: 14, height: 1.5, color: ctx.textSecondary)),
-            const SizedBox(height: 16),
-            FilledButton(onPressed: () => Navigator.pop(ctx, ConflictChoice.local),
-                child: Text(conflict.local.deleted ? 'Keep this device’s deletion' : 'Keep this device’s copy')),
-            OutlinedButton(onPressed: () => Navigator.pop(ctx, ConflictChoice.remote),
-                child: Text(conflict.remote.deleted ? 'Keep the server’s deletion' : 'Keep the server’s copy')),
-            if (!conflict.local.deleted && !conflict.remote.deleted)
-              OutlinedButton(onPressed: () => Navigator.pop(ctx, ConflictChoice.both), child: const Text('Keep both')),
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Decide later')),
-          ]),
-        )));
+    final choice = await showModalBottomSheet<ConflictChoice>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        useSafeArea: true,
+        builder: (ctx) => SingleChildScrollView(
+                child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                        conflict.local.originalName ??
+                            conflict.remote.originalName ??
+                            'Review file',
+                        style: const TextStyle(
+                            fontSize: 20, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 20),
+                    const Text('On this device',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
+                    Text(_conflictDetail(conflict, true)),
+                    const SizedBox(height: 16),
+                    const Text('On the server',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
+                    Text(_conflictDetail(conflict, false)),
+                    const SizedBox(height: 24),
+                    Text(
+                        'Your choice is checked against both copies before it is applied. '
+                        'Keeping one copy replaces the other version in the synced vault.',
+                        style: TextStyle(
+                            fontSize: 14,
+                            height: 1.5,
+                            color: ctx.textSecondary)),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                        onPressed: () =>
+                            Navigator.pop(ctx, ConflictChoice.local),
+                        child: Text(conflict.local.deleted
+                            ? 'Keep this device’s deletion'
+                            : 'Keep this device’s copy')),
+                    OutlinedButton(
+                        onPressed: () =>
+                            Navigator.pop(ctx, ConflictChoice.remote),
+                        child: Text(conflict.remote.deleted
+                            ? 'Keep the server’s deletion'
+                            : 'Keep the server’s copy')),
+                    if (!conflict.local.deleted && !conflict.remote.deleted)
+                      OutlinedButton(
+                          onPressed: () =>
+                              Navigator.pop(ctx, ConflictChoice.both),
+                          child: const Text('Keep both')),
+                    TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Decide later')),
+                  ]),
+            )));
     if (choice != null && mounted && !ref.read(syncProvider).isSyncing) {
       await ref.read(syncProvider.notifier).choose(conflict.id, choice);
     }
@@ -759,7 +841,9 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
   static String _bytes(int value) {
     if (value < 1024) return '$value B';
     if (value < 1024 * 1024) return '${(value / 1024).toStringAsFixed(1)} KB';
-    if (value < 1024 * 1024 * 1024) return '${(value / (1024 * 1024)).toStringAsFixed(1)} MB';
+    if (value < 1024 * 1024 * 1024) {
+      return '${(value / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
     return '${(value / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 

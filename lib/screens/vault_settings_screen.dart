@@ -436,7 +436,8 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                   'Desktop Backup can restore the vault with your original password or PIN. '
                   'Local Backup saves readable files to a folder you choose. '
                   'Server sync alone does not save the recovery key.',
-                  style: TextStyle(fontSize: 14, height: 1.5, color: context.textSecondary),
+                  style: TextStyle(
+                      fontSize: 14, height: 1.5, color: context.textSecondary),
                 ),
               ),
               ListTile(

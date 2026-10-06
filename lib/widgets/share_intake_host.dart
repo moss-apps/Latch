@@ -52,11 +52,11 @@ class _ShareIntakeHostState extends State<ShareIntakeHost> {
     _routeOpen = true;
     Navigator.of(context, rootNavigator: true)
         .push(
-          MaterialPageRoute<void>(
-            fullscreenDialog: true,
-            builder: (_) => const ShareImportScreen(),
-          ),
-        )
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => const ShareImportScreen(),
+      ),
+    )
         .whenComplete(() {
       _routeOpen = false;
       _openIfNeeded();

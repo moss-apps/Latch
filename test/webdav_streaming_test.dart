@@ -51,7 +51,8 @@ void main() {
           case 'MKCOL':
             response.statusCode = 201;
           case 'PUT':
-            final bytes = await request.fold<List<int>>([], (result, chunk) => result..addAll(chunk));
+            final bytes = await request
+                .fold<List<int>>([], (result, chunk) => result..addAll(chunk));
             objects[path] = Uint8List.fromList(bytes);
             response.statusCode = 201;
           case 'HEAD':
@@ -67,16 +68,21 @@ void main() {
               response.statusCode = 404;
               break;
             }
-            response.headers.set('etag', '${weakEtag ? 'W/' : ''}${etag(bytes)}');
+            response.headers
+                .set('etag', '${weakEtag ? 'W/' : ''}${etag(bytes)}');
             response.contentLength = bytes.length;
             for (var offset = 0; offset < bytes.length; offset += 16384) {
-              final end = offset + 16384 > bytes.length ? bytes.length : offset + 16384;
+              final end =
+                  offset + 16384 > bytes.length ? bytes.length : offset + 16384;
               response.add(Uint8List.sublistView(bytes, offset, end));
               await response.flush();
-              if (slow) await Future<void>.delayed(const Duration(milliseconds: 10));
+              if (slow) {
+                await Future<void>.delayed(const Duration(milliseconds: 10));
+              }
             }
           case 'MOVE':
-            final destination = Uri.parse(request.headers.value('destination')!).path;
+            final destination =
+                Uri.parse(request.headers.value('destination')!).path;
             final existing = objects[destination];
             final condition = request.headers.value('if');
             final presented = condition == null
@@ -93,7 +99,8 @@ void main() {
                     !condition.contains('[${etag(existing)}]'))) {
               // rclone/x-net-webdav: bracketed entity-tags never satisfy If.
               response.statusCode = 412;
-            } else if (request.headers.value('overwrite') == 'F' && existing != null) {
+            } else if (request.headers.value('overwrite') == 'F' &&
+                existing != null) {
               response.statusCode = 412;
             } else {
               objects[destination] = objects.remove(path)!;
@@ -131,7 +138,8 @@ void main() {
         // The client deliberately closes the body during cancellation.
       }
     });
-    store = WebDAVStore(baseUrl: 'http://${server.address.address}:${server.port}');
+    store =
+        WebDAVStore(baseUrl: 'http://${server.address.address}:${server.port}');
   });
 
   tearDown(() async {
@@ -140,15 +148,18 @@ void main() {
   });
 
   test('uploads stream to staging, verify, then atomically promote', () async {
-    final bytes = Uint8List.fromList(List<int>.generate(512 * 1024, (i) => i % 251));
+    final bytes =
+        Uint8List.fromList(List<int>.generate(512 * 1024, (i) => i % 251));
     final source = File('${dir.path}/source');
     await source.writeAsBytes(bytes);
     final hash = SyncService.sha256Hex(bytes);
     final name = SyncService.blobNameFor(hash);
     final samples = <int>[];
-    await store.uploadFile(name, source, hash, SyncControl(), (sent, _) => samples.add(sent));
+    await store.uploadFile(
+        name, source, hash, SyncControl(), (sent, _) => samples.add(sent));
     expect(objects['/locker/$name'], bytes);
-    expect(operations.where((o) => o.startsWith('PUT ')).single, contains('.partial'));
+    expect(operations.where((o) => o.startsWith('PUT ')).single,
+        contains('.partial'));
     expect(operations.where((o) => o.startsWith('MOVE ')), hasLength(1));
     expect(objects.keys.any((key) => key.contains('.partial')), isFalse);
     expect(samples.last, bytes.length);
@@ -161,81 +172,105 @@ void main() {
     final expected = SyncService.sha256Hex(Uint8List.fromList([1, 2]));
     final name = SyncService.blobNameFor(expected);
     objects['/locker/$name'] = Uint8List.fromList([1, 2]);
-    await expectLater(store.uploadFile(name, source, expected, SyncControl(), (sent, total) {}), throwsFormatException);
+    await expectLater(
+        store.uploadFile(
+            name, source, expected, SyncControl(), (sent, total) {}),
+        throwsFormatException);
     expect(objects['/locker/$name'], [1, 2]);
     expect(operations.any((o) => o.startsWith('MOVE ')), isFalse);
   });
 
-  test('publication honors both creation and replacement revision preconditions', () async {
+  test(
+      'publication honors both creation and replacement revision preconditions',
+      () async {
     final a = Uint8List.fromList([1, 2]);
     final b = Uint8List.fromList([3, 4]);
     await store.publishManifest(a, null, SyncControl());
     final read = await store.readManifest(SyncControl());
     expect(read.bytes, a);
-    await expectLater(store.publishManifest(b, null, SyncControl()), throwsA(isA<RemoteRevisionChanged>()));
+    await expectLater(store.publishManifest(b, null, SyncControl()),
+        throwsA(isA<RemoteRevisionChanged>()));
     await store.publishManifest(b, read.revision, SyncControl());
-    await expectLater(store.publishManifest(a, read.revision, SyncControl()), throwsA(isA<RemoteRevisionChanged>()));
+    await expectLater(store.publishManifest(a, read.revision, SyncControl()),
+        throwsA(isA<RemoteRevisionChanged>()));
     expect(objects['/locker/${RemoteStore.manifestName}'], b);
   });
 
   test('servers without safe-publication capabilities are rejected', () async {
     supportsDav = false;
-    await expectLater(store.publishManifest(Uint8List.fromList([1]), null, SyncControl()),
+    await expectLater(
+        store.publishManifest(Uint8List.fromList([1]), null, SyncControl()),
         throwsA(isA<UnsafeRemotePublication>()));
     expect(objects['/locker/${RemoteStore.manifestName}'], isNull);
     supportsDav = true;
     weakEtag = true;
     objects['/locker/${RemoteStore.manifestName}'] = Uint8List.fromList([1]);
-    await expectLater(store.readManifest(SyncControl()), throwsA(isA<UnsafeRemotePublication>()));
+    await expectLater(store.readManifest(SyncControl()),
+        throwsA(isA<UnsafeRemotePublication>()));
   });
 
   test('servers that ignore publication preconditions are rejected', () async {
     ignoreIf = true;
-    await expectLater(store.publishManifest(Uint8List.fromList([1]), null, SyncControl()),
+    await expectLater(
+        store.publishManifest(Uint8List.fromList([1]), null, SyncControl()),
         throwsA(isA<UnsafeRemotePublication>()));
     expect(objects['/locker/${RemoteStore.manifestName}'], isNull);
   });
 
-  test('publication falls back to verified exclusive locks when If preconditions are unsupported',
+  test(
+      'publication falls back to verified exclusive locks when If preconditions are unsupported',
       () async {
     rcloneStyle = true;
-    await store.publishManifest(Uint8List.fromList([1, 2]), null, SyncControl());
+    await store.publishManifest(
+        Uint8List.fromList([1, 2]), null, SyncControl());
     expect(store.usesLockPublication, isTrue);
     expect(objects['/locker/${RemoteStore.manifestName}'], [1, 2]);
     final read = await store.readManifest(SyncControl());
-    await store.publishManifest(Uint8List.fromList([3, 4]), read.revision, SyncControl());
+    await store.publishManifest(
+        Uint8List.fromList([3, 4]), read.revision, SyncControl());
     expect(objects['/locker/${RemoteStore.manifestName}'], [3, 4]);
-    await expectLater(store.publishManifest(Uint8List.fromList([5]), read.revision, SyncControl()),
+    await expectLater(
+        store.publishManifest(
+            Uint8List.fromList([5]), read.revision, SyncControl()),
         throwsA(isA<RemoteRevisionChanged>()));
     expect(objects['/locker/${RemoteStore.manifestName}'], [3, 4]);
   });
 
-  test('a manifest that vanishes mid-sync is never replaced with an empty lock stub', () async {
+  test(
+      'a manifest that vanishes mid-sync is never replaced with an empty lock stub',
+      () async {
     rcloneStyle = true;
-    await store.publishManifest(Uint8List.fromList([1, 2]), null, SyncControl());
+    await store.publishManifest(
+        Uint8List.fromList([1, 2]), null, SyncControl());
     final read = await store.readManifest(SyncControl());
     objects.remove('/locker/${RemoteStore.manifestName}');
-    await expectLater(store.publishManifest(Uint8List.fromList([3]), read.revision, SyncControl()),
+    await expectLater(
+        store.publishManifest(
+            Uint8List.fromList([3]), read.revision, SyncControl()),
         throwsA(isA<RemoteRevisionChanged>()));
     expect(objects.containsKey('/locker/${RemoteStore.manifestName}'), isFalse);
   });
 
-  test('download cancellation stops a real HTTP body partway through', () async {
+  test('download cancellation stops a real HTTP body partway through',
+      () async {
     objects['/locker/blob'] = Uint8List(1024 * 1024);
     slow = true;
     final control = SyncControl();
     var received = 0;
     final destination = File('${dir.path}/partial');
-    await expectLater(store.downloadFile('blob', destination, control, (bytes, _) {
-      received = bytes;
-      control.cancel();
-    }), throwsA(isA<SyncCancelled>()));
+    await expectLater(
+        store.downloadFile('blob', destination, control, (bytes, _) {
+          received = bytes;
+          control.cancel();
+        }),
+        throwsA(isA<SyncCancelled>()));
     expect(received, greaterThan(0));
     expect(received, lessThan(1024 * 1024));
     expect(await destination.length(), received);
   });
 
-  test('syncNow streams through the worker and recovers after an index write failure',
+  test(
+      'syncNow streams through the worker and recovers after an index write failure',
       () async {
     TestWidgetsFlutterBinding.ensureInitialized();
     HttpOverrides.global = null;
@@ -286,7 +321,8 @@ void main() {
     }
     final vault = VaultStore()..vaultDirectory = vaultDir;
 
-    final payload = Uint8List.fromList(List<int>.generate(4096, (i) => i % 251));
+    final payload =
+        Uint8List.fromList(List<int>.generate(4096, (i) => i % 251));
     final source = File('${vaultDir.path}/images/${'a' * 64}.jpg');
     await source.writeAsBytes(payload);
     final hash = SyncService.sha256Hex(payload);
@@ -328,7 +364,9 @@ void main() {
       RemoteManifest(
         deviceId: 'devB',
         generatedAt: DateTime.now().toUtc(),
-        entries: [published.entries.single.copyWith(tags: const ['server'])],
+        entries: [
+          published.entries.single.copyWith(tags: const ['server'])
+        ],
       ),
       masterKey,
     );
@@ -337,7 +375,8 @@ void main() {
     failIndexWrite = true;
     final pending =
         await service.syncNow(profile: profile, password: '', deviceId: 'devA');
-    await expectLater(service.complete(profile, pending, crypto.cacheGeneration),
+    await expectLater(
+        service.complete(profile, pending, crypto.cacheGeneration),
         throwsA(isA<PlatformException>()));
     expect(await stateStore.read(target, journal: true), isNotNull);
     expect((await stateStore.load(target)).baseline['a']!.tags,

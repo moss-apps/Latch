@@ -208,7 +208,8 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
             secondChild: const SizedBox(height: 0, width: double.infinity),
             sizeCurve: Curves.easeInOut,
           ),
-          if (activeFilter.hasActiveFilters) _buildActiveFilterBar(activeFilter),
+          if (activeFilter.hasActiveFilters)
+            _buildActiveFilterBar(activeFilter),
           Expanded(
             child: PageView(
               controller: _pageController,
@@ -226,8 +227,8 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
     );
   }
 
-  PreferredSizeWidget _buildAppBar(bool isSelectionMode, Set<String> selectedFiles,
-      VaultFileFilter activeFilter) {
+  PreferredSizeWidget _buildAppBar(bool isSelectionMode,
+      Set<String> selectedFiles, VaultFileFilter activeFilter) {
     if (isSelectionMode) {
       final visibleFiles = _getVisibleFiles();
       final allSelected = visibleFiles.isNotEmpty &&
@@ -291,8 +292,8 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                   right: -6,
                   top: -6,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 4, vertical: 1),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                     constraints: const BoxConstraints(minWidth: 16),
                     decoration: BoxDecoration(
                       color: context.accentColor,
@@ -512,7 +513,8 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
     );
   }
 
-  Widget _buildImportProgress() {    return Container(
+  Widget _buildImportProgress() {
+    return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: context.accentColor.withValues(alpha: 0.1),
       child: Row(
@@ -2189,8 +2191,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (context) =>
-                              const SmartCollectionsScreen()),
+                          builder: (context) => const SmartCollectionsScreen()),
                     );
                   },
                 ),

@@ -76,9 +76,8 @@ final filteredFilesProvider = FutureProvider<List<VaultedFile>>((ref) async {
   final filter = ref.watch(fileFilterProvider);
 
   // Search bar text is just the name dimension of the same filter.
-  final combined = searchQuery.isEmpty
-      ? filter
-      : filter.copyWith(nameQuery: searchQuery);
+  final combined =
+      searchQuery.isEmpty ? filter : filter.copyWith(nameQuery: searchQuery);
 
   final files = await vaultService.searchWithFilter(combined, isDecoy: isDecoy);
 

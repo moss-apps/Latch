@@ -22,6 +22,7 @@ class SyncEngine {
         yield chunk;
       }
     }
+
     return (await sha256.bind(chunks()).first).toString();
   }
 
@@ -43,39 +44,55 @@ class SyncEngine {
     final cancel = control ?? SyncControl();
     final date = (now ?? DateTime.now()).toUtc();
     final twoWay = direction == SyncDirection.twoWay;
-    final streaming = remote is StreamingRemoteStore ? remote as StreamingRemoteStore : null;
+    final streaming =
+        remote is StreamingRemoteStore ? remote as StreamingRemoteStore : null;
     void report(SyncProgress progress) {
       cancel.check();
       onProgress?.call(progress);
     }
+
     report(const SyncProgress(phase: SyncPhase.connecting));
     final snapshot = streaming == null
         ? RemoteManifestSnapshot(await remote.getManifest(), null)
         : await streaming.readManifest(cancel);
-    final manifest = snapshot.bytes == null ? null : SyncService.decryptManifest(snapshot.bytes!, masterKey);
-    final remoteEntries = {for (final e in manifest?.entries ?? <ManifestEntry>[]) e.id: e};
+    final manifest = snapshot.bytes == null
+        ? null
+        : SyncService.decryptManifest(snapshot.bytes!, masterKey);
+    final remoteEntries = {
+      for (final e in manifest?.entries ?? <ManifestEntry>[]) e.id: e
+    };
     final candidates = Map<String, ManifestEntry>.from(remoteEntries);
     final files = {for (final file in local) file.id: file};
     final localEntries = <String, ManifestEntry>{};
     var skipped = 0;
     var hashed = 0;
     for (final file in local) {
-      report(SyncProgress(phase: SyncPhase.hashing, filename: file.originalName,
-          completed: hashed, total: local.length));
+      report(SyncProgress(
+          phase: SyncPhase.hashing,
+          filename: file.originalName,
+          completed: hashed,
+          total: local.length));
       if (!file.syncedDeleted && !await File(file.vaultPath).exists()) {
         skipped++;
         hashed++;
         continue;
       }
-      final hash = file.syncedDeleted ? file.remoteHash : await hashFile(File(file.vaultPath), cancel);
-      localEntries[file.id] = SyncService.buildManifest([file.copyWith(remoteHash: hash)],
-          deviceId: deviceId, now: date).entries.single;
+      final hash = file.syncedDeleted
+          ? file.remoteHash
+          : await hashFile(File(file.vaultPath), cancel);
+      localEntries[file.id] = SyncService.buildManifest(
+              [file.copyWith(remoteHash: hash)],
+              deviceId: deviceId, now: date)
+          .entries
+          .single;
       hashed++;
     }
     // A missing index entry alone is not proof that the user deleted it.
     for (final baseline in checkpoint.baseline.values) {
-      if (!files.containsKey(baseline.id) && deletions.containsKey(baseline.id)) {
-        localEntries[baseline.id] = baseline.copyWith(deleted: true, modifiedAt: deletions[baseline.id]);
+      if (!files.containsKey(baseline.id) &&
+          deletions.containsKey(baseline.id)) {
+        localEntries[baseline.id] = baseline.copyWith(
+            deleted: true, modifiedAt: deletions[baseline.id]);
       }
     }
 
@@ -102,23 +119,29 @@ class SyncEngine {
         agreed[entry.id] = entry;
         final file = files[entry.id];
         if (file != null && !entry.deleted) {
-          resolvedLocal[entry.id] = file.copyWith(remoteHash: entry.contentHash);
+          resolvedLocal[entry.id] =
+              file.copyWith(remoteHash: entry.contentHash);
         }
         continue;
       }
-      final localChanged = baseline == null || syncFingerprint(entry) != syncFingerprint(baseline);
-      final remoteChanged = baseline == null || syncFingerprint(other) != syncFingerprint(baseline);
+      final localChanged = baseline == null ||
+          syncFingerprint(entry) != syncFingerprint(baseline);
+      final remoteChanged = baseline == null ||
+          syncFingerprint(other) != syncFingerprint(baseline);
       ConflictChoice? choice;
       if (localChanged && remoteChanged) {
         for (final saved in checkpoint.conflicts) {
-          if (saved.id == entry.id && saved.matches(entry, other)) choice = saved.choice;
+          if (saved.id == entry.id && saved.matches(entry, other)) {
+            choice = saved.choice;
+          }
         }
         if (choice == null) {
           conflicts.add(SyncConflict(local: entry, remote: other));
           continue;
         }
       }
-      final useLocal = choice == ConflictChoice.local || (!remoteChanged && localChanged);
+      final useLocal =
+          choice == ConflictChoice.local || (!remoteChanged && localChanged);
       if (useLocal) {
         candidates[entry.id] = entry;
         agreed[entry.id] = entry;
@@ -144,14 +167,20 @@ class SyncEngine {
               ? '${source.originalName.substring(0, dot)} (local copy)${source.originalName.substring(dot)}'
               : '${source.originalName} (local copy)';
           final copyEntry = entry.copyWith(id: id, originalName: name);
-          if (vaultRoot == null) throw const FormatException('Missing vault destination');
-          final destination = File(SyncService.vaultPathFor(vaultRoot: vaultRoot, entry: copyEntry));
+          if (vaultRoot == null) {
+            throw const FormatException('Missing vault destination');
+          }
+          final destination = File(
+              SyncService.vaultPathFor(vaultRoot: vaultRoot, entry: copyEntry));
           await destination.parent.create(recursive: true);
-          if (!await destination.exists()) await File(source.vaultPath).copy(destination.path);
+          if (!await destination.exists()) {
+            await File(source.vaultPath).copy(destination.path);
+          }
           if (await hashFile(destination, cancel) != entry.contentHash) {
             throw const FormatException('Conflict copy hash mismatch');
           }
-          final copy = source.copyWith(id: id, originalName: name, vaultPath: destination.path);
+          final copy = source.copyWith(
+              id: id, originalName: name, vaultPath: destination.path);
           resolvedLocal[id] = copy;
           localEntries[id] = copyEntry;
           candidates[id] = copyEntry;
@@ -162,7 +191,9 @@ class SyncEngine {
     }
     if (twoWay) {
       for (final entry in remoteEntries.values) {
-        if (!files.containsKey(entry.id) && !localEntries.containsKey(entry.id) && !entry.deleted) {
+        if (!files.containsKey(entry.id) &&
+            !localEntries.containsKey(entry.id) &&
+            !entry.deleted) {
           pulls.add(entry);
           agreed[entry.id] = entry;
         }
@@ -172,13 +203,15 @@ class SyncEngine {
     var pushed = 0;
     var reused = 0;
     var transferred = 0;
-    var totalBytes = pushes.fold<int>(0, (n, f) => n + File(f.vaultPath).lengthSync());
+    var totalBytes =
+        pushes.fold<int>(0, (n, f) => n + File(f.vaultPath).lengthSync());
     final downloadLengths = <String, int>{};
     for (final entry in pulls) {
       cancel.check();
       final hash = entry.contentHash;
-      final length = streaming == null || hash == null ? null :
-          await streaming.blobLength(SyncService.blobNameFor(hash), cancel);
+      final length = streaming == null || hash == null
+          ? null
+          : await streaming.blobLength(SyncService.blobNameFor(hash), cancel);
       if (length == null) {
         totalBytes = -1;
       } else {
@@ -192,21 +225,31 @@ class SyncEngine {
       final hash = entry.contentHash!;
       final name = SyncService.blobNameFor(hash);
       void progress(int bytes, int total) => report(SyncProgress(
-          phase: SyncPhase.uploading, completed: i, total: pushes.length,
-          filename: file.originalName, fileBytes: bytes, fileTotal: total,
-          transferredBytes: transferred + bytes, totalBytes: totalBytes));
+          phase: SyncPhase.uploading,
+          completed: i,
+          total: pushes.length,
+          filename: file.originalName,
+          fileBytes: bytes,
+          fileTotal: total,
+          transferredBytes: transferred + bytes,
+          totalBytes: totalBytes));
       progress(0, await File(file.vaultPath).length());
       cancel.check();
       var exists = false;
       if (streaming != null) {
         exists = await streaming.verifyBlob(name, hash, cancel);
-        if (!exists) await streaming.uploadFile(name, File(file.vaultPath), hash, cancel, progress);
+        if (!exists) {
+          await streaming.uploadFile(
+              name, File(file.vaultPath), hash, cancel, progress);
+        }
       } else {
         final existing = await remote.getBlob(name);
         exists = existing != null && SyncService.sha256Hex(existing) == hash;
         if (!exists) {
           final bytes = await File(file.vaultPath).readAsBytes();
-          if (SyncService.sha256Hex(bytes) != hash) throw const FormatException('Source changed during sync');
+          if (SyncService.sha256Hex(bytes) != hash) {
+            throw const FormatException('Source changed during sync');
+          }
           await remote.putBlob(name, bytes);
           progress(bytes.length, bytes.length);
         }
@@ -219,61 +262,94 @@ class SyncEngine {
         pushed++;
         transferred += length;
       }
-      report(SyncProgress(phase: SyncPhase.uploading, completed: i + 1, total: pushes.length,
-          filename: file.originalName, fileBytes: exists ? 0 : length, fileTotal: exists ? -1 : length,
-          transferredBytes: transferred, totalBytes: totalBytes));
-      resolvedLocal[file.id] = file.copyWith(remoteHash: hash,
-          modifiedAt: file.modifiedAt ?? date);
+      report(SyncProgress(
+          phase: SyncPhase.uploading,
+          completed: i + 1,
+          total: pushes.length,
+          filename: file.originalName,
+          fileBytes: exists ? 0 : length,
+          fileTotal: exists ? -1 : length,
+          transferredBytes: transferred,
+          totalBytes: totalBytes));
+      resolvedLocal[file.id] =
+          file.copyWith(remoteHash: hash, modifiedAt: file.modifiedAt ?? date);
     }
 
     var pulled = 0;
     for (final entry in pulls) {
       cancel.check();
-      if (vaultRoot == null || entry.contentHash == null) throw const FormatException('Incomplete restore metadata');
+      if (vaultRoot == null || entry.contentHash == null) {
+        throw const FormatException('Incomplete restore metadata');
+      }
       final name = SyncService.blobNameFor(entry.contentHash!);
-      final destination = File(SyncService.vaultPathFor(vaultRoot: vaultRoot, entry: entry));
+      final destination =
+          File(SyncService.vaultPathFor(vaultRoot: vaultRoot, entry: entry));
       await destination.parent.create(recursive: true);
-      final temporary = File('$vaultRoot/temp/sync_${const Uuid().v4()}.partial');
+      final temporary =
+          File('$vaultRoot/temp/sync_${const Uuid().v4()}.partial');
       await temporary.parent.create(recursive: true);
       try {
         void progress(int bytes, int total) => report(SyncProgress(
-            phase: SyncPhase.downloading, completed: pulled, total: pulls.length,
-            filename: entry.originalName, fileBytes: bytes, fileTotal: total,
-            transferredBytes: transferred + bytes, totalBytes: totalBytes));
+            phase: SyncPhase.downloading,
+            completed: pulled,
+            total: pulls.length,
+            filename: entry.originalName,
+            fileBytes: bytes,
+            fileTotal: total,
+            transferredBytes: transferred + bytes,
+            totalBytes: totalBytes));
         progress(0, downloadLengths[entry.id] ?? -1);
         if (streaming != null) {
-          if (!await streaming.downloadFile(name, temporary, cancel, progress)) throw const FormatException('Missing remote blob');
+          if (!await streaming.downloadFile(
+              name, temporary, cancel, progress)) {
+            throw const FormatException('Missing remote blob');
+          }
         } else {
           final bytes = await remote.getBlob(name);
           if (bytes == null) throw const FormatException('Missing remote blob');
           await temporary.writeAsBytes(bytes, flush: true);
           progress(bytes.length, bytes.length);
         }
-        if (await hashFile(temporary, cancel) != entry.contentHash) throw const FormatException('Downloaded blob hash mismatch');
+        if (await hashFile(temporary, cancel) != entry.contentHash) {
+          throw const FormatException('Downloaded blob hash mismatch');
+        }
         // Old payloads remain available until the local index is durable.
         if (await destination.exists()) {
-          if (await hashFile(destination, cancel) != entry.contentHash) throw const FormatException('Destination collision');
+          if (await hashFile(destination, cancel) != entry.contentHash) {
+            throw const FormatException('Destination collision');
+          }
         } else {
           await temporary.rename(destination.path);
         }
-        resolvedLocal[entry.id] = SyncService.vaultedFileFromEntry(entry, vaultPath: destination.path);
+        resolvedLocal[entry.id] = SyncService.vaultedFileFromEntry(entry,
+            vaultPath: destination.path);
         final length = await destination.length();
         transferred += length;
         pulled++;
-        report(SyncProgress(phase: SyncPhase.downloading, completed: pulled, total: pulls.length,
-            filename: entry.originalName, fileBytes: length, fileTotal: length,
-            transferredBytes: transferred, totalBytes: totalBytes));
+        report(SyncProgress(
+            phase: SyncPhase.downloading,
+            completed: pulled,
+            total: pulls.length,
+            filename: entry.originalName,
+            fileBytes: length,
+            fileTotal: length,
+            transferredBytes: transferred,
+            totalBytes: totalBytes));
       } finally {
         if (await temporary.exists()) await temporary.delete();
       }
     }
 
-    final nextBaseline = Map<String, ManifestEntry>.from(checkpoint.baseline)..addAll(agreed);
+    final nextBaseline = Map<String, ManifestEntry>.from(checkpoint.baseline)
+      ..addAll(agreed);
     final next = SyncCheckpoint(baseline: nextBaseline, conflicts: conflicts);
-    final output = RemoteManifest(deviceId: deviceId, generatedAt: date,
+    final output = RemoteManifest(
+        deviceId: deviceId,
+        generatedAt: date,
         entries: candidates.values.toList());
     final bytes = SyncService.encryptManifest(output, masterKey);
-    final refreshed = resolvedLocal.values.where((f) => !f.syncedDeleted).toList();
+    final refreshed =
+        resolvedLocal.values.where((f) => !f.syncedDeleted).toList();
     final journal = {
       'manifestHash': SyncService.sha256Hex(bytes),
       'checkpoint': next.toJson(),
@@ -282,7 +358,9 @@ class SyncEngine {
       'removed': localDeletes,
     };
     cancel.check();
-    if (stateStore != null && target != null) await stateStore.save(target, journal, journal: true);
+    if (stateStore != null && target != null) {
+      await stateStore.save(target, journal, journal: true);
+    }
     cancel.check();
     cancel.committing = true;
     report(const SyncProgress(phase: SyncPhase.committing));
@@ -291,14 +369,30 @@ class SyncEngine {
     } else {
       await streaming.publishManifest(bytes, snapshot.revision, cancel);
     }
-    Diagnostics.event('sync.commit', {'uploaded': pushed, 'reused': reused,
-        'downloaded': pulled, 'conflicts': conflicts.length, 'skipped': skipped});
+    Diagnostics.event('sync.commit', {
+      'uploaded': pushed,
+      'reused': reused,
+      'downloaded': pulled,
+      'conflicts': conflicts.length,
+      'skipped': skipped
+    });
     report(const SyncProgress(phase: SyncPhase.done));
-    return SyncResult(blobsPushed: pushed, blobsDeleted: 0, blobsPulled: pulled,
-        blobsSkipped: skipped, blobsReused: reused, filesDeleted: deletes.length,
-        plan: SyncPlan(toPush: pushes, toPull: pulls, toDelete: deletes,
-            conflicts: conflicts.map((c) => c.id).toList(), toTombstoneLocal: localDeletes),
-        refreshedLocal: refreshed, originalLocal: local, checkpoint: next,
+    return SyncResult(
+        blobsPushed: pushed,
+        blobsDeleted: 0,
+        blobsPulled: pulled,
+        blobsSkipped: skipped,
+        blobsReused: reused,
+        filesDeleted: deletes.length,
+        plan: SyncPlan(
+            toPush: pushes,
+            toPull: pulls,
+            toDelete: deletes,
+            conflicts: conflicts.map((c) => c.id).toList(),
+            toTombstoneLocal: localDeletes),
+        refreshedLocal: refreshed,
+        originalLocal: local,
+        checkpoint: next,
         completedAt: date);
   }
 }

@@ -299,8 +299,11 @@ class VaultStore implements LocalStore {
   }
 
   @override
-  Future<void> saveFileIndex({bool isDecoy = false, bool strict = false,
-      bool allowEmpty = false, Set<String> removedIds = const {}}) async {
+  Future<void> saveFileIndex(
+      {bool isDecoy = false,
+      bool strict = false,
+      bool allowEmpty = false,
+      Set<String> removedIds = const {}}) async {
     if (!isDecoy && pbStore != null) {
       if (_nonDecoyDiverged) {
         await _healDivergedCache(removedIds: removedIds);
@@ -309,8 +312,12 @@ class VaultStore implements LocalStore {
       try {
         await pbStore!.saveFileIndex();
         if (strict) {
-          await _writeLegacyFileIndex(files: cachedFiles ?? const [], isDecoy: false,
-              strict: true, allowEmpty: allowEmpty, removedIds: removedIds);
+          await _writeLegacyFileIndex(
+              files: cachedFiles ?? const [],
+              isDecoy: false,
+              strict: true,
+              allowEmpty: allowEmpty,
+              removedIds: removedIds);
         }
         return;
       } catch (e) {
@@ -320,7 +327,9 @@ class VaultStore implements LocalStore {
           files: cachedFiles ?? const [],
           isDecoy: false,
           unionWithLegacy: true,
-          strict: strict, allowEmpty: allowEmpty, removedIds: removedIds,
+          strict: strict,
+          allowEmpty: allowEmpty,
+          removedIds: removedIds,
         );
         return;
       }
@@ -328,7 +337,9 @@ class VaultStore implements LocalStore {
     await _writeLegacyFileIndex(
       files: (isDecoy ? cachedDecoyFiles : cachedFiles) ?? const [],
       isDecoy: isDecoy,
-      strict: strict, allowEmpty: allowEmpty, removedIds: removedIds,
+      strict: strict,
+      allowEmpty: allowEmpty,
+      removedIds: removedIds,
     );
   }
 

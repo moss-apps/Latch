@@ -46,9 +46,8 @@ class SmartCollectionsNotifier
   Future<void> _load() async {
     final isDecoy = ref.read(isDecoyModeProvider);
     try {
-      final collections = await ref
-          .read(smartCollectionServiceProvider)
-          .load(isDecoy: isDecoy);
+      final collections =
+          await ref.read(smartCollectionServiceProvider).load(isDecoy: isDecoy);
       if (!ref.mounted) return;
       state = AsyncValue.data(collections);
     } catch (e, st) {
@@ -79,14 +78,13 @@ class SmartCollectionsNotifier
   }) async {
     final isDecoy = ref.read(isDecoyModeProvider);
     try {
-      final collection =
-          await ref.read(smartCollectionServiceProvider).create(
-                name: name,
-                filter: filter,
-                window: window,
-                sortOption: sortOption,
-                isDecoy: isDecoy,
-              );
+      final collection = await ref.read(smartCollectionServiceProvider).create(
+            name: name,
+            filter: filter,
+            window: window,
+            sortOption: sortOption,
+            isDecoy: isDecoy,
+          );
       await _load();
       return collection;
     } catch (_) {
@@ -121,9 +119,8 @@ class SmartCollectionsNotifier
   }
 }
 
-final smartCollectionsProvider =
-    NotifierProvider<SmartCollectionsNotifier, AsyncValue<List<SmartCollection>>>(
-        () {
+final smartCollectionsProvider = NotifierProvider<SmartCollectionsNotifier,
+    AsyncValue<List<SmartCollection>>>(() {
   return SmartCollectionsNotifier();
 });
 
@@ -145,7 +142,8 @@ Future<List<VaultedFile>> _evaluate(
   final now = DateTime.now();
   final files =
       all.where((file) => collection.matches(file, now: now)).toList();
-  final SortOption option = collection.sortOption ?? ref.watch(sortOptionProvider);
+  final SortOption option =
+      collection.sortOption ?? ref.watch(sortOptionProvider);
   return ref.read(vaultServiceProvider).sortFiles(files, option);
 }
 
