@@ -78,7 +78,10 @@ class SyncResult {
   });
 
   bool get didAnything =>
-      blobsPushed > 0 || blobsDeleted > 0 || blobsPulled > 0 || filesDeleted > 0;
+      blobsPushed > 0 ||
+      blobsDeleted > 0 ||
+      blobsPulled > 0 ||
+      filesDeleted > 0;
 }
 
 /// The result of diffing local vault state against a remote manifest.
@@ -155,13 +158,18 @@ class SyncService {
     if (journal != null) {
       cancellation.check();
       final published = (await remote.readManifest(cancellation)).bytes;
-      if (published != null && sha256Hex(published) == journal['manifestHash']) {
-        final original = (journal['original'] as List).map((f) =>
-            VaultedFile.fromJson(f as Map<String, dynamic>)).toList();
-        final refreshed = (journal['refreshed'] as List).map((f) =>
-            VaultedFile.fromJson(f as Map<String, dynamic>)).toList();
-        await _apply(refreshed, original, (journal['removed'] as List).cast<String>(), generation);
-        await stateStore.save(target, journal['checkpoint'] as Map<String, dynamic>);
+      if (published != null &&
+          sha256Hex(published) == journal['manifestHash']) {
+        final original = (journal['original'] as List)
+            .map((f) => VaultedFile.fromJson(f as Map<String, dynamic>))
+            .toList();
+        final refreshed = (journal['refreshed'] as List)
+            .map((f) => VaultedFile.fromJson(f as Map<String, dynamic>))
+            .toList();
+        await _apply(refreshed, original,
+            (journal['removed'] as List).cast<String>(), generation);
+        await stateStore.save(
+            target, journal['checkpoint'] as Map<String, dynamic>);
         await stateStore.clearJournal(target);
         Diagnostics.event('sync.recovered', {});
       }
@@ -169,73 +177,110 @@ class SyncService {
     final local = List<VaultedFile>.of(await _store.loadFileIndex());
     final checkpoint = await stateStore.load(target);
     final deletions = await SyncStateStore.deletions();
-    if (!_crypto.isCurrentSession(generation)) throw StateError('Vault session expired');
+    if (!_crypto.isCurrentSession(generation)) {
+      throw StateError('Vault session expired');
+    }
     cancellation.check();
     final direction = profile.direction;
-    final workerRemote = WebDAVStore(baseUrl: profile.serverUrl,
-        username: profile.username ?? '', password: password, basePath: profile.basePath);
-    return _startWorker(local, masterKey, workerRemote, deviceId, dir.path, direction,
-        checkpoint, deletions, target, onProgress, cancellation);
+    final workerRemote = WebDAVStore(
+        baseUrl: profile.serverUrl,
+        username: profile.username ?? '',
+        password: password,
+        basePath: profile.basePath);
+    return _startWorker(local, masterKey, workerRemote, deviceId, dir.path,
+        direction, checkpoint, deletions, target, onProgress, cancellation);
   }
 
-  static Future<SyncResult> _startWorker(List<VaultedFile> local, Uint8List key,
-      RemoteStore remote, String deviceId, String root, SyncDirection direction,
-      SyncCheckpoint checkpoint, Map<String, DateTime> deletions, String target,
-      void Function(SyncProgress)? onProgress, SyncControl? control) {
-    return SensitiveIsolate.runWithEvents(_workerTask(local, key, remote,
-        deviceId, root, direction, checkpoint, deletions, target), onEvent: (event) {
-          if (event is SyncProgress) {
-            if (event.phase == SyncPhase.committing) control?.committing = true;
-            onProgress?.call(event);
-          }
-        }, control: control);
+  static Future<SyncResult> _startWorker(
+      List<VaultedFile> local,
+      Uint8List key,
+      RemoteStore remote,
+      String deviceId,
+      String root,
+      SyncDirection direction,
+      SyncCheckpoint checkpoint,
+      Map<String, DateTime> deletions,
+      String target,
+      void Function(SyncProgress)? onProgress,
+      SyncControl? control) {
+    return SensitiveIsolate.runWithEvents(
+        _workerTask(local, key, remote, deviceId, root, direction, checkpoint,
+            deletions, target), onEvent: (event) {
+      if (event is SyncProgress) {
+        if (event.phase == SyncPhase.committing) control?.committing = true;
+        onProgress?.call(event);
+      }
+    }, control: control);
   }
 
   static Future<SyncResult> Function(SensitiveWorker) _workerTask(
-      List<VaultedFile> local, Uint8List key, RemoteStore remote, String deviceId,
-      String root, SyncDirection direction, SyncCheckpoint checkpoint,
-      Map<String, DateTime> deletions, String target) =>
+          List<VaultedFile> local,
+          Uint8List key,
+          RemoteStore remote,
+          String deviceId,
+          String root,
+          SyncDirection direction,
+          SyncCheckpoint checkpoint,
+          Map<String, DateTime> deletions,
+          String target) =>
       (worker) => runSync(
-          local: local,
-          masterKey: key,
-          remote: remote,
-          deviceId: deviceId,
-          vaultRoot: root,
-          direction: direction,
-          checkpoint: checkpoint,
-          deletions: deletions,
-          control: worker.control,
-          onProgress: worker.emit,
-          stateStore: SyncStateStore(root, key),
-          target: target,
-        );
+            local: local,
+            masterKey: key,
+            remote: remote,
+            deviceId: deviceId,
+            vaultRoot: root,
+            direction: direction,
+            checkpoint: checkpoint,
+            deletions: deletions,
+            control: worker.control,
+            onProgress: worker.emit,
+            stateStore: SyncStateStore(root, key),
+            target: target,
+          );
 
   Future<List<SyncConflict>> pendingConflicts(SyncProfile profile) async {
     final generation = _crypto.cacheGeneration;
     final key = await _crypto.getMasterKey();
     final dir = await _store.ensureVaultDirectory();
-    if (!_crypto.isCurrentSession(generation)) throw StateError('Vault session expired');
-    return (await SyncStateStore(dir.path, key).load(SyncStateStore.targetId(profile))).conflicts;
+    if (!_crypto.isCurrentSession(generation)) {
+      throw StateError('Vault session expired');
+    }
+    return (await SyncStateStore(dir.path, key)
+            .load(SyncStateStore.targetId(profile)))
+        .conflicts;
   }
 
-  Future<void> chooseConflict(SyncProfile profile, String id, ConflictChoice choice) async {
+  Future<void> chooseConflict(
+      SyncProfile profile, String id, ConflictChoice choice) async {
     final generation = _crypto.cacheGeneration;
     final key = await _crypto.getMasterKey();
     final dir = await _store.ensureVaultDirectory();
     final stateStore = SyncStateStore(dir.path, key);
     final target = SyncStateStore.targetId(profile);
     final saved = await stateStore.load(target);
-    if (!_crypto.isCurrentSession(generation)) throw StateError('Vault session expired');
-    final conflicts = saved.conflicts.map((c) => c.id == id
-        ? SyncConflict(local: c.local, remote: c.remote, choice: choice) : c).toList();
-    await stateStore.save(target, SyncCheckpoint(baseline: saved.baseline, conflicts: conflicts).toJson());
+    if (!_crypto.isCurrentSession(generation)) {
+      throw StateError('Vault session expired');
+    }
+    final conflicts = saved.conflicts
+        .map((c) => c.id == id
+            ? SyncConflict(local: c.local, remote: c.remote, choice: choice)
+            : c)
+        .toList();
+    await stateStore.save(
+        target,
+        SyncCheckpoint(baseline: saved.baseline, conflicts: conflicts)
+            .toJson());
   }
 
-  Future<void> complete(SyncProfile profile, SyncResult result, int generation) async {
-    await _apply(result.refreshedLocal, result.originalLocal, result.plan.toTombstoneLocal, generation);
+  Future<void> complete(
+      SyncProfile profile, SyncResult result, int generation) async {
+    await _apply(result.refreshedLocal, result.originalLocal,
+        result.plan.toTombstoneLocal, generation);
     final dir = await _store.ensureVaultDirectory();
     final key = await _crypto.getMasterKey();
-    if (!_crypto.isCurrentSession(generation)) throw StateError('Vault session expired');
+    if (!_crypto.isCurrentSession(generation)) {
+      throw StateError('Vault session expired');
+    }
     final stateStore = SyncStateStore(dir.path, key);
     final target = SyncStateStore.targetId(profile);
     await stateStore.save(target, result.checkpoint.toJson());
@@ -244,16 +289,29 @@ class SyncService {
 
   Future<void> _apply(List<VaultedFile> refreshed, List<VaultedFile> original,
       List<String> removed, int generation) async {
-    if (!_crypto.isCurrentSession(generation)) throw StateError('Vault session expired');
+    if (!_crypto.isCurrentSession(generation)) {
+      throw StateError('Vault session expired');
+    }
     final current = await _store.loadFileIndex();
-    if (!_crypto.isCurrentSession(generation)) throw StateError('Vault session expired');
+    if (!_crypto.isCurrentSession(generation)) {
+      throw StateError('Vault session expired');
+    }
     final merged = mergeSyncedIntoCurrent(current, refreshed,
-        original: original, removed: removed, blobExists: (f) => File(f.vaultPath).existsSync());
+        original: original,
+        removed: removed,
+        blobExists: (f) => File(f.vaultPath).existsSync());
     final keptIds = merged.map((f) => f.id).toSet();
     _store.cachedFiles = merged;
-    await _store.saveFileIndex(strict: true, allowEmpty: true,
-        removedIds: current.where((f) => !keptIds.contains(f.id)).map((f) => f.id).toSet());
-    if (!_crypto.isCurrentSession(generation)) throw StateError('Vault session expired');
+    await _store.saveFileIndex(
+        strict: true,
+        allowEmpty: true,
+        removedIds: current
+            .where((f) => !keptIds.contains(f.id))
+            .map((f) => f.id)
+            .toSet());
+    if (!_crypto.isCurrentSession(generation)) {
+      throw StateError('Vault session expired');
+    }
   }
 
   /// Stream transfers, retain conflicts and publish the manifest last.
@@ -271,10 +329,21 @@ class SyncService {
     Map<String, DateTime> deletions = const {},
     SyncStateStore? stateStore,
     String? target,
-  }) => SyncEngine.run(local: local, masterKey: masterKey, remote: remote,
-      deviceId: deviceId, vaultRoot: vaultRoot, direction: direction, now: now,
-      onProgress: onProgress, control: control, checkpoint: checkpoint,
-      deletions: deletions, stateStore: stateStore, target: target);
+  }) =>
+      SyncEngine.run(
+          local: local,
+          masterKey: masterKey,
+          remote: remote,
+          deviceId: deviceId,
+          vaultRoot: vaultRoot,
+          direction: direction,
+          now: now,
+          onProgress: onProgress,
+          control: control,
+          checkpoint: checkpoint,
+          deletions: deletions,
+          stateStore: stateStore,
+          target: target);
 
   // ---- Pure helpers (no I/O) ----
 
@@ -429,8 +498,12 @@ class SyncService {
         final unchanged = before != null && _sameLocal(f, before);
         if (removed.contains(f.id) && unchanged) continue;
         if (s != null && unchanged) {
-          out.add(s.copyWith(viewCount: f.viewCount, lastViewed: f.lastViewed,
-              notes: f.notes, thumbnailPath: s.vaultPath == f.vaultPath ? f.thumbnailPath : null,
+          out.add(s.copyWith(
+              viewCount: f.viewCount,
+              lastViewed: f.lastViewed,
+              notes: f.notes,
+              thumbnailPath:
+                  s.vaultPath == f.vaultPath ? f.thumbnailPath : null,
               thumbnailIv: s.vaultPath == f.vaultPath ? f.thumbnailIv : null));
         } else {
           out.add(f);
@@ -458,9 +531,11 @@ class SyncService {
   }
 
   static bool _sameLocal(VaultedFile a, VaultedFile b) =>
-      a.vaultPath == b.vaultPath && a.modifiedAt == b.modifiedAt && a.dateModified == b.dateModified &&
+      a.vaultPath == b.vaultPath &&
+      a.modifiedAt == b.modifiedAt &&
+      a.dateModified == b.dateModified &&
       syncFingerprint(buildManifest([a], deviceId: '').entries.single) ==
-      syncFingerprint(buildManifest([b], deviceId: '').entries.single);
+          syncFingerprint(buildManifest([b], deviceId: '').entries.single);
 
   /// Separate local payloads by ID; deleting one copy must not break another.
   static String vaultPathFor({

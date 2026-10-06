@@ -267,21 +267,26 @@ class _LocalBackupScreenState extends ConsumerState<LocalBackupScreen> {
               decoration: BoxDecoration(
                 color: AppColors.error.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.error.withValues(alpha: 0.18)),
+                border:
+                    Border.all(color: AppColors.error.withValues(alpha: 0.18)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     _lastError!,
-                    style: TextStyle(fontSize: 14, height: 1.4, color: context.textPrimary),
+                    style: TextStyle(
+                        fontSize: 14, height: 1.4, color: context.textPrimary),
                   ),
                   if (_lastDiagnosticId != null)
                     TextButton.icon(
                       onPressed: () async {
                         await Clipboard.setData(ClipboardData(
-                            text: 'Latch backup error $_lastDiagnosticId\n$_lastError'));
-                        if (mounted) ToastUtils.showInfo('Error reference copied');
+                            text:
+                                'Latch backup error $_lastDiagnosticId\n$_lastError'));
+                        if (mounted) {
+                          ToastUtils.showInfo('Error reference copied');
+                        }
                       },
                       icon: const Icon(Icons.copy_outlined, size: 18),
                       label: const Text('Copy error reference'),

@@ -1,3 +1,4 @@
+import '../models/vault_file_filter.dart';
 import '../models/vaulted_file.dart';
 import 'vault_store.dart';
 
@@ -14,6 +15,18 @@ class SearchService {
         .toList();
   }
 
+  /// Single source of truth for filtered reads.
+  Future<List<VaultedFile>> searchWithFilter(
+    VaultFileFilter filter, {
+    bool isDecoy = false,
+  }) async {
+    final files = await _store.loadFileIndex(isDecoy: isDecoy);
+    if (filter.isEmpty) return files;
+    return files.where(filter.matches).toList();
+  }
+
+  /// Legacy named-argument entry point. Date bounds are inclusive calendar
+  /// days: any file added on the selected start/end day matches.
   Future<List<VaultedFile>> searchFilesAdvanced({
     String? query,
     List<String>? tags,
@@ -22,39 +35,19 @@ class SearchService {
     DateTime? dateTo,
     bool? isFavorite,
     String? albumId,
-  }) async {
-    var files = await _store.loadFileIndex();
-
-    if (query != null && query.isNotEmpty) {
-      final lowerQuery = query.toLowerCase();
-      files = files
-          .where((f) => f.originalName.toLowerCase().contains(lowerQuery))
-          .toList();
-    }
-
-    if (tags != null && tags.isNotEmpty) {
-      files = files.where((f) => tags.every((tag) => f.hasTag(tag))).toList();
-    }
-
-    if (type != null) {
-      files = files.where((f) => f.type == type).toList();
-    }
-
-    if (dateFrom != null) {
-      files = files.where((f) => f.dateAdded.isAfter(dateFrom)).toList();
-    }
-    if (dateTo != null) {
-      files = files.where((f) => f.dateAdded.isBefore(dateTo)).toList();
-    }
-
-    if (isFavorite != null) {
-      files = files.where((f) => f.isFavorite == isFavorite).toList();
-    }
-
-    if (albumId != null) {
-      files = files.where((f) => f.isInAlbum(albumId)).toList();
-    }
-
-    return files;
+    bool isDecoy = false,
+  }) {
+    return searchWithFilter(
+      VaultFileFilter(
+        nameQuery: query,
+        tags: tags ?? const [],
+        type: type,
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+        isFavorite: isFavorite,
+        albumId: albumId,
+      ),
+      isDecoy: isDecoy,
+    );
   }
 }

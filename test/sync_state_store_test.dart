@@ -73,7 +73,9 @@ void main() {
       originalName: 'a.jpg',
       tags: const ['one'],
     );
-    final checkpoint = SyncCheckpoint(baseline: {'a': entry}, conflicts: [
+    final checkpoint = SyncCheckpoint(baseline: {
+      'a': entry
+    }, conflicts: [
       SyncConflict(
           local: entry,
           remote: entry.copyWith(tags: const ['two']),
@@ -95,11 +97,7 @@ void main() {
     final store = SyncStateStore(root.path, key);
     await store.save('t2', {'baseline': {}, 'conflicts': []});
     final stateDir = Directory('${root.path}/.sync-state');
-    expect(
-        stateDir
-            .listSync()
-            .where((e) => e.path.endsWith('.tmp'))
-            .isEmpty,
+    expect(stateDir.listSync().where((e) => e.path.endsWith('.tmp')).isEmpty,
         isTrue);
     await File('${stateDir.path}/t2.state').writeAsBytes([1, 2, 3]);
     await expectLater(store.load('t2'), throwsFormatException);
@@ -114,10 +112,14 @@ void main() {
         direction: SyncDirection.twoWay,
         wifiOnly: false,
         enabled: true);
-    final a = SyncStateStore.targetId(profile('https://nas/dav/', '/locker/', 'u'));
-    final b = SyncStateStore.targetId(profile('https://nas/dav', '/locker', 'u'));
-    final c = SyncStateStore.targetId(profile('https://other/dav', '/locker', 'u'));
-    final d = SyncStateStore.targetId(profile('https://nas/dav', '/locker', 'v'));
+    final a =
+        SyncStateStore.targetId(profile('https://nas/dav/', '/locker/', 'u'));
+    final b =
+        SyncStateStore.targetId(profile('https://nas/dav', '/locker', 'u'));
+    final c =
+        SyncStateStore.targetId(profile('https://other/dav', '/locker', 'u'));
+    final d =
+        SyncStateStore.targetId(profile('https://nas/dav', '/locker', 'v'));
     expect(a, b);
     expect(a, isNot(c));
     expect(a, isNot(d));

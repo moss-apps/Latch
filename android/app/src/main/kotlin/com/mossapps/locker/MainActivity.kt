@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.OpenableColumns
 import android.view.Display
 import android.view.WindowManager
 import androidx.core.content.FileProvider
@@ -18,8 +19,11 @@ import io.flutter.embedding.android.FlutterFragmentActivity
 
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
+import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import java.io.FileOutputStream
+import java.util.UUID
 
 class MainActivity: FlutterFragmentActivity() {
     private val CHANNEL = "com.mossapps.locker/autokill"
@@ -33,6 +37,26 @@ class MainActivity: FlutterFragmentActivity() {
     private val AMPLITUDE_CHANNEL = "com.mossapps.locker/audio_amplitude"
     private val INSTALL_SOURCE_CHANNEL = "com.mossapps.locker/install_source"
     private val PB_CHANNEL = "com.mossapps.locker/pb"
+    private val SHARE_CHANNEL = "com.mossapps.locker/share_intake"
+
+    private data class ShareItem(
+        val id: String,
+        val uri: String,
+        val name: String?,
+        val mimeType: String?,
+        val size: Long?,
+    ) {
+        fun toMap(): Map<String, Any?> = mapOf(
+            "id" to id,
+            "uri" to uri,
+            "name" to name,
+            "mimeType" to mimeType,
+            "size" to size,
+        )
+    }
+
+    private val pendingShareItems = mutableListOf<ShareItem>()
+    private var shareChannel: MethodChannel? = null
     private val autoKillPreferences by lazy {
         getSharedPreferences(AUTO_KILL_PREFS, MODE_PRIVATE)
     }
@@ -65,6 +89,9 @@ class MainActivity: FlutterFragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         autoKillDelayMillis = loadAutoKillDelayMillis()
+        if (savedInstanceState == null) {
+            handleShareIntent(intent)
+        }
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -191,6 +218,180 @@ class MainActivity: FlutterFragmentActivity() {
                 result.notImplemented()
             }
         }
+
+        val shareChannelInstance =
+            MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SHARE_CHANNEL)
+        shareChannel = shareChannelInstance
+        shareChannelInstance.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getPendingShare" -> result.success(sharePayload())
+                "consumeShare" -> {
+                    val ids = call.argument<List<String>>("ids") ?: emptyList()
+                    pendingShareItems.removeAll { ids.contains(it.id) }
+                    result.success(true)
+                }
+                "clearShare" -> {
+                    pendingShareItems.clear()
+                    result.success(true)
+                }
+                "stageShare" -> stageShare(call, result)
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    private fun sharePayload(): Map<String, Any?> =
+        mapOf("items" to pendingShareItems.map { it.toMap() })
+
+    private fun notifySharePending() {
+        val channel = shareChannel ?: return
+        Handler(Looper.getMainLooper()).post {
+            channel.invokeMethod("onShareReceived", sharePayload())
+        }
+    }
+
+    private fun handleShareIntent(intent: Intent?) {
+        if (intent == null) return
+        val action = intent.action
+        if (action != Intent.ACTION_SEND && action != Intent.ACTION_SEND_MULTIPLE) return
+
+        val uris = extractStreamUris(intent)
+        if (uris.isEmpty()) return
+
+        for (uri in uris) {
+            val existing = pendingShareItems.any { it.uri == uri.toString() }
+            if (existing) continue
+            val metadata = queryShareMetadata(uri)
+            pendingShareItems.add(
+                ShareItem(
+                    id = UUID.randomUUID().toString(),
+                    uri = uri.toString(),
+                    name = metadata.first,
+                    mimeType = intent.type?.takeIf { it.isNotBlank() && it != "*/*" }
+                        ?: contentResolver.getType(uri),
+                    size = metadata.second,
+                )
+            )
+        }
+        notifySharePending()
+    }
+
+    private fun extractStreamUris(intent: Intent): List<Uri> {
+        val uris = mutableListOf<Uri>()
+        if (intent.action == Intent.ACTION_SEND) {
+            val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra(Intent.EXTRA_STREAM) as? Uri
+            }
+            if (uri != null) uris.add(uri)
+        } else if (intent.action == Intent.ACTION_SEND_MULTIPLE) {
+            val list = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)
+            }
+            if (list != null) uris.addAll(list)
+        }
+        intent.clipData?.let { clip ->
+            for (index in 0 until clip.itemCount) {
+                clip.getItemAt(index).uri?.let { uris.add(it) }
+            }
+        }
+        return uris.distinctBy { it.toString() }
+    }
+
+    private fun queryShareMetadata(uri: Uri): Pair<String?, Long?> {
+        var name: String? = null
+        var size: Long? = null
+        try {
+            contentResolver.query(
+                uri,
+                arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE),
+                null,
+                null,
+                null,
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex >= 0 && !cursor.isNull(nameIndex)) {
+                        name = cursor.getString(nameIndex)
+                    }
+                    val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                    if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) {
+                        size = cursor.getLong(sizeIndex)
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+        if (name.isNullOrBlank()) {
+            name = uri.lastPathSegment?.substringAfterLast('/')
+        }
+        return name to size
+    }
+
+    private fun stageShare(call: MethodCall, result: MethodChannel.Result) {
+        val items = call.argument<List<Map<String, Any?>>>("items") ?: emptyList()
+        val destinationDir = call.argument<String>("destinationDir")
+        if (destinationDir.isNullOrBlank()) {
+            result.error("INVALID_ARGUMENT", "Destination directory is required", null)
+            return
+        }
+
+        Thread {
+            val staged = mutableListOf<Map<String, Any?>>()
+            val directory = File(destinationDir)
+            try {
+                directory.mkdirs()
+            } catch (_: Exception) {}
+            for (item in items) {
+                val id = item["id"] as? String
+                val uriString = item["uri"] as? String
+                try {
+                    if (id.isNullOrBlank() || uriString.isNullOrBlank()) {
+                        throw IllegalArgumentException("Missing id or uri")
+                    }
+                    val uri = Uri.parse(uriString)
+                    val fallbackName = item["name"] as? String
+                    val displayName = queryShareMetadata(uri).first ?: fallbackName ?: "shared_file"
+                    val safeName = displayName
+                        .replace(Regex("[^A-Za-z0-9._-]"), "_")
+                        .take(120)
+                        .ifBlank { "shared_file" }
+                    val outFile = File(directory, "${id}_$safeName")
+                    contentResolver.openInputStream(uri).use { input ->
+                        if (input == null) {
+                            throw IllegalStateException("Could not open shared file")
+                        }
+                        FileOutputStream(outFile).use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                    staged.add(
+                        mapOf(
+                            "id" to id,
+                            "path" to outFile.absolutePath,
+                            "name" to displayName,
+                            "mimeType" to (contentResolver.getType(uri)
+                                ?: item["mimeType"]),
+                            "size" to outFile.length(),
+                        )
+                    )
+                } catch (e: Exception) {
+                    staged.add(
+                        mapOf(
+                            "id" to id,
+                            "error" to (e.message ?: "Failed to stage shared file"),
+                        )
+                    )
+                }
+            }
+            Handler(Looper.getMainLooper()).post {
+                result.success(mapOf("staged" to staged))
+            }
+        }.start()
     }
 
     private fun startRecording(path: String, format: String, result: MethodChannel.Result) {
@@ -296,6 +497,7 @@ class MainActivity: FlutterFragmentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        handleShareIntent(intent)
     }
 
     private fun isPackageInstalled(packageName: String): Boolean {

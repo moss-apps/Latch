@@ -69,19 +69,25 @@ class BackupService {
     final crypto = EncryptionService.instance;
     final generation = crypto.cacheGeneration;
     void checkSession() {
-      if (!crypto.isCurrentSession(generation)) throw StateError('Vault session locked');
+      if (!crypto.isCurrentSession(generation)) {
+        throw StateError('Vault session locked');
+      }
     }
+
     try {
       checkSession();
-      final destination = await Directory(destinationDirPath).resolveSymbolicLinks();
+      final destination =
+          await Directory(destinationDirPath).resolveSymbolicLinks();
       final documents = await getApplicationDocumentsDirectory();
       final support = await getApplicationSupportDirectory();
       final temporary = await getTemporaryDirectory();
       if ([documents.path, support.path, temporary.path].any((root) =>
-          destination == root || destination.startsWith('$root/')) ||
+              destination == root || destination.startsWith('$root/')) ||
           destination.contains('/Android/data/')) {
-        return const BackupResult(success: false,
-            error: 'Choose a folder outside Latch, such as Documents or a removable drive, so the backup survives uninstalling.');
+        return const BackupResult(
+            success: false,
+            error:
+                'Choose a folder outside Latch, such as Documents or a removable drive, so the backup survives uninstalling.');
       }
       final filesToBackup =
           files ?? await _vaultService.getAllFiles(isDecoy: false);
@@ -115,9 +121,14 @@ class BackupService {
           final dir = Directory('${workDir.path}/$subdir');
           if (!await dir.exists()) await dir.create(recursive: true);
 
-          final original = file.originalName.replaceAll('\\', '/').split('/').last;
-          final baseName = original.isEmpty || original == '.' || original == '..' ? 'file' : original;
-          final ext = baseName.contains('.') ? '.${baseName.split('.').last}' : '';
+          final original =
+              file.originalName.replaceAll('\\', '/').split('/').last;
+          final baseName =
+              original.isEmpty || original == '.' || original == '..'
+                  ? 'file'
+                  : original;
+          final ext =
+              baseName.contains('.') ? '.${baseName.split('.').last}' : '';
           final stem = ext.isEmpty
               ? baseName
               : baseName.substring(0, baseName.length - ext.length);
@@ -140,7 +151,8 @@ class BackupService {
               await exported.delete();
             } catch (_) {}
           } else {
-            throw const FileSystemException('A backup file could not be exported');
+            throw const FileSystemException(
+                'A backup file could not be exported');
           }
           current++;
           onProgress?.call(current, total);
@@ -178,15 +190,19 @@ class BackupService {
         error: !crypto.isCurrentSession(generation)
             ? 'Backup stopped when the vault locked. Unlock it and try again.'
             : e.toString().toLowerCase().contains('no space')
-            ? 'Not enough free space to create the backup'
-            : 'Backup failed — check the destination and try again',
+                ? 'Not enough free space to create the backup'
+                : 'Backup failed — check the destination and try again',
       );
     } finally {
       if (!closed && encoder != null) {
-        try { await encoder.close(); } catch (_) {}
+        try {
+          await encoder.close();
+        } catch (_) {}
       }
       if (partial != null && await partial.exists()) {
-        try { await partial.delete(); } catch (e, st) {
+        try {
+          await partial.delete();
+        } catch (e, st) {
           Diagnostics.failure('backup.partialCleanup', e, st);
         }
       }

@@ -8,7 +8,9 @@ import 'package:in_app_update/in_app_update.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'services/auto_kill_service.dart';
 import 'services/session_service.dart';
+import 'services/share_intake_service.dart';
 import 'widgets/session_host.dart';
+import 'widgets/share_intake_host.dart';
 import 'screens/gallery_vault_screen.dart';
 import 'services/screenshot_protection_service.dart';
 import 'services/update_service.dart';
@@ -32,7 +34,8 @@ Future<void> main() async {
 
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
-    Diagnostics.failure('flutter.error', details.exception, details.stack ?? StackTrace.current);
+    Diagnostics.failure('flutter.error', details.exception,
+        details.stack ?? StackTrace.current);
   };
   PlatformDispatcher.instance.onError = (error, stack) {
     Diagnostics.failure('platform.error', error, stack);
@@ -59,6 +62,8 @@ Future<void> main() async {
 
   UpdateService.instance.start();
 
+  await ShareIntakeService.instance.initialize();
+
   runApp(SessionHost(
     session: SessionService.instance,
     builder: (_) => const ProviderScope(child: LatchApp()),
@@ -80,11 +85,13 @@ class LatchApp extends ConsumerWidget {
       theme: AppTheme.getLightTheme(accentColor),
       darkTheme: AppTheme.getDarkTheme(accentColor),
       themeMode: themeMode,
-      home: SessionService.instance.isUnlocked
-          ? const GalleryVaultScreen()
-          : SessionService.instance.hasAuthenticated
-              ? const UnlockScreen()
-              : const AppInitializer(),
+      home: ShareIntakeHost(
+        child: SessionService.instance.isUnlocked
+            ? const GalleryVaultScreen()
+            : SessionService.instance.hasAuthenticated
+                ? const UnlockScreen()
+                : const AppInitializer(),
+      ),
     );
   }
 }

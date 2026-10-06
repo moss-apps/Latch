@@ -657,11 +657,24 @@ class FileService {
       final previous = files[index];
       Map<String, dynamic> syncFields(VaultedFile file) => file.toJson()
         ..removeWhere((key, _) => !const {
-          'originalName', 'vaultPath', 'type', 'mimeType', 'fileSize', 'dateModified',
-          'isEncrypted', 'encryptionIv', 'encryptionAlgorithm', 'keyDerivationSalt', 'kdfIterations',
-          'tags', 'isFavorite', 'albumIds', 'folderId',
-        }.contains(key));
-      if (jsonEncode(syncFields(previous)) != jsonEncode(syncFields(updatedFile))) {
+              'originalName',
+              'vaultPath',
+              'type',
+              'mimeType',
+              'fileSize',
+              'dateModified',
+              'isEncrypted',
+              'encryptionIv',
+              'encryptionAlgorithm',
+              'keyDerivationSalt',
+              'kdfIterations',
+              'tags',
+              'isFavorite',
+              'albumIds',
+              'folderId',
+            }.contains(key));
+      if (jsonEncode(syncFields(previous)) !=
+          jsonEncode(syncFields(updatedFile))) {
         updatedFile = updatedFile.copyWith(modifiedAt: DateTime.now().toUtc());
       }
       files[index] = updatedFile;
@@ -731,10 +744,12 @@ class FileService {
 
       if (isDecoy) {
         _store.cachedDecoyFiles!.removeAt(fileIndex);
-        await _store.saveFileIndex(isDecoy: true, strict: true, allowEmpty: true);
+        await _store.saveFileIndex(
+            isDecoy: true, strict: true, allowEmpty: true);
       } else {
         _store.cachedFiles!.removeAt(fileIndex);
-        await _store.saveFileIndex(strict: true, allowEmpty: true, removedIds: {fileId});
+        await _store.saveFileIndex(
+            strict: true, allowEmpty: true, removedIds: {fileId});
       }
 
       return true;
@@ -829,10 +844,12 @@ class FileService {
       final removedSet = removedIds.toSet();
       if (isDecoy) {
         _store.cachedDecoyFiles!.removeWhere((f) => removedSet.contains(f.id));
-        await _store.saveFileIndex(isDecoy: true, strict: true, allowEmpty: true);
+        await _store.saveFileIndex(
+            isDecoy: true, strict: true, allowEmpty: true);
       } else {
         _store.cachedFiles!.removeWhere((f) => removedSet.contains(f.id));
-        await _store.saveFileIndex(strict: true, allowEmpty: true, removedIds: removedSet);
+        await _store.saveFileIndex(
+            strict: true, allowEmpty: true, removedIds: removedSet);
       }
     }
 

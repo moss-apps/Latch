@@ -110,26 +110,31 @@ void main() {
   });
 
   group('S3.5 — guarded publication over a live server', () {
-    test('publish, replace under the probe, and refuse a stale revision', () async {
+    test('publish, replace under the probe, and refuse a stale revision',
+        () async {
       final store = _store(_basePath);
       addTearDown(() => _cleanup(store));
 
-      await store.publishManifest(Uint8List.fromList([1, 2, 3]), null, SyncControl());
+      await store.publishManifest(
+          Uint8List.fromList([1, 2, 3]), null, SyncControl());
       // rclone cannot honor ETag preconditions; the probe must fall back to locks.
       expect(store.usesLockPublication, isTrue);
       final first = await store.readManifest(SyncControl());
       expect(first.bytes, Uint8List.fromList([1, 2, 3]));
 
-      await store.publishManifest(Uint8List.fromList([4, 5, 6]), first.revision, SyncControl());
+      await store.publishManifest(
+          Uint8List.fromList([4, 5, 6]), first.revision, SyncControl());
       final second = await store.readManifest(SyncControl());
       expect(second.bytes, Uint8List.fromList([4, 5, 6]));
 
       // The first revision is stale now; the guard must refuse it.
       await expectLater(
-        store.publishManifest(Uint8List.fromList([7]), first.revision, SyncControl()),
+        store.publishManifest(
+            Uint8List.fromList([7]), first.revision, SyncControl()),
         throwsA(isA<RemoteRevisionChanged>()),
       );
-      expect((await store.readManifest(SyncControl())).bytes, Uint8List.fromList([4, 5, 6]));
+      expect((await store.readManifest(SyncControl())).bytes,
+          Uint8List.fromList([4, 5, 6]));
     });
   });
 

@@ -81,10 +81,13 @@ class WebDAVStore implements RemoteStore, StreamingRemoteStore {
   @override
   Future<RemoteManifestSnapshot> readManifest(SyncControl control) async {
     await _checkPublication(control);
-    final response = await _c.c.req<List<int>>(_c, 'GET', _path(RemoteStore.manifestName),
+    final response = await _c.c.req<List<int>>(
+        _c, 'GET', _path(RemoteStore.manifestName),
         cancelToken: control.network,
         optionsHandler: (o) => o.responseType = ResponseType.bytes);
-    if (response.statusCode == 404) return const RemoteManifestSnapshot(null, null);
+    if (response.statusCode == 404) {
+      return const RemoteManifestSnapshot(null, null);
+    }
     _expect(response, [200]);
     final revision = response.headers.value('etag');
     if (revision == null || revision.startsWith('W/')) {
@@ -94,23 +97,29 @@ class WebDAVStore implements RemoteStore, StreamingRemoteStore {
   }
 
   @override
-  Future<void> publishManifest(Uint8List bytes, String? revision, SyncControl control) async {
+  Future<void> publishManifest(
+      Uint8List bytes, String? revision, SyncControl control) async {
     await _checkPublication(control);
     final canonical = _path(RemoteStore.manifestName);
     await _ensureParent(canonical, cancelToken: control.network);
-    final capabilities = await _c.c.wdOptions(_c, canonical, cancelToken: control.network);
+    final capabilities =
+        await _c.c.wdOptions(_c, canonical, cancelToken: control.network);
     _expect(capabilities, [200, 204]);
-    if (capabilities.headers.value('dav') == null) throw UnsafeRemotePublication();
+    if (capabilities.headers.value('dav') == null) {
+      throw UnsafeRemotePublication();
+    }
     final temporary = '$canonical.${const Uuid().v4()}.partial';
     try {
-      final response = await _c.c.req(_c, 'PUT', temporary, data: bytes,
-        cancelToken: control.network,
-        optionsHandler: (o) => o.headers!['content-length'] = bytes.length);
-    _expect(response, [200, 201, 204]);
+      final response = await _c.c.req(_c, 'PUT', temporary,
+          data: bytes,
+          cancelToken: control.network,
+          optionsHandler: (o) => o.headers!['content-length'] = bytes.length);
+      _expect(response, [200, 201, 204]);
       if (_publication == _Publication.lock) {
         await _publishUnderLock(temporary, canonical, revision, control);
       } else {
-        await _move(temporary, canonical, control, revision: revision, overwrite: revision != null);
+        await _move(temporary, canonical, control,
+            revision: revision, overwrite: revision != null);
       }
     } finally {
       await _removeStaging(temporary);
@@ -120,7 +129,8 @@ class WebDAVStore implements RemoteStore, StreamingRemoteStore {
   Future<void> _removeStaging(String path) async {
     final token = CancelToken();
     try {
-      final response = await _c.c.req(_c, 'DELETE', path, cancelToken: token)
+      final response = await _c.c
+          .req(_c, 'DELETE', path, cancelToken: token)
           .timeout(const Duration(seconds: 2));
       _expect(response, [200, 204, 404]);
     } catch (e, st) {
@@ -136,9 +146,12 @@ class WebDAVStore implements RemoteStore, StreamingRemoteStore {
     final source = '$prefix-source';
     final destination = '$prefix-destination';
     await _ensureParent(source, cancelToken: control.network);
-    final capabilities = await _c.c.wdOptions(_c, basePath, cancelToken: control.network);
+    final capabilities =
+        await _c.c.wdOptions(_c, basePath, cancelToken: control.network);
     _expect(capabilities, [200, 204]);
-    if (capabilities.headers.value('dav') == null) throw UnsafeRemotePublication();
+    if (capabilities.headers.value('dav') == null) {
+      throw UnsafeRemotePublication();
+    }
     try {
       await _putProbe(source, control);
       await _putProbe(destination, control);
@@ -150,7 +163,9 @@ class WebDAVStore implements RemoteStore, StreamingRemoteStore {
       } on RemoteRevisionChanged {
         guardedCreate = true;
       }
-      if (!guardedCreate) throw UnsafeRemotePublication('ignored-publication-precondition');
+      if (!guardedCreate) {
+        throw UnsafeRemotePublication('ignored-publication-precondition');
+      }
       // Prefer server-side ETag preconditions when the server really honors
       // them. x/net/webdav (rclone, many Go DAV servers) treats bracketed
       // entity-tags as lock tokens and 412s every guarded MOVE, so the lock
@@ -173,7 +188,8 @@ class WebDAVStore implements RemoteStore, StreamingRemoteStore {
   bool get usesLockPublication => _publication == _Publication.lock;
 
   Future<void> _putProbe(String path, SyncControl control) async {
-    final response = await _c.c.req(_c, 'PUT', path, data: Uint8List.fromList([1, 2, 3]),
+    final response = await _c.c.req(_c, 'PUT', path,
+        data: Uint8List.fromList([1, 2, 3]),
         cancelToken: control.network,
         optionsHandler: (o) => o.headers!['content-length'] = 3);
     _expect(response, [200, 201, 204]);
@@ -185,15 +201,18 @@ class WebDAVStore implements RemoteStore, StreamingRemoteStore {
         optionsHandler: (o) => o.responseType = ResponseType.bytes);
     _expect(response, [200]);
     final etag = response.headers.value('etag');
-    if (etag == null || etag.startsWith('W/')) throw UnsafeRemotePublication('missing-strong-etag');
+    if (etag == null || etag.startsWith('W/')) {
+      throw UnsafeRemotePublication('missing-strong-etag');
+    }
     return etag;
   }
 
   /// Matching ETags must be accepted; mismatched ones must fail 412/423.
-  Future<bool> _etagGuardsWork(
-      String source, String destination, String etag, SyncControl control) async {
+  Future<bool> _etagGuardsWork(String source, String destination, String etag,
+      SyncControl control) async {
     try {
-      await _move(source, destination, control, revision: etag, overwrite: true);
+      await _move(source, destination, control,
+          revision: etag, overwrite: true);
     } on RemoteRevisionChanged {
       return false;
     } on DioException catch (e) {
@@ -215,7 +234,8 @@ class WebDAVStore implements RemoteStore, StreamingRemoteStore {
 
   /// A lock only counts if it excludes a token-less MOVE and authorizes a
   /// token-tagged one. Both directions are verified against the same resource.
-  Future<bool> _locksWork(String source, String destination, SyncControl control) async {
+  Future<bool> _locksWork(
+      String source, String destination, SyncControl control) async {
     await _putProbe(source, control);
     await _putProbe(destination, control);
     _LockHandle? handle;
@@ -237,7 +257,8 @@ class WebDAVStore implements RemoteStore, StreamingRemoteStore {
       if (!excluded) return false;
       await _putProbe(source, control);
       try {
-        await _move(source, destination, control, overwrite: true, lockToken: handle.token);
+        await _move(source, destination, control,
+            overwrite: true, lockToken: handle.token);
       } on RemoteRevisionChanged {
         return false;
       } on DioException catch (e) {
@@ -250,8 +271,8 @@ class WebDAVStore implements RemoteStore, StreamingRemoteStore {
     }
   }
 
-  Future<void> _publishUnderLock(
-      String source, String destination, String? revision, SyncControl control) async {
+  Future<void> _publishUnderLock(String source, String destination,
+      String? revision, SyncControl control) async {
     if (revision == null) {
       // First publication is an atomic create; the server rejects an existing
       // destination (verified by the probe).
@@ -264,7 +285,8 @@ class WebDAVStore implements RemoteStore, StreamingRemoteStore {
       // Another publisher may have landed between readManifest and the lock.
       final current = await _etagOrNull(destination, control);
       if (current != revision) throw RemoteRevisionChanged();
-      await _move(source, destination, control, lockToken: handle.token, overwrite: true);
+      await _move(source, destination, control,
+          lockToken: handle.token, overwrite: true);
       published = true;
     } finally {
       if (!published && handle.created) {
@@ -273,7 +295,8 @@ class WebDAVStore implements RemoteStore, StreamingRemoteStore {
         try {
           final response = await _c.c.req(_c, 'DELETE', destination,
               cancelToken: control.network,
-              optionsHandler: (o) => o.headers!['if'] = '<${_uri(destination)}> (${handle.token})');
+              optionsHandler: (o) => o.headers!['if'] =
+                  '<${_uri(destination)}> (${handle.token})');
           _expect(response, [200, 204, 404]);
         } catch (e, st) {
           Diagnostics.failure('sync.remoteLockCleanup', e, st);
@@ -290,7 +313,9 @@ class WebDAVStore implements RemoteStore, StreamingRemoteStore {
     if (response.statusCode == 404) return null;
     _expect(response, [200]);
     final etag = response.headers.value('etag');
-    if (etag == null || etag.startsWith('W/')) throw UnsafeRemotePublication('missing-strong-etag');
+    if (etag == null || etag.startsWith('W/')) {
+      throw UnsafeRemotePublication('missing-strong-etag');
+    }
     return etag;
   }
 
@@ -298,30 +323,32 @@ class WebDAVStore implements RemoteStore, StreamingRemoteStore {
   Future<_LockHandle> _lock(String path, SyncControl control) async {
     final response = await _c.c.req(_c, 'LOCK', path,
         data: _exclusiveLockBody,
-        cancelToken: control.network,
-        optionsHandler: (o) {
-          o.headers!['content-type'] = 'application/xml; charset=utf-8';
-          o.headers!['timeout'] = 'Second-60';
-          o.headers!['depth'] = '0';
-        });
+        cancelToken: control.network, optionsHandler: (o) {
+      o.headers!['content-type'] = 'application/xml; charset=utf-8';
+      o.headers!['timeout'] = 'Second-60';
+      o.headers!['depth'] = '0';
+    });
     if (response.statusCode == 423) throw RemoteRevisionChanged();
     if (response.statusCode != 200 && response.statusCode != 201) {
       throw UnsafeRemotePublication('missing-lock-capability');
     }
     final token = response.headers.value('lock-token');
-    if (token == null || token.isEmpty) throw UnsafeRemotePublication('missing-lock-token');
+    if (token == null || token.isEmpty) {
+      throw UnsafeRemotePublication('missing-lock-token');
+    }
     return _LockHandle(token, created: response.statusCode == 201);
   }
 
   /// Best effort: a dangling lock expires on its own via the Timeout header.
-  Future<void> _unlock(String path, _LockHandle handle, SyncControl control) async {
+  Future<void> _unlock(
+      String path, _LockHandle handle, SyncControl control) async {
     try {
       final response = await _c.c.req(_c, 'UNLOCK', path,
           cancelToken: control.network,
           optionsHandler: (o) => o.headers!['lock-token'] = handle.token);
       if (![200, 204, 404, 409].contains(response.statusCode)) {
-        Diagnostics.failure('sync.remoteUnlock', 'unexpected status ${response.statusCode}',
-            StackTrace.current);
+        Diagnostics.failure('sync.remoteUnlock',
+            'unexpected status ${response.statusCode}', StackTrace.current);
       }
     } catch (e, st) {
       Diagnostics.failure('sync.remoteUnlock', e, st);
@@ -330,8 +357,8 @@ class WebDAVStore implements RemoteStore, StreamingRemoteStore {
 
   Future<void> _move(String source, String destination, SyncControl control,
       {String? revision, bool overwrite = false, String? lockToken}) async {
-    final response = await _c.c.req(_c, 'MOVE', source, cancelToken: control.network,
-        optionsHandler: (o) {
+    final response = await _c.c.req(_c, 'MOVE', source,
+        cancelToken: control.network, optionsHandler: (o) {
       o.headers!['destination'] = _uri(destination).toString();
       o.headers!['overwrite'] = overwrite ? 'T' : 'F';
       if (lockToken != null) {
@@ -343,13 +370,15 @@ class WebDAVStore implements RemoteStore, StreamingRemoteStore {
     _expect(response, [201, 204]);
   }
 
-  Stream<List<int>> _cancellable(Stream<List<int>> source, SyncControl control) {
+  Stream<List<int>> _cancellable(
+      Stream<List<int>> source, SyncControl control) {
     late StreamSubscription<List<int>> subscription;
     late StreamController<List<int>> output;
     var closed = false;
     output = StreamController<List<int>>(
       onListen: () {
-        subscription = source.listen(output.add, onError: output.addError, onDone: () {
+        subscription =
+            source.listen(output.add, onError: output.addError, onDone: () {
           closed = true;
           output.close();
         });
@@ -363,21 +392,26 @@ class WebDAVStore implements RemoteStore, StreamingRemoteStore {
       },
       onPause: () => subscription.pause(),
       onResume: () => subscription.resume(),
-      onCancel: () { closed = true; return subscription.cancel(); },
+      onCancel: () {
+        closed = true;
+        return subscription.cancel();
+      },
     );
     return output.stream;
   }
 
-  Future<Response<ResponseBody>> _readStream(String name, SyncControl control) =>
-      _c.c.req<ResponseBody>(_c, 'GET', _path(name), cancelToken: control.network,
-          optionsHandler: (o) {
+  Future<Response<ResponseBody>> _readStream(
+          String name, SyncControl control) =>
+      _c.c.req<ResponseBody>(_c, 'GET', _path(name),
+          cancelToken: control.network, optionsHandler: (o) {
         o.responseType = ResponseType.stream;
         o.headers!['accept-encoding'] = 'identity';
       });
 
   @override
   Future<int?> blobLength(String name, SyncControl control) async {
-    final response = await _c.c.req(_c, 'HEAD', _path(name), cancelToken: control.network);
+    final response =
+        await _c.c.req(_c, 'HEAD', _path(name), cancelToken: control.network);
     if ([404, 405, 501].contains(response.statusCode)) return null;
     _expect(response, [200]);
     return int.tryParse(response.headers.value('content-length') ?? '');
@@ -391,16 +425,21 @@ class WebDAVStore implements RemoteStore, StreamingRemoteStore {
       return false;
     }
     _expect(response, [200]);
-    return (await sha256.bind(_cancellable(response.data!.stream, control)).first).toString() == hash;
+    return (await sha256
+                .bind(_cancellable(response.data!.stream, control))
+                .first)
+            .toString() ==
+        hash;
   }
 
   @override
-  Future<void> uploadFile(String name, File file, String hash, SyncControl control,
-      void Function(int, int) progress) async {
+  Future<void> uploadFile(String name, File file, String hash,
+      SyncControl control, void Function(int, int) progress) async {
     final canonical = _path(name);
     await _ensureParent(canonical, cancelToken: control.network);
     // Authenticate before opening a single-use body stream.
-    final probe = await _c.c.wdOptions(_c, canonical, cancelToken: control.network);
+    final probe =
+        await _c.c.wdOptions(_c, canonical, cancelToken: control.network);
     _expect(probe, [200, 204]);
     final temporaryName = '$name.${const Uuid().v4()}.partial';
     final temporary = _path(temporaryName);
@@ -410,13 +449,15 @@ class WebDAVStore implements RemoteStore, StreamingRemoteStore {
     if (authorization != null) headers['authorization'] = authorization;
     try {
       final response = await _c.c.requestUri(_uri(temporary),
-        data: file.openRead(), cancelToken: control.network,
-        options: Options(method: 'PUT', headers: headers), onSendProgress: progress);
-    _expect(response, [200, 201, 204]);
-    if (!await verifyBlob(temporaryName, hash, control)) {
-      throw const FormatException('Uploaded blob hash mismatch');
-    }
-    // Only a complete, verified body may replace a legacy partial canonical blob.
+          data: file.openRead(),
+          cancelToken: control.network,
+          options: Options(method: 'PUT', headers: headers),
+          onSendProgress: progress);
+      _expect(response, [200, 201, 204]);
+      if (!await verifyBlob(temporaryName, hash, control)) {
+        throw const FormatException('Uploaded blob hash mismatch');
+      }
+      // Only a complete, verified body may replace a legacy partial canonical blob.
       await _move(temporary, canonical, control, overwrite: true);
     } finally {
       await _removeStaging(temporary);
@@ -432,7 +473,8 @@ class WebDAVStore implements RemoteStore, StreamingRemoteStore {
       return false;
     }
     _expect(response, [200]);
-    final total = int.tryParse(response.headers.value('content-length') ?? '') ?? -1;
+    final total =
+        int.tryParse(response.headers.value('content-length') ?? '') ?? -1;
     final sink = await destination.open(mode: FileMode.write);
     var received = 0;
     try {
@@ -484,7 +526,8 @@ class WebDAVStore implements RemoteStore, StreamingRemoteStore {
 
   // Spec-strict servers (rclone, mod_dav) 409 a nested PUT whose parent
   // collection doesn't exist; Nextcloud auto-creates and masks it. Idempotent.
-  Future<void> _ensureParent(String fullPath, {CancelToken? cancelToken}) async {
+  Future<void> _ensureParent(String fullPath,
+      {CancelToken? cancelToken}) async {
     final slash = fullPath.lastIndexOf('/');
     if (slash <= 0) return;
     await _c.mkdirAll(fullPath.substring(0, slash), cancelToken);
