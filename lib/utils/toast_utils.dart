@@ -1,32 +1,24 @@
 import 'package:flutter/material.dart';
-import 'package:locker/themes/app_colors.dart';
-import 'navigator_key.dart';
 
+import '../themes/app_colors.dart';
+import '../widgets/toast_host.dart';
+
+/// App-wide toast helpers. Messages are rendered by [ToastHost], which is
+/// mounted next to the navigator, so toasts can be shown from any screen or
+/// service without a `BuildContext`.
 class ToastUtils {
   static void _show(
     String message, {
     Color? backgroundColor,
     Duration duration = const Duration(seconds: 2),
   }) {
-    final context = navigatorKey.currentContext;
-    if (context == null) return;
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    if (messenger == null) return;
-    messenger
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: backgroundColor,
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(6),
-          ),
-          elevation: 4,
-          duration: duration,
-        ),
-      );
+    ToastHost.show(
+      ToastMessage(
+        message: message,
+        backgroundColor: backgroundColor,
+        duration: duration,
+      ),
+    );
   }
 
   static void showToast(String message) => _show(message);

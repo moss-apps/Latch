@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -10,6 +11,7 @@ import 'package:locker/models/vault_folder.dart';
 import 'package:locker/models/vault_settings.dart';
 import 'package:locker/models/vaulted_file.dart';
 import 'package:locker/services/file_service.dart';
+import 'package:locker/services/file_operation_gate.dart';
 import 'package:locker/services/local_store.dart';
 import 'package:locker/services/vault_service.dart';
 import 'package:locker/services/vault_store.dart';
@@ -291,6 +293,118 @@ void main() {
       );
 
       expect(added.single.isEncrypted, false);
+    });
+  });
+
+  group('operation progress and isolation', () {
+    test(
+        'large plain copies report aggregate bytes and completed, not started, files',
+        () async {
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+      final inputs = <FileToVault>[];
+      var expectedBytes = 0;
+      for (var i = 0; i < 4; i++) {
+        final bytes = List<int>.filled((i + 1) * 128 * 1024, i);
+        final source = File('${tmpDir.path}/large-$i.bin')
+          ..writeAsBytesSync(bytes);
+        expectedBytes += bytes.length;
+        inputs.add(FileToVault(
+            sourcePath: source.path,
+            originalName: 'large-$i.bin',
+            type: VaultedFileType.document,
+            mimeType: 'application/octet-stream',
+            encrypt: false));
+      }
+      final progress = <FileProgressInfo>[];
+      final added =
+          await vault.addFiles(files: inputs, onFileProgress: progress.add);
+      expect(added, hasLength(4));
+      expect(progress, isNotEmpty);
+      expect(progress.every((info) => info.batchTotalBytes == expectedBytes),
+          isTrue);
+      expect(
+          progress.every((info) =>
+              info.batchProcessedBytes! >= 0 &&
+              info.batchProcessedBytes! <= expectedBytes),
+          isTrue);
+      expect(
+          progress.any((info) =>
+              info.completedFiles == 0 && info.batchProcessedBytes! > 0),
+          isTrue);
+      for (var i = 1; i < progress.length; i++) {
+        expect(progress[i].completedFiles!,
+            greaterThanOrEqualTo(progress[i - 1].completedFiles!));
+        expect(progress[i].batchProcessedBytes!,
+            greaterThanOrEqualTo(progress[i - 1].batchProcessedBytes!));
+      }
+      expect(progress.last.completedFiles, 4);
+      expect(progress.last.batchProcessedBytes, expectedBytes);
+    });
+
+    test(
+        'a session invalidated during copying cannot commit or delete originals',
+        () async {
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+      final source = File('${tmpDir.path}/keep-original.bin')
+        ..writeAsBytesSync(List<int>.filled(512 * 1024, 42));
+      final gate = FileOperationGate.instance;
+      final lease = gate.acquire({})!;
+      final added = await gate.run(
+          lease,
+          () => vault.addFiles(
+                files: [
+                  FileToVault(
+                      sourcePath: source.path,
+                      originalName: 'keep-original.bin',
+                      type: VaultedFileType.document,
+                      mimeType: 'application/octet-stream',
+                      encrypt: false)
+                ],
+                deleteOriginals: true,
+                onFileProgress: (info) {
+                  if ((info.batchProcessedBytes ?? 0) > 0) lease.invalidate();
+                },
+              ));
+      expect(added, isEmpty);
+      expect(source.existsSync(), isTrue);
+      expect(await vault.getAllFiles(), isEmpty);
+      final directory =
+          Directory('${tmpDir.path}/${VaultStore.vaultFolderName}');
+      expect(
+          await directory
+              .list(recursive: true)
+              .where(
+                  (entry) => entry is File && !entry.path.endsWith('/.nomedia'))
+              .toList(),
+          isEmpty);
+    });
+
+    test('a minimized owner blocks foreign deletion and stale metadata updates',
+        () async {
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+      await _seedFiles(vault, [_makeFile('protected')]);
+      final original = (await vault.getAllFiles()).single;
+      final gate = FileOperationGate.instance;
+      final lease = gate.acquire({'protected'})!;
+      final release = Completer<void>();
+      final operation = gate.run(lease, () => release.future);
+      expect(await vault.removeFile('protected'), isFalse);
+      expect(
+          await vault.updateFile(original.copyWith(isFavorite: true)), isNull);
+      expect((await vault.getAllFiles()).single.isFavorite, isFalse);
+      release.complete();
+      await operation;
+      expect(await vault.updateFile(original.copyWith(isFavorite: true)),
+          isNotNull);
+    });
+
+    test(
+        'missing delete targets are failures rather than a false all-success result',
+        () async {
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+      final result = await vault.removeFiles(['missing']);
+      expect(result.allSucceeded, isFalse);
+      expect(result.failed, ['missing']);
     });
   });
 
@@ -658,6 +772,31 @@ void main() {
           fileSize: 5,
           dateAdded: DateTime(2024, 1, 1),
         );
+
+    test('progress reports the file name being processed', () async {
+      if (!Platform.isLinux) return;
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+      await vault.updateSettings(
+        const VaultSettings().copyWith(secureDelete: false),
+      );
+
+      final file = _pbEraFile('named', tmpDir);
+      vault.store.cachedFiles = [file];
+      await vault.store.saveFileIndex();
+
+      final names = <String?>[];
+      final result = await vault.removeFiles(
+        ['named'],
+        onProgress: (current, total,
+            {int currentSize = 0, int totalSize = 0, String? currentFileName}) {
+          names.add(currentFileName);
+        },
+      );
+
+      expect(result.allSucceeded, isTrue);
+      expect(names, isNotEmpty);
+      expect(names, everyElement('named.jpg'));
+    });
 
     test('failed deletion keeps only the failed entry and can be retried',
         () async {

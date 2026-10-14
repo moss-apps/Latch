@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import '../models/operation_progress.dart';
 import '../themes/app_colors.dart';
 
-enum OperationType { hide, unhide, delete, encrypt, decrypt, reencrypt }
+export '../models/operation_progress.dart';
 
 class OperationProgressSheet extends StatefulWidget {
   final OperationType operationType;
@@ -15,6 +16,9 @@ class OperationProgressSheet extends StatefulWidget {
   final bool isComplete;
   final bool isEncrypting;
   final VoidCallback? onCancel;
+  final VoidCallback? onMinimize;
+  final VoidCallback? onDone;
+  final OperationOutcome? outcome;
 
   const OperationProgressSheet({
     super.key,
@@ -29,6 +33,9 @@ class OperationProgressSheet extends StatefulWidget {
     this.isComplete = false,
     this.isEncrypting = false,
     this.onCancel,
+    this.onMinimize,
+    this.onDone,
+    this.outcome,
   });
 
   @override
@@ -52,6 +59,7 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: SafeArea(
+        top: false,
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -107,7 +115,7 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: widget.onDone ?? () => Navigator.pop(context),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: context.accentColor,
                       elevation: 0,
@@ -127,6 +135,13 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
                     ),
                   ),
                 ),
+                if (widget.onMinimize != null)
+                  Center(
+                    child: TextButton(
+                      onPressed: widget.onMinimize,
+                      child: const Text('Minimize'),
+                    ),
+                  ),
               ] else ...[
                 _buildProgressSection(progress, sizeProgress),
                 const SizedBox(height: 20),
@@ -150,7 +165,7 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
         icon = widget.isEncrypting
             ? Icons.enhanced_encryption_outlined
             : Icons.lock_outline;
-        color = widget.isEncrypting ? Colors.orange : AppColors.accent;
+        color = widget.isEncrypting ? Colors.orange : context.accentColor;
         break;
       case OperationType.unhide:
         icon = Icons.lock_open_outlined;
@@ -196,27 +211,21 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
   }
 
   String _getTitle() {
-    switch (widget.operationType) {
-      case OperationType.hide:
-        return 'Hiding Files';
-      case OperationType.unhide:
-        return 'Unhiding Files';
-      case OperationType.delete:
-        return 'Deleting Files';
-      case OperationType.encrypt:
-        return 'Encrypting Files';
-      case OperationType.decrypt:
-        return 'Removing Encryption';
-      case OperationType.reencrypt:
-        return 'Re-encrypting Files';
-    }
+    return widget.operationType.title;
   }
 
   String _getSubtitle() {
     if (widget.isComplete) {
-      return 'Completed successfully';
+      return switch (widget.outcome?.kind) {
+        OperationOutcomeKind.error => 'Operation failed',
+        OperationOutcomeKind.warning => 'Completed with issues',
+        OperationOutcomeKind.info => 'Operation finished',
+        _ => 'Completed successfully',
+      };
     }
-    final base = '${widget.currentFile} of ${widget.totalFiles} files';
+    final base = widget.totalFiles > 0
+        ? '${widget.currentFile} of ${widget.totalFiles} files'
+        : 'Working on files...';
     if (widget.isEncrypting) {
       return '$base - Encrypting...';
     }
@@ -227,8 +236,10 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          spacing: 12,
+          runSpacing: 4,
           children: [
             Text(
               'Progress',
@@ -239,7 +250,9 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
               ),
             ),
             Text(
-              '${(progress * 100).clamp(0, 100).toInt()}%',
+              widget.totalFiles > 0 || widget.totalSizeBytes > 0
+                  ? '${(progress * 100).clamp(0, 100).toInt()}%'
+                  : 'Working',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -253,15 +266,19 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
         ClipRRect(
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
-            value: progress,
+            value: widget.totalFiles > 0 || widget.totalSizeBytes > 0
+                ? progress
+                : null,
             backgroundColor: context.dividerColor,
-            valueColor: AlwaysStoppedAnimation(AppColors.accent),
+            valueColor: AlwaysStoppedAnimation(context.accentColor),
             minHeight: 8,
           ),
         ),
         const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          spacing: 12,
+          runSpacing: 4,
           children: [
             Text(
               'Data Processed',
@@ -272,7 +289,9 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
               ),
             ),
             Text(
-              '${_formatSize(widget.processedSizeBytes)} / ${_formatSize(widget.totalSizeBytes)}',
+              widget.totalSizeBytes > 0
+                  ? '${_formatSize(widget.processedSizeBytes)} / ${_formatSize(widget.totalSizeBytes)}'
+                  : 'Calculating...',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -286,7 +305,7 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
         ClipRRect(
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
-            value: sizeProgress,
+            value: widget.totalSizeBytes > 0 ? sizeProgress : null,
             backgroundColor: context.dividerColor,
             valueColor: AlwaysStoppedAnimation(Colors.green),
             minHeight: 6,
@@ -377,33 +396,70 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
   }
 
   Widget _buildActionButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton(
-        onPressed: widget.onCancel,
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          side: BorderSide(color: AppColors.error),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        LayoutBuilder(builder: (context, constraints) {
+          final cancel = OperationCancelButton(onCancel: widget.onCancel);
+          if (widget.onMinimize == null) {
+            return SizedBox(width: double.infinity, child: cancel);
+          }
+          final minimize = OutlinedButton.icon(
+            onPressed: widget.onMinimize,
+            icon: const Icon(Icons.remove_rounded, size: 20),
+            label: const Text('Minimize'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: context.textPrimary,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              side: BorderSide(color: context.borderColor),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          );
+          if (constraints.maxWidth < 280 ||
+              MediaQuery.textScalerOf(context).scale(14) > 20) {
+            return Column(children: [
+              SizedBox(width: double.infinity, child: cancel),
+              const SizedBox(height: 12),
+              SizedBox(width: double.infinity, child: minimize),
+            ]);
+          }
+          return Row(children: [
+            Expanded(child: cancel),
+            const SizedBox(width: 12),
+            Expanded(child: minimize),
+          ]);
+        }),
+        if (widget.onCancel == null) ...[
+          const SizedBox(height: 12),
+          Text(
+            'This operation cannot be cancelled safely. Minimize to keep browsing.',
+            style: TextStyle(
+              fontSize: 12,
+              fontFamily: 'ProductSans',
+              color: context.textSecondary,
+            ),
           ),
-        ),
-        child: Text(
-          'Cancel',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            fontFamily: 'ProductSans',
-            color: AppColors.error,
-          ),
-        ),
-      ),
+        ],
+      ],
     );
   }
 
   Widget _buildCompleteState() {
-    final successColor =
-        context.isDarkMode ? AppColors.darkSuccess : AppColors.success;
+    final kind = widget.outcome?.kind;
+    final successColor = switch (kind) {
+      OperationOutcomeKind.error => AppColors.error,
+      OperationOutcomeKind.warning => AppColors.warning,
+      OperationOutcomeKind.info => context.accentColor,
+      _ => context.isDarkMode ? AppColors.darkSuccess : AppColors.success,
+    };
+    final icon = switch (kind) {
+      OperationOutcomeKind.error => Icons.error_outline,
+      OperationOutcomeKind.warning => Icons.warning_amber_rounded,
+      OperationOutcomeKind.info => Icons.info_outline,
+      _ => Icons.check_circle,
+    };
     return Column(
       children: [
         Container(
@@ -414,11 +470,12 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
           ),
           child: Row(
             children: [
-              Icon(Icons.check_circle, color: successColor, size: 32),
+              Icon(icon, color: successColor, size: 32),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  '${widget.totalFiles} files processed successfully',
+                  widget.outcome?.message ??
+                      '${widget.totalFiles} files processed successfully',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
@@ -437,13 +494,15 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
             _buildStatCard(
               icon: Icons.storage_outlined,
               label: 'Total Size',
-              value: _formatSize(widget.totalSizeBytes),
+              value: widget.totalSizeBytes > 0
+                  ? _formatSize(widget.totalSizeBytes)
+                  : '—',
             ),
             const SizedBox(width: 12),
             _buildStatCard(
               icon: Icons.check_circle_outline,
               label: 'Status',
-              value: 'Complete',
+              value: kind == OperationOutcomeKind.error ? 'Failed' : 'Finished',
             ),
           ],
         ),
@@ -505,50 +564,47 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
   }
 }
 
-class OperationProgressState {
-  final int totalFiles;
-  final int currentFile;
-  final String currentFileName;
-  final int totalSizeBytes;
-  final int processedSizeBytes;
-  final String statusMessage;
-  final bool isProcessing;
-  final bool isComplete;
-  final bool isEncrypting;
+/// The deeper red keeps the white label readable in both app themes.
+class OperationCancelButton extends StatelessWidget {
+  const OperationCancelButton({super.key, this.onCancel, this.compact = false});
 
-  const OperationProgressState({
-    this.totalFiles = 0,
-    this.currentFile = 0,
-    this.currentFileName = '',
-    this.totalSizeBytes = 0,
-    this.processedSizeBytes = 0,
-    this.statusMessage = 'Preparing...',
-    this.isProcessing = true,
-    this.isComplete = false,
-    this.isEncrypting = false,
-  });
+  final VoidCallback? onCancel;
 
-  OperationProgressState copyWith({
-    int? totalFiles,
-    int? currentFile,
-    String? currentFileName,
-    int? totalSizeBytes,
-    int? processedSizeBytes,
-    String? statusMessage,
-    bool? isProcessing,
-    bool? isComplete,
-    bool? isEncrypting,
-  }) {
-    return OperationProgressState(
-      totalFiles: totalFiles ?? this.totalFiles,
-      currentFile: currentFile ?? this.currentFile,
-      currentFileName: currentFileName ?? this.currentFileName,
-      totalSizeBytes: totalSizeBytes ?? this.totalSizeBytes,
-      processedSizeBytes: processedSizeBytes ?? this.processedSizeBytes,
-      statusMessage: statusMessage ?? this.statusMessage,
-      isProcessing: isProcessing ?? this.isProcessing,
-      isComplete: isComplete ?? this.isComplete,
-      isEncrypting: isEncrypting ?? this.isEncrypting,
-    );
-  }
+  /// When true, keeps the button's default [FilledButton] size and shape so it
+  /// matches a plain filled action (the floating panel's Dismiss button)
+  /// instead of the sheet's full-width control geometry.
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+        message: onCancel == null
+            ? 'Cancellation is not supported safely for this operation'
+            : 'Cancel operation',
+        child: FilledButton(
+          onPressed: onCancel,
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFFB3261E),
+            foregroundColor: Colors.white,
+            disabledBackgroundColor: const Color(0xFF8C4542),
+            disabledForegroundColor: Colors.white,
+            padding: compact ? null : const EdgeInsets.symmetric(vertical: 16),
+            shape: compact
+                ? null
+                : RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+          ),
+          child: compact
+              ? const Text('Cancel')
+              : const Text(
+                  'Cancel',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'ProductSans',
+                  ),
+                ),
+        ),
+      );
 }

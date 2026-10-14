@@ -8,6 +8,7 @@ import 'package:video_compress/video_compress.dart';
 import '../models/vaulted_file.dart';
 import 'encryption_service.dart';
 import 'file_service.dart';
+import 'file_operation_gate.dart';
 import 'vault_store.dart';
 
 class StoredThumb {
@@ -33,6 +34,7 @@ class ThumbnailService {
   Future<void> _genLock = Future.value();
 
   Future<Uint8List?> getThumbnailBytes(VaultedFile file) async {
+    if (!FileOperationGate.instance.canRead(file.id)) return null;
     final generation = _encryptionService.cacheGeneration;
     if (!_encryptionService.isCurrentSession(generation)) return null;
     if (!file.isEncrypted) return null;
@@ -44,7 +46,8 @@ class ThumbnailService {
     _inFlight[file.id] = fut;
     try {
       final bytes = await fut;
-      if (!_encryptionService.isCurrentSession(generation)) {
+      if (!_encryptionService.isCurrentSession(generation) ||
+          !FileOperationGate.instance.canRead(file.id)) {
         bytes?.fillRange(0, bytes.length, 0);
         return null;
       }
@@ -74,6 +77,7 @@ class ThumbnailService {
   }
 
   Future<Uint8List?> _loadOrRegenerateThumbnailLocked(VaultedFile file) async {
+    if (!FileOperationGate.instance.canRead(file.id)) return null;
     if (file.thumbnailPath != null && file.thumbnailIv != null) {
       final thumbFile = File(file.thumbnailPath!);
       if (await thumbFile.exists()) {
@@ -90,14 +94,28 @@ class ThumbnailService {
     return _regenerateThumbnail(file);
   }
 
-  Future<Uint8List?> _regenerateThumbnail(VaultedFile file) async {
+  Future<Uint8List?> _regenerateThumbnail(VaultedFile file) =>
+      FileOperationGate.instance.mutate(() async {
+        // Regeneration writes both a payload and its IV. Reserve that whole
+        // commit so browsing cannot race a minimized re-encryption/deletion.
+        final current =
+            await fileService.getFileById(file.id, isDecoy: file.isDecoy);
+        if (current == null || !FileOperationGate.instance.allowsMutation) {
+          return null;
+        }
+        return _regenerateThumbnailReserved(current);
+      }, blockedResult: null, fileIds: {file.id});
+
+  Future<Uint8List?> _regenerateThumbnailReserved(VaultedFile file) async {
     final plaintext =
         await fileService.getVaultedFile(file.id, isDecoy: file.isDecoy);
     if (plaintext == null) return null;
     try {
       final thumbBytes = await generateThumbBytes(plaintext, file.type);
       if (thumbBytes == null) return null;
+      if (!FileOperationGate.instance.canRead(file.id)) return null;
       final derivedKey = await fileService.deriveKeyForFile(file);
+      if (!FileOperationGate.instance.canRead(file.id)) return null;
       if (derivedKey != null) {
         final stored = await encryptAndStoreThumbnail(
           thumbBytes,
@@ -180,6 +198,7 @@ class ThumbnailService {
     required bool isDecoy,
   }) async {
     final files = await _store.loadFileIndex(isDecoy: isDecoy);
+    if (!FileOperationGate.instance.canRead(fileId)) return;
     final idx = files.indexWhere((f) => f.id == fileId);
     if (idx == -1) return;
     files[idx] = files[idx].copyWith(thumbnailPath: path, thumbnailIv: iv);

@@ -15,6 +15,7 @@ import '../models/vault_file_filter.dart';
 import '../models/vaulted_file.dart';
 import '../models/album.dart';
 import '../providers/vault_providers.dart';
+import '../providers/operation_provider.dart';
 import '../providers/smart_collection_providers.dart';
 import '../services/auto_kill_service.dart';
 import '../services/session_service.dart';
@@ -48,7 +49,9 @@ import 'note_editor_screen.dart';
 import 'password_editor_screen.dart';
 import '../providers/note_providers.dart';
 import '../providers/password_providers.dart';
-import '../widgets/operation_progress_sheet.dart';
+import '../models/operation_progress.dart';
+import '../services/operation_controller.dart';
+import '../services/office_converter_service.dart';
 import '../widgets/media_hold_action_sheet.dart';
 import '../widgets/media_multi_select_action_sheet.dart';
 import '../widgets/vault_filter_sheet.dart';
@@ -96,12 +99,8 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
   List<VaultCategory> _enabledCategories = VaultCategory.values;
   FeatureSide _importSide = FeatureSide.right;
   late final PageController _pageController;
-  final FileImportService _importService = FileImportService.instance;
   final Map<String, GlobalKey> _selectionTileKeys = {};
 
-  bool _isImporting = false;
-  int _importProgress = 0;
-  int _importTotal = 0;
   bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
   bool _isSlidingSelection = false;
@@ -198,7 +197,6 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
         children: [
           // Permission warning banner for All Files Access
           const PermissionWarningBanner(),
-          if (_isImporting) _buildImportProgress(),
           AnimatedCrossFade(
             duration: const Duration(milliseconds: 300),
             crossFadeState: _isSearching
@@ -505,40 +503,6 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
               style: TextStyle(
                 color: context.accentColor,
                 fontFamily: 'ProductSans',
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildImportProgress() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: context.accentColor.withValues(alpha: 0.1),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation(context.accentColor),
-              value: _importTotal > 0
-                  ? (_importProgress / _importTotal).clamp(0.0, 1.0)
-                  : null,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              _importTotal > 0
-                  ? 'Importing... ${_importProgress.clamp(0, _importTotal)} / $_importTotal'
-                  : 'Importing...',
-              style: TextStyle(
-                fontFamily: 'ProductSans',
-                color: context.textPrimary,
               ),
             ),
           ),
@@ -1255,6 +1219,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
   }
 
   void _showMultiSelectActionSheet(Set<String> selectedFiles) {
+    if (!ref.read(operationControllerProvider).checkAvailable()) return;
     MediaMultiSelectActionSheet.show(
       context,
       fileCount: selectedFiles.length,
@@ -2435,6 +2400,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
   }
 
   void _showImportDialog() {
+    if (!ref.read(operationControllerProvider).checkAvailable()) return;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -2650,6 +2616,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
   }
 
   Future<void> _unhideSelectedFiles(Set<String> selectedFiles) async {
+    if (!ref.read(operationControllerProvider).checkAvailable()) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -2694,74 +2661,14 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
       ),
     );
 
-    if (confirmed == true) {
-      final progressState = ValueNotifier<OperationProgressState>(
-        OperationProgressState(
-          totalFiles: selectedFiles.length,
-          currentFile: 0,
-          currentFileName: 'Preparing...',
-          totalSizeBytes: 0,
-          processedSizeBytes: 0,
-          statusMessage: 'Starting...',
-          isProcessing: true,
-        ),
-      );
-
-      if (!mounted) return;
-      showModalBottomSheet(
-        context: context,
-        backgroundColor: Colors.transparent,
-        isDismissible: false,
-        enableDrag: false,
-        builder: (context) => ValueListenableBuilder<OperationProgressState>(
-          valueListenable: progressState,
-          builder: (context, state, _) => OperationProgressSheet(
-            operationType: OperationType.unhide,
-            totalFiles: state.totalFiles,
-            currentFile: state.currentFile,
-            currentFileName: state.currentFileName,
-            totalSizeBytes: state.totalSizeBytes,
-            processedSizeBytes: state.processedSizeBytes,
-            statusMessage: state.statusMessage,
-            isProcessing: state.isProcessing,
-            isComplete: state.isComplete,
-            isEncrypting: state.isEncrypting,
-          ),
-        ),
-      );
-
-      final result = await _importService.unhideFiles(
-        fileIds: selectedFiles.toList(),
-        removeFromVault: true,
-        onProgress: (current, total, {int? currentSize, int? totalSize}) {
-          progressState.value = progressState.value.copyWith(
-            totalFiles: total,
-            currentFile: current,
-            totalSizeBytes: totalSize ?? 0,
-            processedSizeBytes: currentSize ?? 0,
-            statusMessage: current == 0
-                ? 'Preparing files...'
-                : 'Processing file $current of $total...',
-          );
-        },
-      );
-
+    if (confirmed != true || !mounted) return;
+    if (ref.read(vaultOperationRunnerProvider).unhide(selectedFiles)) {
       _exitSelectionMode();
-
-      if (!mounted) return;
-
-      if (result.success && result.unhiddenCount > 0) {
-        ToastUtils.showSuccess(result.message ?? 'Files restored to gallery');
-        ref.read(vaultNotifierProvider.notifier).loadFiles();
-      } else if (!result.success) {
-        ToastUtils.showError(result.error ?? 'Failed to unhide files');
-      }
-
-      Navigator.pop(context); // Close progress sheet
     }
   }
 
   Future<void> _deleteSelectedFiles(Set<String> selectedFiles) async {
+    if (!ref.read(operationControllerProvider).checkAvailable()) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -2805,70 +2712,9 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
       ),
     );
 
-    if (confirmed == true) {
-      if (!mounted) return;
-
-      final progressState = ValueNotifier<OperationProgressState>(
-        OperationProgressState(
-          totalFiles: selectedFiles.length,
-          currentFile: 0,
-          currentFileName: 'Preparing...',
-          totalSizeBytes: 0,
-          processedSizeBytes: 0,
-          statusMessage: 'Starting...',
-          isProcessing: true,
-        ),
-      );
-
-      showModalBottomSheet(
-        context: context,
-        backgroundColor: Colors.transparent,
-        isDismissible: false,
-        enableDrag: false,
-        builder: (context) => ValueListenableBuilder<OperationProgressState>(
-          valueListenable: progressState,
-          builder: (context, state, _) => OperationProgressSheet(
-            operationType: OperationType.delete,
-            totalFiles: state.totalFiles,
-            currentFile: state.currentFile,
-            currentFileName: state.currentFileName,
-            totalSizeBytes: state.totalSizeBytes,
-            processedSizeBytes: state.processedSizeBytes,
-            statusMessage: state.statusMessage,
-            isProcessing: state.isProcessing,
-            isComplete: state.isComplete,
-            isEncrypting: state.isEncrypting,
-          ),
-        ),
-      );
-
-      final result = await ref.read(vaultNotifierProvider.notifier).deleteFiles(
-        selectedFiles.toList(),
-        onProgress: (current, total, {int? currentSize, int? totalSize}) {
-          progressState.value = progressState.value.copyWith(
-            totalFiles: total,
-            currentFile: current,
-            totalSizeBytes: totalSize ?? 0,
-            processedSizeBytes: currentSize ?? 0,
-            statusMessage: 'Processing file $current of $total...',
-          );
-        },
-      );
-
-      if (!mounted) return;
-
+    if (confirmed != true || !mounted) return;
+    if (ref.read(vaultOperationRunnerProvider).delete(selectedFiles)) {
       _exitSelectionMode();
-
-      if (result.allSucceeded) {
-        ToastUtils.showSuccess('Files deleted');
-      } else if (result.anyRemoved) {
-        ToastUtils.showError(
-            'Deleted ${result.removedCount}; ${result.failedCount} could not be deleted');
-      } else {
-        ToastUtils.showError('Failed to delete some files');
-      }
-
-      Navigator.pop(context); // Close progress sheet
     }
   }
 
@@ -3102,19 +2948,46 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
   }
 
   // Import methods
-  String _importOutcomeMessage({
-    required int imported,
-    required int skipped,
-    required int failed,
-    required int retained,
-    required bool hiddenFromDevice,
-  }) {
-    final parts = <String>['Imported $imported'];
-    if (skipped > 0) parts.add('$skipped duplicate(s) skipped');
-    if (failed > 0) parts.add('$failed failed');
-    if (retained > 0) parts.add('$retained original(s) retained');
-    if (hiddenFromDevice && retained == 0) parts.add('originals hidden');
-    return parts.join(' · ');
+  void _startHide(
+      int count, Future<OperationOutcome> Function(OperationJob) task) {
+    if (!mounted) return;
+    ref.read(operationControllerProvider).start(
+          type: OperationType.hide,
+          initialProgress: OperationProgressState(totalFiles: count),
+          task: task,
+        );
+  }
+
+  void _startCapturedImport(String path) {
+    _startHide(
+        1,
+        (job) async => importOutcome(
+              await FileImportService.instance.importFromDocumentFiles(
+                filePaths: [path],
+                deleteOriginals: true,
+                onProgress: job.batchProgress,
+                onFileProgress: job.fileProgress,
+              ),
+            ));
+  }
+
+  void _startAssetImport(List<AssetEntity> assets,
+      {Map<String, ({bool encrypt, EncryptionAlgorithm algorithm})>?
+          perFileEncryption}) {
+    if (!mounted) return;
+    ref.read(operationControllerProvider).start(
+          type: OperationType.hide,
+          initialProgress: OperationProgressState(totalFiles: assets.length),
+          task: (job) async => importOutcome(
+            await FileImportService.instance.importFromAssets(
+              assets: assets,
+              deleteOriginals: true,
+              perFileEncryption: perFileEncryption,
+              onProgress: job.batchProgress,
+              onFileProgress: job.fileProgress,
+            ),
+          ),
+        );
   }
 
   Future<void> _importImagesFromGallery() async {
@@ -3130,12 +3003,14 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
       ),
     );
 
+    if (!mounted) return;
     if (selectedAssets == null || selectedAssets.isEmpty) {
       ToastUtils.showInfo('No images selected');
       return;
     }
 
     final settings = await ref.read(vaultSettingsProvider.future);
+    if (!mounted) return;
     final encryptionEnabled = settings.encryptionEnabled;
     final defaultAlgorithm = settings.encryptionAlgorithm;
 
@@ -3169,90 +3044,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
           (encrypt: s.encrypt, algorithm: s.algorithm);
     }
 
-    final progressState = ValueNotifier<OperationProgressState>(
-      OperationProgressState(
-        totalFiles: selectedAssets.length,
-        currentFile: 0,
-        currentFileName: 'Preparing...',
-        totalSizeBytes: 0,
-        processedSizeBytes: 0,
-        statusMessage: 'Starting...',
-        isProcessing: true,
-      ),
-    );
-
-    if (!mounted) return;
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isDismissible: false,
-      enableDrag: false,
-      builder: (context) => ValueListenableBuilder<OperationProgressState>(
-        valueListenable: progressState,
-        builder: (context, state, _) => OperationProgressSheet(
-          operationType: OperationType.hide,
-          totalFiles: state.totalFiles,
-          currentFile: state.currentFile,
-          currentFileName: state.currentFileName,
-          totalSizeBytes: state.totalSizeBytes,
-          processedSizeBytes: state.processedSizeBytes,
-          statusMessage: state.statusMessage,
-          isProcessing: state.isProcessing,
-          isComplete: state.isComplete,
-          isEncrypting: state.isEncrypting,
-        ),
-      ),
-    );
-
-    final result = await _importService.importFromAssets(
-      assets: selectedAssets,
-      deleteOriginals: true,
-      perFileEncryption: perFileEncryption,
-      onProgress: (current, total, {int? currentSize, int? totalSize}) {
-        progressState.value = progressState.value.copyWith(
-          totalFiles: total,
-          currentFile: current,
-          totalSizeBytes: totalSize ?? 0,
-          processedSizeBytes: currentSize ?? 0,
-          statusMessage: current == 0
-              ? 'Preparing files...'
-              : 'Processing file $current of $total...',
-        );
-      },
-      onFileProgress: (fileInfo) {
-        progressState.value = progressState.value.copyWith(
-          totalFiles: fileInfo.total,
-          currentFile: fileInfo.current,
-          currentFileName: fileInfo.fileName,
-          statusMessage: fileInfo.status,
-          isEncrypting: fileInfo.isEncrypting,
-          processedSizeBytes:
-              fileInfo.isEncrypting ? fileInfo.encryptedBytes : null,
-          totalSizeBytes: fileInfo.isEncrypting ? fileInfo.totalBytes : null,
-        );
-      },
-    );
-
-    if (!mounted) return;
-
-    if (result.success && result.importedCount > 0) {
-      ToastUtils.showSuccess(_importOutcomeMessage(
-        imported: result.importedCount,
-        skipped: result.skippedDuplicates,
-        failed: result.failedCount,
-        retained: result.retainedOriginals,
-        hiddenFromDevice: result.deletedOriginals,
-      ));
-      ref.read(vaultNotifierProvider.notifier).loadFiles();
-    } else if (result.skippedDuplicates > 0) {
-      ToastUtils.showInfo(
-        'Skipped ${result.skippedDuplicates} duplicate(s) already in vault',
-      );
-    } else if (!result.success) {
-      ToastUtils.showError(result.error ?? 'Import failed');
-    }
-
-    Navigator.pop(context);
+    _startAssetImport(selectedAssets, perFileEncryption: perFileEncryption);
   }
 
   Future<void> _importVideosFromGallery() async {
@@ -3268,12 +3060,14 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
       ),
     );
 
+    if (!mounted) return;
     if (selectedAssets == null || selectedAssets.isEmpty) {
       ToastUtils.showInfo('No videos selected');
       return;
     }
 
     final settings = await ref.read(vaultSettingsProvider.future);
+    if (!mounted) return;
     final encryptionEnabled = settings.encryptionEnabled;
     final defaultAlgorithm = settings.encryptionAlgorithm;
 
@@ -3307,90 +3101,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
           (encrypt: s.encrypt, algorithm: s.algorithm);
     }
 
-    final progressState = ValueNotifier<OperationProgressState>(
-      OperationProgressState(
-        totalFiles: selectedAssets.length,
-        currentFile: 0,
-        currentFileName: 'Preparing...',
-        totalSizeBytes: 0,
-        processedSizeBytes: 0,
-        statusMessage: 'Starting...',
-        isProcessing: true,
-      ),
-    );
-
-    if (!mounted) return;
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isDismissible: false,
-      enableDrag: false,
-      builder: (context) => ValueListenableBuilder<OperationProgressState>(
-        valueListenable: progressState,
-        builder: (context, state, _) => OperationProgressSheet(
-          operationType: OperationType.hide,
-          totalFiles: state.totalFiles,
-          currentFile: state.currentFile,
-          currentFileName: state.currentFileName,
-          totalSizeBytes: state.totalSizeBytes,
-          processedSizeBytes: state.processedSizeBytes,
-          statusMessage: state.statusMessage,
-          isProcessing: state.isProcessing,
-          isComplete: state.isComplete,
-          isEncrypting: state.isEncrypting,
-        ),
-      ),
-    );
-
-    final result = await _importService.importFromAssets(
-      assets: selectedAssets,
-      deleteOriginals: true,
-      perFileEncryption: perFileEncryption,
-      onProgress: (current, total, {int? currentSize, int? totalSize}) {
-        progressState.value = progressState.value.copyWith(
-          totalFiles: total,
-          currentFile: current,
-          totalSizeBytes: totalSize ?? 0,
-          processedSizeBytes: currentSize ?? 0,
-          statusMessage: current == 0
-              ? 'Preparing files...'
-              : 'Processing file $current of $total...',
-        );
-      },
-      onFileProgress: (fileInfo) {
-        progressState.value = progressState.value.copyWith(
-          totalFiles: fileInfo.total,
-          currentFile: fileInfo.current,
-          currentFileName: fileInfo.fileName,
-          statusMessage: fileInfo.status,
-          isEncrypting: fileInfo.isEncrypting,
-          processedSizeBytes:
-              fileInfo.isEncrypting ? fileInfo.encryptedBytes : null,
-          totalSizeBytes: fileInfo.isEncrypting ? fileInfo.totalBytes : null,
-        );
-      },
-    );
-
-    if (!mounted) return;
-
-    if (result.success && result.importedCount > 0) {
-      ToastUtils.showSuccess(_importOutcomeMessage(
-        imported: result.importedCount,
-        skipped: result.skippedDuplicates,
-        failed: result.failedCount,
-        retained: result.retainedOriginals,
-        hiddenFromDevice: result.deletedOriginals,
-      ));
-      ref.read(vaultNotifierProvider.notifier).loadFiles();
-    } else if (result.skippedDuplicates > 0) {
-      ToastUtils.showInfo(
-        'Skipped ${result.skippedDuplicates} duplicate(s) already in vault',
-      );
-    } else if (!result.success) {
-      ToastUtils.showError(result.error ?? 'Import failed');
-    }
-
-    Navigator.pop(context); // Close progress sheet
+    _startAssetImport(selectedAssets, perFileEncryption: perFileEncryption);
   }
 
   Future<void> _importMediaFromGallery() async {
@@ -3407,95 +3118,13 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
       ),
     );
 
+    if (!mounted) return;
     if (selectedAssets == null || selectedAssets.isEmpty) {
       ToastUtils.showInfo('No media selected');
       return;
     }
 
-    final progressState = ValueNotifier<OperationProgressState>(
-      OperationProgressState(
-        totalFiles: selectedAssets.length,
-        currentFile: 0,
-        currentFileName: 'Preparing...',
-        totalSizeBytes: 0,
-        processedSizeBytes: 0,
-        statusMessage: 'Starting...',
-        isProcessing: true,
-      ),
-    );
-
-    // Show progress sheet
-    if (!mounted) return;
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isDismissible: false,
-      enableDrag: false,
-      builder: (context) => ValueListenableBuilder<OperationProgressState>(
-        valueListenable: progressState,
-        builder: (context, state, _) => OperationProgressSheet(
-          operationType: OperationType.hide,
-          totalFiles: state.totalFiles,
-          currentFile: state.currentFile,
-          currentFileName: state.currentFileName,
-          totalSizeBytes: state.totalSizeBytes,
-          processedSizeBytes: state.processedSizeBytes,
-          statusMessage: state.statusMessage,
-          isProcessing: state.isProcessing,
-          isComplete: state.isComplete,
-          isEncrypting: state.isEncrypting,
-        ),
-      ),
-    );
-
-    final result = await _importService.importFromAssets(
-      assets: selectedAssets,
-      deleteOriginals: true, // Hide from gallery
-      onProgress: (current, total, {int? currentSize, int? totalSize}) {
-        progressState.value = progressState.value.copyWith(
-          totalFiles: total,
-          currentFile: current,
-          totalSizeBytes: totalSize ?? 0,
-          processedSizeBytes: currentSize ?? 0,
-          statusMessage: current == 0
-              ? 'Preparing files...'
-              : 'Processing file $current of $total...',
-        );
-      },
-      onFileProgress: (fileInfo) {
-        progressState.value = progressState.value.copyWith(
-          totalFiles: fileInfo.total,
-          currentFile: fileInfo.current,
-          currentFileName: fileInfo.fileName,
-          statusMessage: fileInfo.status,
-          isEncrypting: fileInfo.isEncrypting,
-          processedSizeBytes:
-              fileInfo.isEncrypting ? fileInfo.encryptedBytes : null,
-          totalSizeBytes: fileInfo.isEncrypting ? fileInfo.totalBytes : null,
-        );
-      },
-    );
-
-    if (!mounted) return;
-
-    if (result.success && result.importedCount > 0) {
-      ToastUtils.showSuccess(_importOutcomeMessage(
-        imported: result.importedCount,
-        skipped: result.skippedDuplicates,
-        failed: result.failedCount,
-        retained: result.retainedOriginals,
-        hiddenFromDevice: result.deletedOriginals,
-      ));
-      ref.read(vaultNotifierProvider.notifier).loadFiles();
-    } else if (result.skippedDuplicates > 0) {
-      ToastUtils.showInfo(
-        'Skipped ${result.skippedDuplicates} duplicate(s) already in vault',
-      );
-    } else if (!result.success) {
-      ToastUtils.showError(result.error ?? 'Import failed');
-    }
-
-    Navigator.pop(context); // Close progress sheet
+    _startAssetImport(selectedAssets);
   }
 
   Future<void> _capturePhoto() async {
@@ -3509,23 +3138,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
       ),
     );
 
-    if (imagePath == null) return;
-
-    setState(() => _isImporting = true);
-
-    final result = await _importService.importFile(
-      filePath: imagePath,
-      deleteOriginal: true,
-    );
-
-    if (mounted) setState(() => _isImporting = false);
-
-    if (result.success && result.importedCount > 0) {
-      ToastUtils.showSuccess('Photo captured and hidden');
-      ref.read(vaultNotifierProvider.notifier).loadFiles();
-    } else if (!result.success) {
-      ToastUtils.showError(result.error ?? 'Capture failed');
-    }
+    if (imagePath != null && mounted) _startCapturedImport(imagePath);
   }
 
   Future<void> _recordVideo() async {
@@ -3539,23 +3152,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
       ),
     );
 
-    if (videoPath == null) return;
-
-    setState(() => _isImporting = true);
-
-    final result = await _importService.importFile(
-      filePath: videoPath,
-      deleteOriginal: true,
-    );
-
-    if (mounted) setState(() => _isImporting = false);
-
-    if (result.success && result.importedCount > 0) {
-      ToastUtils.showSuccess('Video recorded and hidden');
-      ref.read(vaultNotifierProvider.notifier).loadFiles();
-    } else if (!result.success) {
-      ToastUtils.showError(result.error ?? 'Recording failed');
-    }
+    if (videoPath != null && mounted) _startCapturedImport(videoPath);
   }
 
   Future<void> _recordAudio() async {
@@ -3568,23 +3165,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
       ),
     );
 
-    if (audioPath == null) return;
-
-    setState(() => _isImporting = true);
-
-    final result = await _importService.importFile(
-      filePath: audioPath,
-      deleteOriginal: true,
-    );
-
-    if (mounted) setState(() => _isImporting = false);
-
-    if (result.success && result.importedCount > 0) {
-      ToastUtils.showSuccess('Audio recorded and hidden');
-      ref.read(vaultNotifierProvider.notifier).loadFiles();
-    } else if (!result.success) {
-      ToastUtils.showError(result.error ?? 'Recording failed');
-    }
+    if (audioPath != null && mounted) _startCapturedImport(audioPath);
   }
 
   Future<void> _importDocuments() async {
@@ -3599,12 +3180,14 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
       ),
     );
 
+    if (!mounted) return;
     if (selectedDocuments == null || selectedDocuments.isEmpty) {
       ToastUtils.showInfo('No documents selected');
       return;
     }
 
     final settings = await ref.read(vaultSettingsProvider.future);
+    if (!mounted) return;
     final encryptionEnabled = settings.encryptionEnabled;
     final defaultAlgorithm = settings.encryptionAlgorithm;
 
@@ -3638,110 +3221,50 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
           (encrypt: s.encrypt, algorithm: s.algorithm);
     }
 
-    final progressState = ValueNotifier<OperationProgressState>(
-      OperationProgressState(
-        totalFiles: selectedDocuments.length,
-        currentFile: 0,
-        currentFileName: 'Preparing...',
-        totalSizeBytes: 0,
-        processedSizeBytes: 0,
-        statusMessage: 'Starting...',
-        isProcessing: true,
-      ),
-    );
-
     if (!mounted) return;
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isDismissible: false,
-      enableDrag: false,
-      builder: (context) => ValueListenableBuilder<OperationProgressState>(
-        valueListenable: progressState,
-        builder: (context, state, _) => OperationProgressSheet(
-          operationType: OperationType.hide,
-          totalFiles: state.totalFiles,
-          currentFile: state.currentFile,
-          currentFileName: state.currentFileName,
-          totalSizeBytes: state.totalSizeBytes,
-          processedSizeBytes: state.processedSizeBytes,
-          statusMessage: state.statusMessage,
-          isProcessing: state.isProcessing,
-          isComplete: state.isComplete,
-          isEncrypting: state.isEncrypting,
-        ),
-      ),
-    );
-
-    final result = await _importService.importFromDocumentFilesWithConversion(
-      filePaths: selectedDocuments.map((d) => d.path).toList(),
-      deleteOriginals: true,
-      perFileEncryption: perFileEncryption,
-      onConversionConfirmation: (officeFiles) async {
-        final confirmed = await showDialog<bool>(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => OfficeConversionConfirmDialog(
-            officeFiles: officeFiles,
-            onConfirm: () => Navigator.pop(context, true),
-            onCancel: () => Navigator.pop(context, false),
-          ),
-        );
-        return confirmed ?? false;
-      },
-      onProgress: (current, total) {
-        progressState.value = progressState.value.copyWith(
-          totalFiles: total,
-          currentFile: current,
-          statusMessage: current == 0
-              ? 'Preparing files...'
-              : 'Processing file $current of $total...',
-        );
-      },
-      onFileProgress: (fileInfo) {
-        progressState.value = progressState.value.copyWith(
-          totalFiles: fileInfo.total,
-          currentFile: fileInfo.current,
-          currentFileName: fileInfo.fileName,
-          statusMessage: fileInfo.status,
-          isEncrypting: fileInfo.isEncrypting,
-          processedSizeBytes:
-              fileInfo.isEncrypting ? fileInfo.encryptedBytes : null,
-          totalSizeBytes: fileInfo.isEncrypting ? fileInfo.totalBytes : null,
-        );
-      },
-      onStatusUpdate: (message) {
-        progressState.value = progressState.value.copyWith(
-          statusMessage: message,
-        );
-      },
-    );
-
-    if (!mounted) return;
-
-    if (result.success && result.importedCount > 0) {
-      var msg = _importOutcomeMessage(
-        imported: result.importedCount,
-        skipped: 0,
-        failed: result.failedCount,
-        retained: result.retainedOriginals,
-        hiddenFromDevice: result.deletedOriginals,
-      );
-      if (result.convertedCount > 0) {
-        msg = '$msg · ${result.convertedCount} converted to PDF';
+    // Confirm conversion before dispatch. A background job never opens a dialog
+    // using a screen that the user may already have left.
+    final officeFiles = <OfficeFileInfo>[];
+    for (final document in selectedDocuments) {
+      final extension = document.path.split('.').last.toLowerCase();
+      if (OfficeConverterService.isOfficeDocument(extension)) {
+        officeFiles.add(OfficeFileInfo(
+          path: document.path,
+          fileName: document.name,
+          extension: extension,
+          canConvertOnDevice:
+              OfficeConverterService.canConvertOnDevice(extension),
+        ));
       }
-      if (result.skippedFiles.isNotEmpty) {
-        msg = '$msg · ${result.skippedFiles.length} skipped';
-      }
-      ToastUtils.showSuccess(msg);
-      ref.read(vaultNotifierProvider.notifier).loadFiles();
-    } else if (!result.success) {
-      ToastUtils.showError(result.error ?? 'Import failed');
-    } else {
-      ToastUtils.showInfo('No documents imported');
     }
-
-    Navigator.pop(context);
+    if (officeFiles.isNotEmpty) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => OfficeConversionConfirmDialog(
+          officeFiles: officeFiles,
+          onConfirm: () => Navigator.pop(context, true),
+          onCancel: () => Navigator.pop(context, false),
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
+    final paths = selectedDocuments.map((d) => d.path).toList();
+    _startHide(
+        paths.length,
+        (job) async => officeImportOutcome(
+              await FileImportService.instance
+                  .importFromDocumentFilesWithConversion(
+                filePaths: paths,
+                deleteOriginals: true,
+                perFileEncryption: perFileEncryption,
+                onConversionConfirmation: (_) async => true,
+                onFileProgress: job.fileProgress,
+                onStatusUpdate: (message) {
+                  job.value = job.value.copyWith(statusMessage: message);
+                },
+              ),
+            ));
   }
 
   Future<void> _importSongs() async {
@@ -3760,12 +3283,14 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
       ),
     );
 
+    if (!mounted) return;
     if (selectedSongs == null || selectedSongs.isEmpty) {
       ToastUtils.showInfo('No songs selected');
       return;
     }
 
     final settings = await ref.read(vaultSettingsProvider.future);
+    if (!mounted) return;
     final encryptionEnabled = settings.encryptionEnabled;
     final defaultAlgorithm = settings.encryptionAlgorithm;
 
@@ -3799,45 +3324,18 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
           (encrypt: s.encrypt, algorithm: s.algorithm);
     }
 
-    setState(() {
-      _isImporting = true;
-      _importProgress = 0;
-      _importTotal = selectedSongs.length;
-    });
-
-    final result = await _importService.importFromDocumentFiles(
-      filePaths: selectedSongs.map((song) => song.path).toList(),
-      deleteOriginals: true,
-      perFileEncryption: perFileEncryption,
-      onProgress: (current, total) {
-        if (!mounted) return;
-        setState(() {
-          _importProgress = current;
-          _importTotal = total;
-        });
-      },
-    );
-
-    if (mounted) setState(() => _isImporting = false);
-
-    if (result.success && result.importedCount > 0) {
-      ToastUtils.showSuccess(_importOutcomeMessage(
-        imported: result.importedCount,
-        skipped: result.skippedDuplicates,
-        failed: result.failedCount,
-        retained: result.retainedOriginals,
-        hiddenFromDevice: result.deletedOriginals,
-      ));
-      ref.read(vaultNotifierProvider.notifier).loadFiles();
-    } else if (result.skippedDuplicates > 0) {
-      ToastUtils.showInfo(
-        'Skipped ${result.skippedDuplicates} duplicate(s) already in vault',
-      );
-    } else if (!result.success) {
-      ToastUtils.showError(result.error ?? 'Import failed');
-    } else {
-      ToastUtils.showInfo('No songs imported');
-    }
+    final paths = selectedSongs.map((song) => song.path).toList();
+    _startHide(
+        paths.length,
+        (job) async => importOutcome(
+              await FileImportService.instance.importFromDocumentFiles(
+                filePaths: paths,
+                deleteOriginals: true,
+                perFileEncryption: perFileEncryption,
+                onProgress: job.batchProgress,
+                onFileProgress: job.fileProgress,
+              ),
+            ));
   }
 
   Future<void> _importAnyFiles() async {
@@ -3848,12 +3346,14 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
       allowMultiple: true,
     );
 
+    if (!mounted) return;
     if (result == null || result.files.isEmpty) {
       ToastUtils.showInfo('No files selected');
       return;
     }
 
     final settings = await ref.read(vaultSettingsProvider.future);
+    if (!mounted) return;
     final encryptionEnabled = settings.encryptionEnabled;
     final defaultAlgorithm = settings.encryptionAlgorithm;
 
@@ -3893,45 +3393,17 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
           (encrypt: s.encrypt, algorithm: s.algorithm);
     }
 
-    setState(() {
-      _isImporting = true;
-      _importProgress = 0;
-      _importTotal = perFileSettings.length;
-    });
-
-    final importResult = await _importService.importFromDocumentFiles(
-      filePaths: validPaths,
-      deleteOriginals: true,
-      perFileEncryption: perFileEncryption,
-      onProgress: (current, total) {
-        if (!mounted) return;
-        setState(() {
-          _importProgress = current;
-          _importTotal = total;
-        });
-      },
-    );
-
-    if (mounted) setState(() => _isImporting = false);
-
-    if (importResult.success && importResult.importedCount > 0) {
-      ToastUtils.showSuccess(_importOutcomeMessage(
-        imported: importResult.importedCount,
-        skipped: importResult.skippedDuplicates,
-        failed: importResult.failedCount,
-        retained: importResult.retainedOriginals,
-        hiddenFromDevice: importResult.deletedOriginals,
-      ));
-      ref.read(vaultNotifierProvider.notifier).loadFiles();
-    } else if (importResult.skippedDuplicates > 0) {
-      ToastUtils.showInfo(
-        'Skipped ${importResult.skippedDuplicates} duplicate(s) already in vault',
-      );
-    } else if (!importResult.success) {
-      ToastUtils.showError(importResult.error ?? 'Import failed');
-    } else {
-      ToastUtils.showInfo('No files imported');
-    }
+    _startHide(
+        validPaths.length,
+        (job) async => importOutcome(
+              await FileImportService.instance.importFromDocumentFiles(
+                filePaths: validPaths,
+                deleteOriginals: true,
+                perFileEncryption: perFileEncryption,
+                onProgress: job.batchProgress,
+                onFileProgress: job.fileProgress,
+              ),
+            ));
   }
 
   Future<void> _importFolderFromDevice() async {
@@ -3946,42 +3418,37 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
 
     if (selectedPath == null || !mounted) return;
 
-    setState(() {
-      _isImporting = true;
-      _importProgress = 0;
-      _importTotal = 1;
-    });
-
-    try {
-      final result = await _importService.importFolder(
+    _startHide(0, (job) async {
+      final result = await FileImportService.instance.importFolder(
         folderPath: selectedPath,
         recursive: true,
         deleteOriginals: false,
         onProgress: (current, total) {
-          if (!mounted) return;
-          setState(() {
-            _importProgress = current;
-            _importTotal = total;
-          });
+          job.value = job.value.copyWith(
+              statusMessage:
+                  'Importing folder: $current of $total files in this folder');
+        },
+        onFileProgress: (name, current, total) {
+          job.value = job.value.copyWith(
+              currentFileName: name, statusMessage: 'Importing $name...');
         },
       );
-
-      if (mounted) setState(() => _isImporting = false);
-
-      if (result.success && result.filesImported > 0) {
-        ToastUtils.showSuccess(result.message ??
-            'Imported ${result.filesImported} file(s) into ${result.foldersCreated} folder(s)');
-        ref.read(vaultNotifierProvider.notifier).loadFiles();
-        ref.invalidate(foldersNotifierProvider);
-      } else if (!result.success) {
-        ToastUtils.showError(result.error ?? 'Import failed');
-      } else {
-        ToastUtils.showInfo('No files found in folder');
-      }
-    } catch (e) {
-      if (mounted) setState(() => _isImporting = false);
-      ToastUtils.showError('Failed to import folder');
-    }
+      return OperationOutcome(
+        kind: !result.success
+            ? OperationOutcomeKind.error
+            : result.errors.isNotEmpty
+                ? OperationOutcomeKind.warning
+                : result.filesImported == 0
+                    ? OperationOutcomeKind.info
+                    : OperationOutcomeKind.success,
+        message: [
+          result.message ?? result.error ?? 'No files found in folder',
+          if (result.errors.isNotEmpty) result.errors.join(' · '),
+        ].join(' · '),
+        processedFiles: result.filesImported,
+        result: result,
+      );
+    });
   }
 }
 

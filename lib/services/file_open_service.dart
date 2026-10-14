@@ -13,6 +13,7 @@ import '../screens/song_player_screen.dart';
 import '../themes/app_colors.dart';
 import '../utils/toast_utils.dart';
 import 'crypto_isolate_pool.dart';
+import 'file_operation_gate.dart';
 
 /// Centralized, atomic file opener.
 ///
@@ -52,6 +53,14 @@ class FileOpenService {
   }) async {
     if (_isOpening) return;
     if (!context.mounted) return;
+    if (!FileOperationGate.instance.canRead(file.id)) {
+      ToastUtils.showInfo(
+          'This file is being processed. Try again when it finishes.');
+      return;
+    }
+    currentFiles = currentFiles
+        .where((file) => FileOperationGate.instance.canRead(file.id))
+        .toList();
 
     _isOpening = true;
 

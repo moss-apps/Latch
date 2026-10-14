@@ -12,6 +12,7 @@ import '../models/vault_folder.dart';
 import '../models/file_to_vault.dart';
 import 'auto_kill_service.dart';
 import 'decoy_service.dart';
+import 'file_operation_gate.dart';
 import 'media_scanner_service.dart';
 import 'office_converter_service.dart';
 import 'permission_service.dart';
@@ -241,11 +242,13 @@ class FileImportService {
         }
       }
 
+      final inaccessibleCount = assets.length - filesToVault.length;
       if (filesToVault.isEmpty) {
         return ImportResult(
           success: false,
           error: 'Could not access any of the selected files',
           importedFiles: [],
+          failedCount: inaccessibleCount,
         );
       }
 
@@ -271,10 +274,13 @@ class FileImportService {
 
       if (filesToImport.isEmpty) {
         return ImportResult(
-          success: false,
-          error: 'All selected files already exist in vault',
+          success: inaccessibleCount == 0,
+          message: inaccessibleCount == 0
+              ? 'All accessible files already exist in vault'
+              : 'Skipped ${skippedDuplicates.length} duplicate(s); $inaccessibleCount file(s) could not be accessed',
           importedFiles: [],
           skippedDuplicates: skippedDuplicates.length,
+          failedCount: inaccessibleCount,
         );
       }
 
@@ -293,13 +299,16 @@ class FileImportService {
         deleteOriginals: false, // We handle deletion via PhotoManager
         isDecoy: isDecoy,
         onProgress: (current, total) {
-          // Map the vault service progress - estimate size progress proportionally
-          final estimatedSize =
-              totalSize > 0 ? (current / total * totalSize).round() : 0;
-          onProgress?.call(current, total,
-              currentSize: estimatedSize, totalSize: totalSize);
+          // Byte progress comes from the aggregate file callback, not an
+          // estimate based on the number of files (which can differ greatly).
+          if (onFileProgress == null) onProgress?.call(current, total);
         },
-        onFileProgress: onFileProgress,
+        onFileProgress: (info) {
+          onProgress?.call(info.completedFiles ?? 0, info.total,
+              currentSize: info.batchProcessedBytes ?? 0,
+              totalSize: info.batchTotalBytes ?? totalSize);
+          onFileProgress?.call(info);
+        },
       );
 
       debugPrint('[FileImport] Imported ${imported.length} files to vault');
@@ -361,8 +370,9 @@ class FileImportService {
         deletedOriginals: requestedOriginals > 0 && retainedOriginals == 0,
         retainedOriginals: retainedOriginals,
         skippedDuplicates: skippedDuplicates.length,
-        failedCount: (filesToImport.length - imported.length)
-            .clamp(0, filesToImport.length),
+        failedCount: inaccessibleCount +
+            (filesToImport.length - imported.length)
+                .clamp(0, filesToImport.length),
       );
     } catch (e, stackTrace) {
       debugPrint('[FileImport] Error importing from assets: $e');
@@ -379,7 +389,8 @@ class FileImportService {
   Future<UnhideResult> unhideFiles({
     required List<String> fileIds,
     bool removeFromVault = true,
-    Function(int current, int total, {int currentSize, int totalSize})?
+    Function(int current, int total,
+            {int currentSize, int totalSize, String? currentFileName})?
         onProgress,
   }) async {
     if (fileIds.isEmpty) {
@@ -446,6 +457,7 @@ class FileImportService {
 
       final fileProgress = <int, int>{};
       final exportResults = <int, File?>{};
+      var completedExports = 0;
 
       await Future.wait(
         vaultedFiles.asMap().entries.map((e) async {
@@ -466,10 +478,11 @@ class FileImportService {
                 final totalProcessed =
                     fileProgress.values.fold(0, (a, b) => a + b);
                 onProgress?.call(
-                  index + 1,
+                  completedExports,
                   vaultedFiles.length,
                   currentSize: totalProcessed,
                   totalSize: totalSize,
+                  currentFileName: vaultedFile.originalName,
                 );
               },
             );
@@ -479,11 +492,17 @@ class FileImportService {
                 '[FileImport] Error exporting ${vaultedFile.originalName}: $e');
             exportResults[index] = null;
           }
+          completedExports++;
+          onProgress?.call(completedExports, vaultedFiles.length,
+              currentSize: fileProgress.values.fold<int>(0, (a, b) => a + b),
+              totalSize: totalSize,
+              currentFileName: vaultedFile.originalName);
         }),
       );
 
       int successCount = 0;
-      int errorCount = 0;
+      int errorCount = fileIds.length - vaultedFiles.length;
+      int retainedInVault = 0;
       final restoredPaths = <String>[];
       final successFileIds = <String>[];
 
@@ -494,7 +513,9 @@ class FileImportService {
         final destPath = destinationPaths[fileId]!;
         final exported = exportResults[i];
 
-        if (exported != null && await exported.exists()) {
+        if (exported != null &&
+            await exported.exists() &&
+            FileOperationGate.instance.allowsMutation) {
           debugPrint('[FileImport] Exported file to: $destPath');
           await _notifyMediaStore(destPath);
           restoredPaths.add(destPath);
@@ -506,28 +527,35 @@ class FileImportService {
           errorCount++;
         }
 
-        onProgress?.call(i + 1, vaultedFiles.length,
-            currentSize: totalSize, totalSize: totalSize);
+        onProgress?.call(completedExports, vaultedFiles.length,
+            currentSize: fileProgress.values.fold<int>(0, (a, b) => a + b),
+            totalSize: totalSize,
+            currentFileName: vaultedFile.originalName);
       }
 
-      if (removeFromVault) {
+      if (removeFromVault && FileOperationGate.instance.allowsMutation) {
         for (final fileId in successFileIds) {
+          if (!FileOperationGate.instance.allowsMutation) break;
           try {
-            await _vaultService.removeFile(fileId, isDecoy: isDecoy);
+            if (!await _vaultService.removeFile(fileId, isDecoy: isDecoy)) {
+              retainedInVault++;
+            }
           } catch (e) {
+            retainedInVault++;
             debugPrint('[FileImport] Failed to remove $fileId from vault: $e');
           }
         }
       }
 
       final message = successCount > 0
-          ? 'Restored $successCount file(s) to gallery${errorCount > 0 ? ' ($errorCount failed)' : ''}'
+          ? 'Restored $successCount file(s) to gallery${errorCount > 0 ? ' ($errorCount failed)' : ''}${retainedInVault > 0 ? ' · $retainedInVault still in vault' : ''}'
           : 'Failed to restore files';
 
       return UnhideResult(
         success: successCount > 0,
         unhiddenCount: successCount,
         errorCount: errorCount,
+        retainedInVault: retainedInVault,
         restoredPaths: restoredPaths,
         message: message,
       );
@@ -1003,6 +1031,7 @@ class FileImportService {
     required List<String> filePaths,
     bool deleteOriginals = true,
     Function(int current, int total)? onProgress,
+    Function(FileProgressInfo)? onFileProgress,
     Map<String, ({bool encrypt, EncryptionAlgorithm algorithm})>?
         perFileEncryption,
   }) async {
@@ -1021,7 +1050,6 @@ class FileImportService {
       final filesToVault = <FileToVault>[];
       final pathsToDelete = <String>[];
       final fileSizesByPath = <String, int>{};
-      int processed = 0;
 
       for (final path in filePaths) {
         try {
@@ -1048,8 +1076,13 @@ class FileImportService {
 
           pathsToDelete.add(path);
 
-          processed++;
-          onProgress?.call(processed, filePaths.length);
+          onFileProgress?.call(FileProgressInfo(
+            current: 0,
+            total: filePaths.length,
+            fileName: fileName,
+            fileSize: fileSizesByPath[path]!,
+            status: 'Preparing...',
+          ));
 
           debugPrint('[FileImport] Prepared file for import: $fileName');
         } catch (e) {
@@ -1057,11 +1090,13 @@ class FileImportService {
         }
       }
 
+      final inaccessibleCount = filePaths.length - filesToVault.length;
       if (filesToVault.isEmpty) {
         return ImportResult(
           success: false,
           error: 'Could not access any of the selected files',
           importedFiles: [],
+          failedCount: inaccessibleCount,
         );
       }
 
@@ -1073,10 +1108,13 @@ class FileImportService {
       }
       if (filesToImport.isEmpty) {
         return ImportResult(
-          success: false,
-          error: 'All selected files already exist in vault',
+          success: inaccessibleCount == 0,
+          message: inaccessibleCount == 0
+              ? 'All accessible files already exist in vault'
+              : 'Skipped ${skippedDuplicates.length} duplicate(s); $inaccessibleCount file(s) could not be accessed',
           importedFiles: [],
           skippedDuplicates: skippedDuplicates.length,
+          failedCount: inaccessibleCount,
         );
       }
 
@@ -1088,17 +1126,15 @@ class FileImportService {
         deleteOriginals: false,
         isDecoy: _decoyService.isDecoyModeActive,
         onProgress: onProgress,
+        onFileProgress: onFileProgress,
       );
 
       debugPrint('[FileImport] Imported ${imported.length} files to vault');
 
       // Delete originals if requested, only for files that landed in the vault.
-      final importedNames = {
-        for (final f in imported) f.originalName.toLowerCase()
-      };
-      final deletablePaths = pathsToDelete
-          .where((p) => importedNames.contains(p.split('/').last.toLowerCase()))
-          .toList();
+      final importedPaths = {for (final f in imported) f.originalPath};
+      final deletablePaths =
+          pathsToDelete.where(importedPaths.contains).toList();
       int requestedOriginals = 0;
       int deletedOriginalsCount = 0;
       if (deleteOriginals && deletablePaths.isNotEmpty) {
@@ -1118,8 +1154,9 @@ class FileImportService {
         deletedOriginals: requestedOriginals > 0 && retainedOriginals == 0,
         retainedOriginals: retainedOriginals,
         skippedDuplicates: skippedDuplicates.length,
-        failedCount: (filesToImport.length - imported.length)
-            .clamp(0, filesToImport.length),
+        failedCount: inaccessibleCount +
+            (filesToImport.length - imported.length)
+                .clamp(0, filesToImport.length),
       );
     } catch (e, stackTrace) {
       debugPrint('[FileImport] Error importing documents from files: $e');
@@ -1156,6 +1193,7 @@ class FileImportService {
       );
     }
 
+    final temporaryPdfs = <String>[];
     try {
       debugPrint(
           '[FileImport] Processing ${filePaths.length} documents for import');
@@ -1199,7 +1237,7 @@ class FileImportService {
       }
 
       final filesToVault = <FileToVault>[];
-      final pathsToDelete = <({String path, String name})>[];
+      final pathsToDelete = <({String path, String sourcePath})>[];
       final convertedFiles = <String>[];
       final skippedFiles = <String>[];
       int processed = 0;
@@ -1207,6 +1245,7 @@ class FileImportService {
 
       // Process regular files first
       for (final path in regularFilePaths) {
+        if (!FileOperationGate.instance.allowsMutation) break;
         try {
           final file = File(path);
           if (!await file.exists()) {
@@ -1227,7 +1266,7 @@ class FileImportService {
             encryptionAlgorithm: perFileConfig?.algorithm,
           ));
 
-          pathsToDelete.add((path: path, name: fileName));
+          pathsToDelete.add((path: path, sourcePath: path));
           processed++;
           onProgress?.call(processed, totalFiles);
           onFileProgress?.call(FileProgressInfo(
@@ -1250,6 +1289,7 @@ class FileImportService {
       final tempDir = await getTemporaryDirectory();
 
       for (final officeFile in officeFiles) {
+        if (!FileOperationGate.instance.allowsMutation) break;
         try {
           if (!officeFile.canConvertOnDevice) {
             // Cannot convert on device, import original
@@ -1269,7 +1309,7 @@ class FileImportService {
             ));
 
             pathsToDelete
-                .add((path: officeFile.path, name: officeFile.fileName));
+                .add((path: officeFile.path, sourcePath: officeFile.path));
             processed++;
             onProgress?.call(processed, totalFiles);
             onFileProgress?.call(FileProgressInfo(
@@ -1303,6 +1343,7 @@ class FileImportService {
 
           // Read file data
           final fileData = await file.readAsBytes();
+          if (!FileOperationGate.instance.allowsMutation) break;
 
           // Convert to PDF
           final result = await converter.convertToPdf(
@@ -1310,6 +1351,7 @@ class FileImportService {
             officeFile.fileName,
             officeFile.extension,
           );
+          if (!FileOperationGate.instance.allowsMutation) break;
 
           if (result.success && result.pdfData != null) {
             // Save converted PDF to temp location
@@ -1317,6 +1359,7 @@ class FileImportService {
                 '${officeFile.fileName.replaceAll(RegExp(r'\.[^.]+$'), '')}.pdf';
             final tempPdfPath =
                 '${tempDir.path}/lkr_office_${DateTime.now().microsecondsSinceEpoch}.pdf';
+            temporaryPdfs.add(tempPdfPath);
             await File(tempPdfPath).writeAsBytes(result.pdfData!);
 
             final perFileConfig = perFileEncryption?[officeFile.path];
@@ -1329,7 +1372,7 @@ class FileImportService {
               encryptionAlgorithm: perFileConfig?.algorithm,
             ));
 
-            pathsToDelete.add((path: officeFile.path, name: pdfFileName));
+            pathsToDelete.add((path: officeFile.path, sourcePath: tempPdfPath));
             convertedFiles.add('${officeFile.fileName} → $pdfFileName');
 
             debugPrint(
@@ -1353,7 +1396,7 @@ class FileImportService {
             ));
 
             pathsToDelete
-                .add((path: officeFile.path, name: officeFile.fileName));
+                .add((path: officeFile.path, sourcePath: officeFile.path));
             // Don't add to convertedFiles, maybe add to a 'fallback' list or just implicitly handled
           }
 
@@ -1385,7 +1428,7 @@ class FileImportService {
               encryptionAlgorithm: perFileConfig?.algorithm,
             ));
             pathsToDelete
-                .add((path: officeFile.path, name: officeFile.fileName));
+                .add((path: officeFile.path, sourcePath: officeFile.path));
           } catch (e2) {
             skippedFiles.add(officeFile.fileName);
           }
@@ -1434,12 +1477,10 @@ class FileImportService {
       debugPrint('[FileImport] Imported ${imported.length} documents to vault');
 
       // Delete originals if requested, only for documents that landed in the
-      // vault (converted files are matched by their PDF name).
-      final importedNames = {
-        for (final f in imported) f.originalName.toLowerCase()
-      };
+      // vault. Match exact input paths, not names shared by different folders.
+      final importedPaths = {for (final f in imported) f.originalPath};
       final deletablePaths = pathsToDelete
-          .where((p) => importedNames.contains(p.name.toLowerCase()))
+          .where((p) => importedPaths.contains(p.sourcePath))
           .toList();
       int requestedOriginals = 0;
       int deletedOriginalsCount = 0;
@@ -1490,6 +1531,16 @@ class FileImportService {
         skippedFiles: [],
         failedCount: filePaths.length,
       );
+    } finally {
+      for (final path in temporaryPdfs) {
+        try {
+          final file = File(path);
+          if (await file.exists()) await file.delete();
+        } catch (error) {
+          debugPrint(
+              'Could not remove converted document scratch file: $error');
+        }
+      }
     }
   }
 
@@ -2034,6 +2085,7 @@ class FileImportService {
   /// Returns the number of assets confirmed deleted. Callers must not report
   /// the originals as removed unless every requested asset was deleted.
   Future<int> _deleteAssetsFromGallery(List<AssetEntity> assets) async {
+    if (!FileOperationGate.instance.allowsMutation) return 0;
     if (assets.isEmpty) {
       debugPrint('[FileImport] No assets to delete');
       return 0;
@@ -2131,7 +2183,7 @@ class FileImportService {
       );
 
       return FolderImportResult(
-        success: true,
+        success: result.errors.isEmpty || result.filesImported > 0,
         foldersCreated: result.foldersCreated,
         filesImported: result.filesImported,
         errors: result.errors,
@@ -2161,9 +2213,10 @@ class FileImportService {
   Future<int> _deleteFiles(List<String> paths) async {
     int deleted = 0;
     for (final path in paths) {
+      if (!FileOperationGate.instance.allowsMutation) break;
       try {
         final file = File(path);
-        if (await file.exists()) {
+        if (await file.exists() && FileOperationGate.instance.allowsMutation) {
           await file.delete();
           debugPrint('Deleted file: $path');
         }
@@ -2224,6 +2277,7 @@ class UnhideResult {
   final bool success;
   final int unhiddenCount;
   final int errorCount;
+  final int retainedInVault;
   final String? error;
   final String? message;
   final List<String> restoredPaths;
@@ -2232,6 +2286,7 @@ class UnhideResult {
     required this.success,
     required this.unhiddenCount,
     this.errorCount = 0,
+    this.retainedInVault = 0,
     this.error,
     this.message,
     this.restoredPaths = const [],

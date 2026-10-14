@@ -267,7 +267,8 @@ class VaultNotifier extends Notifier<AsyncValue<List<VaultedFile>>> {
 
   Future<BulkDeleteResult> deleteFiles(
     List<String> fileIds, {
-    void Function(int current, int total, {int currentSize, int totalSize})?
+    void Function(int current, int total,
+            {int currentSize, int totalSize, String? currentFileName})?
         onProgress,
   }) async {
     final isDecoy = ref.read(isDecoyModeProvider);
