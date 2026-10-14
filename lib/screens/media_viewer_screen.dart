@@ -1350,7 +1350,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                       _forceLandscape
                           ? Icons.stay_current_portrait
                           : Icons.stay_current_landscape,
-                      color: _forceLandscape ? context.accentColor : Colors.white,
+                      color:
+                          _forceLandscape ? context.accentColor : Colors.white,
                     ),
                     tooltip: _forceLandscape
                         ? 'Play vertically'
