@@ -28,6 +28,7 @@ import 'autofill_app.dart';
 import 'utils/frame_rate_optimizer.dart';
 import 'utils/navigator_key.dart';
 import 'utils/performance_config.dart';
+import 'widgets/toast_host.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -85,6 +86,8 @@ class LatchApp extends ConsumerWidget {
       theme: AppTheme.getLightTheme(accentColor),
       darkTheme: AppTheme.getDarkTheme(accentColor),
       themeMode: themeMode,
+      builder: (context, child) =>
+          ToastHost(child: child ?? const SizedBox.shrink()),
       home: ShareIntakeHost(
         child: SessionService.instance.isUnlocked
             ? const GalleryVaultScreen()
