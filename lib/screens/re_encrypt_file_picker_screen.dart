@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/encryption_algorithm.dart';
 import '../models/vaulted_file.dart';
 import '../providers/vault_providers.dart';
+import '../providers/operation_provider.dart';
 import '../themes/app_colors.dart';
-import '../widgets/operation_progress_sheet.dart';
+import '../models/operation_progress.dart';
 import '../widgets/re_encrypt_warning_dialog.dart';
 
 class ReEncryptFilePickerScreen extends ConsumerStatefulWidget {
@@ -23,7 +24,7 @@ class ReEncryptFilePickerScreen extends ConsumerStatefulWidget {
 class _ReEncryptFilePickerScreenState
     extends ConsumerState<ReEncryptFilePickerScreen> {
   final Set<String> _selectedIds = {};
-  bool _isReEncrypting = false;
+  bool get _isReEncrypting => ref.read(operationControllerProvider).isBusy;
   String _searchQuery = '';
 
   void _setSearchQuery(String value) {
@@ -60,7 +61,12 @@ class _ReEncryptFilePickerScreenState
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(
+        listenable: ref.watch(operationControllerProvider),
+        builder: (context, _) => _buildScreen(context),
+      );
+
+  Widget _buildScreen(BuildContext context) {
     final filesAsync = ref.watch(vaultNotifierProvider);
     final encryptedFiles = _encryptedFiles(filesAsync);
     final filteredFiles = _applySearchFilter(encryptedFiles);
@@ -70,7 +76,7 @@ class _ReEncryptFilePickerScreenState
       appBar: AppBar(
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: context.textPrimary),
-          onPressed: _isReEncrypting ? null : () => Navigator.pop(context),
+          onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'Select Files to Re-Encrypt',
@@ -365,6 +371,7 @@ class _ReEncryptFilePickerScreenState
   }
 
   Future<void> _startReEncrypt() async {
+    if (!ref.read(operationControllerProvider).checkAvailable()) return;
     final encryptedFiles = _encryptedFiles(ref.read(vaultNotifierProvider));
     final largeFiles = encryptedFiles
         .where((f) =>
@@ -453,105 +460,10 @@ class _ReEncryptFilePickerScreenState
     );
     if (warningAcknowledged != true || !mounted) return;
 
-    setState(() => _isReEncrypting = true);
-
-    final progressState = ValueNotifier<OperationProgressState>(
-      OperationProgressState(
-        totalFiles: _selectedIds.length,
-        currentFileName: 'Preparing...',
-        statusMessage: 'Starting...',
-        isProcessing: true,
-        isEncrypting: true,
-      ),
-    );
-
-    if (!mounted) {
-      progressState.dispose();
-      return;
-    }
-
-    void onProgress(
-      int current,
-      int total,
-      String name,
-      int processed,
-      int totalBytes,
-    ) {
-      progressState.value = progressState.value.copyWith(
-        totalFiles: total,
-        currentFile: current,
-        currentFileName: name,
-        totalSizeBytes: totalBytes,
-        processedSizeBytes: processed,
-        statusMessage: current >= total
-            ? 'Finalizing...'
-            : 'Processing ${current + 1} of $total...',
-      );
-    }
-
-    final sheetFuture = showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isDismissible: false,
-      enableDrag: false,
-      builder: (ctx) => ValueListenableBuilder<OperationProgressState>(
-        valueListenable: progressState,
-        builder: (context, state, _) => OperationProgressSheet(
-          operationType: OperationType.reencrypt,
-          totalFiles: state.totalFiles,
-          currentFile: state.currentFile,
-          currentFileName: state.currentFileName,
-          totalSizeBytes: state.totalSizeBytes,
-          processedSizeBytes: state.processedSizeBytes,
-          statusMessage: state.statusMessage,
-          isProcessing: state.isProcessing,
-          isComplete: state.isComplete,
-          isEncrypting: state.isEncrypting,
-        ),
-      ),
-    );
-
-    final result = await ref.read(vaultServiceProvider).reEncryptVault(
+    ref.read(vaultOperationRunnerProvider).encryption(
+          _selectedIds,
+          OperationType.reencrypt,
           widget.targetAlgorithm,
-          fileFilter: _selectedIds,
-          onProgress: onProgress,
         );
-
-    if (!mounted) {
-      progressState.dispose();
-      return;
-    }
-
-    ref.invalidate(vaultSettingsProvider);
-    ref.invalidate(vaultNotifierProvider);
-
-    if (result < 0) {
-      Navigator.of(context).pop(); // close sheet
-      progressState.dispose();
-      setState(() => _isReEncrypting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Re-encryption failed',
-            style: TextStyle(fontFamily: 'ProductSans'),
-          ),
-        ),
-      );
-      return;
-    }
-
-    progressState.value = progressState.value.copyWith(
-      isComplete: true,
-      isProcessing: false,
-      currentFile: progressState.value.totalFiles,
-      processedSizeBytes: progressState.value.totalSizeBytes,
-      statusMessage: 'Completed successfully',
-    );
-
-    await sheetFuture; // user taps Done
-    progressState.dispose();
-    if (!mounted) return;
-    setState(() => _isReEncrypting = false);
-    Navigator.of(context).pop(); // pop picker
   }
 }

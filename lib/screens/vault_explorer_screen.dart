@@ -6,13 +6,12 @@ import '../models/vault_folder.dart';
 import '../models/vaulted_file.dart';
 import '../providers/vault_providers.dart';
 import '../providers/explorer_providers.dart';
-import '../services/file_import_service.dart';
+import '../providers/operation_provider.dart';
 import '../themes/app_colors.dart';
 import '../utils/toast_utils.dart';
 import '../widgets/folder_breadcrumb_widget.dart';
 import '../widgets/explorer_file_grid.dart';
 import '../widgets/explorer_toolbar.dart';
-import '../widgets/operation_progress_sheet.dart';
 import '../widgets/media_multi_select_action_sheet.dart';
 import '../widgets/add_tags_sheet.dart';
 import 'note_list_screen.dart';
@@ -202,6 +201,7 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
   }
 
   void _showMultiSelectActionSheet(Set<String> selectedFiles) {
+    if (!ref.read(operationControllerProvider).checkAvailable()) return;
     MediaMultiSelectActionSheet.show(
       context,
       fileCount: selectedFiles.length,
@@ -249,6 +249,7 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
   }
 
   Future<void> _deleteSelectedFiles(Set<String> selectedFiles) async {
+    if (!ref.read(operationControllerProvider).checkAvailable()) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -294,68 +295,9 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
 
     if (confirmed != true || !mounted) return;
 
-    final progressState = ValueNotifier<OperationProgressState>(
-      OperationProgressState(
-        totalFiles: selectedFiles.length,
-        currentFile: 0,
-        currentFileName: 'Preparing...',
-        totalSizeBytes: 0,
-        processedSizeBytes: 0,
-        statusMessage: 'Starting...',
-        isProcessing: true,
-      ),
-    );
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isDismissible: false,
-      enableDrag: false,
-      builder: (ctx) => ValueListenableBuilder<OperationProgressState>(
-        valueListenable: progressState,
-        builder: (ctx, state, _) => OperationProgressSheet(
-          operationType: OperationType.delete,
-          totalFiles: state.totalFiles,
-          currentFile: state.currentFile,
-          currentFileName: state.currentFileName,
-          totalSizeBytes: state.totalSizeBytes,
-          processedSizeBytes: state.processedSizeBytes,
-          statusMessage: state.statusMessage,
-          isProcessing: state.isProcessing,
-          isComplete: state.isComplete,
-          isEncrypting: state.isEncrypting,
-        ),
-      ),
-    );
-
-    final result = await ref.read(vaultNotifierProvider.notifier).deleteFiles(
-      selectedFiles.toList(),
-      onProgress: (current, total, {int? currentSize, int? totalSize}) {
-        progressState.value = progressState.value.copyWith(
-          totalFiles: total,
-          currentFile: current,
-          totalSizeBytes: totalSize ?? 0,
-          processedSizeBytes: currentSize ?? 0,
-          statusMessage: 'Processing file $current of $total...',
-        );
-      },
-    );
-
-    if (!mounted) return;
-
-    _exitSelectionMode();
-
-    if (result.allSucceeded) {
-      ToastUtils.showSuccess('Files deleted');
-    } else if (result.anyRemoved) {
-      ToastUtils.showError(
-          'Deleted ${result.removedCount}; ${result.failedCount} could not be deleted');
-    } else {
-      ToastUtils.showError('Failed to delete some files');
+    if (ref.read(vaultOperationRunnerProvider).delete(selectedFiles)) {
+      _exitSelectionMode();
     }
-
-    Navigator.pop(context); // Close progress sheet
-    _invalidateExplorerProviders();
   }
 
   void _showAddToAlbumSheet(Set<String> selectedFiles) {
@@ -485,6 +427,7 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
   }
 
   Future<void> _unhideSelectedFiles(Set<String> selectedFiles) async {
+    if (!ref.read(operationControllerProvider).checkAvailable()) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -531,69 +474,9 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
 
     if (confirmed != true || !mounted) return;
 
-    final progressState = ValueNotifier<OperationProgressState>(
-      OperationProgressState(
-        totalFiles: selectedFiles.length,
-        currentFile: 0,
-        currentFileName: 'Preparing...',
-        totalSizeBytes: 0,
-        processedSizeBytes: 0,
-        statusMessage: 'Starting...',
-        isProcessing: true,
-      ),
-    );
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isDismissible: false,
-      enableDrag: false,
-      builder: (ctx) => ValueListenableBuilder<OperationProgressState>(
-        valueListenable: progressState,
-        builder: (ctx, state, _) => OperationProgressSheet(
-          operationType: OperationType.unhide,
-          totalFiles: state.totalFiles,
-          currentFile: state.currentFile,
-          currentFileName: state.currentFileName,
-          totalSizeBytes: state.totalSizeBytes,
-          processedSizeBytes: state.processedSizeBytes,
-          statusMessage: state.statusMessage,
-          isProcessing: state.isProcessing,
-          isComplete: state.isComplete,
-          isEncrypting: state.isEncrypting,
-        ),
-      ),
-    );
-
-    final result = await FileImportService.instance.unhideFiles(
-      fileIds: selectedFiles.toList(),
-      removeFromVault: true,
-      onProgress: (current, total, {int? currentSize, int? totalSize}) {
-        progressState.value = progressState.value.copyWith(
-          totalFiles: total,
-          currentFile: current,
-          totalSizeBytes: totalSize ?? 0,
-          processedSizeBytes: currentSize ?? 0,
-          statusMessage: current == 0
-              ? 'Preparing files...'
-              : 'Processing file $current of $total...',
-        );
-      },
-    );
-
-    if (!mounted) return;
-
-    _exitSelectionMode();
-
-    if (result.success && result.unhiddenCount > 0) {
-      ToastUtils.showSuccess(result.message ?? 'Files restored to gallery');
-      ref.read(vaultNotifierProvider.notifier).loadFiles();
-    } else if (!result.success) {
-      ToastUtils.showError(result.error ?? 'Failed to unhide files');
+    if (ref.read(vaultOperationRunnerProvider).unhide(selectedFiles)) {
+      _exitSelectionMode();
     }
-
-    Navigator.pop(context); // Close progress sheet
-    _invalidateExplorerProviders();
   }
 
   // ───── Folder Operations (Create, Rename, Delete) ─────

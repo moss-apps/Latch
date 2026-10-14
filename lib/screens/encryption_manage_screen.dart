@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/encryption_algorithm.dart';
 import '../models/vaulted_file.dart';
 import '../providers/vault_providers.dart';
+import '../providers/operation_provider.dart';
 import '../themes/app_colors.dart';
-import '../widgets/operation_progress_sheet.dart';
+import '../models/operation_progress.dart';
 
 class EncryptionManageScreen extends ConsumerStatefulWidget {
   final VaultEncryptionAction action;
@@ -26,7 +27,7 @@ class EncryptionManageScreen extends ConsumerStatefulWidget {
 class _EncryptionManageScreenState
     extends ConsumerState<EncryptionManageScreen> {
   final Set<String> _selectedIds = {};
-  bool _isRunning = false;
+  bool get _isRunning => ref.read(operationControllerProvider).isBusy;
   String _searchQuery = '';
 
   static const int _largeFileThresholdBytes = 50 * 1024 * 1024;
@@ -84,7 +85,12 @@ class _EncryptionManageScreenState
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(
+        listenable: ref.watch(operationControllerProvider),
+        builder: (context, _) => _buildScreen(context),
+      );
+
+  Widget _buildScreen(BuildContext context) {
     final filesAsync = ref.watch(vaultNotifierProvider);
     final eligible = _eligibleFiles(filesAsync);
     final filtered = _applySearchFilter(eligible);
@@ -94,7 +100,7 @@ class _EncryptionManageScreenState
       appBar: AppBar(
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: context.textPrimary),
-          onPressed: _isRunning ? null : () => Navigator.pop(context),
+          onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'Select Files to $_actionVerb',
@@ -374,6 +380,7 @@ class _EncryptionManageScreenState
   }
 
   Future<void> _start() async {
+    if (!ref.read(operationControllerProvider).checkAvailable()) return;
     final eligible = _eligibleFiles(ref.read(vaultNotifierProvider));
     final largeFiles = eligible
         .where((f) =>
@@ -492,118 +499,10 @@ class _EncryptionManageScreenState
     );
     if (confirmed != true || !mounted) return;
 
-    await _runWithBottomSheet();
-  }
-
-  // Runs the operation off the main isolate (pool) and surfaces progress as a
-  // modal bottom sheet — same pattern as gallery_vault_screen batch ops. The
-  // sheet stays open during the await, then shows a Done state on success.
-  Future<void> _runWithBottomSheet() async {
-    setState(() => _isRunning = true);
-
-    final progressState = ValueNotifier<OperationProgressState>(
-      OperationProgressState(
-        totalFiles: _selectedIds.length,
-        currentFileName: 'Preparing...',
-        statusMessage: 'Starting...',
-        isProcessing: true,
-        isEncrypting: _isEncrypt,
-      ),
-    );
-
-    if (!mounted) {
-      progressState.dispose();
-      return;
-    }
-
-    void onProgress(
-      int current,
-      int total,
-      String name,
-      int processed,
-      int totalBytes,
-    ) {
-      progressState.value = progressState.value.copyWith(
-        totalFiles: total,
-        currentFile: current,
-        currentFileName: name,
-        totalSizeBytes: totalBytes,
-        processedSizeBytes: processed,
-        statusMessage: current >= total
-            ? 'Finalizing...'
-            : 'Processing ${current + 1} of $total...',
-      );
-    }
-
-    final sheetFuture = showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isDismissible: false,
-      enableDrag: false,
-      builder: (ctx) => ValueListenableBuilder<OperationProgressState>(
-        valueListenable: progressState,
-        builder: (context, state, _) => OperationProgressSheet(
-          operationType:
-              _isEncrypt ? OperationType.encrypt : OperationType.decrypt,
-          totalFiles: state.totalFiles,
-          currentFile: state.currentFile,
-          currentFileName: state.currentFileName,
-          totalSizeBytes: state.totalSizeBytes,
-          processedSizeBytes: state.processedSizeBytes,
-          statusMessage: state.statusMessage,
-          isProcessing: state.isProcessing,
-          isComplete: state.isComplete,
-          isEncrypting: state.isEncrypting,
-        ),
-      ),
-    );
-
-    final vaultService = ref.read(vaultServiceProvider);
-    final result = _isEncrypt
-        ? await vaultService.encryptVaultFiles(
-            widget.algorithm,
-            fileFilter: _selectedIds,
-            onProgress: onProgress,
-          )
-        : await vaultService.removeEncryption(
-            fileFilter: _selectedIds,
-            onProgress: onProgress,
-          );
-
-    if (!mounted) {
-      progressState.dispose();
-      return;
-    }
-
-    ref.invalidate(vaultNotifierProvider);
-
-    if (result < 0) {
-      Navigator.of(context).pop(); // close sheet
-      progressState.dispose();
-      setState(() => _isRunning = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '$_actionVerb failed',
-            style: const TextStyle(fontFamily: 'ProductSans'),
-          ),
-        ),
-      );
-      return;
-    }
-
-    progressState.value = progressState.value.copyWith(
-      isComplete: true,
-      isProcessing: false,
-      currentFile: progressState.value.totalFiles,
-      processedSizeBytes: progressState.value.totalSizeBytes,
-      statusMessage: 'Completed successfully',
-    );
-
-    await sheetFuture; // user taps Done
-    progressState.dispose();
-    if (!mounted) return;
-    setState(() => _isRunning = false);
-    Navigator.of(context).pop(); // pop picker, return to settings
+    ref.read(vaultOperationRunnerProvider).encryption(
+          _selectedIds,
+          _isEncrypt ? OperationType.encrypt : OperationType.decrypt,
+          widget.algorithm,
+        );
   }
 }
