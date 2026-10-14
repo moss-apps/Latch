@@ -1290,7 +1290,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                   IconButton(
                     icon: Icon(
                       _isLooping ? Icons.repeat_one : Icons.repeat,
-                      color: _isLooping ? AppColors.accent : Colors.white,
+                      color: _isLooping ? context.accentColor : Colors.white,
                     ),
                     tooltip: 'Loop',
                     onPressed: _toggleLooping,
@@ -1350,7 +1350,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                       _forceLandscape
                           ? Icons.stay_current_portrait
                           : Icons.stay_current_landscape,
-                      color: _forceLandscape ? AppColors.accent : Colors.white,
+                      color: _forceLandscape ? context.accentColor : Colors.white,
                     ),
                     tooltip: _forceLandscape
                         ? 'Play vertically'
