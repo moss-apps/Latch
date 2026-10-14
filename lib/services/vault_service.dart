@@ -13,6 +13,7 @@ import 'album_service.dart';
 import 'crypto_isolate_pool.dart';
 import 'encryption_service.dart';
 import 'file_service.dart';
+import 'file_operation_gate.dart';
 import 'folder_service.dart';
 import 'pb/migrate_legacy_index.dart';
 import 'pb/pocketbase_runtime.dart';
@@ -121,6 +122,11 @@ class VaultService {
 
   // ---- Files ----
 
+  Future<T> _mutate<T>(Future<T> Function() task, T blockedResult,
+          {Set<String> fileIds = const {}}) =>
+      FileOperationGate.instance
+          .mutate(task, blockedResult: blockedResult, fileIds: fileIds);
+
   Future<VaultedFile?> addFile({
     required String sourcePath,
     required String originalName,
@@ -134,19 +140,21 @@ class VaultService {
     EncryptionAlgorithm? encryptionAlgorithm,
     int? kdfIterations,
   }) =>
-      _files.addFile(
-        sourcePath: sourcePath,
-        originalName: originalName,
-        type: type,
-        mimeType: mimeType,
-        deleteOriginal: deleteOriginal,
-        encrypt: encrypt,
-        isDecoy: isDecoy,
-        tags: tags,
-        albumIds: albumIds,
-        encryptionAlgorithm: encryptionAlgorithm,
-        kdfIterations: kdfIterations,
-      );
+      _mutate(
+          () => _files.addFile(
+                sourcePath: sourcePath,
+                originalName: originalName,
+                type: type,
+                mimeType: mimeType,
+                deleteOriginal: deleteOriginal,
+                encrypt: encrypt,
+                isDecoy: isDecoy,
+                tags: tags,
+                albumIds: albumIds,
+                encryptionAlgorithm: encryptionAlgorithm,
+                kdfIterations: kdfIterations,
+              ),
+          null);
 
   Future<List<VaultedFile>> addFiles({
     required List<FileToVault> files,
@@ -156,17 +164,20 @@ class VaultService {
     Function(int current, int total)? onProgress,
     Function(FileProgressInfo)? onFileProgress,
   }) =>
-      _files.addFiles(
-        files: files,
-        deleteOriginals: deleteOriginals,
-        encrypt: encrypt,
-        isDecoy: isDecoy,
-        onProgress: onProgress,
-        onFileProgress: onFileProgress,
-      );
+      _mutate(
+          () => _files.addFiles(
+                files: files,
+                deleteOriginals: deleteOriginals,
+                encrypt: encrypt,
+                isDecoy: isDecoy,
+                onProgress: onProgress,
+                onFileProgress: onFileProgress,
+              ),
+          const <VaultedFile>[]);
 
   Future<VaultedFile?> updateFile(VaultedFile updatedFile) =>
-      _files.updateFile(updatedFile);
+      _mutate(() => _files.updateFile(updatedFile), null,
+          fileIds: {updatedFile.id});
 
   Future<String> hashFile(String path) => FileService.hashFile(path);
 
@@ -174,19 +185,24 @@ class VaultService {
       _files.contentHashFor(file, isDecoy: isDecoy);
 
   Future<bool> removeFile(String fileId, {bool isDecoy = false}) =>
-      _files.removeFile(fileId, isDecoy: isDecoy);
+      _mutate(() => _files.removeFile(fileId, isDecoy: isDecoy), false,
+          fileIds: {fileId});
 
   Future<BulkDeleteResult> removeFiles(
     List<String> fileIds, {
     bool isDecoy = false,
-    void Function(int current, int total, {int currentSize, int totalSize})?
+    void Function(int current, int total,
+            {int currentSize, int totalSize, String? currentFileName})?
         onProgress,
   }) =>
-      _files.removeFiles(
-        fileIds,
-        isDecoy: isDecoy,
-        onProgress: onProgress,
-      );
+      _mutate(
+          () => _files.removeFiles(
+                fileIds,
+                isDecoy: isDecoy,
+                onProgress: onProgress,
+              ),
+          BulkDeleteResult(removed: const [], failed: List.of(fileIds)),
+          fileIds: fileIds.toSet());
 
   Future<List<VaultedFile>> getAllFiles({bool isDecoy = false}) =>
       _files.getAllFiles(isDecoy: isDecoy);
@@ -221,12 +237,15 @@ class VaultService {
     bool isDecoy = false,
     Function(int processed, int total)? onProgress,
   }) =>
-      _files.exportFile(
-        fileId,
-        destinationPath,
-        isDecoy: isDecoy,
-        onProgress: onProgress,
-      );
+      _mutate(
+          () => _files.exportFile(
+                fileId,
+                destinationPath,
+                isDecoy: isDecoy,
+                onProgress: onProgress,
+              ),
+          null,
+          fileIds: {fileId});
 
   Future<int> reEncryptVault(
     EncryptionAlgorithm targetAlgorithm, {
@@ -236,12 +255,15 @@ class VaultService {
         onProgress,
     Set<String>? fileFilter,
   }) =>
-      _files.reEncryptVault(
-        targetAlgorithm,
-        isDecoy: isDecoy,
-        onProgress: onProgress,
-        fileFilter: fileFilter,
-      );
+      _mutate(
+          () => _files.reEncryptVault(
+                targetAlgorithm,
+                isDecoy: isDecoy,
+                onProgress: onProgress,
+                fileFilter: fileFilter,
+              ),
+          -1,
+          fileIds: fileFilter ?? const {});
 
   Future<int> encryptVaultFiles(
     EncryptionAlgorithm algorithm, {
@@ -251,12 +273,15 @@ class VaultService {
         onProgress,
     Set<String>? fileFilter,
   }) =>
-      _files.encryptVaultFiles(
-        algorithm,
-        isDecoy: isDecoy,
-        onProgress: onProgress,
-        fileFilter: fileFilter,
-      );
+      _mutate(
+          () => _files.encryptVaultFiles(
+                algorithm,
+                isDecoy: isDecoy,
+                onProgress: onProgress,
+                fileFilter: fileFilter,
+              ),
+          -1,
+          fileIds: fileFilter ?? const {});
 
   Future<int> removeEncryption({
     bool isDecoy = false,
@@ -265,11 +290,14 @@ class VaultService {
         onProgress,
     Set<String>? fileFilter,
   }) =>
-      _files.removeEncryption(
-        isDecoy: isDecoy,
-        onProgress: onProgress,
-        fileFilter: fileFilter,
-      );
+      _mutate(
+          () => _files.removeEncryption(
+                isDecoy: isDecoy,
+                onProgress: onProgress,
+                fileFilter: fileFilter,
+              ),
+          -1,
+          fileIds: fileFilter ?? const {});
 
   Future<void> cleanupTemp({bool throwOnError = false}) =>
       _files.cleanupTemp(throwOnError: throwOnError);
@@ -354,21 +382,26 @@ class VaultService {
       );
 
   Future<Album?> updateAlbum(Album updatedAlbum) =>
-      _albums.updateAlbum(updatedAlbum);
+      _mutate(() => _albums.updateAlbum(updatedAlbum), null);
 
-  Future<bool> deleteAlbum(String albumId) => _albums.deleteAlbum(albumId);
+  Future<bool> deleteAlbum(String albumId) =>
+      _mutate(() => _albums.deleteAlbum(albumId), false);
 
   Future<bool> addFileToAlbum(String fileId, String albumId) =>
-      _albums.addFileToAlbum(fileId, albumId);
+      _mutate(() => _albums.addFileToAlbum(fileId, albumId), false,
+          fileIds: {fileId});
 
   Future<bool> addFilesToAlbum(List<String> fileIds, String albumId) =>
-      _albums.addFilesToAlbum(fileIds, albumId);
+      _mutate(() => _albums.addFilesToAlbum(fileIds, albumId), false,
+          fileIds: fileIds.toSet());
 
   Future<bool> removeFilesFromAlbum(List<String> fileIds, String albumId) =>
-      _albums.removeFilesFromAlbum(fileIds, albumId);
+      _mutate(() => _albums.removeFilesFromAlbum(fileIds, albumId), false,
+          fileIds: fileIds.toSet());
 
   Future<bool> removeFileFromAlbum(String fileId, String albumId) =>
-      _albums.removeFileFromAlbum(fileId, albumId);
+      _mutate(() => _albums.removeFileFromAlbum(fileId, albumId), false,
+          fileIds: {fileId});
 
   Future<List<VaultedFile>> getFilesInAlbum(String albumId) =>
       _albums.getFilesInAlbum(albumId);
@@ -397,16 +430,20 @@ class VaultService {
       );
 
   Future<VaultFolder?> updateFolder(VaultFolder updatedFolder) =>
-      _folders.updateFolder(updatedFolder);
+      _mutate(() => _folders.updateFolder(updatedFolder), null);
 
   Future<bool> deleteFolder(String folderId, {bool deleteContents = false}) =>
-      _folders.deleteFolder(folderId, deleteContents: deleteContents);
+      _mutate(
+          () => _folders.deleteFolder(folderId, deleteContents: deleteContents),
+          false);
 
   Future<bool> addFileToFolder(String fileId, String folderId) =>
-      _folders.addFileToFolder(fileId, folderId);
+      _mutate(() => _folders.addFileToFolder(fileId, folderId), false,
+          fileIds: {fileId});
 
   Future<bool> removeFileFromFolder(String fileId, String folderId) =>
-      _folders.removeFileFromFolder(fileId, folderId);
+      _mutate(() => _folders.removeFileFromFolder(fileId, folderId), false,
+          fileIds: {fileId});
 
   Future<List<VaultedFile>> getFilesInFolder(String folderId) =>
       _folders.getFilesInFolder(folderId);
@@ -421,16 +458,21 @@ class VaultService {
     Function(int current, int total)? onProgress,
     Function(String fileName, int fileNumber, int total)? onFileProgress,
   }) =>
-      _folders.importDeviceFolder(
-        deviceFolderPath,
-        parentFolderId: parentFolderId,
-        recursive: recursive,
-        deleteOriginals: deleteOriginals,
-        encrypt: encrypt,
-        isDecoy: isDecoy,
-        onProgress: onProgress,
-        onFileProgress: onFileProgress,
-      );
+      _mutate(
+          () => _folders.importDeviceFolder(
+                deviceFolderPath,
+                parentFolderId: parentFolderId,
+                recursive: recursive,
+                deleteOriginals: deleteOriginals,
+                encrypt: encrypt,
+                isDecoy: isDecoy,
+                onProgress: onProgress,
+                onFileProgress: onFileProgress,
+              ),
+          const FolderImportResult(
+              foldersCreated: 0,
+              filesImported: 0,
+              errors: ['Another file operation is already running']));
 
   // ---- Tags ----
 
@@ -442,10 +484,11 @@ class VaultService {
   Future<List<VaultedFile>> getUntaggedFiles() => _tags.getUntaggedFiles();
 
   Future<VaultedFile?> addTagToFile(String fileId, String tag) =>
-      _tags.addTagToFile(fileId, tag);
+      _mutate(() => _tags.addTagToFile(fileId, tag), null, fileIds: {fileId});
 
   Future<VaultedFile?> removeTagFromFile(String fileId, String tag) =>
-      _tags.removeTagFromFile(fileId, tag);
+      _mutate(() => _tags.removeTagFromFile(fileId, tag), null,
+          fileIds: {fileId});
 
   Future<TagInfo> createTag(String name, [int? colorValue]) =>
       _tags.createTag(name, colorValue);
@@ -453,12 +496,13 @@ class VaultService {
   Future<bool> updateTagColor(String tagName, int colorValue) =>
       _tags.updateTagColor(tagName, colorValue);
 
-  Future<bool> deleteTag(String tagName) => _tags.deleteTag(tagName);
+  Future<bool> deleteTag(String tagName) =>
+      _mutate(() => _tags.deleteTag(tagName), false);
 
   // ---- Favorites ----
 
   Future<VaultedFile?> toggleFavorite(String fileId) =>
-      _tags.toggleFavorite(fileId);
+      _mutate(() => _tags.toggleFavorite(fileId), null, fileIds: {fileId});
 
   Future<List<VaultedFile>> getFavoriteFiles() => _tags.getFavoriteFiles();
 
