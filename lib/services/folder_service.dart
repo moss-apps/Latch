@@ -8,6 +8,7 @@ import '../models/file_to_vault.dart';
 import '../models/vault_folder.dart';
 import '../models/vaulted_file.dart';
 import 'file_service.dart';
+import 'file_operation_gate.dart';
 import 'vault_store.dart';
 
 /// Folder CRUD + importDeviceFolder. Splits out of `VaultService`.
@@ -43,6 +44,7 @@ class FolderService {
     String? parentId,
     String? description,
   }) async {
+    if (!FileOperationGate.instance.allowsMutation) return null;
     try {
       final now = DateTime.now();
       final id = sha256
@@ -81,8 +83,10 @@ class FolderService {
   }
 
   Future<VaultFolder?> updateFolder(VaultFolder updatedFolder) async {
+    if (!FileOperationGate.instance.allowsMutation) return null;
     try {
       final folders = await _store.loadFolders();
+      if (!FileOperationGate.instance.allowsMutation) return null;
       final index = folders.indexWhere((f) => f.id == updatedFolder.id);
 
       if (index == -1) return null;
@@ -100,6 +104,7 @@ class FolderService {
 
   Future<bool> deleteFolder(String folderId,
       {bool deleteContents = false}) async {
+    if (!FileOperationGate.instance.allowsMutation) return false;
     try {
       final folders = await _store.loadFolders();
       final folder = folders.firstWhere(
@@ -140,6 +145,7 @@ class FolderService {
         }
       }
 
+      if (!FileOperationGate.instance.allowsMutation) return false;
       if (folder.parentId != null) {
         final parentIndex =
             _store.cachedFolders!.indexWhere((f) => f.id == folder.parentId);
@@ -160,11 +166,13 @@ class FolderService {
   }
 
   Future<bool> addFileToFolder(String fileId, String folderId) async {
+    if (!FileOperationGate.instance.allowsMutation) return false;
     try {
       final file = await _fileService.getFileById(fileId);
       if (file == null) return false;
 
       final folders = await _store.loadFolders();
+      if (!FileOperationGate.instance.allowsMutation) return false;
       final folderIndex = folders.indexWhere((f) => f.id == folderId);
       if (folderIndex == -1) return false;
 
@@ -192,8 +200,10 @@ class FolderService {
   }
 
   Future<bool> removeFileFromFolder(String fileId, String folderId) async {
+    if (!FileOperationGate.instance.allowsMutation) return false;
     try {
       final folders = await _store.loadFolders();
+      if (!FileOperationGate.instance.allowsMutation) return false;
       final folderIndex = folders.indexWhere((f) => f.id == folderId);
       if (folderIndex == -1) return false;
 
@@ -231,6 +241,12 @@ class FolderService {
     Function(int current, int total)? onProgress,
     Function(String fileName, int fileNumber, int total)? onFileProgress,
   }) async {
+    if (!FileOperationGate.instance.allowsMutation) {
+      return const FolderImportResult(
+          foldersCreated: 0,
+          filesImported: 0,
+          errors: ['File operation is no longer active']);
+    }
     final deviceDir = Directory(deviceFolderPath);
     if (!await deviceDir.exists()) {
       return FolderImportResult(
@@ -280,10 +296,15 @@ class FolderService {
         await addFileToFolder(importedFile.id, folder.id);
         filesImported++;
       }
+      if (importedFiles.length < totalFiles) {
+        errors.add(
+            '${totalFiles - importedFiles.length} file(s) could not be imported');
+      }
     }
 
     if (recursive) {
       for (final subPath in subfolderPaths) {
+        if (!FileOperationGate.instance.allowsMutation) break;
         final subResult = await importDeviceFolder(
           subPath,
           parentFolderId: folder.id,
@@ -291,6 +312,7 @@ class FolderService {
           deleteOriginals: deleteOriginals,
           encrypt: encrypt,
           isDecoy: isDecoy,
+          onFileProgress: onFileProgress,
         );
         foldersCreated += subResult.foldersCreated;
         filesImported += subResult.filesImported;

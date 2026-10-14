@@ -29,6 +29,8 @@ import 'utils/frame_rate_optimizer.dart';
 import 'utils/navigator_key.dart';
 import 'utils/performance_config.dart';
 import 'widgets/toast_host.dart';
+import 'widgets/operation_progress_host.dart';
+import 'providers/operation_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -81,13 +83,18 @@ class LatchApp extends ConsumerWidget {
 
     return MaterialApp(
       navigatorKey: navigatorKey,
+      navigatorObservers: [ref.watch(operationNavigatorObserverProvider)],
       debugShowCheckedModeBanner: false,
       title: 'Latch',
       theme: AppTheme.getLightTheme(accentColor),
       darkTheme: AppTheme.getDarkTheme(accentColor),
       themeMode: themeMode,
-      builder: (context, child) =>
-          ToastHost(child: child ?? const SizedBox.shrink()),
+      builder: (context, child) => ToastHost(
+        child: OperationProgressHost(
+          navigatorKey: navigatorKey,
+          child: child ?? const SizedBox.shrink(),
+        ),
+      ),
       home: ShareIntakeHost(
         child: SessionService.instance.isUnlocked
             ? const GalleryVaultScreen()
