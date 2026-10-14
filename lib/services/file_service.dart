@@ -11,6 +11,7 @@ import '../models/vaulted_file.dart';
 import 'compression_service.dart';
 import 'crypto_isolate_pool.dart';
 import 'encryption_service.dart';
+import 'file_operation_gate.dart';
 import 'sync_state_store.dart';
 import 'thumbnail_service.dart';
 import 'vault_store.dart';
@@ -24,6 +25,9 @@ class FileProgressInfo {
   final bool isEncrypting;
   final int encryptedBytes;
   final int totalBytes;
+  final int? completedFiles;
+  final int? batchProcessedBytes;
+  final int? batchTotalBytes;
 
   const FileProgressInfo({
     required this.current,
@@ -34,6 +38,9 @@ class FileProgressInfo {
     this.isEncrypting = false,
     this.encryptedBytes = 0,
     this.totalBytes = 0,
+    this.completedFiles,
+    this.batchProcessedBytes,
+    this.batchTotalBytes,
   });
 }
 
@@ -84,6 +91,7 @@ class FileService {
   final ThumbnailService _thumbnailService;
 
   FileService(this._store, this._encryptionService, this._thumbnailService);
+  FileOperationGate get _operationGate => FileOperationGate.instance;
 
   /// Late-bound to break a constructor cycle (TagService → FileService →
   /// TagService for tag-usage updates on import).
@@ -125,6 +133,7 @@ class FileService {
   /// entries and persisted on the file record.
   Future<String?> contentHashFor(VaultedFile file,
       {bool isDecoy = false}) async {
+    if (!_operationGate.canRead(file.id)) return null;
     if (file.contentHash != null) return file.contentHash;
 
     final payload = File(file.vaultPath);
@@ -189,6 +198,7 @@ class FileService {
     EncryptionAlgorithm? encryptionAlgorithm,
     int? kdfIterations,
   }) async {
+    if (!_operationGate.allowsMutation) return null;
     final prepared = await _prepareVaultAddition(
       sourcePath: sourcePath,
       originalName: originalName,
@@ -204,7 +214,10 @@ class FileService {
 
     if (prepared == null) return null;
 
-    await _storePreparedVaultAddition(prepared, deleteOriginal: deleteOriginal);
+    if (!await _storePreparedVaultAddition(prepared,
+        deleteOriginal: deleteOriginal)) {
+      return null;
+    }
 
     return prepared.vaultedFile;
   }
@@ -217,14 +230,22 @@ class FileService {
     Function(int current, int total)? onProgress,
     Function(FileProgressInfo)? onFileProgress,
   }) async {
+    if (!_operationGate.allowsMutation) return [];
     _store.cachedSettings ??= await _store.loadSettings();
     final results = <VaultedFile>[];
 
     int completed = 0;
+    final sizes = await Future.wait(
+        files.map((file) => _store.getFileSizeIfExists(file.sourcePath)));
+    final totalSize = sizes.fold<int>(0, (sum, size) => sum + size);
+    final processedBytes = <int, int>{};
+    int getProcessedBytes() =>
+        processedBytes.values.fold<int>(0, (sum, bytes) => sum + bytes);
 
     for (int start = 0;
         start < files.length;
         start += _maxConcurrentBatchAdds) {
+      if (!_operationGate.allowsMutation) break;
       final chunk = files
           .sublist(
             start,
@@ -239,8 +260,7 @@ class FileService {
 
       final preparedChunk = await Future.wait(
         chunk.map((entry) async {
-          final fileSize =
-              await _store.getFileSizeIfExists(entry.file.sourcePath);
+          final fileSize = sizes[entry.index];
           final fileEncrypt = entry.file.encrypt ?? encrypt;
           final fileShouldEncrypt = resolveEncryption(
             perFile: entry.file.encrypt,
@@ -256,6 +276,9 @@ class FileService {
             status: fileShouldEncrypt ? 'Encrypting 0%...' : 'Processing...',
             isEncrypting: fileShouldEncrypt,
             totalBytes: fileShouldEncrypt ? fileSize : 0,
+            completedFiles: completed,
+            batchProcessedBytes: getProcessedBytes(),
+            batchTotalBytes: totalSize,
           ));
 
           final prepared = await _prepareVaultAddition(
@@ -267,23 +290,29 @@ class FileService {
             isDecoy: isDecoy,
             encryptionAlgorithm: entry.file.encryptionAlgorithm,
             kdfIterations: entry.file.kdfIterations,
-            onEncryptionProgress: fileShouldEncrypt
-                ? (processed, total) {
-                    final pct = total > 0
-                        ? (processed / total * 100).toStringAsFixed(0)
-                        : '0';
-                    onFileProgress?.call(FileProgressInfo(
-                      current: entry.index + 1,
-                      total: files.length,
-                      fileName: entry.file.originalName,
-                      fileSize: fileSize,
-                      status: 'Encrypting $pct%...',
-                      isEncrypting: true,
-                      encryptedBytes: processed,
-                      totalBytes: total,
-                    ));
-                  }
-                : null,
+            onEncryptionProgress: (processed, total) {
+              processedBytes[entry.index] = total > 0
+                  ? (processed / total * fileSize).round().clamp(0, fileSize)
+                  : 0;
+              final pct = total > 0
+                  ? (processed / total * 100).toStringAsFixed(0)
+                  : '0';
+              onFileProgress?.call(FileProgressInfo(
+                current: entry.index + 1,
+                total: files.length,
+                fileName: entry.file.originalName,
+                fileSize: fileSize,
+                status: fileShouldEncrypt
+                    ? 'Encrypting $pct%...'
+                    : 'Copying $pct%...',
+                isEncrypting: fileShouldEncrypt,
+                encryptedBytes: processed,
+                totalBytes: total,
+                completedFiles: completed,
+                batchProcessedBytes: getProcessedBytes(),
+                batchTotalBytes: totalSize,
+              ));
+            },
           );
 
           return _BatchPreparationResult(
@@ -296,15 +325,19 @@ class FileService {
       );
 
       for (final preparedResult in preparedChunk) {
+        bool stored = false;
         if (preparedResult.prepared != null) {
-          await _storePreparedVaultAddition(
+          stored = await _storePreparedVaultAddition(
             preparedResult.prepared!,
             deleteOriginal: deleteOriginals,
           );
-          results.add(preparedResult.prepared!.vaultedFile);
+          if (stored) results.add(preparedResult.prepared!.vaultedFile);
         }
 
         completed++;
+        if (stored) {
+          processedBytes[preparedResult.index] = preparedResult.fileSize;
+        }
         onProgress?.call(completed, files.length);
 
         onFileProgress?.call(FileProgressInfo(
@@ -312,8 +345,11 @@ class FileService {
           total: files.length,
           fileName: preparedResult.file.originalName,
           fileSize: preparedResult.fileSize,
-          status: preparedResult.prepared != null ? 'Complete' : 'Failed',
+          status: stored ? 'Complete' : 'Failed',
           isEncrypting: false,
+          completedFiles: completed,
+          batchProcessedBytes: getProcessedBytes(),
+          batchTotalBytes: totalSize,
         ));
       }
     }
@@ -339,6 +375,7 @@ class FileService {
     Uint8List? compressedImageBytes;
 
     try {
+      if (!_operationGate.allowsMutation) return null;
       final sourceFile = File(sourcePath);
       if (!await sourceFile.exists()) {
         debugPrint('Source file does not exist: $sourcePath');
@@ -367,6 +404,7 @@ class FileService {
         }
       }
 
+      if (!_operationGate.allowsMutation) return null;
       final directory = isDecoy
           ? await _store.ensureDecoyDirectory()
           : await _store.ensureVaultDirectory();
@@ -393,6 +431,7 @@ class FileService {
         final salt = _encryptionService.generateFileSalt();
         final masterKey =
             await _encryptionService.getMasterKey(isDecoy: isDecoy);
+        if (!_operationGate.allowsMutation) return null;
         derivedKey = await _encryptionService.deriveFileKeyAsync(
             masterKey, salt, iterations);
         usedAlgorithm = algorithm;
@@ -400,6 +439,7 @@ class FileService {
         usedKdfIterations = iterations;
       }
 
+      if (!_operationGate.allowsMutation) return null;
       if (compressedImageBytes != null) {
         fileSize = compressedImageBytes.length;
 
@@ -472,10 +512,15 @@ class FileService {
           encryptionIv = encResult.iv;
           fileSize = encResult.originalSize ?? fileSize;
         } else {
-          await _store.streamCopyFile(sourceFileForProcessing, File(vaultPath));
+          await _store.streamCopyFile(sourceFileForProcessing, File(vaultPath),
+              onProgress: onEncryptionProgress);
         }
       }
 
+      if (!_operationGate.allowsMutation) {
+        await _store.deleteFileIfExists(vaultPath);
+        return null;
+      }
       final normalizedTags = (tags ?? [])
           .map((tag) => tag.toLowerCase().trim())
           .where((tag) => tag.isNotEmpty)
@@ -570,18 +615,29 @@ class FileService {
     }
   }
 
-  Future<void> _storePreparedVaultAddition(
+  Future<bool> _storePreparedVaultAddition(
     _PreparedVaultAddition prepared, {
     required bool deleteOriginal,
   }) async {
     final vaultedFile = prepared.vaultedFile;
+    Future<bool> discard() async {
+      await _store.deleteFileIfExists(vaultedFile.vaultPath);
+      if (vaultedFile.thumbnailPath != null) {
+        await _store.deleteFileIfExists(vaultedFile.thumbnailPath!);
+      }
+      return false;
+    }
+
+    if (!_operationGate.allowsMutation) return discard();
 
     if (vaultedFile.isDecoy) {
       _store.cachedDecoyFiles ??= await _store.loadFileIndex(isDecoy: true);
+      if (!_operationGate.allowsMutation) return discard();
       _store.cachedDecoyFiles!.add(vaultedFile);
       await _store.saveFileIndex(isDecoy: true);
     } else {
       _store.cachedFiles ??= await _store.loadFileIndex();
+      if (!_operationGate.allowsMutation) return discard();
       _store.cachedFiles!.add(vaultedFile);
       await _store.saveFileIndex();
 
@@ -605,15 +661,17 @@ class FileService {
       }
     }
 
-    if (!deleteOriginal || vaultedFile.originalPath == null) {
-      return;
+    if (!deleteOriginal ||
+        vaultedFile.originalPath == null ||
+        !_operationGate.allowsMutation) {
+      return true;
     }
 
     final originalFile = File(vaultedFile.originalPath!);
     bool deleted = false;
 
     try {
-      if (await originalFile.exists()) {
+      if (await originalFile.exists() && _operationGate.allowsMutation) {
         await originalFile.delete();
         deleted = true;
       } else {
@@ -623,7 +681,7 @@ class FileService {
       debugPrint('Could not delete original file: $e');
     }
 
-    if (!deleted) {
+    if (!deleted && _operationGate.allowsMutation) {
       try {
         if (await originalFile.exists()) {
           debugPrint(
@@ -643,11 +701,14 @@ class FileService {
             'WARNING: Could not delete original file from device storage: ${vaultedFile.originalPath}');
       }
     } catch (_) {}
+    return true;
   }
 
   Future<VaultedFile?> updateFile(VaultedFile updatedFile) async {
+    if (!_operationGate.allowsMutation) return null;
     try {
       final files = await _store.loadFileIndex(isDecoy: updatedFile.isDecoy);
+      if (!_operationGate.allowsMutation) return null;
       final index = files.indexWhere((f) => f.id == updatedFile.id);
 
       if (index == -1) return null;
@@ -714,6 +775,7 @@ class FileService {
   }
 
   Future<bool> removeFile(String fileId, {bool isDecoy = false}) async {
+    if (!_operationGate.allowsMutation) return false;
     try {
       final files = await _store.loadFileIndex(isDecoy: isDecoy);
       final fileIndex = files.indexWhere((f) => f.id == fileId);
@@ -722,6 +784,7 @@ class FileService {
 
       final file = files[fileIndex];
 
+      if (!_operationGate.allowsMutation) return false;
       await _deleteFilePayload(file);
       if (!isDecoy) await SyncStateStore.recordDeletion(file.id);
 
@@ -762,9 +825,13 @@ class FileService {
   Future<BulkDeleteResult> removeFiles(
     List<String> fileIds, {
     bool isDecoy = false,
-    void Function(int current, int total, {int currentSize, int totalSize})?
+    void Function(int current, int total,
+            {int currentSize, int totalSize, String? currentFileName})?
         onProgress,
   }) async {
+    if (!_operationGate.allowsMutation) {
+      return BulkDeleteResult(removed: const [], failed: List.of(fileIds));
+    }
     final fileIndex = await _store.loadFileIndex(isDecoy: isDecoy);
     final idSet = fileIds.toSet();
     final filesToDelete = fileIndex.where((f) => idSet.contains(f.id)).toList();
@@ -773,10 +840,24 @@ class FileService {
     final albumUpdates = <String, Set<String>>{};
     final folderUpdates = <String, Set<String>>{};
     final removedIds = <String>[];
-    final failedIds = <String>[];
+    final foundIds = filesToDelete.map((file) => file.id).toSet();
+    final failedIds = fileIds.where((id) => !foundIds.contains(id)).toList();
     int currentSize = 0;
 
     for (final file in filesToDelete) {
+      if (!_operationGate.allowsMutation) {
+        failedIds.add(file.id);
+        continue;
+      }
+      // Announce the file before its payload work starts so large deletions
+      // show a name while they run, not only after they finish.
+      onProgress?.call(
+        removedIds.length + failedIds.length,
+        fileIds.length,
+        currentSize: currentSize,
+        totalSize: totalSize,
+        currentFileName: file.originalName,
+      );
       try {
         await _deleteFilePayload(file);
         if (!isDecoy) await SyncStateStore.recordDeletion(file.id);
@@ -802,6 +883,7 @@ class FileService {
         fileIds.length,
         currentSize: currentSize,
         totalSize: totalSize,
+        currentFileName: file.originalName,
       );
     }
 
@@ -883,10 +965,14 @@ class FileService {
     Function(int processed, int total)? onProgress,
     CancelToken? cancelToken,
   }) async {
+    if (!_operationGate.canRead(fileId)) return null;
     final generation = _encryptionService.cacheGeneration;
-    if (!_encryptionService.isCurrentSession(generation)) return null;
+    if (!_encryptionService.isCurrentSession(generation) ||
+        !_operationGate.canRead(fileId)) {
+      return null;
+    }
     final vaultedFile = await getFileById(fileId, isDecoy: isDecoy);
-    if (vaultedFile == null) return null;
+    if (vaultedFile == null || !_operationGate.canRead(fileId)) return null;
 
     final file = File(vaultedFile.vaultPath);
     if (!await file.exists()) return null;
@@ -902,7 +988,8 @@ class FileService {
       final derivedKey = await deriveKeyForFile(vaultedFile, isDecoy: isDecoy);
 
       if (cancelToken?.isCancelled == true ||
-          !_encryptionService.isCurrentSession(generation)) {
+          !_encryptionService.isCurrentSession(generation) ||
+          !_operationGate.canRead(fileId)) {
         return null;
       }
 
@@ -935,7 +1022,8 @@ class FileService {
         );
       }
 
-      if (!_encryptionService.isCurrentSession(generation)) {
+      if (!_encryptionService.isCurrentSession(generation) ||
+          !_operationGate.canRead(fileId)) {
         await _store.deleteFileIfExists(tempPath);
         await _store.deleteFileIfExists('$tempPath.tmp');
         return null;
@@ -953,13 +1041,15 @@ class FileService {
 
   Future<Uint8List?> getDecryptedFileData(String fileId,
       {bool isDecoy = false}) async {
+    if (!_operationGate.canRead(fileId)) return null;
     final generation = _encryptionService.cacheGeneration;
     if (!_encryptionService.isCurrentSession(generation)) return null;
     final vaultedFile = await getFileById(fileId, isDecoy: isDecoy);
-    if (vaultedFile == null) return null;
+    if (vaultedFile == null || !_operationGate.canRead(fileId)) return null;
 
     if (vaultedFile.isEncrypted && vaultedFile.encryptionIv != null) {
       final derivedKey = await deriveKeyForFile(vaultedFile, isDecoy: isDecoy);
+      if (!_operationGate.canRead(fileId)) return null;
       final result = await _encryptionService.decryptStreamedFileToMemory(
         vaultedFile.vaultPath,
         vaultedFile.encryptionIv!,
@@ -969,7 +1059,8 @@ class FileService {
 
       if (result.success && result.data != null) {
         await updateFile(vaultedFile.markViewed());
-        if (!_encryptionService.isCurrentSession(generation)) {
+        if (!_encryptionService.isCurrentSession(generation) ||
+            !_operationGate.canRead(fileId)) {
           result.data!.fillRange(0, result.data!.length, 0);
           return null;
         }
@@ -983,7 +1074,8 @@ class FileService {
 
     await updateFile(vaultedFile.markViewed());
     final bytes = await file.readAsBytes();
-    if (!_encryptionService.isCurrentSession(generation)) {
+    if (!_encryptionService.isCurrentSession(generation) ||
+        !_operationGate.canRead(fileId)) {
       bytes.fillRange(0, bytes.length, 0);
       return null;
     }
@@ -996,12 +1088,16 @@ class FileService {
     bool isDecoy = false,
     Function(int processed, int total)? onProgress,
   }) async {
+    if (!_operationGate.allowsMutation || !_operationGate.canRead(fileId)) {
+      return null;
+    }
     try {
       final vaultedFile = await getFileById(fileId, isDecoy: isDecoy);
       if (vaultedFile == null) return null;
 
       final sourceFile = File(vaultedFile.vaultPath);
       if (!await sourceFile.exists()) return null;
+      if (!_operationGate.allowsMutation) return null;
 
       if (vaultedFile.isEncrypted && vaultedFile.encryptionIv != null) {
         final format =
@@ -1009,6 +1105,7 @@ class FileService {
         final isLegacyCbc = (format == 0 || format == 3);
         final derivedKey =
             await deriveKeyForFile(vaultedFile, isDecoy: isDecoy);
+        if (!_operationGate.allowsMutation) return null;
 
         FileDecryptionResult result;
         if (isLegacyCbc) {
@@ -1041,6 +1138,10 @@ class FileService {
           );
         }
 
+        if (!_operationGate.allowsMutation) {
+          await _store.deleteFileIfExists(destinationPath);
+          return null;
+        }
         if (result.success && result.decryptedPath != null) {
           return File(result.decryptedPath!);
         }
@@ -1049,6 +1150,10 @@ class FileService {
 
       await _store.streamCopyFile(sourceFile, File(destinationPath),
           onProgress: onProgress);
+      if (!_operationGate.allowsMutation) {
+        await _store.deleteFileIfExists(destinationPath);
+        return null;
+      }
       return File(destinationPath);
     } catch (e) {
       debugPrint('Error exporting file: $e');
@@ -1064,6 +1169,7 @@ class FileService {
         onProgress,
     Set<String>? fileFilter,
   }) async {
+    if (!_operationGate.allowsMutation) return -1;
     try {
       final files = isDecoy
           ? (await getAllFiles(isDecoy: true))
@@ -1123,6 +1229,7 @@ class FileService {
       int reEncryptedCount = 0;
 
       for (int i = 0; i < encryptedFiles.length; i++) {
+        if (!_operationGate.allowsMutation) break;
         final file = encryptedFiles[i];
         onProgress?.call(i, encryptedFiles.length, file.originalName,
             processedBytes, totalBytes);
@@ -1171,6 +1278,7 @@ class FileService {
             isDecoy: isDecoy || file.isDecoy);
         final newDerivedKey = await _encryptionService.deriveFileKeyAsync(
             masterKey, newSalt, newIterations);
+        if (!_operationGate.allowsMutation) break;
 
         final baseBytes = processedBytes;
         final halfBytes = file.fileSize ~/ 2;
@@ -1230,6 +1338,11 @@ class FileService {
       await _store.delete(VaultStore.reEncryptJournalKey);
       return reEncryptedCount;
     } catch (e) {
+      // Earlier atomic rewrites must retain their matching metadata even if a
+      // later file fails or the session locks while the worker is running.
+      try {
+        await _store.saveFileIndex(isDecoy: isDecoy);
+      } catch (_) {}
       debugPrint('Re-encryption error: $e');
       return -1;
     }
@@ -1243,6 +1356,7 @@ class FileService {
         onProgress,
     Set<String>? fileFilter,
   }) async {
+    if (!_operationGate.allowsMutation) return -1;
     try {
       final files = await getAllFiles(isDecoy: isDecoy);
       var targets = files.where((f) => !f.isEncrypted).toList();
@@ -1257,6 +1371,7 @@ class FileService {
       var count = 0;
 
       for (int i = 0; i < targets.length; i++) {
+        if (!_operationGate.allowsMutation) break;
         final file = targets[i];
         onProgress?.call(
             i, targets.length, file.originalName, processedBytes, totalBytes);
@@ -1270,6 +1385,7 @@ class FileService {
             isDecoy: isDecoy || file.isDecoy);
         final derivedKey = await _encryptionService.deriveFileKeyAsync(
             masterKey, salt, iterations);
+        if (!_operationGate.allowsMutation) break;
 
         final baseBytes = processedBytes;
         final newIv = await _encryptionService.encryptFileInPlace(
@@ -1317,6 +1433,7 @@ class FileService {
         onProgress,
     Set<String>? fileFilter,
   }) async {
+    if (!_operationGate.allowsMutation) return -1;
     try {
       final files = await getAllFiles(isDecoy: isDecoy);
       var targets = files.where((f) => f.isEncrypted).toList();
@@ -1330,6 +1447,7 @@ class FileService {
       var count = 0;
 
       for (int i = 0; i < targets.length; i++) {
+        if (!_operationGate.allowsMutation) break;
         final file = targets[i];
         onProgress?.call(
             i, targets.length, file.originalName, processedBytes, totalBytes);
@@ -1343,6 +1461,7 @@ class FileService {
         }
 
         final derivedKey = await deriveKeyForFile(file, isDecoy: isDecoy);
+        if (!_operationGate.allowsMutation) break;
 
         final baseBytes = processedBytes;
         await _encryptionService.decryptFileInPlace(
