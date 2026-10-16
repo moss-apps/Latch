@@ -12,13 +12,14 @@ These are non-negotiable; changes that violate them will not be merged:
 - **No cloud.** No backend service, account, sync, telemetry, or analytics.
   Network traffic is limited to loopback `latchd` pairing/backup, sync the user
   explicitly configured (PocketBase/WebDAV/SMB), and Play Store updates.
-- **Media leaves the device encrypted.** Vault backups and sync carry
-  ciphertext only.
+- **Preserve encryption choices.** Sync and desktop backup carry payloads as
+  stored, including hidden, unencrypted files. Never claim hiding is encryption.
+  Local ZIP export deliberately decrypts files; disclose that boundary.
 - **Secrets never leave secure storage.** PINs, passwords, and keys go through
   `flutter_secure_storage` (Android Keystore) only — never into logs, prefs,
   plaintext files, or crash output.
-- **Security defaults stay on.** Auto-kill and screenshot protection must not
-  be silently weakened.
+- **Preserve security settings.** Auto-kill defaults on; file encryption and
+  screenshot protection default off. Do not silently change saved choices.
 - **Android, `arm64-v8a`** for the embedded PocketBase sidecar. Adding ABIs is
   a deliberate decision, not a drive-by change.
 
@@ -26,8 +27,9 @@ These are non-negotiable; changes that violate them will not be merged:
 
 - Flutter 3.47.2 (stable) — the version pinned in CI
 - Dart SDK `>=3.4.4` (ships with Flutter)
-- Android SDK API 36, JDK 17; a device or emulator running API 26+
-- Go 1.25.x for `latchd` and the PocketBase sidecar
+- JDK 17 and Android SDK/NDK versions required by the pinned Flutter/Gradle
+  configuration; a device or emulator running API 26+
+- Go 1.27+ for the PocketBase sidecar; Go 1.26+ for `latchd` (see each `go.mod`)
 - Node (only for `latchd/web-src` UI work)
 
 ## Setup

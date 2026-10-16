@@ -1,7 +1,7 @@
 # Latch
 
 <p align="center">
-  <img src="assets/banner_locker.png" alt="Latch Banner" width="100%">
+  <img src="assets/banner_locker.webp" alt="Latch Banner" width="100%">
 </p>
 
 <p align="center">
@@ -12,10 +12,11 @@
 
 ---
 
-Latch is a private media vault for Android, written in Flutter. It hides
-photos, videos, and documents behind PIN/password/biometric auth, encrypts
-them with AES-256, and removes itself from the recents list when you leave
-(auto-kill).
+Latch is a private vault for Android, written in Flutter. It hides photos,
+videos, audio, documents, notes, and passwords behind PIN/password/biometric
+authentication. **Hiding is the default; file encryption is an explicit
+opt-in**, globally or per file. Session locking and optional background
+auto-kill control what happens when you leave the app.
 
 > On Google Play: [Download Latch](https://play.google.com/store/apps/details?id=com.mossapps.locker).
 
@@ -23,15 +24,29 @@ them with AES-256, and removes itself from the recents list when you leave
 
 **Vault**
 - Import from gallery, camera, or files; optionally delete the originals
+- Share file attachments to Latch from other Android apps (sources stay intact)
 - Duplicate detection on import
 - Per-file encryption settings and compression
-- Local backup and restore
+- Local ZIP backup/restore, desktop backup/restore, and manual WebDAV sync
+- Recently Deleted: local recovery for 30 days by default; choose 7/30/90 days
+  or immediate deletion, restore before expiry, or explicitly delete permanently
 
 **Organization**
 - Nested folders with drag-and-drop, breadcrumbs, and a tree view
 - Albums, color-coded tags, favorites
 - Grid/list explorer with filters, multi-select, sorting (date, name, size, type)
 - Search across name, tags, type, and date
+- Saved smart collections, including Untagged, Unencrypted, and Large Videos
+- Customizable bottom navigation with scrolling labels at narrow widths or large text sizes
+
+**Notes and passwords**
+- Plain-text and Markdown notes, with encryption choices and dedicated editors
+- Password entries with a dedicated editor and Android Autofill integration
+- To fill stored logins in other apps, choose **Latch** as the Android Autofill
+  service in system settings (usually Passwords & accounts → Autofill service)
+- Separately, optional **Autofill Credential** in Latch Security settings lets an
+  external password manager fill the *vault unlock* field; it is off by default
+  and is not the same feature as filling stored logins
 
 **Viewing**
 - Image viewer (pinch-zoom, slideshow)
@@ -42,13 +57,47 @@ them with AES-256, and removes itself from the recents list when you leave
 
 **Security**
 - PIN or password unlock, with biometrics
-- AES-256-GCM (default) or AES-256-CTR, with re-encryption of existing files
+- AES-256-GCM (default algorithm when encryption is enabled) or AES-256-CTR,
+  with re-encryption of existing files; explicit per-file choices override the global default
 - Argon2id master-key wrapping; per-file PBKDF2
-- Auto-kill, screenshot protection, secure delete
+- Inactivity/background session locking, Lock now, configurable auto-kill and screenshot protection
+- Best-effort secure deletion when permanently removing vault bytes or source files;
+  this does not guarantee erasure from flash storage
 - Decoy vault behind a separate PIN
 
 **Theme**
 - Accent colors, custom theming, glassmorphism unlock screen
+
+## Recovery and backups
+
+Open **Recently Deleted** from the vault drawer or Settings → Storage. Deleted
+items leave active lists, search, and password Autofill but still consume local
+storage, including thumbnails. Retention changes affect future deletions only.
+Expiry cleanup runs while unlocked and on the next unlock/resume, not as a
+guaranteed OS background job. New ZIP and desktop backups exclude trash.
+
+Deletion records a WebDAV tombstone locally for the next sync; restoring makes
+the item eligible to sync again. Permanent deletion/expiry removes local bytes,
+**not existing backups or retained remote blobs**. See the
+[recovery policy](docs/recently_deleted.md) for interrupted-operation handling,
+storage accounting, and sync conflicts. Keep an external backup: uninstalling or
+clearing app data removes the local vault and Recently Deleted.
+
+## WebDAV sync
+
+Settings → Storage → **Server Sync** connects the main vault to a user-chosen
+WebDAV server in push-only backup or two-way mode. Sync is manual, streams file
+transfers, reports byte progress, supports cancellation, and asks for review when
+versions conflict. The server must support the tested publication guards; unsafe
+servers are rejected rather than silently risking an overwrite.
+
+The manifest is encrypted, but **payloads are uploaded as stored**: hidden-only
+files remain unencrypted on the server. Enable file encryption if that is not
+acceptable. Prefer HTTPS; HTTP requires an explicit warning and is unsuitable
+for untrusted networks. WebDAV does not upload the vault master key, so a fresh
+device needs key continuity via desktop restore and the original vault credential.
+Album/folder definitions and smart-collection definitions do not sync. Details:
+[WebDAV design and recovery limits](docs/local_server_sync.md).
 
 ## Moss Ecosystem
 
@@ -61,9 +110,12 @@ return via `locker://return`. Details in the
 
 `latchd` is a tiny companion you run on your desktop. It hosts a local
 web UI (`http://127.0.0.1:7800`, loopback only), shows a pairing QR, and
-receives encrypted vault backups from the phone over Wi-Fi or USB — no
-server, no accounts, ciphertext only in transit. It can also browse,
-verify, restore, and export-decrypt a backup.
+receives vault backups from the phone over Wi-Fi or USB without a hosted
+account. The manifest/key bundle is encrypted; file payloads keep their existing
+encryption state, so hidden-only files are **not** made encrypted by backup.
+The pairing receiver uses token-gated HTTP, not TLS: use a trusted LAN or USB,
+especially for unencrypted files. It can also browse, verify, restore, and
+export-decrypt a backup.
 
 ### Installation
 
@@ -81,7 +133,7 @@ directory), `LATCHD_VERSION` (pin a release tag, e.g. `0.18.0-beta.1`),
 **Windows** — download `latchd-windows-amd64.exe` from
 [releases](https://github.com/moss-apps/Latch/releases).
 
-**From source** — needs Go; no repo clone required for the installer
+**From source** — needs Go 1.26+ and Make; no repo clone required for the installer
 paths above:
 
 ```bash
@@ -155,15 +207,31 @@ Full spec: [docs/desktop_backup.md](docs/desktop_backup.md).
 
 ## Getting Started
 
-**Prerequisites:** Flutter 3.4.4+, Android SDK API 36, JDK 17, Android 8.0 (API 26)+ device.
+**Android app prerequisites**
+
+- Flutter **3.47.2 stable** (the CI version; bundled Dart 3.13.2). The
+  `pubspec.yaml` Dart constraint is `>=3.4.4 <4.0.0`, not a Flutter version requirement.
+- JDK 17 and the Android SDK/NDK required by that Flutter toolchain; compile/target
+  SDK and NDK versions come from Flutter's Gradle configuration.
+- Android 8.0 (API 26)+ device/emulator. The bundled PocketBase sidecar build
+  currently targets **arm64-v8a**; rebuilding it needs **Go 1.27+** and Make
+  (`pocketbase/go.mod`). `make pb-linux` is available for host-side development.
+- For release signing, configure your own untracked `android/key.properties`
+  and keystore; never commit signing secrets or private symbol files.
 
 ```bash
 flutter pub get
+make pb                                      # rebuild ARM64 sidecar when needed
 flutter run                                  # debug
 flutter run -d <device-id>                   # specific device
 flutter build apk --release --obfuscate --split-debug-info=./build/symbols
 flutter pub run flutter_launcher_icons       # regenerate icons (optional)
 ```
+
+Checks: `dart format --output=none --set-exit-if-changed lib test`,
+`flutter analyze --no-pub`, and `flutter test --no-pub`. Building `latchd` is
+separate from the Android app and needs Go 1.26+; Node is only needed to rebuild
+its web assets with `make latchd-web`, not to use the committed embedded assets.
 
 ## Permissions
 
@@ -181,14 +249,19 @@ flutter pub run flutter_launcher_icons       # regenerate icons (optional)
 Service-based, split into four layers: **Services** (auth, encryption,
 file ops, media), **Providers** (Riverpod reactive state), **Screens**
 (feature UI), and a **Kotlin backend** (auto-kill, permissions, camera).
-All sensitive data (PINs, passwords, keys) goes through
-`flutter_secure_storage` into Android's Keystore. See
+Credentials/key wraps and recovery metadata use `flutter_secure_storage`
+backed by Android platform security. Payload encryption follows the file's
+chosen policy. Gallery picker coordination, drawer, thumbnails, and filtering
+are separate components/services rather than one screen. See
 [Media Encryption & Compression](docs/architecture_media.md).
 
 ## Documentation
 
 - [Media Encryption & Compression](docs/architecture_media.md): compression, encryption, file ops
 - [Unlock Autofill](docs/unlock_autofill.md): unlock credential autofill and its security model
+- [WebDAV Sync](docs/local_server_sync.md): setup model, server requirements, conflicts, and key continuity
+- [Recently Deleted](docs/recently_deleted.md): retention, permanent deletion, backup, and sync policy
+- [Phase 5 Device Checks](docs/phase5_testing.md): recovery, accessibility, and gallery regression checklist
 - [Flick Integration Guide](docs/flick_integration.md): Flick playback handoff contract
 
 ## Contributing
