@@ -38,6 +38,7 @@ class SyncEngine {
     SyncControl? control,
     SyncCheckpoint checkpoint = const SyncCheckpoint(),
     Map<String, DateTime> deletions = const {},
+    Set<String> retainedLocalIds = const {},
     SyncStateStore? stateStore,
     String? target,
   }) async {
@@ -88,11 +89,11 @@ class SyncEngine {
       hashed++;
     }
     // A missing index entry alone is not proof that the user deleted it.
-    for (final baseline in checkpoint.baseline.values) {
-      if (!files.containsKey(baseline.id) &&
-          deletions.containsKey(baseline.id)) {
-        localEntries[baseline.id] = baseline.copyWith(
-            deleted: true, modifiedAt: deletions[baseline.id]);
+    for (final id in deletions.keys) {
+      final evidence = checkpoint.baseline[id] ?? remoteEntries[id];
+      if (!files.containsKey(id) && evidence != null) {
+        localEntries[id] =
+            evidence.copyWith(deleted: true, modifiedAt: deletions[id]);
       }
     }
 
@@ -124,7 +125,13 @@ class SyncEngine {
         }
         continue;
       }
+      final restoredAt = DateTime.tryParse(
+          files[entry.id]?.metadata?['restoredAt'] as String? ?? '');
+      final restoredSinceBaseline = restoredAt != null &&
+          baseline != null &&
+          restoredAt.isAfter(baseline.modifiedAt);
       final localChanged = baseline == null ||
+          restoredSinceBaseline ||
           syncFingerprint(entry) != syncFingerprint(baseline);
       final remoteChanged = baseline == null ||
           syncFingerprint(other) != syncFingerprint(baseline);
@@ -151,6 +158,12 @@ class SyncEngine {
           pushes.add(files[entry.id]!);
         }
       } else if (twoWay || choice != null) {
+        // Recovery owns this ID until the user restores or purges it. Never
+        // download a same-ID version behind an authoritative local receipt.
+        if (!other.deleted && retainedLocalIds.contains(entry.id)) {
+          conflicts.add(SyncConflict(local: entry, remote: other));
+          continue;
+        }
         agreed[entry.id] = other;
         if (other.deleted) {
           localDeletes.add(entry.id);
@@ -194,6 +207,15 @@ class SyncEngine {
         if (!files.containsKey(entry.id) &&
             !localEntries.containsKey(entry.id) &&
             !entry.deleted) {
+          // A receipt can survive a failed tombstone write. It is still
+          // explicit deletion evidence, never permission to pull over it.
+          if (retainedLocalIds.contains(entry.id)) {
+            conflicts.add(SyncConflict(
+                local: entry.copyWith(
+                    deleted: true, modifiedAt: deletions[entry.id] ?? date),
+                remote: entry));
+            continue;
+          }
           pulls.add(entry);
           agreed[entry.id] = entry;
         }

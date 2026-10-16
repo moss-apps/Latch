@@ -35,7 +35,17 @@ class FileOperationGate {
 
   FileOperationLease? acquire(Set<String> fileIds) {
     if (isBusy) return null;
-    return _active = FileOperationLease._(Set.unmodifiable(fileIds));
+    return _active = FileOperationLease._(Set.of(fileIds));
+  }
+
+  /// Nested maintenance discovers ids after acquiring the mutation gate.
+  /// Extend its read reservation before moving or overwriting those files.
+  void reserveFileIds(Iterable<String> fileIds) {
+    final caller = Zone.current[_zoneKey] as FileOperationLease?;
+    if (caller == null || !caller.isValid || !identical(caller, _active)) {
+      throw StateError('No active file operation');
+    }
+    caller._fileIds.addAll(fileIds);
   }
 
   Future<T> run<T>(FileOperationLease lease, Future<T> Function() task) async {
@@ -57,8 +67,9 @@ class FileOperationGate {
 }
 
 class FileOperationLease {
-  FileOperationLease._(this.fileIds);
-  final Set<String> fileIds;
+  FileOperationLease._(this._fileIds);
+  final Set<String> _fileIds;
+  Set<String> get fileIds => Set.unmodifiable(_fileIds);
   final Completer<void> _done = Completer<void>();
   bool isValid = true;
 

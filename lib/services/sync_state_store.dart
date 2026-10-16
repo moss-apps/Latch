@@ -60,6 +60,19 @@ class SyncStateStore {
     return write;
   }
 
+  static Future<void> clearDeletion(String id) {
+    final write = _deletionWrite.then((_) async {
+      final saved = await deletions();
+      saved.remove(id);
+      await _storage.write(
+          key: _deletionsKey,
+          value: jsonEncode(
+              saved.map((id, date) => MapEntry(id, date.toIso8601String()))));
+    });
+    _deletionWrite = write.catchError((Object _) {});
+    return write;
+  }
+
   static String targetId(SyncProfile profile) => sha256
       .convert(utf8.encode('${profile.serverUrl.replaceAll(RegExp(r'/+$'), '')}'
           '|${profile.basePath.replaceAll(RegExp(r'/+$'), '')}|${profile.username}'))

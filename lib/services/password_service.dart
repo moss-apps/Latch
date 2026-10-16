@@ -48,7 +48,13 @@ class PasswordService {
   Future<List<PasswordEntry>> loadPasswords({bool isDecoy = false}) async {
     final generation = _cacheGeneration;
     final cached = _caches[isDecoy];
-    if (cached != null) return cached;
+    if (cached != null) {
+      final visible = await _visiblePasswords(cached, isDecoy);
+      if (generation != _cacheGeneration) {
+        throw StateError('Passwords session changed');
+      }
+      return _caches[isDecoy] = visible;
+    }
     final json = await _secureStorage.read(
       key: isDecoy ? _decoyIndexKey : _indexKey,
     );
@@ -60,14 +66,27 @@ class PasswordService {
     }
     try {
       final List<dynamic> decoded = jsonDecode(json) as List<dynamic>;
-      return _caches[isDecoy] = decoded
+      final entries = decoded
           .map((e) => PasswordEntry.fromJson(e as Map<String, dynamic>))
           .toList();
+      final visible = await _visiblePasswords(entries, isDecoy);
+      if (generation != _cacheGeneration) {
+        throw StateError('Passwords session changed');
+      }
+      return _caches[isDecoy] = visible;
     } catch (e) {
       // ponytail: a corrupt index must throw, an empty list here would
       // silently overwrite every entry on the next _save
       throw Exception('Password index is corrupt: $e');
     }
+  }
+
+  Future<List<PasswordEntry>> _visiblePasswords(
+      List<PasswordEntry> entries, bool decoy) async {
+    final records = await VaultService.instance.store.visibleEditorRecords(
+        entries.map((e) => e.toJson()).toList(), 'passwordId',
+        isDecoy: decoy);
+    return records.map(PasswordEntry.fromJson).toList();
   }
 
   Future<void> _save({bool isDecoy = false}) async {
@@ -279,25 +298,22 @@ class PasswordService {
 
   Future<void> deletePassword(PasswordEntry entry,
       {bool isDecoy = false}) async {
-    await loadPasswords(isDecoy: isDecoy);
-    await _encryptionService.secureDelete(entry.encryptedContentPath);
-    _caches[isDecoy]!.removeWhere((e) => e.id == entry.id);
-    await _save(isDecoy: isDecoy);
-    await VaultService.instance.removePasswordEntry(entry.id, isDecoy: isDecoy);
+    final files = await VaultService.instance.getAllFiles(isDecoy: isDecoy);
+    final file =
+        files.where((f) => f.metadata?['passwordId'] == entry.id).firstOrNull;
+    if (file == null ||
+        !await VaultService.instance.removeFile(file.id, isDecoy: isDecoy)) {
+      clearCache();
+      throw StateError(
+          'Password deletion could not finish. Retry in Recently Deleted.');
+    }
+    clearCache();
   }
 
   Future<void> deletePasswords(List<PasswordEntry> entries,
       {bool isDecoy = false}) async {
-    await loadPasswords(isDecoy: isDecoy);
     for (final entry in entries) {
-      await _encryptionService.secureDelete(entry.encryptedContentPath);
-    }
-    final ids = entries.map((e) => e.id).toSet();
-    _caches[isDecoy]!.removeWhere((e) => ids.contains(e.id));
-    await _save(isDecoy: isDecoy);
-    for (final entry in entries) {
-      await VaultService.instance
-          .removePasswordEntry(entry.id, isDecoy: isDecoy);
+      await deletePassword(entry, isDecoy: isDecoy);
     }
   }
 

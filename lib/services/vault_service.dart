@@ -15,6 +15,9 @@ import 'encryption_service.dart';
 import 'file_service.dart';
 import 'file_operation_gate.dart';
 import 'folder_service.dart';
+import 'note_service.dart';
+import 'password_service.dart';
+import 'recently_deleted_service.dart';
 import 'pb/migrate_legacy_index.dart';
 import 'pb/pocketbase_runtime.dart';
 import 'pb/pocketbase_store.dart';
@@ -57,6 +60,7 @@ class VaultService {
   late final SearchService _search = SearchService(_store);
   late final StatsService _stats = StatsService(_store);
   late final SettingsService _settings = SettingsService(_store);
+  RecentlyDeletedService get recentlyDeleted => _files.recentlyDeleted;
 
   // Wire late back-edges once everything's constructed. Tests hit this via
   // the implicit first call to any forwarded method.
@@ -66,6 +70,7 @@ class VaultService {
     _thumbnails.fileService = _files;
     _files.updateTagUsage = _tags.updateTagUsage;
     _files.removeFileFromAlbumFn = _albums.removeFileFromAlbum;
+    _files.recentlyDeleted.onChanged = clearEditorCaches;
     _wired = true;
   }
 
@@ -203,6 +208,12 @@ class VaultService {
               ),
           BulkDeleteResult(removed: const [], failed: List.of(fileIds)),
           fileIds: fileIds.toSet());
+
+  void clearEditorCaches() {
+    NoteService.instance.clearCache();
+    PasswordService.instance.clearCache();
+    clearThumbnailCache();
+  }
 
   Future<List<VaultedFile>> getAllFiles({bool isDecoy = false}) =>
       _files.getAllFiles(isDecoy: isDecoy);

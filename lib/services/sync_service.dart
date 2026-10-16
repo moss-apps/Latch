@@ -177,6 +177,13 @@ class SyncService {
     final local = List<VaultedFile>.of(await _store.loadFileIndex());
     final checkpoint = await stateStore.load(target);
     final deletions = await SyncStateStore.deletions();
+    final retained = await _store.loadDeletedItems();
+    final retainedIds = retained.map((item) => item.file.id).toSet();
+    // The durable recovery receipt precedes the separate tombstone write.
+    // Preserve that intent if the process stopped between those writes.
+    for (final item in retained) {
+      deletions.putIfAbsent(item.file.id, () => item.deletedAt);
+    }
     if (!_crypto.isCurrentSession(generation)) {
       throw StateError('Vault session expired');
     }
@@ -187,8 +194,19 @@ class SyncService {
         username: profile.username ?? '',
         password: password,
         basePath: profile.basePath);
-    return _startWorker(local, masterKey, workerRemote, deviceId, dir.path,
-        direction, checkpoint, deletions, target, onProgress, cancellation);
+    return _startWorker(
+        local,
+        masterKey,
+        workerRemote,
+        deviceId,
+        dir.path,
+        direction,
+        checkpoint,
+        deletions,
+        retainedIds,
+        target,
+        onProgress,
+        cancellation);
   }
 
   static Future<SyncResult> _startWorker(
@@ -200,12 +218,13 @@ class SyncService {
       SyncDirection direction,
       SyncCheckpoint checkpoint,
       Map<String, DateTime> deletions,
+      Set<String> retainedIds,
       String target,
       void Function(SyncProgress)? onProgress,
       SyncControl? control) {
     return SensitiveIsolate.runWithEvents(
         _workerTask(local, key, remote, deviceId, root, direction, checkpoint,
-            deletions, target), onEvent: (event) {
+            deletions, retainedIds, target), onEvent: (event) {
       if (event is SyncProgress) {
         if (event.phase == SyncPhase.committing) control?.committing = true;
         onProgress?.call(event);
@@ -222,6 +241,7 @@ class SyncService {
           SyncDirection direction,
           SyncCheckpoint checkpoint,
           Map<String, DateTime> deletions,
+          Set<String> retainedIds,
           String target) =>
       (worker) => runSync(
             local: local,
@@ -232,6 +252,7 @@ class SyncService {
             direction: direction,
             checkpoint: checkpoint,
             deletions: deletions,
+            retainedLocalIds: retainedIds,
             control: worker.control,
             onProgress: worker.emit,
             stateStore: SyncStateStore(root, key),
@@ -252,6 +273,11 @@ class SyncService {
 
   Future<void> chooseConflict(
       SyncProfile profile, String id, ConflictChoice choice) async {
+    if (choice != ConflictChoice.local &&
+        (await _store.loadDeletedItems()).any((item) => item.file.id == id)) {
+      throw StateError(
+          'Restore or permanently delete this item in Recently Deleted before choosing the remote version.');
+    }
     final generation = _crypto.cacheGeneration;
     final key = await _crypto.getMasterKey();
     final dir = await _store.ensureVaultDirectory();
@@ -293,6 +319,13 @@ class SyncService {
       throw StateError('Vault session expired');
     }
     final current = await _store.loadFileIndex();
+    final retainedIds =
+        (await _store.loadDeletedItems()).map((item) => item.file.id).toSet();
+    if (refreshed
+        .any((file) => !file.syncedDeleted && retainedIds.contains(file.id))) {
+      throw StateError(
+          'A sync item is in Recently Deleted. Restore or permanently delete it before retrying sync.');
+    }
     if (!_crypto.isCurrentSession(generation)) {
       throw StateError('Vault session expired');
     }
@@ -327,6 +360,7 @@ class SyncService {
     SyncControl? control,
     SyncCheckpoint checkpoint = const SyncCheckpoint(),
     Map<String, DateTime> deletions = const {},
+    Set<String> retainedLocalIds = const {},
     SyncStateStore? stateStore,
     String? target,
   }) =>
@@ -342,6 +376,7 @@ class SyncService {
           control: control,
           checkpoint: checkpoint,
           deletions: deletions,
+          retainedLocalIds: retainedLocalIds,
           stateStore: stateStore,
           target: target);
 

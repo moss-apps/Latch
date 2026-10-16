@@ -46,7 +46,13 @@ class NoteService {
   Future<List<Note>> loadNotes({bool isDecoy = false}) async {
     final generation = _cacheGeneration;
     final cached = _notesCache[isDecoy];
-    if (cached != null) return cached;
+    if (cached != null) {
+      final visible = await _visibleNotes(cached, isDecoy);
+      if (generation != _cacheGeneration) {
+        throw StateError('Notes session changed');
+      }
+      return _notesCache[isDecoy] = visible;
+    }
     if (!isDecoy) await _migrateLegacyNotes();
     final json = await _secureStorage.read(
       key: isDecoy ? _notesIndexDecoyKey : _notesIndexKey,
@@ -69,8 +75,19 @@ class NoteService {
         // index unreadable; keep loaded list empty
       }
     }
-    _notesCache[isDecoy] = notes;
-    return notes;
+    final visible = await _visibleNotes(notes, isDecoy);
+    if (generation != _cacheGeneration) {
+      throw StateError('Notes session changed');
+    }
+    _notesCache[isDecoy] = visible;
+    return _notesCache[isDecoy]!;
+  }
+
+  Future<List<Note>> _visibleNotes(List<Note> notes, bool decoy) async {
+    final records = await VaultService.instance.store.visibleEditorRecords(
+        notes.map((n) => n.toJson()).toList(), 'noteId',
+        isDecoy: decoy);
+    return records.map(Note.fromJson).toList();
   }
 
   // ponytail: one-time split of the pre-decoy-fix shared index; remove later
@@ -390,35 +407,21 @@ class NoteService {
   }
 
   Future<void> deleteNote(Note note, {bool isDecoy = false}) async {
-    final notes = await loadNotes(isDecoy: isDecoy);
-    if (note.isEncrypted) {
-      await _encryptionService.secureDelete(note.encryptedContentPath);
-    } else {
-      final file = File(note.encryptedContentPath);
-      if (await file.exists()) await file.delete();
+    final files = await VaultService.instance.getAllFiles(isDecoy: isDecoy);
+    final file =
+        files.where((f) => f.metadata?['noteId'] == note.id).firstOrNull;
+    if (file == null ||
+        !await VaultService.instance.removeFile(file.id, isDecoy: isDecoy)) {
+      clearCache();
+      throw StateError(
+          'Note deletion could not finish. Retry in Recently Deleted.');
     }
-    notes.removeWhere((n) => n.id == note.id);
-    await _saveNotes(isDecoy: isDecoy);
-
-    await VaultService.instance.removeNoteEntry(note.id, isDecoy: isDecoy);
+    clearCache();
   }
 
   Future<void> deleteNotes(List<Note> notes, {bool isDecoy = false}) async {
-    final cached = await loadNotes(isDecoy: isDecoy);
     for (final note in notes) {
-      if (note.isEncrypted) {
-        await _encryptionService.secureDelete(note.encryptedContentPath);
-      } else {
-        final file = File(note.encryptedContentPath);
-        if (await file.exists()) await file.delete();
-      }
-    }
-    final ids = notes.map((n) => n.id).toSet();
-    cached.removeWhere((n) => ids.contains(n.id));
-    await _saveNotes(isDecoy: isDecoy);
-
-    for (final note in notes) {
-      await VaultService.instance.removeNoteEntry(note.id, isDecoy: isDecoy);
+      await deleteNote(note, isDecoy: isDecoy);
     }
   }
 
