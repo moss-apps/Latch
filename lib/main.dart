@@ -30,6 +30,7 @@ import 'utils/navigator_key.dart';
 import 'utils/performance_config.dart';
 import 'widgets/toast_host.dart';
 import 'widgets/operation_progress_host.dart';
+import 'widgets/recently_deleted_host.dart';
 import 'providers/operation_provider.dart';
 
 Future<void> main() async {
@@ -92,7 +93,7 @@ class LatchApp extends ConsumerWidget {
       builder: (context, child) => ToastHost(
         child: OperationProgressHost(
           navigatorKey: navigatorKey,
-          child: child ?? const SizedBox.shrink(),
+          child: RecentlyDeletedHost(child: child ?? const SizedBox.shrink()),
         ),
       ),
       home: ShareIntakeHost(

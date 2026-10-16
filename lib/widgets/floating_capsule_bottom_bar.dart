@@ -103,12 +103,9 @@ class CurvedDiamondBorder extends OutlinedBorder {
 
 /// Floating capsule bottom bar.
 ///
-/// Total slots = tabs + the feature (import) button, capped to 5.
-/// When the total is odd the feature sits dead-center and the diamond pokes
-/// above the capsule; when even it parks on [featureSide] inside the capsule.
+/// All destinations remain available. When labels no longer fit, the tabs
+/// scroll independently of the always-reachable import action.
 class FloatingCapsuleBottomBar extends StatelessWidget {
-  static const int _maxSlots = 5;
-
   final List<NavTab> tabs;
   final NavTab feature;
   final FeatureSide featureSide;
@@ -119,12 +116,32 @@ class FloatingCapsuleBottomBar extends StatelessWidget {
   static const double _capsuleRadius = 31;
   static const double _tabWidth = 64;
   static const double _elevatedDiamond = 58;
-  static const double _inlineDiamond = 44;
+  static const double _inlineDiamond = 48;
   static const double _protrusion = 20;
   static const double _squircleN = 4.5;
 
-  // footprint excluding safe-area inset; callers pad + add it themselves.
-  static const double bottomFootprint = _capsuleHeight + 10;
+  static const _labelStyle = TextStyle(
+      fontFamily: 'ProductSans',
+      fontSize: 12,
+      height: 1.3,
+      fontWeight: FontWeight.w600);
+
+  static double _height(BuildContext context) {
+    final painter = TextPainter(
+      text: const TextSpan(text: 'Ag', style: _labelStyle),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout();
+    // Include vertical padding and the capsule's one-pixel borders. Measure
+    // the actual line rather than assuming the system text scaler is linear.
+    final height = math.max(_capsuleHeight, 22 + 3 + painter.height + 16 + 2);
+    painter.dispose();
+    return height.ceilToDouble();
+  }
+
+  /// Conservative footprint, excluding safe-area insets, for extended bodies.
+  static double bottomFootprintFor(BuildContext context) =>
+      _height(context) + _protrusion + 10;
 
   const FloatingCapsuleBottomBar({
     super.key,
@@ -136,175 +153,270 @@ class FloatingCapsuleBottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // hard cap at 5 total slots (feature + up to 4 tabs).
-    final visibleTabs =
-        (tabs.length >= _maxSlots) ? tabs.sublist(0, _maxSlots - 1) : tabs;
-
-    final slots = visibleTabs.length + (showFeature ? 1 : 0);
-    final featureInMiddle = showFeature && slots.isOdd;
-
     final accent = context.accentColor;
-    final totalHeight =
-        featureInMiddle ? _capsuleHeight + _protrusion : _capsuleHeight;
-
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        16,
-        0,
-        16,
-        MediaQuery.of(context).padding.bottom + 10,
-      ),
-      child: SizedBox(
-        height: totalHeight,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Center(
-                child: _capsule(context, visibleTabs, accent, featureInMiddle),
-              ),
-            ),
-            if (featureInMiddle)
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: Center(child: _diamond(context, accent, elevated: true)),
-              ),
-          ],
+    final widths = tabs.map((tab) {
+      final painter = TextPainter(
+        text: TextSpan(text: tab.label, style: _labelStyle),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+      )..layout();
+      final width = math.max(_tabWidth, painter.width + 24);
+      painter.dispose();
+      return width;
+    }).toList();
+    final height = _height(context);
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          0,
+          16,
+          10,
         ),
-      ),
-    );
-  }
-
-  Widget _capsule(
-    BuildContext context,
-    List<NavTab> tabs,
-    Color accent,
-    bool featureInMiddle,
-  ) {
-    List<Widget> rowChildren;
-    if (featureInMiddle) {
-      // Reserve a centered gap for the protruding diamond.
-      final half = tabs.length ~/ 2;
-      final left = tabs.sublist(0, half);
-      final right = tabs.sublist(half);
-      rowChildren = [
-        for (final t in left) _tab(context, t),
-        SizedBox(width: _elevatedDiamond + 6),
-        for (final t in right) _tab(context, t),
-      ];
-    } else {
-      final tabsRow = tabs.map((t) => _tab(context, t)).toList();
-      if (!showFeature) {
-        rowChildren = tabsRow;
-      } else if (featureSide == FeatureSide.left) {
-        rowChildren = [_inlineDiamondSlot(context, accent), ...tabsRow];
-      } else {
-        rowChildren = [...tabsRow, _inlineDiamondSlot(context, accent)];
-      }
-    }
-
-    return Container(
-      height: _capsuleHeight,
-      decoration: BoxDecoration(
-        color: context.backgroundColor,
-        borderRadius: BorderRadius.circular(_capsuleRadius),
-        border: Border.all(color: context.borderColor.withValues(alpha: 0.5)),
-        boxShadow: [
-          BoxShadow(
-            color:
-                Colors.black.withValues(alpha: context.isDarkMode ? 0.5 : 0.18),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      child: Row(mainAxisSize: MainAxisSize.min, children: rowChildren),
-    );
-  }
-
-  Widget _tab(BuildContext context, NavTab tab) {
-    final accent = context.accentColor;
-    final color = tab.selected ? accent : context.textTertiary;
-    return SizedBox(
-      width: _tabWidth,
-      child: Tooltip(
-        message: tab.label,
-        child: InkWell(
-          onTap: tab.onTap,
-          customBorder: const StadiumBorder(),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
+        child: LayoutBuilder(builder: (context, constraints) {
+          final requiredWidth = widths.fold<double>(12, (a, b) => a + b) +
+              (showFeature ? _tabWidth : 0);
+          final fits = requiredWidth <= constraints.maxWidth;
+          final featureInMiddle = fits &&
+              showFeature &&
+              (tabs.length + 1).isOdd &&
+              widths.every((width) => width == _tabWidth);
+          final tabWidgets = [
+            for (var i = 0; i < tabs.length; i++)
+              _tab(context, tabs[i], widths[i], height)
+          ];
+          final featureSlot = SizedBox(
+              width: _tabWidth,
+              height: height,
+              child: Center(child: _diamond(context, accent, elevated: false)));
+          final List<Widget> children;
+          if (!fits) {
+            children = [
+              if (showFeature && featureSide == FeatureSide.left) featureSlot,
+              Expanded(
+                  child: _ScrollableTabs(tabs: tabs, children: tabWidgets)),
+              if (showFeature && featureSide == FeatureSide.right) featureSlot,
+            ];
+          } else if (featureInMiddle) {
+            final half = tabs.length ~/ 2;
+            children = [
+              ...tabWidgets.take(half),
+              const SizedBox(width: _tabWidth),
+              ...tabWidgets.skip(half)
+            ];
+          } else {
+            children = [
+              if (showFeature && featureSide == FeatureSide.left) featureSlot,
+              ...tabWidgets,
+              if (showFeature && featureSide == FeatureSide.right) featureSlot,
+            ];
+          }
+          return SizedBox(
+            height: height + (featureInMiddle ? _protrusion : 0),
+            child: Stack(
+              clipBehavior: Clip.none,
               children: [
-                Icon(tab.icon, size: 22, color: color),
-                const SizedBox(height: 3),
-                Text(
-                  tab.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: 'ProductSans',
-                    fontSize: 10,
-                    fontWeight:
-                        tab.selected ? FontWeight.w600 : FontWeight.normal,
-                    color: color,
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: Container(
+                      height: height,
+                      constraints:
+                          BoxConstraints(maxWidth: constraints.maxWidth),
+                      decoration: BoxDecoration(
+                        color: context.backgroundColor,
+                        borderRadius: BorderRadius.circular(_capsuleRadius),
+                        border: Border.all(
+                            color: context.borderColor.withValues(alpha: 0.5)),
+                        boxShadow: [
+                          BoxShadow(
+                              color: Colors.black.withValues(
+                                  alpha: context.isDarkMode ? 0.5 : 0.18),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8))
+                        ],
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: Row(
+                          mainAxisSize:
+                              fits ? MainAxisSize.min : MainAxisSize.max,
+                          children: children),
+                    ),
                   ),
                 ),
+                if (featureInMiddle)
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                        child: _diamond(context, accent, elevated: true)),
+                  ),
               ],
             ),
-          ),
-        ),
+          );
+        }),
       ),
     );
   }
 
-  Widget _inlineDiamondSlot(BuildContext context, Color accent) {
-    return SizedBox(
-      width: _tabWidth,
-      child: Center(child: _diamond(context, accent, elevated: false)),
+  Widget _tab(BuildContext context, NavTab tab, double width, double height) {
+    final accent = context.accentColor;
+    final color = tab.selected ? accent : context.textSecondary;
+    return Semantics(
+      label: tab.label,
+      button: true,
+      selected: tab.selected,
+      onTap: tab.onTap,
+      child: ExcludeSemantics(
+          child: SizedBox(
+        width: width,
+        height: height,
+        child: Tooltip(
+          message: tab.label,
+          excludeFromSemantics: true,
+          child: InkWell(
+            onTap: tab.onTap,
+            customBorder: const StadiumBorder(),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(tab.icon, size: 22, color: color),
+                  const SizedBox(height: 3),
+                  Text(
+                    tab.label,
+                    maxLines: 1,
+                    style: _labelStyle.copyWith(
+                      fontWeight:
+                          tab.selected ? FontWeight.w600 : FontWeight.normal,
+                      color: color,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      )),
     );
   }
 
   Widget _diamond(BuildContext context, Color accent,
       {required bool elevated}) {
     final size = elevated ? _elevatedDiamond : _inlineDiamond;
-    return Tooltip(
-      message: feature.label,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: feature.onTap,
-          customBorder: const CurvedDiamondBorder(n: _squircleN),
-          child: Container(
-            width: size,
-            height: size,
-            decoration: ShapeDecoration(
-              color: accent,
-              shadows: [
-                BoxShadow(
-                  color: accent.withValues(alpha: 0.45),
-                  blurRadius: elevated ? 16 : 8,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-              shape: const CurvedDiamondBorder(n: _squircleN),
-            ),
-            child: Icon(
-              feature.icon,
-              color: Colors.white,
-              size: elevated ? 28 : 24,
+    return Semantics(
+      label: feature.label,
+      button: true,
+      onTap: feature.onTap,
+      child: ExcludeSemantics(
+          child: Tooltip(
+        message: feature.label,
+        excludeFromSemantics: true,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: feature.onTap,
+            customBorder: const CurvedDiamondBorder(n: _squircleN),
+            child: Container(
+              width: size,
+              height: size,
+              decoration: ShapeDecoration(
+                color: accent,
+                shadows: [
+                  BoxShadow(
+                    color: accent.withValues(alpha: 0.45),
+                    blurRadius: elevated ? 16 : 8,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+                shape: const CurvedDiamondBorder(n: _squircleN),
+              ),
+              child: Icon(
+                feature.icon,
+                color: Colors.white,
+                size: elevated ? 28 : 24,
+              ),
             ),
           ),
         ),
-      ),
+      )),
     );
   }
+}
+
+class _ScrollableTabs extends StatefulWidget {
+  const _ScrollableTabs({required this.tabs, required this.children});
+  final List<NavTab> tabs;
+  final List<Widget> children;
+  @override
+  State<_ScrollableTabs> createState() => _ScrollableTabsState();
+}
+
+class _ScrollableTabsState extends State<_ScrollableTabs> {
+  final _controller = ScrollController();
+  final _keys = <int, GlobalKey>{};
+
+  @override
+  void initState() {
+    super.initState();
+    _revealSelection();
+  }
+
+  @override
+  void didUpdateWidget(_ScrollableTabs oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.tabs.indexWhere((t) => t.selected) !=
+        widget.tabs.indexWhere((t) => t.selected)) {
+      _revealSelection();
+    }
+  }
+
+  void _revealSelection() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final index = widget.tabs.indexWhere((t) => t.selected);
+      final context = _keys[index]?.currentContext;
+      if (context != null) {
+        Scrollable.ensureVisible(context,
+            alignment: 0.5, duration: Duration.zero);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scrollbar(
+        controller: _controller,
+        thumbVisibility: true,
+        child: SingleChildScrollView(
+          controller: _controller,
+          scrollDirection: Axis.horizontal,
+          child: Row(children: [
+            for (var i = 0; i < widget.children.length; i++)
+              Focus(
+                onFocusChange: (focused) {
+                  final context = _keys[i]?.currentContext;
+                  if (focused && context != null) {
+                    Scrollable.ensureVisible(context,
+                        alignment: 0.5, duration: Duration.zero);
+                  }
+                },
+                child: KeyedSubtree(
+                    key: _keys.putIfAbsent(i, GlobalKey.new),
+                    child: widget.children[i]),
+              ),
+          ]),
+        ),
+      );
 }
