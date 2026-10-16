@@ -1,6 +1,6 @@
 # Latch Product Improvement Roadmap
 
-This roadmap turns the product review into phased, actionable work. Phases are ordered to reduce data-loss and security risks before expanding the feature set. Status reflects a source and documentation review performed on 2026-10-02; it does not imply that runtime verification was performed.
+This roadmap turns the product review into phased, actionable work. Phases are ordered to reduce data-loss and security risks before expanding the feature set. The initial source and documentation review was performed on 2026-10-02; subsequent implementation dates and automated checks are recorded below. Physical-device verification is separate and is not implied by automated checks.
 
 ## Status legend
 
@@ -19,8 +19,8 @@ This roadmap turns the product review into phased, actionable work. Phases are o
 | 1 | Protection defaults and import clarity | **Done** | High |
 | 2 | Session locking | **Done** | High |
 | 3 | Large-vault sync and conflict recovery | **Done** | High |
-| 4 | Import convenience and discovery | **Not started** | Medium |
-| 5 | Recovery and product polish | **Not started** | Medium |
+| 4 | Import convenience and discovery | **Done** | Medium |
+| 5 | Recovery and product polish | **Done** | Medium |
 
 ## Phase 0 — Reliability and data integrity
 
@@ -30,9 +30,11 @@ Fix the paths where failures can leave the vault's index, disk, or remote state 
 
 Implemented 2026-10-02: failure-safe bulk deletion returns per-file removed/failed results and retains failed entries; WebDAV reads treat only a confirmed 404 as absent and propagate transport/auth/server errors; import results report retained originals instead of claiming deletion. Regression tests cover all failure cases (`flutter test`: 164 passing; `flutter analyze` clean).
 
+**Phase 5 follow-up:** deletion now commits a durable recovery receipt before moving payloads. An interrupted deletion after that commit is hidden from the active vault but remains recoverable/retryable in Recently Deleted; failure to write the initial receipt leaves the active entry and bytes untouched. This supersedes the original active-entry retention behavior without discarding the failed item's recovery data.
+
 | Item | Work | Acceptance criteria |
 |---|---|---|
-| 0.1 | Make bulk deletion failure-safe in `lib/services/file_service.dart`. | Failed file or thumbnail deletion does not remove the corresponding vault entry. Successful deletions remain removed. The caller can identify failures and retry them. |
+| 0.1 | Make bulk deletion failure-safe in `lib/services/file_service.dart`. | Failed file or thumbnail deletion preserves the corresponding entry or, under Phase 5, its durable recovery receipt and remaining payloads. Successful deletions remain removed from the active vault. The caller can identify failures and retry them. |
 | 0.2 | Make WebDAV reads distinguish missing resources from transport, authentication, and server failures in `lib/services/remote/webdav_store.dart`. | Only a confirmed not-found result is treated as an absent manifest/blob. Other errors propagate to sync. A failed manifest read cannot be interpreted as a first sync or lead to manifest replacement. |
 | 0.3 | Add regression tests for the failure cases above. | Tests cover failed bulk deletion and the WebDAV not-found, unauthorized, and unreachable cases. Sync aborts without committing when the existing manifest could not be read. |
 | 0.4 | Review import outcomes when original-media deletion fails. | The user sees whether import succeeded, whether originals were deleted, and what action remains; no success message implies originals were removed when they remain. |
@@ -91,7 +93,7 @@ Implemented 2026-10-06. The rewrite replaces whole-buffer transfers and last-wri
 - **Review-first conflicts.** Diverged files become `needsReview` conflicts with local/remote/keep-both/later choices; keep-both writes a hash-verified separate copy with a distinct id. The manifest is never rewritten with a losing version.
 - **Safe publication.** `manifest.enc` publication probes the server (DAV header, strong ETag, honored `Overwrite: F` / `If` preconditions) before trusting it and is rejected with a plain-language error when the server would silently ignore revision guards. No silent fallback.
 - **Progress and cancellation.** The UI shows phase, file name, per-file and overall bytes (unknown totals stay indeterminate); cancel is cooperative mid-transfer, ignored only for the brief commit step, and lock cleanup still hard-kills the worker. A partial transfer leaves the manifest and both payloads intact and retries cleanly.
-- **Payload retention, no GC.** Remote "deletes" are manifest tombstones; superseded and deleted payloads are retained on both sides for recovery. Reclaimed-space GC is deliberately out of scope.
+- **Remote payload retention, no GC.** Remote "deletes" are manifest tombstones; remote blobs and superseded local sync payloads remain retained rather than being garbage-collected. Phase 5 adds a separate retention/expiry policy for explicit local user deletions; remote-originated tombstones do not automatically create Recently Deleted entries.
 
 | Item | Work | Acceptance criteria | Status |
 |---|---|---|---|
@@ -102,7 +104,7 @@ Implemented 2026-10-06. The rewrite replaces whole-buffer transfers and last-wri
 
 **Checks:** `flutter test --no-pub`: 219 passing; `flutter analyze --no-pub`: clean; `flutter build apk --debug --no-pub`: successful. Regression coverage includes streamed staging/MOVE transfers over a loopback WebDAV fixture, publication-precondition rejection, mid-body cancellation, stale-ETag races, corrupt-pull rejection, encrypted-journal recovery after a failed index write, backup-mode remote preservation, every conflict direction and resolution, and worker-scoped cancellation. Physical-device verification (1–2 GB transfers, cancel/retry, mid-sync lock, conflict review, real-server capability probing) is user-run; see `docs/local_server_testing.md` → *Phase 3 hardware guide*.
 
-**Remaining limits (documented, not silent):** album/folder definitions still do not sync (file-level ids are carried); payload GC is deferred in favor of retention; and WebDAV sync does not carry the vault master key, so reinstall/new-device recovery requires the Desktop backup/restore key bundle or the original credential (see `docs/local_server_sync.md` → *Key continuity and reinstall*).
+**Remaining limits (documented, not silent):** album/folder definitions still do not sync (file-level ids are carried); remote payload GC is deferred in favor of retention; and WebDAV sync does not carry the vault master key, so reinstall/new-device recovery requires the Desktop backup/restore key bundle and its original credential (see `docs/local_server_sync.md` → *Key continuity and reinstall*).
 
 ## Phase 4 — Import convenience and discovery
 
@@ -127,16 +129,27 @@ Implemented 2026-10-06:
 
 ## Phase 5 — Recovery and product polish
 
-**Status: Not started**
+**Status: Done**
 
-| Item | Work | Acceptance criteria |
-|---|---|---|
-| 5.1 | Consider a Recently Deleted area with configurable retention. | Deleted items can be restored before expiry; permanent deletion is explicit; storage use and sync behavior are documented. |
-| 5.2 | Improve small-screen and large-text navigation behavior. | Bottom navigation remains readable and usable at narrow widths and larger system font scales, with semantics for assistive technology. |
-| 5.3 | Refresh README product and setup documentation. | README describes notes, password storage/autofill, WebDAV sync, and current prerequisites accurately. |
-| 5.4 | Split the gallery screen into focused components/services. | `gallery_vault_screen.dart` is reduced into maintainable pieces without changing user-visible behavior; existing flows remain covered by tests. |
+Implemented 2026-10-16:
 
-Recently Deleted requires an explicit product decision on retention, secure-delete timing, backup, and WebDAV tombstone behavior before implementation.
+- **Local recovery.** Recently Deleted is available from the drawer and Storage settings, with configurable retention, storage accounting, restore, permanent deletion, and empty-bin confirmation. Durable per-namespace receipts replay interrupted delete/restore/purge operations. Restore preserves stored payload bytes and encryption metadata, including note/password editor records, and uses unique paths without overwriting another file. Recovery and PocketBase fallback tests prevent stale sidecar rows from resurrecting purged files or replacing restored paths.
+- **Adaptive navigation.** All enabled categories remain accessible, including Docs. Narrow widths or larger text use scrollable labeled tabs with a pinned Import action; labels honor system text scaling, touch targets are at least 48 dp, and selected/button semantics and keyboard focus are exposed. Recovery dialogs and the extracted drawer also scroll at large text sizes.
+- **Accurate product documentation.** README covers notes, password storage/Android autofill versus optional unlock-credential autofill, manual WebDAV sync, recovery, and verified build prerequisites. Backup/sync documentation distinguishes encrypted manifests from payloads uploaded as stored: hidden-but-unencrypted files are not made encrypted by transfer.
+- **Focused gallery components.** `gallery_vault_screen.dart` is reduced from 4,007 to 2,346 lines by extracting the import coordinator/sheet, drawer, thumbnail widget, folder picker, category model, and shared file query. Existing import/encryption/progress paths are preserved; selection now uses the same structured filter as the visible grid rather than selecting hidden matches.
+
+| Item | Work | Acceptance criteria | Status |
+|---|---|---|---|
+| 5.1 | Add Recently Deleted with configurable retention following the approved policy. | Deleted items can be restored before expiry; permanent deletion is explicit; storage use and sync behavior are documented. | **Done** |
+| 5.2 | Improve small-screen and large-text navigation behavior. | Bottom navigation remains readable and usable at narrow widths and larger system font scales, with semantics for assistive technology. | **Done** |
+| 5.3 | Refresh README product and setup documentation. | README describes notes, password storage/autofill, WebDAV sync, and current prerequisites accurately. | **Done** |
+| 5.4 | Split the gallery screen into focused components/services. | `gallery_vault_screen.dart` is reduced into maintainable pieces while preserving existing flows, with regression coverage for shared filtering, import-sheet actions, and existing services. | **Done** |
+
+**Approved decision record:** local-only recovery, separate for real and decoy vaults; **30 days by default**, configurable to **7, 30, or 90 days**, or confirmed **Immediate deletion**. Retention changes apply to future deletions, not existing deadlines. Expiry or explicit permanent deletion removes local payloads and thumbnails; Secure Delete performs best-effort overwrite before unlinking, not guaranteed flash erasure. New ZIP/Desktop backups exclude trash; existing backups and retained remote blobs are not erased. An explicit deletion is recorded locally for the next manual WebDAV sync. Restore clears that deletion and makes the item eligible for sync again; divergent versions still require review. Full policy: [`recently_deleted.md`](recently_deleted.md).
+
+**Checks:** `flutter test --no-pub`: **342 passing**; `flutter analyze --no-pub`: clean; `dart format --output=none --set-exit-if-changed lib test`: clean; `git diff --check`: clean; `flutter build apk --debug --no-pub`: successful. Coverage includes encrypted-byte decryptable restoration, metadata and editor-index recovery, expiry and fixed deadlines, immediate/permanent deletion, partial purge failure, initial and interrupted persistence failures, lock invalidation/replay, real/decoy isolation, backup exclusion, sync tombstone/restore/conflict safety, PocketBase outage/restart convergence, all navigation categories at 240/320/600 px and 1×/2×/3.2× text, keyboard/semantics checks, large-text recovery confirmations, and extracted gallery filtering/import-sheet callbacks.
+
+**Device handoff and limits:** physical-device testing is user-run using [`phase5_testing.md`](phase5_testing.md), including TalkBack, actual system fonts, pickers/capture, editor/autofill restoration, and real-server sync. Expired items cannot be restored; cleanup runs while unlocked and on unlock/resume, not as a guaranteed OS background deadline. Local permanent deletion does not delete remote retained blobs or old backups. A remote/keep-both conflict choice for an id still in Recently Deleted requires restoring or permanently deleting that local receipt first. The successful Android build reports Kotlin Gradle Plugin migration warnings for future Flutter compatibility; migrating the app/plugins is not part of this phase.
 
 ## Existing capabilities
 
@@ -158,7 +171,7 @@ These are already present and should be reused rather than rebuilt:
 3. Ship **Phase 2 session locking** as the next major user-facing feature.
 4. Prioritize **Phase 3 sync safety/progress** before broadening sync conflict behavior.
 5. Both **Share to Latch** and **smart collections** are implemented in Phase 4.
-6. Start **Recently Deleted** only after its deletion and sync semantics are agreed.
+6. **Recently Deleted** is implemented in Phase 5 following the approved deletion, retention, backup, and sync policy above.
 
 ## Updating status
 
