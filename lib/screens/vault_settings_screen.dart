@@ -27,6 +27,7 @@ import 'legal_doc_screen.dart';
 import 'local_backup_screen.dart';
 import 'performance_settings_screen.dart';
 import 'privacy_policy_screen.dart';
+import 'recently_deleted_screen.dart';
 import 'sync_settings_screen.dart';
 
 class VaultSettingsScreen extends ConsumerStatefulWidget {
@@ -215,7 +216,7 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                   style: TextStyle(fontFamily: 'ProductSans'),
                 ),
                 subtitle: Text(
-                  'Overwrite files before deletion',
+                  'Best-effort overwrite on permanent deletion, expiry, and source removal; not guaranteed flash erasure',
                   style: TextStyle(
                     fontFamily: 'ProductSans',
                     fontSize: 12,
@@ -429,6 +430,19 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
               Divider(color: context.borderColor),
               const SizedBox(height: 20),
               _buildSectionTitle(context, 'Storage'),
+              ListTile(
+                leading: Icon(Icons.restore_from_trash_outlined,
+                    color: context.accentColor),
+                title: const Text('Recently Deleted'),
+                subtitle: Text(settings.recentlyDeletedRetentionDays == 0
+                    ? 'Future deletions are immediate · manage local recovery'
+                    : 'Keep deleted items for ${settings.recentlyDeletedRetentionDays} days'),
+                onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                        builder: (_) => const RecentlyDeletedScreen())),
+                contentPadding: EdgeInsets.zero,
+              ),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Text(

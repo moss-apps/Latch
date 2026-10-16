@@ -52,7 +52,6 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
   String? _token;
   ReceiverInfo? _receiver;
   RestoreSourceInfo? _source;
-  DesktopVaultSnapshot? _snapshot;
   DesktopPushProgress? _progress;
   DesktopPushReport? _report;
   RestoreProgress? _rprogress;
@@ -192,7 +191,6 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
     _base = base;
     _token = token;
     _receiver = null;
-    _snapshot = null;
     _report = null;
     _cancelled = false;
     _teardownScanner();
@@ -277,16 +275,18 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
   Future<void> _send() async {
     if (_flow == _Flow.restore) return _restore();
     setState(() => _mode = _Mode.preparing);
+    final vault = ref.read(vaultServiceProvider);
+    final crypto = ref.read(encryptionServiceProvider);
     try {
-      final snapshot = _snapshot ??
-          await DesktopVaultSnapshot.fromLiveVault(
-            files: ref.read(vaultNotifierProvider).value ?? const [],
-            crypto: ref.read(encryptionServiceProvider),
-            deviceId: await desktopLinkDeviceId(),
-          );
+      // Rebuild on retries: a cached snapshot could include an item deleted
+      // since a previous attempt. Recovery payloads never enter new backups.
+      final snapshot = await DesktopVaultSnapshot.fromLiveVault(
+        files: await vault.getAllFiles(),
+        crypto: crypto,
+        deviceId: await desktopLinkDeviceId(),
+      );
       if (!mounted) return;
       setState(() {
-        _snapshot = snapshot;
         _progress = null;
         _mode = _Mode.sending;
       });
@@ -405,7 +405,6 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
       _token = null;
       _receiver = null;
       _source = null;
-      _snapshot = null;
       _progress = null;
       _report = null;
       _rprogress = null;
@@ -933,7 +932,6 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
         label: 'Send again',
         icon: Icons.refresh,
         onPressed: () {
-          _snapshot = null;
           _cancelled = false;
           _send();
         },
