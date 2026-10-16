@@ -7,10 +7,12 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../models/album.dart';
+import '../models/deleted_vault_item.dart';
 import '../models/vault_folder.dart';
 import '../models/vault_settings.dart';
 import '../models/vaulted_file.dart';
 import 'local_store.dart';
+import 'sync_state_store.dart';
 
 /// Centralized vault state + persistence. Owns `_storage`, directories, the
 /// `_cached*` maps and all `_load*`/`_save*` methods. Domain services depend
@@ -38,6 +40,8 @@ class VaultStore implements LocalStore {
   static const String decoyFolderName = '.locker_decoy';
   static const String foldersKey = 'vault_folders';
   static const String reEncryptJournalKey = 'reencrypt_journal';
+  static String recentlyDeletedKey(bool isDecoy) =>
+      isDecoy ? 'vault_recently_deleted_decoy' : 'vault_recently_deleted';
 
   Directory? vaultDirectory;
   Directory? decoyDirectory;
@@ -69,6 +73,69 @@ class VaultStore implements LocalStore {
       _storage.write(key: key, value: value);
 
   Future<void> delete(String key) => _storage.delete(key: key);
+
+  /// Strict parsing: corrupt recovery metadata must never become an empty list
+  /// which a later delete could silently overwrite.
+  Future<List<DeletedVaultItem>> loadDeletedItems(
+      {bool isDecoy = false}) async {
+    final raw = await read(recentlyDeletedKey(isDecoy));
+    if (raw == null) return [];
+    return (jsonDecode(raw) as List<dynamic>)
+        .map((e) => DeletedVaultItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> saveDeletedItems(List<DeletedVaultItem> items,
+          {bool isDecoy = false}) =>
+      write(recentlyDeletedKey(isDecoy),
+          jsonEncode(items.map((e) => e.toJson()).toList()));
+
+  /// Receipts are authoritative even if a legacy/PB write was interrupted.
+  Future<List<VaultedFile>> _visibleFiles(List<VaultedFile> files,
+      {required bool isDecoy}) async {
+    final receipts = {
+      for (final e in await loadDeletedItems(isDecoy: isDecoy)) e.file.id: e
+    };
+    final visible = files.where((file) {
+      final receipt = receipts[file.id];
+      return receipt == null ||
+          (receipt.stage == DeletionStage.restoring &&
+              receipt.restoredFile?.vaultPath == file.vaultPath);
+    }).toList();
+    // A strict save may have fallen back to legacy while PB was unavailable.
+    // Once a purge drops its receipt, don't display PB's stale, missing blob.
+    if (!isDecoy) {
+      final deleted = await SyncStateStore.deletions();
+      if (deleted.isNotEmpty) {
+        final stale = <String>{};
+        for (final file in visible) {
+          if (deleted.containsKey(file.id) &&
+              !receipts.containsKey(file.id) &&
+              !await File(file.vaultPath).exists()) {
+            stale.add(file.id);
+          }
+        }
+        visible.removeWhere((file) => stale.contains(file.id));
+      }
+    }
+    return visible;
+  }
+
+  Future<List<Map<String, dynamic>>> visibleEditorRecords(
+      List<Map<String, dynamic>> records, String metadataKey,
+      {bool isDecoy = false}) async {
+    final receipts = {
+      for (final item in await loadDeletedItems(isDecoy: isDecoy))
+        if (item.file.metadata?[metadataKey] != null)
+          item.file.metadata![metadataKey]: item
+    };
+    return records.where((record) {
+      final item = receipts[record['id']];
+      return item == null ||
+          (item.stage == DeletionStage.restoring &&
+              item.restoredFile?.vaultPath == record['encryptedContentPath']);
+    }).toList();
+  }
 
   /// Ensure the vault directory (and its subdirs) exist.
   Future<Directory> ensureVaultDirectory() async {
@@ -158,9 +225,11 @@ class VaultStore implements LocalStore {
     bool forceReload = false,
   }) async {
     if (!forceReload && !isDecoy && cachedFiles != null) {
+      cachedFiles = await _visibleFiles(cachedFiles!, isDecoy: false);
       return cachedFiles!;
     }
     if (!forceReload && isDecoy && cachedDecoyFiles != null) {
+      cachedDecoyFiles = await _visibleFiles(cachedDecoyFiles!, isDecoy: true);
       return cachedDecoyFiles!;
     }
 
@@ -172,18 +241,31 @@ class VaultStore implements LocalStore {
         debugPrint('[PB] loadFileIndex failed, falling back to legacy: $e');
       }
       if (pbFiles != null) {
-        cachedFiles = pbFiles;
+        final visible = await _visibleFiles(pbFiles, isDecoy: false);
+        final legacy = await _visibleFiles(
+            await _readLegacyFileIndex(isDecoy: false),
+            isDecoy: false);
+        cachedFiles = await _mergeRecoveryFallbacks(visible, legacy,
+            includeLegacyOnly: _nonDecoyDiverged);
+        if (jsonEncode(pbFiles.map((f) => f.toJson()).toList()) !=
+            jsonEncode(cachedFiles!.map((f) => f.toJson()).toList())) {
+          _nonDecoyDiverged = true;
+        }
         return cachedFiles!;
       }
       // PB unreachable: cache-first merge so entries written to legacy
       // during an earlier outage stay visible instead of being replaced.
       _nonDecoyDiverged = true;
       final legacy = await _readLegacyFileIndex(isDecoy: false);
-      cachedFiles = mergeFileLists(cachedFiles ?? const [], legacy);
+      cachedFiles = await _visibleFiles(
+          mergeFileLists(cachedFiles ?? const [], legacy),
+          isDecoy: false);
       return cachedFiles!;
     }
 
-    final files = await _readLegacyFileIndex(isDecoy: isDecoy);
+    final files = await _visibleFiles(
+        await _readLegacyFileIndex(isDecoy: isDecoy),
+        isDecoy: isDecoy);
     if (isDecoy) {
       cachedDecoyFiles = files;
       return cachedDecoyFiles!;
@@ -244,12 +326,44 @@ class VaultStore implements LocalStore {
     return [...base, ...extra.where((f) => !ids.contains(f.id))];
   }
 
+  /// An offline restore deliberately moves the payload to a unique path. A
+  /// recovered PB reader must not replace that record with its old, missing
+  /// path. This is recovery evidence, not timestamp-based conflict resolution:
+  /// a live PB payload always wins and unrelated same-id edits are untouched.
+  Future<List<VaultedFile>> _mergeRecoveryFallbacks(
+      List<VaultedFile> pbFiles, List<VaultedFile> legacy,
+      {bool includeLegacyOnly = false}) async {
+    final merged = List<VaultedFile>.of(pbFiles);
+    final positions = {for (var i = 0; i < merged.length; i++) merged[i].id: i};
+    for (final file in legacy) {
+      final restoredAt = file.metadata?['restoredAt'];
+      final explicitRestore =
+          restoredAt is String && DateTime.tryParse(restoredAt) != null;
+      final position = positions[file.id];
+      if (position == null) {
+        if ((includeLegacyOnly || explicitRestore) &&
+            await File(file.vaultPath).exists()) {
+          positions[file.id] = merged.length;
+          merged.add(file);
+        }
+      } else if (explicitRestore &&
+          merged[position].vaultPath != file.vaultPath &&
+          await File(file.vaultPath).exists() &&
+          !await File(merged[position].vaultPath).exists()) {
+        merged[position] = file;
+      }
+    }
+    return merged;
+  }
+
   /// Pull PB rows the cache is missing (outage survivors with their blob
   /// still on disk) back into the cache before a reconciling save, so
   /// reconcile doesn't delete them.
   Future<void> _healDivergedCache({Set<String> removedIds = const {}}) async {
     try {
-      final pbFiles = await pbStore!.loadFileIndex(forceReload: true);
+      final pbFiles = await _visibleFiles(
+          await pbStore!.loadFileIndex(forceReload: true),
+          isDecoy: false);
       final cacheIds = (cachedFiles ?? const []).map((f) => f.id).toSet();
       final missing = <VaultedFile>[];
       for (final f in pbFiles) {
@@ -274,24 +388,25 @@ class VaultStore implements LocalStore {
   Future<void> healLegacyDivergence() async {
     if (pbStore == null) return;
     try {
-      final pbFiles = await pbStore!.loadFileIndex(forceReload: true);
-      final legacy = await _readLegacyFileIndex(isDecoy: false);
-      final pbIds = pbFiles.map((f) => f.id).toSet();
-      final resurrected = <VaultedFile>[];
-      for (final f in legacy) {
-        if (pbIds.contains(f.id)) continue;
-        if (!await File(f.vaultPath).exists()) continue;
-        resurrected.add(f);
-      }
+      final rawPbFiles = await pbStore!.loadFileIndex(forceReload: true);
+      final pbFiles = await _visibleFiles(rawPbFiles, isDecoy: false);
+      final legacy = await _visibleFiles(
+          await _readLegacyFileIndex(isDecoy: false),
+          isDecoy: false);
+      final merged = await _mergeRecoveryFallbacks(pbFiles, legacy,
+          includeLegacyOnly: true);
       _nonDecoyDiverged = false;
-      if (resurrected.isEmpty) return;
+      if (jsonEncode(rawPbFiles.map((f) => f.toJson()).toList()) ==
+          jsonEncode(merged.map((f) => f.toJson()).toList())) {
+        return;
+      }
 
-      final merged = mergeFileLists(pbFiles, resurrected);
       cachedFiles = merged;
       pbStore!.cachedFiles = merged;
       await pbStore!.saveFileIndex();
-      await _writeLegacyFileIndex(files: merged, isDecoy: false);
-      debugPrint('[PB] healed ${resurrected.length} legacy-only entries');
+      await _writeLegacyFileIndex(
+          files: merged, isDecoy: false, strict: true, allowEmpty: true);
+      debugPrint('[PB] reconciled legacy recovery records and stale PB rows');
     } catch (e) {
       _nonDecoyDiverged = true;
       debugPrint('[PB] healLegacyDivergence failed: $e');
@@ -304,6 +419,12 @@ class VaultStore implements LocalStore {
       bool strict = false,
       bool allowEmpty = false,
       Set<String> removedIds = const {}}) async {
+    if (isDecoy) {
+      cachedDecoyFiles =
+          await _visibleFiles(cachedDecoyFiles ?? [], isDecoy: true);
+    } else {
+      cachedFiles = await _visibleFiles(cachedFiles ?? [], isDecoy: false);
+    }
     if (!isDecoy && pbStore != null) {
       if (_nonDecoyDiverged) {
         await _healDivergedCache(removedIds: removedIds);
@@ -360,7 +481,9 @@ class VaultStore implements LocalStore {
       final key = isDecoy ? decoyIndexKey : vaultIndexKey;
 
       if (unionWithLegacy) {
-        final legacy = await _readLegacyFileIndex(isDecoy: isDecoy);
+        final legacy = await _visibleFiles(
+            await _readLegacyFileIndex(isDecoy: isDecoy),
+            isDecoy: isDecoy);
         final fileIds = files.map((f) => f.id).toSet();
         final survivors = <VaultedFile>[];
         for (final f in legacy) {
@@ -699,6 +822,8 @@ class VaultStore implements LocalStore {
     if (await directory.exists()) {
       await directory.delete(recursive: true);
     }
+
+    await delete(recentlyDeletedKey(isDecoy));
 
     if (isDecoy) {
       cachedDecoyFiles = [];

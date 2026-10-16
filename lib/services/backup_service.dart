@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:archive/archive_io.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
@@ -89,8 +90,11 @@ class BackupService {
             error:
                 'Choose a folder outside Latch, such as Documents or a removable drive, so the backup survives uninstalling.');
       }
-      final filesToBackup =
-          files ?? await _vaultService.getAllFiles(isDecoy: false);
+      final activeFiles = await _vaultService.getAllFiles(isDecoy: false);
+      final selectedIds = files?.map((f) => f.id).toSet();
+      final filesToBackup = activeFiles
+          .where((f) => selectedIds == null || selectedIds.contains(f.id))
+          .toList();
       if (filesToBackup.isEmpty) {
         return BackupResult(
           success: false,
@@ -161,7 +165,14 @@ class BackupService {
         final passwordIndex = await _secureStorage.read(key: _passwordIndexKey);
         if (passwordIndex != null && passwordIndex.isNotEmpty) {
           final indexFile = File('${workDir.path}/$_passwordIndexEntry');
-          await indexFile.writeAsString(passwordIndex);
+          final passwordIds = filesToBackup
+              .map((f) => f.metadata?['passwordId'])
+              .whereType<String>()
+              .toSet();
+          final records = (jsonDecode(passwordIndex) as List<dynamic>)
+              .where((e) => passwordIds.contains(e['id']))
+              .toList();
+          await indexFile.writeAsString(jsonEncode(records));
           await encoder.addFile(indexFile, _passwordIndexEntry);
           try {
             await indexFile.delete();

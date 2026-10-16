@@ -313,7 +313,7 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
           ),
         ),
         content: Text(
-          'Delete $count ${count == 1 ? 'note' : 'notes'}? This cannot be undone.',
+          'Delete $count ${count == 1 ? 'note' : 'notes'}? Recover them in Recently Deleted when retention is enabled. If retention is set to Immediate deletion, this cannot be undone.',
           style: TextStyle(
             fontFamily: 'ProductSans',
             color: context.textSecondary,

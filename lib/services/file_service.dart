@@ -12,7 +12,7 @@ import 'compression_service.dart';
 import 'crypto_isolate_pool.dart';
 import 'encryption_service.dart';
 import 'file_operation_gate.dart';
-import 'sync_state_store.dart';
+import 'recently_deleted_service.dart';
 import 'thumbnail_service.dart';
 import 'vault_store.dart';
 
@@ -65,8 +65,8 @@ class _BatchPreparationResult {
 
 /// Outcome of a bulk delete.
 ///
-/// Only [removed] entries were deleted from disk and dropped from the index.
-/// [failed] entries are still in the index and can be retried.
+/// [removed] entries left the active vault (retained locally when configured).
+/// [failed] entries may have a durable pending recovery receipt for retry.
 class BulkDeleteResult {
   final List<String> removed;
   final List<String> failed;
@@ -89,6 +89,8 @@ class FileService {
   final VaultStore _store;
   final EncryptionService _encryptionService;
   final ThumbnailService _thumbnailService;
+  late final RecentlyDeletedService recentlyDeleted =
+      RecentlyDeletedService(_store, _encryptionService);
 
   FileService(this._store, this._encryptionService, this._thumbnailService);
   FileOperationGate get _operationGate => FileOperationGate.instance;
@@ -748,74 +750,13 @@ class FileService {
     }
   }
 
-  /// Deletes the on-disk payload and thumbnail for [file].
-  ///
-  /// Throws when either deletion fails so callers can retain the index entry
-  /// and let the user retry.
-  Future<void> _deleteFilePayload(VaultedFile file) async {
-    final vaultFile = File(file.vaultPath);
-    if (await vaultFile.exists()) {
-      if (_store.cachedSettings?.secureDelete == true) {
-        final deleted = await _encryptionService.secureDelete(file.vaultPath);
-        if (!deleted) {
-          throw FileSystemException('Secure delete failed', file.vaultPath);
-        }
-      } else {
-        await vaultFile.delete();
-      }
-    }
-
-    final thumbnailPath = file.thumbnailPath;
-    if (thumbnailPath != null) {
-      final thumbFile = File(thumbnailPath);
-      if (await thumbFile.exists()) {
-        await thumbFile.delete();
-      }
-    }
-  }
-
   Future<bool> removeFile(String fileId, {bool isDecoy = false}) async {
     if (!_operationGate.allowsMutation) return false;
     try {
       final files = await _store.loadFileIndex(isDecoy: isDecoy);
-      final fileIndex = files.indexWhere((f) => f.id == fileId);
-
-      if (fileIndex == -1) return false;
-
-      final file = files[fileIndex];
-
-      if (!_operationGate.allowsMutation) return false;
-      await _deleteFilePayload(file);
-      if (!isDecoy) await SyncStateStore.recordDeletion(file.id);
-
-      if (!isDecoy && file.albumIds.isNotEmpty) {
-        for (final albumId in file.albumIds) {
-          await removeFileFromAlbumFn?.call(fileId, albumId);
-        }
-      }
-
-      if (!isDecoy && file.folderId != null) {
-        _store.cachedFolders ??= await _store.loadFolders();
-        final folderIndex =
-            _store.cachedFolders!.indexWhere((f) => f.id == file.folderId);
-        if (folderIndex != -1) {
-          _store.cachedFolders![folderIndex] =
-              _store.cachedFolders![folderIndex].removeFile(fileId);
-          await _store.saveFolders();
-        }
-      }
-
-      if (isDecoy) {
-        _store.cachedDecoyFiles!.removeAt(fileIndex);
-        await _store.saveFileIndex(
-            isDecoy: true, strict: true, allowEmpty: true);
-      } else {
-        _store.cachedFiles!.removeAt(fileIndex);
-        await _store.saveFileIndex(
-            strict: true, allowEmpty: true, removedIds: {fileId});
-      }
-
-      return true;
+      final file = files.where((f) => f.id == fileId).firstOrNull;
+      return file != null &&
+          await recentlyDeleted.delete(file, isDecoy: isDecoy);
     } catch (e) {
       debugPrint('Error removing file from vault: $e');
       return false;
@@ -837,8 +778,6 @@ class FileService {
     final filesToDelete = fileIndex.where((f) => idSet.contains(f.id)).toList();
     final totalSize = filesToDelete.fold<int>(0, (s, f) => s + f.fileSize);
 
-    final albumUpdates = <String, Set<String>>{};
-    final folderUpdates = <String, Set<String>>{};
     final removedIds = <String>[];
     final foundIds = filesToDelete.map((file) => file.id).toSet();
     final failedIds = fileIds.where((id) => !foundIds.contains(id)).toList();
@@ -859,21 +798,12 @@ class FileService {
         currentFileName: file.originalName,
       );
       try {
-        await _deleteFilePayload(file);
-        if (!isDecoy) await SyncStateStore.recordDeletion(file.id);
-
-        if (!isDecoy && file.albumIds.isNotEmpty) {
-          for (final albumId in file.albumIds) {
-            albumUpdates.putIfAbsent(albumId, () => {}).add(file.id);
-          }
+        if (await recentlyDeleted.delete(file, isDecoy: isDecoy)) {
+          removedIds.add(file.id);
+          currentSize += file.fileSize;
+        } else {
+          failedIds.add(file.id);
         }
-
-        if (!isDecoy && file.folderId != null) {
-          folderUpdates.putIfAbsent(file.folderId!, () => {}).add(file.id);
-        }
-
-        removedIds.add(file.id);
-        currentSize += file.fileSize;
       } catch (e) {
         debugPrint('Error deleting file ${file.id}: $e');
         failedIds.add(file.id);
@@ -885,54 +815,6 @@ class FileService {
         totalSize: totalSize,
         currentFileName: file.originalName,
       );
-    }
-
-    if (!isDecoy && albumUpdates.isNotEmpty) {
-      final albums = await _store.loadAlbums();
-      bool albumsChanged = false;
-      for (final entry in albumUpdates.entries) {
-        final albumIdx = albums.indexWhere((a) => a.id == entry.key);
-        if (albumIdx != -1) {
-          var album = albums[albumIdx];
-          for (final fid in entry.value) {
-            album = album.removeFile(fid);
-          }
-          albums[albumIdx] = album;
-          albumsChanged = true;
-        }
-      }
-      if (albumsChanged) await _store.saveAlbums();
-    }
-
-    if (!isDecoy && folderUpdates.isNotEmpty) {
-      _store.cachedFolders ??= await _store.loadFolders();
-      bool foldersChanged = false;
-      for (final entry in folderUpdates.entries) {
-        final folderIdx =
-            _store.cachedFolders!.indexWhere((f) => f.id == entry.key);
-        if (folderIdx != -1) {
-          var folder = _store.cachedFolders![folderIdx];
-          for (final fid in entry.value) {
-            folder = folder.removeFile(fid);
-          }
-          _store.cachedFolders![folderIdx] = folder;
-          foldersChanged = true;
-        }
-      }
-      if (foldersChanged) await _store.saveFolders();
-    }
-
-    if (removedIds.isNotEmpty) {
-      final removedSet = removedIds.toSet();
-      if (isDecoy) {
-        _store.cachedDecoyFiles!.removeWhere((f) => removedSet.contains(f.id));
-        await _store.saveFileIndex(
-            isDecoy: true, strict: true, allowEmpty: true);
-      } else {
-        _store.cachedFiles!.removeWhere((f) => removedSet.contains(f.id));
-        await _store.saveFileIndex(
-            strict: true, allowEmpty: true, removedIds: removedSet);
-      }
     }
 
     return BulkDeleteResult(removed: removedIds, failed: failedIds);
@@ -1579,6 +1461,7 @@ class FileService {
       kdfIterations: kdfIterations,
       folderId: folderId,
       metadata: {'noteId': noteId},
+      isDecoy: isDecoy,
     );
 
     if (existingIndex != -1) {
@@ -1642,6 +1525,7 @@ class FileService {
       encryptionAlgorithm: encryptionAlgorithm,
       kdfIterations: kdfIterations,
       metadata: {'passwordId': passwordId},
+      isDecoy: isDecoy,
     );
 
     if (existingIndex != -1) {

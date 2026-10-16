@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:locker/models/vaulted_file.dart';
 import 'package:locker/services/pb/pb_client.dart';
@@ -123,7 +123,34 @@ class _MemRemote implements RemoteStore {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  // These tests exercise an actual loopback server, not widget-test HTTP mocks.
+  HttpOverrides.global = null;
   final key = Uint8List.fromList(List.filled(32, 7));
+  const storageChannel =
+      MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
+  final storage = <String, String>{};
+  setUp(() {
+    storage.clear();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(storageChannel, (call) async {
+      final args = call.arguments as Map;
+      final key = args['key'] as String?;
+      switch (call.method) {
+        case 'read':
+          return storage[key];
+        case 'write':
+          storage[key!] = args['value'] as String;
+          return null;
+        default:
+          throw UnsupportedError(call.method);
+      }
+    });
+  });
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(storageChannel, null);
+  });
 
   test(
       'P4.4 e2e: seed vault → PB rows appear → runSync pushes blobs + '
@@ -200,8 +227,8 @@ void main() {
       masterKey: key,
     );
 
-    // Legacy path in a bare test env has no secure storage → empty index,
-    // but the PB failure is swallowed, not propagated.
+    // An empty legacy index is a valid fallback. Recovery metadata is still
+    // read strictly, even when PB is unavailable.
     expect(await store.loadFileIndex(forceReload: true), isEmpty);
   });
 }

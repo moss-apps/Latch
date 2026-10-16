@@ -342,7 +342,7 @@ class _PasswordListScreenState extends ConsumerState<PasswordListScreen> {
           ),
         ),
         content: Text(
-          'Delete ${_selectedIds.length} entry(s)? This cannot be undone.',
+          'Delete ${_selectedIds.length} entry(s)? Recover them in Recently Deleted when retention is enabled. If retention is set to Immediate deletion, this cannot be undone.',
           style: TextStyle(
             fontFamily: 'ProductSans',
             color: context.textSecondary,

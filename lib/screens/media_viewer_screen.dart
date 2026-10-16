@@ -1463,7 +1463,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
           ),
         ),
         content: Text(
-          'Are you sure you want to delete "${file.originalName}"?',
+          'Delete "${file.originalName}"? Recover it in Recently Deleted when retention is enabled. If retention is set to Immediate deletion, this cannot be undone.',
           style: TextStyle(
             fontFamily: 'ProductSans',
             color: context.textSecondary,

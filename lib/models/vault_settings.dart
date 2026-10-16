@@ -7,6 +7,10 @@ class VaultSettings {
   final EncryptionAlgorithm encryptionAlgorithm;
   final int kdfIterations;
   final bool secureDelete;
+
+  /// Applies to future deletions only. Zero opts out of local recovery.
+  final int recentlyDeletedRetentionDays;
+  static const retentionOptions = [0, 7, 30, 90];
   final bool screenshotProtectionEnabled;
   final int autoKillDelaySeconds;
   final bool autoKillEnabled;
@@ -41,6 +45,7 @@ class VaultSettings {
     this.encryptionAlgorithm = EncryptionAlgorithm.aes256Gcm,
     this.kdfIterations = 600000,
     this.secureDelete = true,
+    this.recentlyDeletedRetentionDays = 30,
     this.screenshotProtectionEnabled = false,
     this.autoKillDelaySeconds = 0,
     this.autoKillEnabled = true,
@@ -71,6 +76,7 @@ class VaultSettings {
     EncryptionAlgorithm? encryptionAlgorithm,
     int? kdfIterations,
     bool? secureDelete,
+    int? recentlyDeletedRetentionDays,
     bool? screenshotProtectionEnabled,
     int? autoKillDelaySeconds,
     bool? autoKillEnabled,
@@ -100,6 +106,8 @@ class VaultSettings {
       encryptionAlgorithm: encryptionAlgorithm ?? this.encryptionAlgorithm,
       kdfIterations: kdfIterations ?? this.kdfIterations,
       secureDelete: secureDelete ?? this.secureDelete,
+      recentlyDeletedRetentionDays:
+          recentlyDeletedRetentionDays ?? this.recentlyDeletedRetentionDays,
       screenshotProtectionEnabled:
           screenshotProtectionEnabled ?? this.screenshotProtectionEnabled,
       autoKillDelaySeconds: autoKillDelaySeconds ?? this.autoKillDelaySeconds,
@@ -141,6 +149,7 @@ class VaultSettings {
         'encryptionAlgorithm': encryptionAlgorithm.name,
         'kdfIterations': kdfIterations,
         'secureDelete': secureDelete,
+        'recentlyDeletedRetentionDays': recentlyDeletedRetentionDays,
         'screenshotProtectionEnabled': screenshotProtectionEnabled,
         'autoKillDelaySeconds': autoKillDelaySeconds,
         'autoKillEnabled': autoKillEnabled,
@@ -176,6 +185,10 @@ class VaultSettings {
       ),
       kdfIterations: json['kdfIterations'] as int? ?? 600000,
       secureDelete: json['secureDelete'] as bool? ?? true,
+      recentlyDeletedRetentionDays:
+          retentionOptions.contains(json['recentlyDeletedRetentionDays'])
+              ? json['recentlyDeletedRetentionDays'] as int
+              : 30,
       screenshotProtectionEnabled:
           json['screenshotProtectionEnabled'] as bool? ?? false,
       autoKillDelaySeconds: json['autoKillDelaySeconds'] as int? ?? 0,

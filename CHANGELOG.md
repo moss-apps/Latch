@@ -4,6 +4,20 @@ Notable changes to Latch.
 
 ## 0.18.0-beta.1
 
+### Recovery & Product Polish
+- **Recently Deleted** — local-only recovery with 30-day default retention,
+  7/30/90-day or immediate-deletion choices, restore, and explicit permanent
+  deletion. Expiry cleanup runs while unlocked and on unlock/resume.
+- Durable recovery receipts protect interrupted operations, including note and
+  password metadata; new ZIP/desktop backups exclude trash. WebDAV records local
+  deletion intent for the next sync without erasing retained remote blobs.
+- Bottom navigation keeps all categories reachable at narrow widths and large
+  text sizes, with labeled scrolling tabs, selected semantics, and keyboard access.
+- Gallery import coordination, drawer, thumbnails, and filtering extracted into
+  focused components; display and selection now share structured filters.
+- README/setup and recovery/sync policy documentation refreshed; device checks
+  documented separately from automated verification.
+
 ### Desktop Backup & Restore (latchd)
 - **latchd desktop companion** — Go-based companion binary hosting the Latch web UI for pairing and encrypted vault backup over Wi-Fi or USB
 - Pairing receiver with QR approval; web UI binds loopback only

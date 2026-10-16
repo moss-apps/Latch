@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:locker/models/album.dart';
+import 'package:locker/models/deleted_vault_item.dart';
 import 'package:locker/models/file_to_vault.dart';
 import 'package:locker/models/vault_folder.dart';
 import 'package:locker/models/vault_settings.dart';
@@ -762,6 +763,75 @@ void main() {
     });
   });
 
+  group('PB recovery divergence', () {
+    test('stale PB rows stay hidden through trash, purge and healing',
+        () async {
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+      final file = _pbEraFile('purged-offline', tmpDir);
+      final pb = _FakePBStore(files: [file]);
+      vault.store.pbStore = pb;
+      await vault.store.loadFileIndex(forceReload: true);
+      await vault.updateSettings(const VaultSettings(secureDelete: false));
+      pb.saveError = StateError('sidecar offline');
+      expect(await vault.removeFile(file.id), isTrue);
+      expect(await vault.store.loadFileIndex(forceReload: true), isEmpty);
+      expect(await vault.recentlyDeleted.permanentlyDelete(file.id), isTrue);
+      expect(await vault.store.loadDeletedItems(), isEmpty);
+      pb.saveError = null;
+      expect(await vault.store.loadFileIndex(forceReload: true), isEmpty);
+      await vault.store.healLegacyDivergence();
+      expect(await vault.getAllFiles(), isEmpty);
+      expect(await pb.loadFileIndex(), isEmpty);
+    });
+
+    test('restore after PB outage converges at the unique restored path',
+        () async {
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+      final file = _pbEraFile('restore-offline', tmpDir);
+      final pb = _FakePBStore(files: [file]);
+      vault.store.pbStore = pb;
+      await vault.store.loadFileIndex(forceReload: true);
+      pb.saveError = StateError('sidecar offline');
+      expect(await vault.removeFile(file.id), isTrue);
+      expect(await vault.recentlyDeleted.restore(file.id), isTrue);
+      final restored = (await vault.getAllFiles()).single;
+      expect(restored.vaultPath, isNot(file.vaultPath));
+      pb.saveError = null;
+      // A new session has no in-memory divergence flag. Its first PB read
+      // must still find the explicitly restored, valid legacy payload.
+      final reopened = await _freshVault(storage: storage, tmpDir: tmpDir);
+      reopened.store.pbStore = pb;
+      expect(
+          (await reopened.store.loadFileIndex(forceReload: true))
+              .single
+              .vaultPath,
+          restored.vaultPath);
+      await reopened.store.healLegacyDivergence();
+      final converged = (await pb.loadFileIndex()).single;
+      expect(converged.vaultPath, restored.vaultPath);
+      expect(await File(converged.vaultPath).readAsString(),
+          'blob-restore-offline');
+    });
+
+    test('a live same-id PB payload is not replaced by an older restore',
+        () async {
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+      final live = _pbEraFile('live-pb', tmpDir);
+      final restored = _pbEraFile('old-restored', tmpDir).copyWith(
+          id: live.id,
+          metadata: {'restoredAt': DateTime.utc(2026).toIso8601String()});
+      storage[VaultStore.vaultIndexKey] = jsonEncode([restored.toJson()]);
+      final pb = _FakePBStore(files: [live]);
+      vault.store.pbStore = pb;
+      expect(
+          (await vault.store.loadFileIndex(forceReload: true)).single.vaultPath,
+          live.vaultPath);
+      await vault.store.healLegacyDivergence();
+      expect((await pb.loadFileIndex()).single.vaultPath, live.vaultPath);
+      expect(await File(restored.vaultPath).exists(), isTrue);
+    });
+  });
+
   group('removeFiles failure safety', () {
     VaultedFile undeletable(String id) => VaultedFile(
           id: id,
@@ -798,7 +868,7 @@ void main() {
       expect(names, everyElement('named.jpg'));
     });
 
-    test('failed deletion keeps only the failed entry and can be retried',
+    test('failed move retains an authoritative recovery receipt and payload',
         () async {
       if (!Platform.isLinux) return;
       final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
@@ -817,18 +887,18 @@ void main() {
       expect(result.failed, ['bad']);
       expect(result.allSucceeded, isFalse);
       expect(File(good.vaultPath).existsSync(), isFalse);
-      expect((await vault.getAllFiles()).map((f) => f.id), ['bad']);
-
-      final fixedPath = '${tmpDir.path}/bad-fixed';
-      File(fixedPath).writeAsStringSync('blob-bad');
-      await vault.updateFile(bad.copyWith(vaultPath: fixedPath));
-
-      final retry = await vault.removeFiles(['bad']);
-      expect(retry.allSucceeded, isTrue);
       expect(await vault.getAllFiles(), isEmpty);
+      final receipts = await vault.store.loadDeletedItems();
+      expect(receipts.map((e) => e.file.id), containsAll(['good', 'bad']));
+      expect(receipts.firstWhere((e) => e.file.id == 'bad').stage,
+          DeletionStage.deleting);
+      expect(File(bad.vaultPath).existsSync(), isTrue);
+      expect(await vault.recentlyDeleted.maintain(), isFalse);
+      expect(await vault.recentlyDeleted.restore('good'), isTrue);
+      expect((await vault.getAllFiles()).single.id, 'good');
     });
 
-    test('failed thumbnail deletion keeps the entry and can be retried',
+    test('failed thumbnail move keeps the moved payload in a pending receipt',
         () async {
       if (!Platform.isLinux) return;
       final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
@@ -845,15 +915,16 @@ void main() {
 
       expect(result.removed, isEmpty);
       expect(result.failed, ['thumbed']);
-      expect(await vault.getAllFiles(), hasLength(1));
-
-      await vault.updateFile(file.copyWith(thumbnailPath: ''));
-      final retry = await vault.removeFiles(['thumbed']);
-      expect(retry.allSucceeded, isTrue);
       expect(await vault.getAllFiles(), isEmpty);
+      final receipt = (await vault.store.loadDeletedItems()).single;
+      expect(receipt.stage, DeletionStage.deleting);
+      expect(await File(receipt.payloadPath).readAsString(), 'blob-thumbed');
+      expect(File('/proc/version').existsSync(), isTrue);
+      expect(await vault.recentlyDeleted.maintain(), isFalse);
     });
 
-    test('secure delete failure keeps the entry', () async {
+    test('move failure never reaches secure deletion or loses its receipt',
+        () async {
       if (!Platform.isLinux) return;
       final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
       await vault.updateSettings(
@@ -867,7 +938,9 @@ void main() {
 
       expect(result.removed, isEmpty);
       expect(result.failed, ['bad']);
-      expect((await vault.getAllFiles()).map((f) => f.id), ['bad']);
+      expect(await vault.getAllFiles(), isEmpty);
+      expect((await vault.store.loadDeletedItems()).single.file.id, 'bad');
+      expect(File('/proc/version').existsSync(), isTrue);
     });
   });
 }

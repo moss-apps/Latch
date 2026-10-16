@@ -2,9 +2,11 @@
 
 ## Overview
 
-The vault is device-local. This document specifies encrypted-at-rest sync to a
-user-chosen WebDAV server (NAS, home server, self-hosted cloud), push-only or
-two-way. The server never sees plaintext: it is dumb encrypted blob storage.
+The vault is device-local. Latch supports push-only or two-way sync to a
+user-chosen WebDAV server (NAS, home server, self-hosted cloud). The manifest
+is encrypted, but payloads are transferred **as stored**: encrypted imports
+remain encrypted; hidden, unencrypted imports remain plaintext on the server.
+Enable file encryption before importing sensitive content and prefer HTTPS.
 
 Status: **Phase 3 complete** (2026-10-06). Streaming transfers, durable
 encrypted sync state, review-first conflict recovery, byte progress, and
@@ -18,7 +20,7 @@ the Phase 3 hardware guide.
 
 - Push the vault to a user-chosen server and pull it back on another device
   or after a wipe, without losing a version to a race.
-- The server sees opaque encrypted bytes only.
+- Keep the manifest encrypted and preserve each file's chosen encryption state.
 - Manual sync first; scheduled/background sync later.
 - Reuse the existing encrypted file format, manifest schema, and key model —
   no new crypto, and older manifests stay readable.
@@ -30,8 +32,8 @@ the Phase 3 hardware guide.
 - A hosted cloud account; sync is local / self-hosted only.
 - Multiple simultaneous servers (one remote per vault).
 - Streaming media playback from the server (sync, not remote mount).
-- Payload GC / reaping. Superseded and deleted payloads are retained on both
-  sides for recovery; the manifest is the source of truth (see *Retention*).
+- Remote payload GC / reaping. Superseded and deleted remote blobs remain
+  retained. Explicit local deletions follow Recently Deleted (see *Retention*).
 - Carrying the vault master key through WebDAV. Key continuity is a separate
   concern; see *Key continuity and reinstall*.
 
@@ -40,6 +42,7 @@ the Phase 3 hardware guide.
 | Asset | Where | Exposure if server is compromised |
 |---|---|---|
 | Media ciphertext | Server | Safe. AES-256-GCM/CTR, per-file key derived via PBKDF2 from the master key. Server sees blobs only. |
+| Hidden, unencrypted file payloads | Server, as stored | Readable by the server. Hiding alone is not encryption; HTTPS protects transit, not server-side storage. |
 | Manifest (index, names, tags, albums, folders) | Server, encrypted | Safe: GCM-encrypted with the master key. The raw `vault_file_index` JSON is never uploaded. |
 | Server credentials (URL, user, app password) | `flutter_secure_storage` → Android Keystore | Safe; same path as the PIN/master-key wrap. |
 | Sync baseline + write-ahead journal | `<vault>/.sync-state/`, encrypted | Safe: AES-GCM with the master key. Contains manifest entries + hashes, no credentials. |
@@ -48,8 +51,9 @@ the Phase 3 hardware guide.
 
 Hard rules:
 
-- **Plaintext never crosses the network.** `BackupService`'s decrypted ZIP
-  stays a local export; it is not a sync transport.
+- **Sync does not decrypt or add encryption to payloads.** Hidden, unencrypted
+  files therefore cross the network as plaintext unless TLS protects transit.
+  `BackupService`'s decrypted ZIP is a separate local export, not a sync transport.
 - **The manifest and local sync state are encrypted** with the vault master
   key. The server holds `manifest.enc` plus content-addressed blobs.
 - **Credentials live in `flutter_secure_storage`**, never in `VaultSettings`
@@ -57,7 +61,7 @@ Hard rules:
 - **TLS by default**; WebDAV over plain HTTP on the LAN (self-signed certs,
   `.local` hostnames) is allowed only with an explicit warning, never by
   silent downgrade.
-- **No implicit trust in the server.** Pulls verify sha256 of the ciphertext
+- **No implicit trust in the server.** Pulls verify sha256 of the stored payload
   against the authenticated manifest before anything enters the vault.
 - **No silent unsafe publication.** If the server does not actually honor
   revision preconditions, sync stops with a plain-language error instead of
@@ -97,11 +101,11 @@ interface remains for older callers/tests; production sync uses
 ```
 <basePath>/                     # SyncProfile.basePath, default /locker
   manifest.enc                  # encrypted index + metadata + tombstones
-  ab/cd/<64-hex>.enc            # content-addressed encrypted media (sha256 of ciphertext)
+  ab/cd/<64-hex>.enc            # sha256 of stored payload; suffix does not imply encryption
   ef/01/<64-hex>.enc
 ```
 
-Blobs stay content-addressed by ciphertext hash: dedupe across devices, easy
+Blobs stay content-addressed by stored-payload hash: dedupe across devices, easy
 diff (the manifest lists hashes, not paths), and renames/moves are
 metadata-only. Transfers temporarily add `<name>.<uuid>.partial` staging
 objects between the canonical paths; a compatible server never exposes a
@@ -190,9 +194,17 @@ sync reports the revision race.
   - **Later** → leave unresolved; the next run reports it again.
   A saved choice is honored only if both current fingerprints still match the
   ones recorded at decision time; otherwise the conflict is re-raised.
-- **Deletion recording.** A successful delete in the vault registers the id
-  in `locker_sync_deletions` before the index entry is removed. Failed
-  deletions keep their entry (Phase 0 behavior) and register nothing.
+  If the local id is in Recently Deleted, restore it or permanently delete its
+  retained local copy before selecting Remote/Keep both. Sync cannot silently
+  pull a same-id version behind the recovery receipt.
+- **Deletion recording.** A local delete first saves a durable recovery receipt,
+  then records the id in `locker_sync_deletions` before moving payloads or
+  removing index/editor records. An interrupted operation stays hidden behind
+  that receipt and retries on unlock/resume. Sync also uses receipt timestamps
+  as explicit deletion evidence if the separate tombstone write was interrupted.
+  Failure to save the initial receipt leaves the active entry and bytes intact.
+  A remote-only id with explicit deletion evidence but no agreed baseline is
+  reviewed instead of being silently re-imported or deleted.
 - **Commit ordering and recovery.** Every transfer finishes before commit;
   the journal (with the checkpoint, affected local/refreshed entries, and the
   expected manifest hash) is encrypted to disk, then `manifest.enc` is
@@ -219,12 +231,20 @@ and shows "checking files" / "finishing safely" for hash and commit phases.
 
 ### Retention
 
-Superseded blobs and tombstones keep their payloads on both sides. Remote
-deletes are logical (manifest tombstones); local deletes remove the index
-entry but the file is only removed by an explicit user delete. Nothing in the
-sync path calls `DELETE` on a canonical blob. This is a deliberate
-data-recovery trade-off; reclaiming space is out of scope until a safe GC
-design exists.
+Remote deletes are logical manifest tombstones. Nothing in the sync path calls
+`DELETE` on a canonical remote blob; superseded remote versions remain retained
+until a separate safe GC policy exists. A server-originated tombstone also
+retains the previous local payload under the Phase 3 policy; it is not
+automatically added to Recently Deleted.
+
+Explicit **local user deletions** instead follow the Phase 5
+[Recently Deleted policy](recently_deleted.md): 30 days by default, configurable
+7/30/90 days or immediate deletion. Local expiry/permanent deletion removes the
+retained local payload and thumbnail, not remote blobs or existing backups.
+Cleanup runs while unlocked and on unlock/resume, not as a guaranteed OS
+background job. Restoring clears local deletion evidence, preserves bytes and
+key metadata, and records explicit restore intent for the next manual sync;
+divergence against a remote edit/deletion remains review-first.
 
 ## Key continuity and reinstall
 

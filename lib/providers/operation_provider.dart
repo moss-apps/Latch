@@ -7,6 +7,8 @@ import '../services/operation_controller.dart';
 import '../services/vault_operation_runner.dart';
 import '../utils/toast_utils.dart';
 import 'explorer_providers.dart';
+import 'note_providers.dart';
+import 'password_providers.dart';
 import 'vault_providers.dart';
 
 final operationControllerProvider = Provider<OperationController>((ref) {
@@ -23,6 +25,8 @@ final operationControllerProvider = Provider<OperationController>((ref) {
       ref.invalidate(foldersNotifierProvider);
       ref.invalidate(totalStorageProvider);
       ref.invalidate(vaultSettingsProvider);
+      ref.invalidate(notesNotifierProvider);
+      ref.invalidate(passwordsNotifierProvider);
       ref.invalidate(explorerSubfoldersProvider);
       switch (outcome.kind) {
         case OperationOutcomeKind.success:

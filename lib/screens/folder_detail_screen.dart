@@ -872,7 +872,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
               TextStyle(fontFamily: 'ProductSans', color: context.textPrimary),
         ),
         content: Text(
-          'Permanently delete ${_selectedFiles.length} file${_selectedFiles.length == 1 ? '' : 's'}? This cannot be undone.',
+          'Delete ${_selectedFiles.length} file${_selectedFiles.length == 1 ? '' : 's'}? Recover them in Recently Deleted when retention is enabled. If retention is set to Immediate deletion, this cannot be undone.',
           style: TextStyle(
               fontFamily: 'ProductSans', color: context.textSecondary),
         ),

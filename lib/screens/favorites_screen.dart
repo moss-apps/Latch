@@ -923,7 +923,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
           ),
         ),
         content: Text(
-          'Are you sure you want to delete ${_selectedFiles.length} file(s)? This action cannot be undone.',
+          'Delete ${_selectedFiles.length} file(s)? Recover them in Recently Deleted when retention is enabled. If retention is set to Immediate deletion, this cannot be undone.',
           style: TextStyle(
             fontFamily: 'ProductSans',
             color: context.textSecondary,
