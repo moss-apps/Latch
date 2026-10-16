@@ -61,6 +61,7 @@ void main() {
           SyncDirection direction = SyncDirection.twoWay,
           SyncControl? control,
           Map<String, DateTime> deletions = const {},
+          Set<String> retainedLocalIds = const {},
           SyncStateStore? stateStore,
           void Function(SyncProgress)? progress}) =>
       SyncService.runSync(
@@ -74,6 +75,7 @@ void main() {
           control: control,
           onProgress: progress,
           deletions: deletions,
+          retainedLocalIds: retainedLocalIds,
           stateStore: stateStore,
           target: 'target');
 
@@ -196,6 +198,90 @@ void main() {
     final result = await run([], checkpoint: seed.checkpoint);
     expect(manifest().entries.single.deleted, isFalse);
     expect(result.filesDeleted, 0);
+  });
+
+  test('recorded deletion with no target baseline is reviewed, never re-pulled',
+      () async {
+    await run([await file('a')]);
+    final result = await run([],
+        deletions: {'a': DateTime.now().toUtc()}, retainedLocalIds: {'a'});
+    expect(result.blobsPulled, 0);
+    expect(result.refreshedLocal, isEmpty);
+    expect(result.checkpoint.conflicts.single.local.deleted, isTrue);
+    expect(manifest().entries.single.deleted, isFalse);
+  });
+
+  test('receipt without a completed tombstone write blocks remote-only pulls',
+      () async {
+    await run([await file('a')]);
+    final result = await run([], retainedLocalIds: {'a'});
+    expect(result.blobsPulled, 0);
+    expect(result.refreshedLocal, isEmpty);
+    expect(result.checkpoint.conflicts.single.local.deleted, isTrue);
+    expect(manifest().entries.single.deleted, isFalse);
+  });
+
+  test('saved remote choice cannot pull over a local recovery receipt',
+      () async {
+    final seed = await run([await file('a')]);
+    final other = manifest().entries.single.copyWith(tags: ['remote-edit']);
+    remote.manifest = SyncService.encryptManifest(
+        RemoteManifest(
+            deviceId: 'other', generatedAt: DateTime.now(), entries: [other]),
+        key);
+    final deletion = DateTime.now().toUtc();
+    final conflict =
+        (await run([], checkpoint: seed.checkpoint, deletions: {'a': deletion}))
+            .checkpoint
+            .conflicts
+            .single;
+    final result = await run([],
+        checkpoint:
+            SyncCheckpoint(baseline: seed.checkpoint.baseline, conflicts: [
+          SyncConflict(
+              local: conflict.local,
+              remote: conflict.remote,
+              choice: ConflictChoice.remote)
+        ]),
+        deletions: {'a': deletion},
+        retainedLocalIds: {'a'});
+    expect(result.blobsPulled, 0);
+    expect(result.checkpoint.conflicts.single.choice, isNull);
+    expect(result.refreshedLocal, isEmpty);
+    expect(remote.operations, isNot(contains('delete')));
+  });
+
+  test('restore after committed tombstone publishes live metadata again',
+      () async {
+    final seed = await run([await file('a')]);
+    final deleted = await run([],
+        checkpoint: seed.checkpoint, deletions: {'a': DateTime.now().toUtc()});
+    final restored = seed.refreshedLocal.single.copyWith(
+        modifiedAt: DateTime.now().toUtc(),
+        metadata: {'restoredAt': DateTime.now().toUtc().toIso8601String()});
+    final result = await run([restored], checkpoint: deleted.checkpoint);
+    expect(result.checkpoint.conflicts, isEmpty);
+    expect(manifest().entries.single.deleted, isFalse);
+    expect(remote.blobs, hasLength(1));
+  });
+
+  test('explicit restore versus new remote deletion is reviewable', () async {
+    final seed = await run([await file('a')]);
+    final tombstone = manifest().entries.single.copyWith(deleted: true);
+    remote.manifest = SyncService.encryptManifest(
+        RemoteManifest(
+            deviceId: 'other',
+            generatedAt: DateTime.now(),
+            entries: [tombstone]),
+        key);
+    final restoredAt = DateTime.now().toUtc();
+    final restored = seed.refreshedLocal.single.copyWith(
+        modifiedAt: restoredAt,
+        metadata: {'restoredAt': restoredAt.toIso8601String()});
+    final result = await run([restored], checkpoint: seed.checkpoint);
+    expect(result.checkpoint.conflicts, hasLength(1));
+    expect(result.refreshedLocal.single.id, restored.id);
+    expect(result.plan.toTombstoneLocal, isEmpty);
   });
 
   test('delete versus remote edit is reviewable rather than destructive',
