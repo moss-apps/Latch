@@ -1043,7 +1043,8 @@ class _AddFilesToAlbumSheetState extends ConsumerState<_AddFilesToAlbumSheet> {
                           )
                         : Text(
                             'Add (${_selectedFiles.length})',
-                            style: const TextStyle(fontFamily: 'GoogleSansFlex'),
+                            style:
+                                const TextStyle(fontFamily: 'GoogleSansFlex'),
                           ),
                   ),
               ],

@@ -94,8 +94,8 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
         ),
         title: Text(
           '${_selectedFiles.length} selected',
-          style:
-              const TextStyle(fontFamily: 'GoogleSansFlex', color: Colors.white),
+          style: const TextStyle(
+              fontFamily: 'GoogleSansFlex', color: Colors.white),
         ),
         actions: [
           if (files.isNotEmpty)
@@ -817,8 +817,8 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         title: Text(
           'Remove from Folder',
-          style:
-              TextStyle(fontFamily: 'GoogleSansFlex', color: context.textPrimary),
+          style: TextStyle(
+              fontFamily: 'GoogleSansFlex', color: context.textPrimary),
         ),
         content: Text(
           'Remove ${_selectedFiles.length} file${_selectedFiles.length == 1 ? '' : 's'} from this folder? The files will not be deleted from the vault.',
@@ -830,7 +830,8 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
             onPressed: () => Navigator.pop(context, false),
             child: Text('Cancel',
                 style: TextStyle(
-                    fontFamily: 'GoogleSansFlex', color: context.textSecondary)),
+                    fontFamily: 'GoogleSansFlex',
+                    color: context.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -868,8 +869,8 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         title: Text(
           'Delete Files',
-          style:
-              TextStyle(fontFamily: 'GoogleSansFlex', color: context.textPrimary),
+          style: TextStyle(
+              fontFamily: 'GoogleSansFlex', color: context.textPrimary),
         ),
         content: Text(
           'Delete ${_selectedFiles.length} file${_selectedFiles.length == 1 ? '' : 's'}? Recover them in Recently Deleted when retention is enabled. If retention is set to Immediate deletion, this cannot be undone.',
@@ -881,7 +882,8 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
             onPressed: () => Navigator.pop(context, false),
             child: Text('Cancel',
                 style: TextStyle(
-                    fontFamily: 'GoogleSansFlex', color: context.textSecondary)),
+                    fontFamily: 'GoogleSansFlex',
+                    color: context.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -987,8 +989,8 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         title: Text(
           'Create Subfolder',
-          style:
-              TextStyle(fontFamily: 'GoogleSansFlex', color: context.textPrimary),
+          style: TextStyle(
+              fontFamily: 'GoogleSansFlex', color: context.textPrimary),
         ),
         content: TextField(
           controller: nameController,
@@ -1009,7 +1011,8 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
             onPressed: () => Navigator.pop(context),
             child: Text('Cancel',
                 style: TextStyle(
-                    fontFamily: 'GoogleSansFlex', color: context.textSecondary)),
+                    fontFamily: 'GoogleSansFlex',
+                    color: context.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -1153,7 +1156,8 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
             onPressed: () => Navigator.pop(context),
             child: Text('Cancel',
                 style: TextStyle(
-                    fontFamily: 'GoogleSansFlex', color: context.textSecondary)),
+                    fontFamily: 'GoogleSansFlex',
+                    color: context.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -1206,7 +1210,8 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
             onPressed: () => Navigator.pop(context),
             child: Text('Cancel',
                 style: TextStyle(
-                    fontFamily: 'GoogleSansFlex', color: context.textSecondary)),
+                    fontFamily: 'GoogleSansFlex',
+                    color: context.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -1442,7 +1447,8 @@ class _AddFilesToFolderSheetState
                           )
                         : Text(
                             'Add (${_selectedFileIds.length})',
-                            style: const TextStyle(fontFamily: 'GoogleSansFlex'),
+                            style:
+                                const TextStyle(fontFamily: 'GoogleSansFlex'),
                           ),
                   ),
               ],
@@ -1779,8 +1785,8 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
             : null,
         title: const Text(
           'Select Folder to Import',
-          style:
-              TextStyle(fontFamily: 'GoogleSansFlex', fontWeight: FontWeight.w600),
+          style: TextStyle(
+              fontFamily: 'GoogleSansFlex', fontWeight: FontWeight.w600),
         ),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         foregroundColor: context.textPrimary,
@@ -1892,7 +1898,8 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
                   label: const Text(
                     'Import This Folder',
                     style: TextStyle(
-                        fontFamily: 'GoogleSansFlex', fontWeight: FontWeight.w600),
+                        fontFamily: 'GoogleSansFlex',
+                        fontWeight: FontWeight.w600),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: context.accentColor,
@@ -1978,7 +1985,8 @@ class _ImportProgressDialogState extends ConsumerState<_ImportProgressDialog> {
         _isImporting
             ? 'Importing Folder'
             : (_error != null ? 'Import Failed' : 'Import Complete'),
-        style: TextStyle(fontFamily: 'GoogleSansFlex', color: context.textPrimary),
+        style:
+            TextStyle(fontFamily: 'GoogleSansFlex', color: context.textPrimary),
       ),
       content: Column(
         mainAxisSize: MainAxisSize.min,

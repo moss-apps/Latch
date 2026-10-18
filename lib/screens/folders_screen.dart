@@ -1051,8 +1051,8 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
             : null,
         title: const Text(
           'Select Folder to Import',
-          style:
-              TextStyle(fontFamily: 'GoogleSansFlex', fontWeight: FontWeight.w600),
+          style: TextStyle(
+              fontFamily: 'GoogleSansFlex', fontWeight: FontWeight.w600),
         ),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         foregroundColor: context.textPrimary,
@@ -1168,7 +1168,8 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
                   label: const Text(
                     'Import This Folder',
                     style: TextStyle(
-                        fontFamily: 'GoogleSansFlex', fontWeight: FontWeight.w600),
+                        fontFamily: 'GoogleSansFlex',
+                        fontWeight: FontWeight.w600),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: context.accentColor,

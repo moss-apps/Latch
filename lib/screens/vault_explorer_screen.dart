@@ -131,7 +131,8 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
       ),
       title: Text(
         '${selectedFiles.length} selected',
-        style: const TextStyle(fontFamily: 'GoogleSansFlex', color: Colors.white),
+        style:
+            const TextStyle(fontFamily: 'GoogleSansFlex', color: Colors.white),
       ),
       actions: [
         if (files.isNotEmpty)
@@ -492,8 +493,8 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         title: Text(
           currentFolderId != null ? 'Create Subfolder' : 'Create Folder',
-          style:
-              TextStyle(fontFamily: 'GoogleSansFlex', color: context.textPrimary),
+          style: TextStyle(
+              fontFamily: 'GoogleSansFlex', color: context.textPrimary),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -539,7 +540,8 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
             child: Text(
               'Cancel',
               style: TextStyle(
-                  fontFamily: 'GoogleSansFlex', color: this.context.textSecondary),
+                  fontFamily: 'GoogleSansFlex',
+                  color: this.context.textSecondary),
             ),
           ),
           ElevatedButton(
@@ -674,7 +676,8 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
           decoration: InputDecoration(
             labelText: 'Folder Name',
             labelStyle: TextStyle(
-                fontFamily: 'GoogleSansFlex', color: this.context.textSecondary),
+                fontFamily: 'GoogleSansFlex',
+                color: this.context.textSecondary),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),

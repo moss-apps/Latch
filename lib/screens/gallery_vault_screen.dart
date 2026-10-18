@@ -2218,7 +2218,8 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                                 ),
                                 title: const Text(
                                   'Set Decoy PIN',
-                                  style: TextStyle(fontFamily: 'GoogleSansFlex'),
+                                  style:
+                                      TextStyle(fontFamily: 'GoogleSansFlex'),
                                 ),
                                 subtitle: Text(
                                   settings.hasPinSet
