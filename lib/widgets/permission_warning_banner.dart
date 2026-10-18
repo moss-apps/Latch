@@ -156,7 +156,7 @@ class _PermissionWarningBannerState
                         const Text(
                           'All Files Access Required',
                           style: TextStyle(
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -166,7 +166,7 @@ class _PermissionWarningBannerState
                         Text(
                           'To hide files from other apps, Latch needs permission to access all files on your device.',
                           style: TextStyle(
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                             fontSize: 13,
                             color: Colors.white.withValues(alpha: 0.9),
                             height: 1.3,

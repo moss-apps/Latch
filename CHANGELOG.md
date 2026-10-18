@@ -18,6 +18,11 @@ Notable changes to Latch.
 - README/setup and recovery/sync policy documentation refreshed; device checks
   documented separately from automated verification.
 
+### Typography
+- Replaced proprietary Product Sans with OFL-licensed **Google Sans Flex** in the
+  app and latchd web UI. The four regular/italic/bold/bold-italic faces are
+  self-hosted, and the font license appears under Open Source Libraries.
+
 ### Desktop Backup & Restore (latchd)
 - **latchd desktop companion** — Go-based companion binary hosting the Latch web UI for pairing and encrypted vault backup over Wi-Fi or USB
 - Pairing receiver with QR approval; web UI binds loopback only

@@ -29,7 +29,7 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
         title: const Text(
           'Albums',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -51,7 +51,7 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
               Text(
                 'Failed to load albums',
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   color: context.textSecondary,
                 ),
               ),
@@ -74,7 +74,7 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
         label: const Text(
           'New Album',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontWeight: FontWeight.w600,
             color: Colors.white,
           ),
@@ -128,7 +128,7 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
         fontSize: 14,
         fontWeight: FontWeight.w600,
         color: context.textTertiary,
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
         letterSpacing: 0.5,
       ),
     );
@@ -197,7 +197,7 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
                         child: Text(
                           album.name,
                           style: TextStyle(
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                             fontWeight: FontWeight.w600,
                             color: context.textPrimary,
                             fontSize: 14,
@@ -212,7 +212,7 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
                   Text(
                     '${album.fileCount} items',
                     style: TextStyle(
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                       color: context.textTertiary,
                       fontSize: 12,
                     ),
@@ -381,7 +381,7 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
               Text(
                 'Create Album',
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   color: context.accentColor,
                   fontWeight: FontWeight.w600,
                 ),
@@ -418,7 +418,7 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
               fontSize: 20,
               fontWeight: FontWeight.w600,
               color: context.textPrimary,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
             ),
           ),
           const SizedBox(height: 8),
@@ -427,7 +427,7 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
             style: TextStyle(
               fontSize: 14,
               color: context.textSecondary,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
             ),
           ),
           const SizedBox(height: 24),
@@ -495,7 +495,7 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: context.textPrimary,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -546,7 +546,7 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
       title: Text(
         label,
         style: TextStyle(
-          fontFamily: 'ProductSans',
+          fontFamily: 'GoogleSansFlex',
           color: color ?? AppColors.lightTextPrimary,
         ),
       ),
@@ -566,7 +566,7 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
         title: Text(
           'Create Album',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textPrimary,
           ),
         ),
@@ -578,7 +578,7 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
               decoration: InputDecoration(
                 labelText: 'Album Name',
                 labelStyle: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   color: context.textSecondary,
                 ),
                 border: OutlineInputBorder(
@@ -597,7 +597,7 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
               decoration: InputDecoration(
                 labelText: 'Description (optional)',
                 labelStyle: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   color: context.textSecondary,
                 ),
                 border: OutlineInputBorder(
@@ -618,7 +618,7 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
             child: Text(
               'Cancel',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
               ),
             ),
@@ -653,7 +653,7 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
             ),
             child: const Text(
               'Create',
-              style: TextStyle(fontFamily: 'ProductSans'),
+              style: TextStyle(fontFamily: 'GoogleSansFlex'),
             ),
           ),
         ],
@@ -674,7 +674,7 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
         title: Text(
           'Rename Album',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textPrimary,
           ),
         ),
@@ -683,7 +683,7 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
           decoration: InputDecoration(
             labelText: 'Album Name',
             labelStyle: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: context.textSecondary,
             ),
             border: OutlineInputBorder(
@@ -702,7 +702,7 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
             child: Text(
               'Cancel',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
               ),
             ),
@@ -733,7 +733,7 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
             ),
             child: const Text(
               'Rename',
-              style: TextStyle(fontFamily: 'ProductSans'),
+              style: TextStyle(fontFamily: 'GoogleSansFlex'),
             ),
           ),
         ],
@@ -749,14 +749,14 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
         title: Text(
           'Delete Album',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textPrimary,
           ),
         ),
         content: Text(
           'Are you sure you want to delete "${album.name}"? Files in this album will not be deleted.',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textSecondary,
           ),
         ),
@@ -766,7 +766,7 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
             child: Text(
               'Cancel',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
               ),
             ),
@@ -791,7 +791,7 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
             ),
             child: const Text(
               'Delete',
-              style: TextStyle(fontFamily: 'ProductSans'),
+              style: TextStyle(fontFamily: 'GoogleSansFlex'),
             ),
           ),
         ],
@@ -873,7 +873,7 @@ class _ChangeCoverSheetState extends ConsumerState<_ChangeCoverSheet> {
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: context.textPrimary,
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                     ),
                   ),
                 ),
@@ -899,7 +899,7 @@ class _ChangeCoverSheetState extends ConsumerState<_ChangeCoverSheet> {
                           )
                         : const Text(
                             'Save',
-                            style: TextStyle(fontFamily: 'ProductSans'),
+                            style: TextStyle(fontFamily: 'GoogleSansFlex'),
                           ),
                   ),
               ],
@@ -913,7 +913,7 @@ class _ChangeCoverSheetState extends ConsumerState<_ChangeCoverSheet> {
                 child: Text(
                   'Failed to load files',
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     color: context.textSecondary,
                   ),
                 ),
@@ -951,7 +951,7 @@ class _ChangeCoverSheetState extends ConsumerState<_ChangeCoverSheet> {
                         Text(
                           'No images available',
                           style: TextStyle(
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                             color: context.textSecondary,
                           ),
                         ),
@@ -959,7 +959,7 @@ class _ChangeCoverSheetState extends ConsumerState<_ChangeCoverSheet> {
                         Text(
                           'Add some images to your vault first',
                           style: TextStyle(
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                             fontSize: 12,
                             color: context.textTertiary,
                           ),
@@ -981,7 +981,7 @@ class _ChangeCoverSheetState extends ConsumerState<_ChangeCoverSheet> {
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: context.textTertiary,
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                           ),
                         ),
                       ),
@@ -1105,7 +1105,7 @@ class _ChangeCoverSheetState extends ConsumerState<_ChangeCoverSheet> {
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 10,
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                   ),
                 ),
               ),

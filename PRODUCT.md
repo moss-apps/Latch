@@ -15,7 +15,7 @@ the interface must explain that users should pair on trusted networks.
 The approved redesign covers the shared shell, full-page settings, and phone
 pairing, including responsive browser layouts. Settings is a sidebar destination,
 not a dialog. Use familiar Google Drive navigation and restrained Proton Drive
-control/panel treatment while retaining Latch's logo, ProductSans, Material icons,
+control/panel treatment while retaining Latch's logo, Google Sans Flex, Material icons,
 light/dark themes, and saved accent choices. Preserve the existing file browser.
 
 Success means users can find preferences and backup operations quickly, connect

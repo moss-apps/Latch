@@ -69,7 +69,7 @@ class OfficeConverterService {
     if (_fontLoaded) return _cachedFontBytes;
     _fontLoaded = true;
     try {
-      final fontData = await rootBundle.load('fonts/productsans_regular.ttf');
+      final fontData = await rootBundle.load('fonts/googlesansflex_regular.ttf');
       _cachedFontBytes = fontData.buffer.asUint8List();
     } catch (e) {
       debugPrint('Could not load custom font for PDF: $e');

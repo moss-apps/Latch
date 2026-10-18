@@ -113,7 +113,7 @@ class _PinInputWidgetState extends State<PinInputWidget> {
             Text(
               'PIN',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
               ),
             ),
@@ -121,7 +121,7 @@ class _PinInputWidgetState extends State<PinInputWidget> {
             Text(
               'Enter your 6-digit PIN',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textTertiary,
                 fontSize: 13,
               ),

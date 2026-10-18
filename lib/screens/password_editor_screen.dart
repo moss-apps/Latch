@@ -182,7 +182,7 @@ class _PasswordEditorScreenState extends ConsumerState<PasswordEditorScreen> {
         title: Text(
           isEditing ? 'Edit Entry' : 'New Entry',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontSize: 18,
             fontWeight: FontWeight.w600,
             color: context.textPrimary,
@@ -275,7 +275,7 @@ class _PasswordEditorScreenState extends ConsumerState<PasswordEditorScreen> {
     return TextField(
       controller: _titleController,
       style: TextStyle(
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
         fontSize: 22,
         fontWeight: FontWeight.w600,
         color: context.textPrimary,
@@ -283,7 +283,7 @@ class _PasswordEditorScreenState extends ConsumerState<PasswordEditorScreen> {
       decoration: InputDecoration(
         hintText: 'Title',
         hintStyle: TextStyle(
-          fontFamily: 'ProductSans',
+          fontFamily: 'GoogleSansFlex',
           fontSize: 22,
           fontWeight: FontWeight.w600,
           color: context.textTertiary,
@@ -310,14 +310,14 @@ class _PasswordEditorScreenState extends ConsumerState<PasswordEditorScreen> {
       maxLines: maxLines,
       autofillHints: autofillHints,
       style: TextStyle(
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
         fontSize: 15,
         color: context.textPrimary,
       ),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(
-          fontFamily: 'ProductSans',
+          fontFamily: 'GoogleSansFlex',
           fontSize: 14,
           color: context.textTertiary,
         ),
@@ -350,14 +350,14 @@ class _PasswordEditorScreenState extends ConsumerState<PasswordEditorScreen> {
         isEditing ? AutofillHints.password : AutofillHints.newPassword
       ],
       style: TextStyle(
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
         fontSize: 15,
         color: context.textPrimary,
       ),
       decoration: InputDecoration(
         labelText: 'Password',
         labelStyle: TextStyle(
-          fontFamily: 'ProductSans',
+          fontFamily: 'GoogleSansFlex',
           fontSize: 14,
           color: context.textTertiary,
         ),
@@ -416,7 +416,7 @@ class _PasswordEditorScreenState extends ConsumerState<PasswordEditorScreen> {
         Text(
           'Tags',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontSize: 14,
             color: context.textSecondary,
           ),
@@ -431,7 +431,7 @@ class _PasswordEditorScreenState extends ConsumerState<PasswordEditorScreen> {
                 label: Text(
                   tag,
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     fontSize: 12,
                     color: context.accentColor,
                   ),
@@ -451,14 +451,14 @@ class _PasswordEditorScreenState extends ConsumerState<PasswordEditorScreen> {
               child: TextField(
                 controller: _tagController,
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontSize: 14,
                   color: context.textPrimary,
                 ),
                 decoration: InputDecoration(
                   hintText: 'Add tag...',
                   hintStyle: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     fontSize: 14,
                     color: context.textTertiary,
                   ),
@@ -499,7 +499,7 @@ class _PasswordEditorScreenState extends ConsumerState<PasswordEditorScreen> {
         Text(
           'Encryption',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontSize: 14,
             color: context.textSecondary,
           ),
@@ -514,7 +514,7 @@ class _PasswordEditorScreenState extends ConsumerState<PasswordEditorScreen> {
               selected: selected,
               selectedColor: context.accentColor.withValues(alpha: 0.2),
               labelStyle: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontSize: 13,
                 color: selected ? context.accentColor : context.textSecondary,
               ),
@@ -539,7 +539,7 @@ class _PasswordEditorScreenState extends ConsumerState<PasswordEditorScreen> {
         Text(
           'Key Derivation Iterations',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontSize: 14,
             color: context.textSecondary,
           ),
@@ -554,7 +554,7 @@ class _PasswordEditorScreenState extends ConsumerState<PasswordEditorScreen> {
               selected: selected,
               selectedColor: context.accentColor.withValues(alpha: 0.2),
               labelStyle: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontSize: 13,
                 color: selected ? context.accentColor : context.textSecondary,
               ),

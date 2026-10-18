@@ -546,7 +546,7 @@ class _DocumentPickerScreenState extends State<DocumentPickerScreen> {
         title: Text(
           widget.title,
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textPrimary,
             fontWeight: FontWeight.w600,
           ),
@@ -596,7 +596,7 @@ class _DocumentPickerScreenState extends State<DocumentPickerScreen> {
         decoration: InputDecoration(
           hintText: 'Search ${widget.itemLabelPlural}...',
           hintStyle: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textTertiary,
           ),
           prefixIcon: Icon(Icons.search, color: context.textTertiary),
@@ -619,7 +619,7 @@ class _DocumentPickerScreenState extends State<DocumentPickerScreen> {
               const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
         style: TextStyle(
-          fontFamily: 'ProductSans',
+          fontFamily: 'GoogleSansFlex',
           color: context.textPrimary,
         ),
       ),
@@ -654,7 +654,7 @@ class _DocumentPickerScreenState extends State<DocumentPickerScreen> {
                       child: Text(
                         _currentFolder,
                         style: TextStyle(
-                          fontFamily: 'ProductSans',
+                          fontFamily: 'GoogleSansFlex',
                           color: context.textPrimary,
                           fontWeight: FontWeight.w500,
                         ),
@@ -682,13 +682,13 @@ class _DocumentPickerScreenState extends State<DocumentPickerScreen> {
                       Expanded(
                         child: Text(
                           folder,
-                          style: const TextStyle(fontFamily: 'ProductSans'),
+                          style: const TextStyle(fontFamily: 'GoogleSansFlex'),
                         ),
                       ),
                       Text(
                         '($count)',
                         style: TextStyle(
-                          fontFamily: 'ProductSans',
+                          fontFamily: 'GoogleSansFlex',
                           color: context.textTertiary,
                           fontSize: 12,
                         ),
@@ -733,7 +733,7 @@ class _DocumentPickerScreenState extends State<DocumentPickerScreen> {
                     const SizedBox(width: 8),
                     Text(
                       option.label,
-                      style: const TextStyle(fontFamily: 'ProductSans'),
+                      style: const TextStyle(fontFamily: 'GoogleSansFlex'),
                     ),
                   ],
                 ),
@@ -757,7 +757,7 @@ class _DocumentPickerScreenState extends State<DocumentPickerScreen> {
           Text(
             'Scanning for ${widget.itemLabelPlural}...',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               fontSize: 16,
               color: context.textSecondary,
             ),
@@ -784,7 +784,7 @@ class _DocumentPickerScreenState extends State<DocumentPickerScreen> {
               _error ?? 'An error occurred',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontSize: 16,
                 color: context.textSecondary,
               ),
@@ -826,7 +826,7 @@ class _DocumentPickerScreenState extends State<DocumentPickerScreen> {
                 ? 'No ${widget.itemLabelPlural} matching "$_searchQuery"'
                 : 'No ${widget.itemLabelPlural} found',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               fontSize: 18,
               color: context.textSecondary,
             ),
@@ -836,7 +836,7 @@ class _DocumentPickerScreenState extends State<DocumentPickerScreen> {
             'Your ${widget.itemLabelPlural} will appear here when found on your device',
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               fontSize: 14,
               color: context.textTertiary,
             ),
@@ -910,7 +910,7 @@ class _DocumentPickerScreenState extends State<DocumentPickerScreen> {
                         Text(
                           doc.name,
                           style: TextStyle(
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                             fontSize: 15,
                             fontWeight: FontWeight.w500,
                             color: context.textPrimary,
@@ -924,7 +924,7 @@ class _DocumentPickerScreenState extends State<DocumentPickerScreen> {
                             Text(
                               doc.formattedSize,
                               style: TextStyle(
-                                fontFamily: 'ProductSans',
+                                fontFamily: 'GoogleSansFlex',
                                 fontSize: 12,
                                 color: context.textSecondary,
                               ),
@@ -941,7 +941,7 @@ class _DocumentPickerScreenState extends State<DocumentPickerScreen> {
                             Text(
                               doc.formattedDate,
                               style: TextStyle(
-                                fontFamily: 'ProductSans',
+                                fontFamily: 'GoogleSansFlex',
                                 fontSize: 12,
                                 color: context.textSecondary,
                               ),
@@ -967,7 +967,7 @@ class _DocumentPickerScreenState extends State<DocumentPickerScreen> {
                               child: Text(
                                 doc.extension.toUpperCase(),
                                 style: TextStyle(
-                                  fontFamily: 'ProductSans',
+                                  fontFamily: 'GoogleSansFlex',
                                   fontSize: 10,
                                   fontWeight: FontWeight.w600,
                                   color: doc.iconColor,
@@ -1011,7 +1011,7 @@ class _DocumentPickerScreenState extends State<DocumentPickerScreen> {
                                 color: Colors.white,
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
-                                fontFamily: 'ProductSans',
+                                fontFamily: 'GoogleSansFlex',
                               ),
                             ),
                           )
@@ -1050,7 +1050,7 @@ class _DocumentPickerScreenState extends State<DocumentPickerScreen> {
             child: Text(
               '${_selectedDocuments.length} selected',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: context.textPrimary,

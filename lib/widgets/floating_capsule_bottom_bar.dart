@@ -121,7 +121,7 @@ class FloatingCapsuleBottomBar extends StatelessWidget {
   static const double _squircleN = 4.5;
 
   static const _labelStyle = TextStyle(
-      fontFamily: 'ProductSans',
+      fontFamily: 'GoogleSansFlex',
       fontSize: 12,
       height: 1.3,
       fontWeight: FontWeight.w600);

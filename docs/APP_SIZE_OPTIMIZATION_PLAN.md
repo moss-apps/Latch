@@ -122,20 +122,17 @@ Or create `.flutter-plugins-dependencies` exclusion.
 
 ### 1d. Font subsetting
 
-**Current:** 4 Product Sans variants × ~50 KB = 206 KB  
-**Action:** Subset to Latin glyphs only, or drop unused italic variants
+**Current:** 4 Google Sans Flex static variants × ~78 KB = 315 KB. The files are
+already subset to Latin + punctuation by `scripts/build-google-sans-flex.py`.
+
+**Remaining option:** Drop Bold Italic (~79 KB) if no screen needs bold italic,
+or drop both italics (~158 KB). Italics are used sparingly for Markdown
+blockquotes and a few legal/changelog labels.
+
+**Regenerate:**
 
 ```bash
-# Install fonttools
-pip install fonttools
-
-# Subset to Latin (example)
-pyftsubset fonts/productsans_regular.ttf --unicodes="0000-00FF"
-```
-
-**Check usage:**
-```bash
-grep -r "productsans_italic" lib/  # If 0 results, drop italic variants
+python3 scripts/build-google-sans-flex.py
 ```
 
 ### 1e. Enable ABI splits for APK builds

@@ -97,7 +97,7 @@ class _LegalConsentScreenState extends State<LegalConsentScreen>
                   fontSize: 28,
                   fontWeight: FontWeight.w700,
                   color: context.textPrimary,
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                 ),
               ),
               const SizedBox(height: 8),
@@ -106,7 +106,7 @@ class _LegalConsentScreenState extends State<LegalConsentScreen>
                 style: TextStyle(
                   fontSize: 14,
                   color: context.textSecondary,
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   height: 1.5,
                 ),
               ),
@@ -116,7 +116,7 @@ class _LegalConsentScreenState extends State<LegalConsentScreen>
                 isScrollable: true,
                 tabAlignment: TabAlignment.start,
                 labelStyle: const TextStyle(
-                    fontFamily: 'ProductSans', fontWeight: FontWeight.w600),
+                    fontFamily: 'GoogleSansFlex', fontWeight: FontWeight.w600),
                 tabs: [for (final d in _docs) Tab(text: d.$1)],
               ),
               const SizedBox(height: 8),
@@ -157,7 +157,7 @@ class _LegalConsentScreenState extends State<LegalConsentScreen>
                   style: TextStyle(
                     fontSize: 12,
                     color: context.textTertiary,
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                   ),
                 ),
               ),

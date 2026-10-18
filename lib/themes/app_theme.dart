@@ -36,7 +36,7 @@ class AppTheme {
       canvasColor: AppColors.darkBackground,
 
       // Typography
-      fontFamily: 'ProductSans',
+      fontFamily: 'GoogleSansFlex',
       textTheme: _buildTextTheme(AppColors.darkTextPrimary),
 
       // App Bar
@@ -51,7 +51,7 @@ class AppTheme {
           color: AppColors.darkTextPrimary,
           fontSize: 20,
           fontWeight: FontWeight.w600,
-          fontFamily: 'ProductSans',
+          fontFamily: 'GoogleSansFlex',
         ),
         systemOverlayStyle: const SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
@@ -159,12 +159,12 @@ class AppTheme {
           color: AppColors.darkTextPrimary,
           fontSize: 20,
           fontWeight: FontWeight.w600,
-          fontFamily: 'ProductSans',
+          fontFamily: 'GoogleSansFlex',
         ),
         contentTextStyle: const TextStyle(
           color: AppColors.darkTextSecondary,
           fontSize: 16,
-          fontFamily: 'ProductSans',
+          fontFamily: 'GoogleSansFlex',
         ),
       ),
 
@@ -263,7 +263,7 @@ class AppTheme {
       canvasColor: AppColors.lightBackground,
 
       // Typography
-      fontFamily: 'ProductSans',
+      fontFamily: 'GoogleSansFlex',
       textTheme: _buildTextTheme(AppColors.lightTextPrimary),
 
       // App Bar
@@ -278,7 +278,7 @@ class AppTheme {
           color: AppColors.lightTextPrimary,
           fontSize: 20,
           fontWeight: FontWeight.w600,
-          fontFamily: 'ProductSans',
+          fontFamily: 'GoogleSansFlex',
         ),
         systemOverlayStyle: const SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
@@ -389,91 +389,91 @@ class AppTheme {
         color: textColor,
         fontSize: 57,
         fontWeight: FontWeight.w400,
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
       ),
       displayMedium: TextStyle(
         color: textColor,
         fontSize: 45,
         fontWeight: FontWeight.w400,
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
       ),
       displaySmall: TextStyle(
         color: textColor,
         fontSize: 36,
         fontWeight: FontWeight.w400,
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
       ),
       headlineLarge: TextStyle(
         color: textColor,
         fontSize: 32,
         fontWeight: FontWeight.w600,
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
       ),
       headlineMedium: TextStyle(
         color: textColor,
         fontSize: 28,
         fontWeight: FontWeight.w600,
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
       ),
       headlineSmall: TextStyle(
         color: textColor,
         fontSize: 24,
         fontWeight: FontWeight.w600,
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
       ),
       titleLarge: TextStyle(
         color: textColor,
         fontSize: 22,
         fontWeight: FontWeight.w500,
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
       ),
       titleMedium: TextStyle(
         color: textColor,
         fontSize: 16,
         fontWeight: FontWeight.w500,
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
       ),
       titleSmall: TextStyle(
         color: textColor,
         fontSize: 14,
         fontWeight: FontWeight.w500,
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
       ),
       bodyLarge: TextStyle(
         color: textColor,
         fontSize: 16,
         fontWeight: FontWeight.w400,
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
       ),
       bodyMedium: TextStyle(
         color: textColor,
         fontSize: 14,
         fontWeight: FontWeight.w400,
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
       ),
       bodySmall: TextStyle(
         color: textColor,
         fontSize: 12,
         fontWeight: FontWeight.w400,
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
       ),
       labelLarge: TextStyle(
         color: textColor,
         fontSize: 14,
         fontWeight: FontWeight.w500,
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
       ),
       labelMedium: TextStyle(
         color: textColor,
         fontSize: 12,
         fontWeight: FontWeight.w500,
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
       ),
       labelSmall: TextStyle(
         color: textColor,
         fontSize: 11,
         fontWeight: FontWeight.w500,
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
       ),
     );
   }

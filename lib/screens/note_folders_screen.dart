@@ -38,7 +38,7 @@ class _NoteFoldersScreenState extends ConsumerState<NoteFoldersScreen> {
         title: Text(
           'Note Folders',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontSize: 18,
             fontWeight: FontWeight.w600,
             color: context.textPrimary,
@@ -61,7 +61,7 @@ class _NoteFoldersScreenState extends ConsumerState<NoteFoldersScreen> {
                   Text(
                     'No folders yet',
                     style: TextStyle(
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                       fontSize: 16,
                       color: context.textTertiary,
                     ),
@@ -94,7 +94,7 @@ class _NoteFoldersScreenState extends ConsumerState<NoteFoldersScreen> {
                 title: Text(
                   folder.name,
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
                     color: context.textPrimary,
@@ -103,7 +103,7 @@ class _NoteFoldersScreenState extends ConsumerState<NoteFoldersScreen> {
                 subtitle: Text(
                   '$noteCount ${noteCount == 1 ? 'note' : 'notes'}',
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     fontSize: 12,
                     color: context.textTertiary,
                   ),
@@ -129,7 +129,7 @@ class _NoteFoldersScreenState extends ConsumerState<NoteFoldersScreen> {
                           Text(
                             'Rename',
                             style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               color: context.textPrimary,
                             ),
                           ),
@@ -146,7 +146,7 @@ class _NoteFoldersScreenState extends ConsumerState<NoteFoldersScreen> {
                           Text(
                             'Delete',
                             style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               color: AppColors.error,
                             ),
                           ),
@@ -169,7 +169,7 @@ class _NoteFoldersScreenState extends ConsumerState<NoteFoldersScreen> {
           child: Text(
             'Error loading folders',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: context.textTertiary,
             ),
           ),
@@ -221,7 +221,7 @@ class _NoteFoldersScreenState extends ConsumerState<NoteFoldersScreen> {
         title: Text(
           title,
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontWeight: FontWeight.w600,
             color: context.textPrimary,
           ),
@@ -230,13 +230,13 @@ class _NoteFoldersScreenState extends ConsumerState<NoteFoldersScreen> {
           controller: _nameController,
           autofocus: true,
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textPrimary,
           ),
           decoration: InputDecoration(
             hintText: 'Folder name',
             hintStyle: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: context.textTertiary,
             ),
             filled: true,
@@ -261,7 +261,7 @@ class _NoteFoldersScreenState extends ConsumerState<NoteFoldersScreen> {
             child: Text(
               'Cancel',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
               ),
             ),
@@ -272,7 +272,7 @@ class _NoteFoldersScreenState extends ConsumerState<NoteFoldersScreen> {
             child: Text(
               'Save',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.accentColor,
               ),
             ),
@@ -290,7 +290,7 @@ class _NoteFoldersScreenState extends ConsumerState<NoteFoldersScreen> {
         title: Text(
           'Delete Folder',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontWeight: FontWeight.w600,
             color: context.textPrimary,
           ),
@@ -298,7 +298,7 @@ class _NoteFoldersScreenState extends ConsumerState<NoteFoldersScreen> {
         content: Text(
           'Delete "${folder.name}"? Notes in this folder will not be deleted.',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textSecondary,
           ),
         ),
@@ -308,7 +308,7 @@ class _NoteFoldersScreenState extends ConsumerState<NoteFoldersScreen> {
             child: Text(
               'Cancel',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
               ),
             ),
@@ -318,7 +318,7 @@ class _NoteFoldersScreenState extends ConsumerState<NoteFoldersScreen> {
             child: Text(
               'Delete',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: AppColors.error,
               ),
             ),

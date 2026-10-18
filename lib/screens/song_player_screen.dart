@@ -153,7 +153,7 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen> {
               Expanded(
                 child: Text(
                   'Exporting ${widget.file.originalName}...',
-                  style: const TextStyle(fontFamily: 'ProductSans'),
+                  style: const TextStyle(fontFamily: 'GoogleSansFlex'),
                 ),
               ),
             ],
@@ -205,7 +205,7 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen> {
               Expanded(
                 child: Text(
                   'Preparing ${widget.file.originalName}...',
-                  style: const TextStyle(fontFamily: 'ProductSans'),
+                  style: const TextStyle(fontFamily: 'GoogleSansFlex'),
                 ),
               ),
             ],
@@ -271,7 +271,7 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen> {
         title: Text(
           'Song Player',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textPrimary,
             fontWeight: FontWeight.w600,
           ),
@@ -334,7 +334,7 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen> {
             _error ?? 'Something went wrong',
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               fontSize: 16,
               color: context.textSecondary,
             ),
@@ -401,7 +401,7 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontSize: 24,
                         fontWeight: FontWeight.w700,
                         color: context.textPrimary,
@@ -412,7 +412,7 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen> {
                       '${widget.file.extension.toUpperCase()} • ${widget.file.formattedSize}',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontSize: 14,
                         color: context.textSecondary,
                       ),
@@ -435,14 +435,14 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen> {
                           Text(
                             _formatDuration(position),
                             style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               color: context.textSecondary,
                             ),
                           ),
                           Text(
                             _formatDuration(duration),
                             style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               color: context.textSecondary,
                             ),
                           ),

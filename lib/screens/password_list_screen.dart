@@ -65,7 +65,7 @@ class _PasswordListScreenState extends ConsumerState<PasswordListScreen> {
               title: Text(
                 'Passwords',
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontSize: 20,
                   fontWeight: FontWeight.w600,
                   color: context.textPrimary,
@@ -82,13 +82,13 @@ class _PasswordListScreenState extends ConsumerState<PasswordListScreen> {
                 ref.read(passwordSearchQueryProvider.notifier).state = value;
               },
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textPrimary,
               ),
               decoration: InputDecoration(
                 hintText: 'Search passwords',
                 hintStyle: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   color: context.textTertiary,
                 ),
                 prefixIcon:
@@ -132,7 +132,7 @@ class _PasswordListScreenState extends ConsumerState<PasswordListScreen> {
                               ? 'No passwords found'
                               : 'No passwords yet',
                           style: TextStyle(
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                             fontSize: 15,
                             color: context.textTertiary,
                           ),
@@ -195,7 +195,7 @@ class _PasswordListScreenState extends ConsumerState<PasswordListScreen> {
                 child: Text(
                   'Error loading passwords',
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     color: context.textTertiary,
                   ),
                 ),
@@ -244,7 +244,7 @@ class _PasswordListScreenState extends ConsumerState<PasswordListScreen> {
                 Text(
                   'Autofill is available',
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: context.accentColor,
@@ -255,7 +255,7 @@ class _PasswordListScreenState extends ConsumerState<PasswordListScreen> {
                   'Enable in Android Settings to fill logins in any app:\n'
                   'Settings → Passwords & accounts → Autofill service → Latch',
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     fontSize: 12,
                     color: context.textSecondary,
                     height: 1.4,
@@ -292,7 +292,7 @@ class _PasswordListScreenState extends ConsumerState<PasswordListScreen> {
       title: Text(
         '${_selectedIds.length} selected',
         style: TextStyle(
-          fontFamily: 'ProductSans',
+          fontFamily: 'GoogleSansFlex',
           fontSize: 18,
           fontWeight: FontWeight.w600,
           color: context.textPrimary,
@@ -336,7 +336,7 @@ class _PasswordListScreenState extends ConsumerState<PasswordListScreen> {
         title: Text(
           'Delete Passwords',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontWeight: FontWeight.w600,
             color: context.textPrimary,
           ),
@@ -344,7 +344,7 @@ class _PasswordListScreenState extends ConsumerState<PasswordListScreen> {
         content: Text(
           'Delete ${_selectedIds.length} entry(s)? Recover them in Recently Deleted when retention is enabled. If retention is set to Immediate deletion, this cannot be undone.',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textSecondary,
           ),
         ),
@@ -354,7 +354,7 @@ class _PasswordListScreenState extends ConsumerState<PasswordListScreen> {
             child: Text(
               'Cancel',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
               ),
             ),
@@ -364,7 +364,7 @@ class _PasswordListScreenState extends ConsumerState<PasswordListScreen> {
             child: Text(
               'Delete',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: AppColors.error,
               ),
             ),

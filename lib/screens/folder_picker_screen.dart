@@ -185,7 +185,7 @@ class _FolderPickerScreenState extends State<FolderPickerScreen> {
         title: Text(
           _pathStack.isEmpty ? 'Choose folder' : _displayName(_pathStack.last),
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontWeight: FontWeight.w600,
             fontSize: 20,
             color: context.textPrimary,
@@ -299,7 +299,7 @@ class _FolderPickerScreenState extends State<FolderPickerScreen> {
             label: Text(
               'Select this folder',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontWeight: FontWeight.w600,
                 fontSize: 16,
               ),
@@ -367,7 +367,7 @@ class _BreadcrumbBar extends StatelessWidget {
                 child: Text(
                   names[i],
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     fontSize: 14,
                     color: i == names.length - 1
                         ? context.textPrimary
@@ -419,7 +419,7 @@ class _FolderTile extends StatelessWidget {
         title: Text(
           name,
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontWeight: FontWeight.w500,
             fontSize: 16,
             color: context.textPrimary,
@@ -452,7 +452,7 @@ class _EmptyState extends StatelessWidget {
             Text(
               'No subfolders here',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontSize: 16,
                 color: context.textSecondary,
               ),
@@ -461,7 +461,7 @@ class _EmptyState extends StatelessWidget {
             Text(
               'You can still select this folder',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontSize: 14,
                 color: context.textTertiary,
               ),
@@ -492,7 +492,7 @@ class _ErrorState extends StatelessWidget {
             Text(
               'Could not load folder',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontSize: 16,
                 color: context.textSecondary,
               ),
@@ -502,7 +502,7 @@ class _ErrorState extends StatelessWidget {
               message,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontSize: 12,
                 color: context.textTertiary,
               ),
@@ -514,7 +514,7 @@ class _ErrorState extends StatelessWidget {
               onPressed: onRetry,
               icon: const Icon(Icons.refresh, size: 18),
               label: const Text('Retry',
-                  style: TextStyle(fontFamily: 'ProductSans')),
+                  style: TextStyle(fontFamily: 'GoogleSansFlex')),
               style: FilledButton.styleFrom(
                 backgroundColor: context.accentColor,
                 foregroundColor: Theme.of(context).colorScheme.onPrimary,

@@ -107,7 +107,7 @@ class _AddTagsSheetState extends ConsumerState<AddTagsSheet> {
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: context.textPrimary,
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                     ),
                   ),
                   Text(
@@ -115,7 +115,7 @@ class _AddTagsSheetState extends ConsumerState<AddTagsSheet> {
                     style: TextStyle(
                       fontSize: 13,
                       color: context.textSecondary,
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -124,7 +124,7 @@ class _AddTagsSheetState extends ConsumerState<AddTagsSheet> {
                     decoration: InputDecoration(
                       hintText: 'Create new tag',
                       hintStyle: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         color: context.textTertiary,
                       ),
                       border: OutlineInputBorder(
@@ -157,7 +157,7 @@ class _AddTagsSheetState extends ConsumerState<AddTagsSheet> {
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: context.textTertiary,
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -175,7 +175,7 @@ class _AddTagsSheetState extends ConsumerState<AddTagsSheet> {
                     error: (_, __) => Text(
                       'Failed to load tags',
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         color: context.textSecondary,
                       ),
                     ),
@@ -187,7 +187,7 @@ class _AddTagsSheetState extends ConsumerState<AddTagsSheet> {
                             child: Text(
                               'No tags yet. Create one above!',
                               style: TextStyle(
-                                fontFamily: 'ProductSans',
+                                fontFamily: 'GoogleSansFlex',
                                 color: context.textTertiary,
                               ),
                             ),
@@ -210,7 +210,7 @@ class _AddTagsSheetState extends ConsumerState<AddTagsSheet> {
                                   label: Text(
                                     tag.name,
                                     style: const TextStyle(
-                                      fontFamily: 'ProductSans',
+                                      fontFamily: 'GoogleSansFlex',
                                       fontSize: 12,
                                     ),
                                   ),
@@ -231,7 +231,7 @@ class _AddTagsSheetState extends ConsumerState<AddTagsSheet> {
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: context.textTertiary,
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -243,7 +243,7 @@ class _AddTagsSheetState extends ConsumerState<AddTagsSheet> {
                               label: Text(
                                 tag,
                                 style: const TextStyle(
-                                  fontFamily: 'ProductSans',
+                                  fontFamily: 'GoogleSansFlex',
                                   fontSize: 12,
                                 ),
                               ),

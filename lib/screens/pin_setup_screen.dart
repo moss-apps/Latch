@@ -88,7 +88,7 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
         title: Text(
           _isConfirmation ? 'Confirm PIN' : 'Create PIN',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textPrimary,
             fontWeight: FontWeight.w600,
           ),
@@ -173,7 +173,7 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
       style: TextStyle(
         fontSize: 18,
         color: context.textSecondary,
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
       ),
       textAlign: TextAlign.center,
     );
@@ -229,7 +229,7 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
             style: TextStyle(
               color: AppColors.error,
               fontSize: 14,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
             ),
           ),
         ),

@@ -46,7 +46,7 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
         title: Text(
           'Privacy Policy',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: _textPrimary(isDark),
             fontWeight: FontWeight.w600,
           ),
@@ -63,36 +63,36 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
               styleSheet: MarkdownStyleSheet(
                 h1: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
                   color: _textPrimary(isDark),
                 ),
                 h2: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
                   color: _textPrimary(isDark),
                 ),
                 p: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontSize: 14,
                   color: _textSecondary(isDark),
                   height: 1.5,
                 ),
                 strong: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontWeight: FontWeight.w600,
                   color: _textPrimary(isDark),
                 ),
                 listBullet: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontSize: 14,
                   color: _textSecondary(isDark),
                 ),
                 listBulletPadding: const EdgeInsets.symmetric(horizontal: 8),
                 blockquote: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontSize: 14,
                   fontStyle: FontStyle.italic,
                   color: _textSecondary(isDark),

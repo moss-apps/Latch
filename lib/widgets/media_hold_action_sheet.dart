@@ -139,7 +139,7 @@ class MediaHoldActionSheet extends ConsumerWidget {
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                           color: context.textPrimary,
-                          fontFamily: 'ProductSans',
+                          fontFamily: 'GoogleSansFlex',
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -150,7 +150,7 @@ class MediaHoldActionSheet extends ConsumerWidget {
                         style: TextStyle(
                           fontSize: 13,
                           color: context.textSecondary,
-                          fontFamily: 'ProductSans',
+                          fontFamily: 'GoogleSansFlex',
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,

@@ -33,7 +33,7 @@ class ReEncryptWarningDialog extends StatelessWidget {
             child: Text(
               'Re-Encryption Warning',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontWeight: FontWeight.bold,
                 color: context.textPrimary,
                 fontSize: 20,
@@ -49,7 +49,7 @@ class ReEncryptWarningDialog extends StatelessWidget {
           Text(
             'Re-encryption rewrites every encrypted file in your vault. If the process is interrupted — for example by a dead battery, app crash, force-stop, or running out of storage — some files may be left in a corrupted state and become permanently unrecoverable.',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: context.textSecondary,
               fontSize: 14,
               height: 1.4,
@@ -78,7 +78,7 @@ class ReEncryptWarningDialog extends StatelessWidget {
                   child: Text(
                     'Make sure your device is charged, has enough free storage, and will not be interrupted before continuing.',
                     style: TextStyle(
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                       color: context.textPrimary,
                       fontSize: 12,
                       height: 1.4,
@@ -113,7 +113,7 @@ class ReEncryptWarningDialog extends StatelessWidget {
                   Text(
                     'More information',
                     style: TextStyle(
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                       color: context.accentColor,
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
@@ -131,7 +131,7 @@ class ReEncryptWarningDialog extends StatelessWidget {
           child: Text(
             'Cancel',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: context.textSecondary,
             ),
           ),
@@ -147,7 +147,7 @@ class ReEncryptWarningDialog extends StatelessWidget {
           ),
           child: const Text(
             'I Understand, Continue',
-            style: TextStyle(fontFamily: 'ProductSans'),
+            style: TextStyle(fontFamily: 'GoogleSansFlex'),
           ),
         ),
       ],
@@ -168,7 +168,7 @@ class ReEncryptWarningDialog extends StatelessWidget {
               child: Text(
                 'Why Can Re-Encryption Corrupt Files?',
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontWeight: FontWeight.bold,
                   color: context.textPrimary,
                   fontSize: 18,
@@ -225,7 +225,7 @@ class ReEncryptWarningDialog extends StatelessWidget {
             child: Text(
               'Got it',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.accentColor,
                 fontWeight: FontWeight.w600,
               ),
@@ -261,7 +261,7 @@ class ReEncryptWarningDialog extends StatelessWidget {
               Text(
                 title,
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontWeight: FontWeight.w600,
                   color: context.textPrimary,
                   fontSize: 14,
@@ -271,7 +271,7 @@ class ReEncryptWarningDialog extends StatelessWidget {
               Text(
                 description,
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   color: context.textSecondary,
                   fontSize: 12,
                   height: 1.4,

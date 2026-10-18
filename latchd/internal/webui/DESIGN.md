@@ -83,39 +83,39 @@ colors:
   favorite: "#FFC107"
 typography:
   headline:
-    fontFamily: '"ProductSans", "Segoe UI", system-ui, sans-serif'
+    fontFamily: '"GoogleSansFlex", "Segoe UI", system-ui, sans-serif'
     fontSize: "26px"
     fontWeight: 700
     letterSpacing: "-0.025em"
   title:
-    fontFamily: '"ProductSans", "Segoe UI", system-ui, sans-serif'
+    fontFamily: '"GoogleSansFlex", "Segoe UI", system-ui, sans-serif'
     fontSize: "20px"
     fontWeight: 700
     letterSpacing: "-0.025em"
   section-title:
-    fontFamily: '"ProductSans", "Segoe UI", system-ui, sans-serif'
+    fontFamily: '"GoogleSansFlex", "Segoe UI", system-ui, sans-serif'
     fontSize: "18px"
     fontWeight: 700
     lineHeight: "28px"
   body:
-    fontFamily: '"ProductSans", "Segoe UI", system-ui, sans-serif'
+    fontFamily: '"GoogleSansFlex", "Segoe UI", system-ui, sans-serif'
     fontSize: "14px"
     fontWeight: 400
     lineHeight: "20px"
   label:
-    fontFamily: '"ProductSans", "Segoe UI", system-ui, sans-serif'
+    fontFamily: '"GoogleSansFlex", "Segoe UI", system-ui, sans-serif'
     fontSize: "14px"
     fontWeight: 700
     lineHeight: "20px"
   meta:
-    fontFamily: '"ProductSans", "Segoe UI", system-ui, sans-serif'
+    fontFamily: '"GoogleSansFlex", "Segoe UI", system-ui, sans-serif'
     fontSize: "13px"
   caption:
-    fontFamily: '"ProductSans", "Segoe UI", system-ui, sans-serif'
+    fontFamily: '"GoogleSansFlex", "Segoe UI", system-ui, sans-serif'
     fontSize: "12px"
     lineHeight: "16px"
   table-label:
-    fontFamily: '"ProductSans", "Segoe UI", system-ui, sans-serif'
+    fontFamily: '"GoogleSansFlex", "Segoe UI", system-ui, sans-serif'
     fontSize: "11px"
     fontWeight: 700
     letterSpacing: "0.07em"
@@ -184,7 +184,7 @@ components:
 
 **Creative North Star: "A coherent, calm local file-management app"**
 
-Latch uses familiar Google Drive navigation and Proton's restrained utility-panel treatment with Latch's own logo, palette, ProductSans, and Material icons. The world is flat, real application UI: files, settings, and phone backup are useful destinations, with task titles and controls in the first viewport rather than an oversized brand presentation. There are no physical decorative materials in this approved direction.
+Latch uses familiar Google Drive navigation and Proton's restrained utility-panel treatment with Latch's own logo, palette, Google Sans Flex, and Material icons. The world is flat, real application UI: files, settings, and phone backup are useful destinations, with task titles and controls in the first viewport rather than an oversized brand presentation. There are no physical decorative materials in this approved direction.
 
 The redesign boundary is the shared shell, full-page settings, phone pairing, and responsive browser layout. The incumbent table/grid browser and viewer remain the functional reference. Settings uses grouped rows; pairing places a scannable QR beside phone instructions with manual and USB disclosures. These are expressions of the confirmed direction, not composition requirements for every future screen.
 
@@ -226,7 +226,7 @@ Raw custom properties in `index.css` map to shadcn roles: `--background` → `--
 
 ## Typography
 
-**Body and heading font:** ProductSans with Segoe UI, system-ui, and sans-serif fallbacks. The regular, italic, bold, and bold-italic faces are self-hosted from `public/fonts/`; no replacement font is introduced.
+**Body and heading font:** Google Sans Flex (SIL OFL 1.1) with Segoe UI, system-ui, and sans-serif fallbacks. The regular, italic, bold, and bold-italic faces are self-hosted from `public/fonts/`.
 
 **Code font:** the existing mono stack in frontmatter, used for pairing credentials, USB commands, and text previews. The stylesheet names JetBrains Mono and Cascadia Code as fallbacks; it does not self-host those fonts.
 
@@ -336,7 +336,7 @@ Protocol, receiver lifecycle, and thumbnail storage behavior belong to `docs/des
 ## Do's and Don'ts
 
 ### Do:
-- **Do** retain Latch's logo, ProductSans, codepoint Material icons, and saved light/dark and accent choices.
+- **Do** retain Latch's logo, Google Sans Flex, codepoint Material icons, and saved light/dark and accent choices.
 - **Do** use live CSS variables for themed controls, including explicit foreground text in the export input.
 - **Do** keep files, settings, and phone backup as shared-shell destinations with retained file-view and operation state.
 - **Do** stack settings controls and pairing content on narrow screens, use the mobile drawer, and allow full credentials to wrap.

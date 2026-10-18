@@ -98,7 +98,7 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
         title: Text(
           _isConfirmation ? 'Confirm Password' : 'Create Password',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textPrimary,
             fontWeight: FontWeight.w600,
           ),
@@ -183,7 +183,7 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
       style: TextStyle(
         fontSize: 18,
         color: context.textSecondary,
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
       ),
       textAlign: TextAlign.center,
     );
@@ -215,21 +215,21 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
             obscureText:
                 _isConfirmation ? _obscureConfirmPassword : _obscurePassword,
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               fontSize: 16,
               color: context.textPrimary,
             ),
             decoration: InputDecoration(
               labelText: _isConfirmation ? 'Confirm Password' : 'Password',
               labelStyle: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
               ),
               hintText: _isConfirmation
                   ? 'Re-enter your password'
                   : 'Enter your password',
               hintStyle: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textTertiary,
               ),
               filled: true,
@@ -299,7 +299,7 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
             style: TextStyle(
               color: AppColors.error,
               fontSize: 14,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
             ),
           ),
         ),
@@ -341,7 +341,7 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: Colors.white,
           ),
         ),

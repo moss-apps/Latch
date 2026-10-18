@@ -70,7 +70,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
               label: const Text(
                 'New Tag',
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
                 ),
@@ -95,7 +95,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
         title: Text(
           '${_selectedFiles.length} selected',
           style: const TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: Colors.white,
           ),
         ),
@@ -107,7 +107,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                 allSelected ? 'Deselect All' : 'Select All',
                 style: const TextStyle(
                   color: Colors.white,
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                 ),
               ),
             ),
@@ -147,7 +147,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
       title: Text(
         _showingUntagged ? 'Untagged' : (_selectedTag ?? 'Tags'),
         style: const TextStyle(
-          fontFamily: 'ProductSans',
+          fontFamily: 'GoogleSansFlex',
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -174,7 +174,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
             Text(
               'Failed to load tags',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
               ),
             ),
@@ -258,7 +258,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                     Text(
                       'Untagged',
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontWeight: FontWeight.w600,
                         fontSize: 16,
                         color: context.textPrimary,
@@ -268,7 +268,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                     Text(
                       '$count ${count == 1 ? 'file' : 'files'} with no tags',
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontSize: 13,
                         color: context.textSecondary,
                       ),
@@ -304,7 +304,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
               fontSize: 18,
               fontWeight: FontWeight.w600,
               color: context.textPrimary,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
             ),
           ),
           const SizedBox(height: 8),
@@ -313,7 +313,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
             style: TextStyle(
               fontSize: 14,
               color: context.textSecondary,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
             ),
             textAlign: TextAlign.center,
           ),
@@ -358,7 +358,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                     Text(
                       tag.name,
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontWeight: FontWeight.w600,
                         fontSize: 16,
                         color: context.textPrimary,
@@ -368,7 +368,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                     Text(
                       '$count ${count == 1 ? 'file' : 'files'}',
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontSize: 13,
                         color: context.textSecondary,
                       ),
@@ -398,7 +398,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
         child: Text(
           'Failed to load files',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textSecondary,
           ),
         ),
@@ -449,7 +449,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
               fontSize: 18,
               fontWeight: FontWeight.w600,
               color: context.textPrimary,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
             ),
           ),
           const SizedBox(height: 8),
@@ -460,7 +460,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
             style: TextStyle(
               fontSize: 14,
               color: context.textSecondary,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
             ),
           ),
         ],
@@ -631,7 +631,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
                 color: color,
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -765,7 +765,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
                                     color: context.textPrimary,
-                                    fontFamily: 'ProductSans'),
+                                    fontFamily: 'GoogleSansFlex'),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -775,7 +775,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                                 style: TextStyle(
                                     fontSize: 13,
                                     color: context.textSecondary,
-                                    fontFamily: 'ProductSans'),
+                                    fontFamily: 'GoogleSansFlex'),
                               ),
                             ],
                           ),
@@ -787,7 +787,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                         style: TextStyle(
                             fontSize: 13,
                             color: context.textSecondary,
-                            fontFamily: 'ProductSans')),
+                            fontFamily: 'GoogleSansFlex')),
                     const SizedBox(height: 12),
                     ListTile(
                       leading: Container(
@@ -801,11 +801,11 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                       ),
                       title: const Text('Export to Downloads',
                           style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               fontWeight: FontWeight.w500)),
                       subtitle: Text('Save decrypted file to Downloads folder',
                           style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               fontSize: 12,
                               color: AppColors.lightTextSecondary)),
                       contentPadding: EdgeInsets.zero,
@@ -827,11 +827,11 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                       ),
                       title: const Text('Open with...',
                           style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               fontWeight: FontWeight.w500)),
                       subtitle: Text('Open file with an external app',
                           style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               fontSize: 12,
                               color: AppColors.lightTextSecondary)),
                       contentPadding: EdgeInsets.zero,
@@ -865,7 +865,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
               const SizedBox(width: 20),
               Expanded(
                   child: Text('Exporting ${file.originalName}...',
-                      style: const TextStyle(fontFamily: 'ProductSans'))),
+                      style: const TextStyle(fontFamily: 'GoogleSansFlex'))),
             ],
           ),
         ),
@@ -912,7 +912,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
               const SizedBox(width: 20),
               Expanded(
                   child: Text('Preparing ${file.originalName}...',
-                      style: const TextStyle(fontFamily: 'ProductSans'))),
+                      style: const TextStyle(fontFamily: 'GoogleSansFlex'))),
             ],
           ),
         ),
@@ -952,7 +952,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
           title: Text(
             'Create Tag',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: context.textPrimary,
             ),
           ),
@@ -964,7 +964,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                 decoration: InputDecoration(
                   labelText: 'Tag Name',
                   labelStyle: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     color: context.textSecondary,
                   ),
                   border: OutlineInputBorder(
@@ -985,7 +985,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
               Text(
                 'Tag Color',
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontWeight: FontWeight.w600,
                   color: context.textPrimary,
                 ),
@@ -1034,7 +1034,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
               child: Text(
                 'Cancel',
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   color: context.textSecondary,
                 ),
               ),
@@ -1062,7 +1062,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
               ),
               child: const Text(
                 'Create',
-                style: TextStyle(fontFamily: 'ProductSans'),
+                style: TextStyle(fontFamily: 'GoogleSansFlex'),
               ),
             ),
           ],
@@ -1124,7 +1124,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                             color: context.textPrimary,
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                           ),
                         ),
                       ],
@@ -1135,7 +1135,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                           color: context.accentColor),
                       title: const Text(
                         'Change Color',
-                        style: TextStyle(fontFamily: 'ProductSans'),
+                        style: TextStyle(fontFamily: 'GoogleSansFlex'),
                       ),
                       onTap: () {
                         Navigator.pop(context);
@@ -1149,7 +1149,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                       title: Text(
                         'Delete Tag',
                         style: TextStyle(
-                          fontFamily: 'ProductSans',
+                          fontFamily: 'GoogleSansFlex',
                           color: AppColors.error,
                         ),
                       ),
@@ -1181,7 +1181,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
           title: Text(
             'Change Color',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: context.textPrimary,
             ),
           ),
@@ -1216,7 +1216,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
               child: Text(
                 'Cancel',
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   color: context.textSecondary,
                 ),
               ),
@@ -1237,7 +1237,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
               ),
               child: const Text(
                 'Save',
-                style: TextStyle(fontFamily: 'ProductSans'),
+                style: TextStyle(fontFamily: 'GoogleSansFlex'),
               ),
             ),
           ],
@@ -1254,14 +1254,14 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
         title: Text(
           'Delete Tag',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textPrimary,
           ),
         ),
         content: Text(
           'Are you sure you want to delete "${tag.name}"? This tag will be removed from all files.',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textSecondary,
           ),
         ),
@@ -1271,7 +1271,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
             child: Text(
               'Cancel',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
               ),
             ),
@@ -1293,7 +1293,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
             ),
             child: const Text(
               'Delete',
-              style: TextStyle(fontFamily: 'ProductSans'),
+              style: TextStyle(fontFamily: 'GoogleSansFlex'),
             ),
           ),
         ],
@@ -1325,14 +1325,14 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
         title: Text(
           'Delete Files',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textPrimary,
           ),
         ),
         content: Text(
           'Delete ${_selectedFiles.length} file(s)? Recover them in Recently Deleted when retention is enabled. If retention is set to Immediate deletion, this cannot be undone.',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textSecondary,
           ),
         ),
@@ -1342,7 +1342,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
             child: Text(
               'Cancel',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
               ),
             ),
@@ -1355,7 +1355,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
             ),
             child: const Text(
               'Delete',
-              style: TextStyle(fontFamily: 'ProductSans'),
+              style: TextStyle(fontFamily: 'GoogleSansFlex'),
             ),
           ),
         ],
@@ -1421,7 +1421,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: context.textPrimary,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -1437,7 +1437,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                           title: Text(
                             option.displayName,
                             style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               color: context.textPrimary,
                             ),
                           ),

@@ -50,7 +50,7 @@ class FileInfoSheet {
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: ctx.textPrimary,
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -101,7 +101,7 @@ class FileInfoSheet {
             child: Text(
               label,
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textTertiary,
                 fontSize: 14,
               ),
@@ -111,7 +111,7 @@ class FileInfoSheet {
             child: Text(
               value,
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textPrimary,
                 fontSize: 14,
               ),
@@ -141,7 +141,7 @@ class _SectionDivider extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          fontFamily: 'ProductSans',
+          fontFamily: 'GoogleSansFlex',
           fontWeight: FontWeight.w600,
           color: context.textSecondary,
           fontSize: 13,

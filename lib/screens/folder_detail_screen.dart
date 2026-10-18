@@ -44,7 +44,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
           child: Text(
             'Error loading folder',
             style: TextStyle(
-                fontFamily: 'ProductSans', color: context.textSecondary),
+                fontFamily: 'GoogleSansFlex', color: context.textSecondary),
           ),
         ),
         data: (folder) {
@@ -53,7 +53,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
               child: Text(
                 'Folder not found',
                 style: TextStyle(
-                    fontFamily: 'ProductSans', color: context.textSecondary),
+                    fontFamily: 'GoogleSansFlex', color: context.textSecondary),
               ),
             );
           }
@@ -70,7 +70,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
               label: const Text(
                 'Add',
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
                 ),
@@ -95,7 +95,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
         title: Text(
           '${_selectedFiles.length} selected',
           style:
-              const TextStyle(fontFamily: 'ProductSans', color: Colors.white),
+              const TextStyle(fontFamily: 'GoogleSansFlex', color: Colors.white),
         ),
         actions: [
           if (files.isNotEmpty)
@@ -104,7 +104,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
               child: Text(
                 allSelected ? 'Deselect All' : 'Select All',
                 style: const TextStyle(
-                    color: Colors.white, fontFamily: 'ProductSans'),
+                    color: Colors.white, fontFamily: 'GoogleSansFlex'),
               ),
             ),
           IconButton(
@@ -131,7 +131,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
         data: (folder) => Text(
           folder?.name ?? 'Folder',
           style: const TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -213,7 +213,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
         child: Text(
           'Error loading files',
           style: TextStyle(
-              fontFamily: 'ProductSans', color: context.textSecondary),
+              fontFamily: 'GoogleSansFlex', color: context.textSecondary),
         ),
       ),
       data: (files) {
@@ -223,7 +223,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
             child: Text(
               'Error loading subfolders',
               style: TextStyle(
-                  fontFamily: 'ProductSans', color: context.textSecondary),
+                  fontFamily: 'GoogleSansFlex', color: context.textSecondary),
             ),
           ),
           data: (subfolders) {
@@ -275,7 +275,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
         fontSize: 14,
         fontWeight: FontWeight.w600,
         color: context.textTertiary,
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
         letterSpacing: 0.5,
       ),
     );
@@ -345,7 +345,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                         child: Text(
                           subfolder.name,
                           style: TextStyle(
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                             fontWeight: FontWeight.w600,
                             color: context.textPrimary,
                             fontSize: 14,
@@ -360,7 +360,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                   Text(
                     _getFolderItemCount(subfolder),
                     style: TextStyle(
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                       color: context.textTertiary,
                       fontSize: 12,
                     ),
@@ -499,7 +499,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 10,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -512,7 +512,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 10,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                       ),
                     ),
                   ],
@@ -566,7 +566,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
                 color: color,
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -603,7 +603,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
               fontSize: 20,
               fontWeight: FontWeight.w600,
               color: context.textPrimary,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
             ),
           ),
           const SizedBox(height: 8),
@@ -612,7 +612,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
             style: TextStyle(
               fontSize: 14,
               color: context.textSecondary,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
             ),
           ),
           const SizedBox(height: 24),
@@ -708,7 +708,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                         color: context.textPrimary,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -818,19 +818,19 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
         title: Text(
           'Remove from Folder',
           style:
-              TextStyle(fontFamily: 'ProductSans', color: context.textPrimary),
+              TextStyle(fontFamily: 'GoogleSansFlex', color: context.textPrimary),
         ),
         content: Text(
           'Remove ${_selectedFiles.length} file${_selectedFiles.length == 1 ? '' : 's'} from this folder? The files will not be deleted from the vault.',
           style: TextStyle(
-              fontFamily: 'ProductSans', color: context.textSecondary),
+              fontFamily: 'GoogleSansFlex', color: context.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text('Cancel',
                 style: TextStyle(
-                    fontFamily: 'ProductSans', color: context.textSecondary)),
+                    fontFamily: 'GoogleSansFlex', color: context.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -838,7 +838,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                 backgroundColor: AppColors.error,
                 foregroundColor: Colors.white),
             child: const Text('Remove',
-                style: TextStyle(fontFamily: 'ProductSans')),
+                style: TextStyle(fontFamily: 'GoogleSansFlex')),
           ),
         ],
       ),
@@ -869,19 +869,19 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
         title: Text(
           'Delete Files',
           style:
-              TextStyle(fontFamily: 'ProductSans', color: context.textPrimary),
+              TextStyle(fontFamily: 'GoogleSansFlex', color: context.textPrimary),
         ),
         content: Text(
           'Delete ${_selectedFiles.length} file${_selectedFiles.length == 1 ? '' : 's'}? Recover them in Recently Deleted when retention is enabled. If retention is set to Immediate deletion, this cannot be undone.',
           style: TextStyle(
-              fontFamily: 'ProductSans', color: context.textSecondary),
+              fontFamily: 'GoogleSansFlex', color: context.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text('Cancel',
                 style: TextStyle(
-                    fontFamily: 'ProductSans', color: context.textSecondary)),
+                    fontFamily: 'GoogleSansFlex', color: context.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -889,7 +889,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                 backgroundColor: AppColors.error,
                 foregroundColor: Colors.white),
             child: const Text('Delete',
-                style: TextStyle(fontFamily: 'ProductSans')),
+                style: TextStyle(fontFamily: 'GoogleSansFlex')),
           ),
         ],
       ),
@@ -948,7 +948,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: context.textPrimary,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -957,7 +957,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                           title: Text(
                             option.displayName,
                             style: TextStyle(
-                                fontFamily: 'ProductSans',
+                                fontFamily: 'GoogleSansFlex',
                                 color: context.textPrimary),
                           ),
                           onTap: () {
@@ -988,14 +988,14 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
         title: Text(
           'Create Subfolder',
           style:
-              TextStyle(fontFamily: 'ProductSans', color: context.textPrimary),
+              TextStyle(fontFamily: 'GoogleSansFlex', color: context.textPrimary),
         ),
         content: TextField(
           controller: nameController,
           decoration: InputDecoration(
             labelText: 'Folder Name',
             labelStyle: TextStyle(
-                fontFamily: 'ProductSans', color: context.textSecondary),
+                fontFamily: 'GoogleSansFlex', color: context.textSecondary),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -1009,7 +1009,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
             onPressed: () => Navigator.pop(context),
             child: Text('Cancel',
                 style: TextStyle(
-                    fontFamily: 'ProductSans', color: context.textSecondary)),
+                    fontFamily: 'GoogleSansFlex', color: context.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -1039,7 +1039,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                 backgroundColor: context.accentColor,
                 foregroundColor: Colors.white),
             child: const Text('Create',
-                style: TextStyle(fontFamily: 'ProductSans')),
+                style: TextStyle(fontFamily: 'GoogleSansFlex')),
           ),
         ],
       ),
@@ -1083,7 +1083,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: context.textPrimary,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -1092,7 +1092,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                           Icon(Icons.edit_outlined, color: context.textPrimary),
                       title: Text('Rename',
                           style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               color: context.textPrimary)),
                       contentPadding: EdgeInsets.zero,
                       onTap: () {
@@ -1105,7 +1105,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                           Icon(Icons.delete_outline, color: AppColors.error),
                       title: Text('Delete',
                           style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               color: AppColors.error)),
                       contentPadding: EdgeInsets.zero,
                       onTap: () {
@@ -1133,13 +1133,13 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         title: Text('Rename Subfolder',
             style: TextStyle(
-                fontFamily: 'ProductSans', color: context.textPrimary)),
+                fontFamily: 'GoogleSansFlex', color: context.textPrimary)),
         content: TextField(
           controller: nameController,
           decoration: InputDecoration(
             labelText: 'Folder Name',
             labelStyle: TextStyle(
-                fontFamily: 'ProductSans', color: context.textSecondary),
+                fontFamily: 'GoogleSansFlex', color: context.textSecondary),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -1153,7 +1153,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
             onPressed: () => Navigator.pop(context),
             child: Text('Cancel',
                 style: TextStyle(
-                    fontFamily: 'ProductSans', color: context.textSecondary)),
+                    fontFamily: 'GoogleSansFlex', color: context.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -1181,7 +1181,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                 backgroundColor: context.accentColor,
                 foregroundColor: Colors.white),
             child: const Text('Rename',
-                style: TextStyle(fontFamily: 'ProductSans')),
+                style: TextStyle(fontFamily: 'GoogleSansFlex')),
           ),
         ],
       ),
@@ -1195,18 +1195,18 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         title: Text('Delete Subfolder',
             style: TextStyle(
-                fontFamily: 'ProductSans', color: context.textPrimary)),
+                fontFamily: 'GoogleSansFlex', color: context.textPrimary)),
         content: Text(
           'Are you sure you want to delete "${subfolder.name}"? Files in this subfolder will not be deleted from the vault.',
           style: TextStyle(
-              fontFamily: 'ProductSans', color: context.textSecondary),
+              fontFamily: 'GoogleSansFlex', color: context.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text('Cancel',
                 style: TextStyle(
-                    fontFamily: 'ProductSans', color: context.textSecondary)),
+                    fontFamily: 'GoogleSansFlex', color: context.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -1228,7 +1228,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                 backgroundColor: AppColors.error,
                 foregroundColor: Colors.white),
             child: const Text('Delete',
-                style: TextStyle(fontFamily: 'ProductSans')),
+                style: TextStyle(fontFamily: 'GoogleSansFlex')),
           ),
         ],
       ),
@@ -1314,7 +1314,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: context.textPrimary,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -1323,7 +1323,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                           color: context.accentColor),
                       title: Text('Add Files from Vault',
                           style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               color: context.textPrimary)),
                       contentPadding: EdgeInsets.zero,
                       onTap: () {
@@ -1336,7 +1336,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                           color: context.accentColor),
                       title: Text('Create Subfolder',
                           style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               color: context.textPrimary)),
                       contentPadding: EdgeInsets.zero,
                       onTap: () {
@@ -1349,7 +1349,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                           color: context.accentColor),
                       title: Text('Import from Device',
                           style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               color: context.textPrimary)),
                       contentPadding: EdgeInsets.zero,
                       onTap: () {
@@ -1419,7 +1419,7 @@ class _AddFilesToFolderSheetState
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: context.textPrimary,
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                     ),
                   ),
                 ),
@@ -1442,7 +1442,7 @@ class _AddFilesToFolderSheetState
                           )
                         : Text(
                             'Add (${_selectedFileIds.length})',
-                            style: const TextStyle(fontFamily: 'ProductSans'),
+                            style: const TextStyle(fontFamily: 'GoogleSansFlex'),
                           ),
                   ),
               ],
@@ -1460,14 +1460,14 @@ class _AddFilesToFolderSheetState
                         Text(
                           'No files available',
                           style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               color: context.textSecondary),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           'All vault files are already in this folder',
                           style: TextStyle(
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                             fontSize: 12,
                             color: context.textTertiary,
                           ),
@@ -1616,7 +1616,7 @@ class _AddFilesToFolderSheetState
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
                 color: color,
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -1780,7 +1780,7 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
         title: const Text(
           'Select Folder to Import',
           style:
-              TextStyle(fontFamily: 'ProductSans', fontWeight: FontWeight.w600),
+              TextStyle(fontFamily: 'GoogleSansFlex', fontWeight: FontWeight.w600),
         ),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         foregroundColor: context.textPrimary,
@@ -1799,7 +1799,7 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
                       Text(
                         _error!,
                         style: TextStyle(
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                             color: context.textSecondary),
                         textAlign: TextAlign.center,
                       ),
@@ -1829,7 +1829,7 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
                                   child: Text(
                                     _currentPath ?? '',
                                     style: TextStyle(
-                                      fontFamily: 'ProductSans',
+                                      fontFamily: 'GoogleSansFlex',
                                       fontSize: 12,
                                       color: context.textTertiary,
                                     ),
@@ -1854,7 +1854,7 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
                                   Text(
                                     'No subfolders',
                                     style: TextStyle(
-                                        fontFamily: 'ProductSans',
+                                        fontFamily: 'GoogleSansFlex',
                                         color: context.textSecondary),
                                   ),
                                 ],
@@ -1871,7 +1871,7 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
                                       color: context.accentColor),
                                   title: Text(name,
                                       style: TextStyle(
-                                          fontFamily: 'ProductSans',
+                                          fontFamily: 'GoogleSansFlex',
                                           color: context.textPrimary)),
                                   trailing: Icon(Icons.chevron_right,
                                       color: context.textTertiary),
@@ -1892,7 +1892,7 @@ class _FolderImportPickerScreenState extends State<_FolderImportPickerScreen> {
                   label: const Text(
                     'Import This Folder',
                     style: TextStyle(
-                        fontFamily: 'ProductSans', fontWeight: FontWeight.w600),
+                        fontFamily: 'GoogleSansFlex', fontWeight: FontWeight.w600),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: context.accentColor,
@@ -1978,7 +1978,7 @@ class _ImportProgressDialogState extends ConsumerState<_ImportProgressDialog> {
         _isImporting
             ? 'Importing Folder'
             : (_error != null ? 'Import Failed' : 'Import Complete'),
-        style: TextStyle(fontFamily: 'ProductSans', color: context.textPrimary),
+        style: TextStyle(fontFamily: 'GoogleSansFlex', color: context.textPrimary),
       ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1996,7 +1996,7 @@ class _ImportProgressDialogState extends ConsumerState<_ImportProgressDialog> {
           Text(
             _status,
             style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
                 fontSize: 14),
             textAlign: TextAlign.center,
@@ -2010,7 +2010,7 @@ class _ImportProgressDialogState extends ConsumerState<_ImportProgressDialog> {
             child: Text(
               _error != null ? 'OK' : 'Done',
               style: TextStyle(
-                  fontFamily: 'ProductSans', color: context.accentColor),
+                  fontFamily: 'GoogleSansFlex', color: context.accentColor),
             ),
           ),
       ],

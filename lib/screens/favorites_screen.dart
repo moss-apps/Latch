@@ -48,7 +48,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
               Text(
                 'Failed to load favorites',
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   color: context.textSecondary,
                 ),
               ),
@@ -88,7 +88,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         title: Text(
           '${_selectedFiles.length} selected',
           style: const TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: Colors.white,
           ),
         ),
@@ -100,7 +100,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                 allSelected ? 'Deselect All' : 'Select All',
                 style: const TextStyle(
                   color: Colors.white,
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                 ),
               ),
             ),
@@ -129,7 +129,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
           Text(
             'Favorites',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: context.textPrimary,
               fontWeight: FontWeight.w600,
             ),
@@ -137,7 +137,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
           Text(
             '$fileCount items',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               fontSize: 12,
               color: context.textSecondary,
             ),
@@ -272,7 +272,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 10,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                       ),
                     ),
                   ],
@@ -296,7 +296,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 10,
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -415,7 +415,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
                 color: color,
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -452,7 +452,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
               fontSize: 20,
               fontWeight: FontWeight.w600,
               color: context.textPrimary,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
             ),
           ),
           const SizedBox(height: 8),
@@ -463,7 +463,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
               style: TextStyle(
                 fontSize: 14,
                 color: context.textSecondary,
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
               ),
               textAlign: TextAlign.center,
             ),
@@ -585,7 +585,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
                                   color: context.textPrimary,
-                                  fontFamily: 'ProductSans',
+                                  fontFamily: 'GoogleSansFlex',
                                 ),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
@@ -596,7 +596,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                                 style: TextStyle(
                                   fontSize: 13,
                                   color: context.textSecondary,
-                                  fontFamily: 'ProductSans',
+                                  fontFamily: 'GoogleSansFlex',
                                 ),
                               ),
                             ],
@@ -610,7 +610,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                       style: TextStyle(
                         fontSize: 13,
                         color: context.textSecondary,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -627,11 +627,11 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                       ),
                       title: const Text('Export to Downloads',
                           style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               fontWeight: FontWeight.w500)),
                       subtitle: Text('Save decrypted file to Downloads folder',
                           style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               fontSize: 12,
                               color: AppColors.lightTextSecondary)),
                       contentPadding: EdgeInsets.zero,
@@ -654,11 +654,11 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                       ),
                       title: const Text('Open with...',
                           style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               fontWeight: FontWeight.w500)),
                       subtitle: Text('Open file with an external app',
                           style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               fontSize: 12,
                               color: AppColors.lightTextSecondary)),
                       contentPadding: EdgeInsets.zero,
@@ -692,7 +692,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
               const SizedBox(width: 20),
               Expanded(
                   child: Text('Exporting ${file.originalName}...',
-                      style: const TextStyle(fontFamily: 'ProductSans'))),
+                      style: const TextStyle(fontFamily: 'GoogleSansFlex'))),
             ],
           ),
         ),
@@ -739,7 +739,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
               const SizedBox(width: 20),
               Expanded(
                   child: Text('Preparing ${file.originalName}...',
-                      style: const TextStyle(fontFamily: 'ProductSans'))),
+                      style: const TextStyle(fontFamily: 'GoogleSansFlex'))),
             ],
           ),
         ),
@@ -823,7 +823,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                             color: context.textPrimary,
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -843,7 +843,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                                   child: Text(
                                     'No albums yet. Create one from the Albums screen.',
                                     style: TextStyle(
-                                      fontFamily: 'ProductSans',
+                                      fontFamily: 'GoogleSansFlex',
                                       color: context.textSecondary,
                                     ),
                                     textAlign: TextAlign.center,
@@ -862,13 +862,13 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                                         title: Text(
                                           album.name,
                                           style: const TextStyle(
-                                            fontFamily: 'ProductSans',
+                                            fontFamily: 'GoogleSansFlex',
                                           ),
                                         ),
                                         subtitle: Text(
                                           '${album.fileCount} items',
                                           style: TextStyle(
-                                            fontFamily: 'ProductSans',
+                                            fontFamily: 'GoogleSansFlex',
                                             fontSize: 12,
                                             color: context.textTertiary,
                                           ),
@@ -918,14 +918,14 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         title: Text(
           'Delete Files',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textPrimary,
           ),
         ),
         content: Text(
           'Delete ${_selectedFiles.length} file(s)? Recover them in Recently Deleted when retention is enabled. If retention is set to Immediate deletion, this cannot be undone.',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textSecondary,
           ),
         ),
@@ -935,7 +935,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
             child: Text(
               'Cancel',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
               ),
             ),
@@ -945,7 +945,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
             child: Text(
               'Delete',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: AppColors.error,
               ),
             ),
@@ -1013,7 +1013,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: context.textPrimary,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -1029,7 +1029,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                           title: Text(
                             option.displayName,
                             style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               color: context.textPrimary,
                             ),
                           ),

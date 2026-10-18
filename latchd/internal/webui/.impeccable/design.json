@@ -122,7 +122,7 @@
   ],
   "narrative": {
     "northStar": "A coherent, calm local file-management app",
-    "overview": "Latch uses familiar Google Drive navigation and Proton's restrained utility-panel treatment with Latch's own logo, palette, ProductSans, and Material icons. The world is flat, real application UI: files, settings, and phone backup are useful destinations, with task titles and controls in the first viewport rather than an oversized brand presentation. There are no physical decorative materials in this approved direction.\n\nThe redesign boundary is the shared shell, full-page settings, phone pairing, and responsive browser layout. The incumbent table/grid browser and viewer remain the functional reference. Settings uses grouped rows; pairing places a scannable QR beside phone instructions with manual and USB disclosures. These are expressions of the confirmed direction, not composition requirements for every future screen.",
+    "overview": "Latch uses familiar Google Drive navigation and Proton's restrained utility-panel treatment with Latch's own logo, palette, Google Sans Flex, and Material icons. The world is flat, real application UI: files, settings, and phone backup are useful destinations, with task titles and controls in the first viewport rather than an oversized brand presentation. There are no physical decorative materials in this approved direction.\n\nThe redesign boundary is the shared shell, full-page settings, phone pairing, and responsive browser layout. The incumbent table/grid browser and viewer remain the functional reference. Settings uses grouped rows; pairing places a scannable QR beside phone instructions with manual and USB disclosures. These are expressions of the confirmed direction, not composition requirements for every future screen.",
     "keyCharacteristics": [
       "Familiar destination navigation with retained file-view state.",
       "Flat tonal surfaces, hairline dividers, and restrained utility panels.",
@@ -136,7 +136,7 @@
       { "name": "The Flat Utility Rule", "body": "Use tonal grounds and row dividers for routine settings; reserve a separate panel for a concrete grouped interaction such as USB approval.", "section": "elevation" }
     ],
     "dos": [
-      "**Do** retain Latch's logo, ProductSans, codepoint Material icons, and saved light/dark and accent choices.",
+      "**Do** retain Latch's logo, Google Sans Flex, codepoint Material icons, and saved light/dark and accent choices.",
       "**Do** use live CSS variables for themed controls, including explicit foreground text in the export input.",
       "**Do** keep files, settings, and phone backup as shared-shell destinations with retained file-view and operation state.",
       "**Do** stack settings controls and pairing content on narrow screens, use the mobile drawer, and allow full credentials to wrap.",

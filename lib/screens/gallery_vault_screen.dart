@@ -196,7 +196,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
         title: Text(
           '${selectedFiles.length} selected',
           style: const TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: Colors.white,
           ),
         ),
@@ -207,7 +207,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
               allSelected ? 'Deselect All' : 'Select All',
               style: const TextStyle(
                 color: Colors.white,
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
               ),
             ),
           ),
@@ -224,7 +224,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
       title: Text(
         'Gallery Vault',
         style: TextStyle(
-          fontFamily: 'ProductSans',
+          fontFamily: 'GoogleSansFlex',
           color: context.textPrimary,
           fontWeight: FontWeight.w600,
         ),
@@ -257,7 +257,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                       style: const TextStyle(
                         fontSize: 10,
                         color: Colors.white,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -375,7 +375,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
         decoration: InputDecoration(
           hintText: 'Search files...',
           hintStyle: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textTertiary,
           ),
           prefixIcon: Icon(Icons.search, color: context.textTertiary, size: 20),
@@ -389,7 +389,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
               const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
         style: TextStyle(
-          fontFamily: 'ProductSans',
+          fontFamily: 'GoogleSansFlex',
           color: context.textPrimary,
         ),
         onChanged: (value) {
@@ -446,7 +446,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
               style: TextStyle(
                 fontSize: 13,
                 color: context.textSecondary,
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
               ),
             ),
           ),
@@ -456,7 +456,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
               'Clear',
               style: TextStyle(
                 color: context.accentColor,
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
               ),
             ),
           ),
@@ -611,7 +611,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: context.textPrimary,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                       ),
                     ),
                   ),
@@ -623,7 +623,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                     child: Text(
                       'Drag to reorder. Toggle to show or hide.',
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontSize: 13,
                         color: context.textSecondary,
                       ),
@@ -670,7 +670,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                         ),
                         title: Text(
                           cat.label,
-                          style: const TextStyle(fontFamily: 'ProductSans'),
+                          style: const TextStyle(fontFamily: 'GoogleSansFlex'),
                         ),
                         contentPadding:
                             const EdgeInsets.symmetric(horizontal: 20),
@@ -692,12 +692,12 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                   ),
                   title: const Text(
                     'Import button on left',
-                    style: TextStyle(fontFamily: 'ProductSans'),
+                    style: TextStyle(fontFamily: 'GoogleSansFlex'),
                   ),
                   subtitle: Text(
                     'Only applies when the bar has an even total (not centered)',
                     style: TextStyle(
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                       fontSize: 12,
                       color: context.textTertiary,
                     ),
@@ -722,7 +722,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                       child: const Text(
                         'Done',
                         style: TextStyle(
-                          fontFamily: 'ProductSans',
+                          fontFamily: 'GoogleSansFlex',
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -758,7 +758,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
             Text(
               'Failed to load files',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
               ),
             ),
@@ -960,7 +960,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 10,
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -973,7 +973,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                             style: const TextStyle(
                               color: Colors.white70,
                               fontSize: 10,
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                             ),
                           ),
                         ],
@@ -1008,7 +1008,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 10,
-                                fontFamily: 'ProductSans',
+                                fontFamily: 'GoogleSansFlex',
                               ),
                             ),
                           ],
@@ -1358,7 +1358,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
                                 color: context.textPrimary,
-                                fontFamily: 'ProductSans',
+                                fontFamily: 'GoogleSansFlex',
                               ),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
@@ -1369,7 +1369,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                               style: TextStyle(
                                 fontSize: 13,
                                 color: context.textSecondary,
-                                fontFamily: 'ProductSans',
+                                fontFamily: 'GoogleSansFlex',
                               ),
                             ),
                           ],
@@ -1383,7 +1383,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                     style: TextStyle(
                       fontSize: 13,
                       color: context.textSecondary,
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -1404,14 +1404,14 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                     title: const Text(
                       'Export to Downloads',
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                     subtitle: Text(
                       'Save decrypted file to Downloads folder',
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontSize: 12,
                         color: context.textSecondary,
                       ),
@@ -1440,14 +1440,14 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                     title: const Text(
                       'Open with...',
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                     subtitle: Text(
                       'Open file with an external app',
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontSize: 12,
                         color: context.textSecondary,
                       ),
@@ -1476,14 +1476,14 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                     title: const Text(
                       'File Info',
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                     subtitle: Text(
                       'View file details',
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontSize: 12,
                         color: context.textSecondary,
                       ),
@@ -1522,7 +1522,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
               Expanded(
                 child: Text(
                   'Exporting ${file.originalName}...',
-                  style: const TextStyle(fontFamily: 'ProductSans'),
+                  style: const TextStyle(fontFamily: 'GoogleSansFlex'),
                 ),
               ),
             ],
@@ -1578,7 +1578,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
               Expanded(
                 child: Text(
                   'Preparing ${file.originalName}...',
-                  style: const TextStyle(fontFamily: 'ProductSans'),
+                  style: const TextStyle(fontFamily: 'GoogleSansFlex'),
                 ),
               ),
             ],
@@ -1753,7 +1753,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                 fontSize: 24,
                 fontWeight: FontWeight.w700,
                 color: context.textPrimary,
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
               ),
             ),
             const SizedBox(height: 12),
@@ -1762,7 +1762,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
               style: TextStyle(
                 fontSize: 15,
                 color: context.textSecondary,
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
               ),
               textAlign: TextAlign.center,
             ),
@@ -1790,7 +1790,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                 label: const Text(
                   'Add Files',
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
                   ),
@@ -1852,7 +1852,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: context.textPrimary,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -1868,7 +1868,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                           title: Text(
                             option.displayName,
                             style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               color: context.textPrimary,
                             ),
                           ),
@@ -1928,7 +1928,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                             color: context.textPrimary,
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -1949,13 +1949,13 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                                       title: Text(
                                         album.name,
                                         style: const TextStyle(
-                                          fontFamily: 'ProductSans',
+                                          fontFamily: 'GoogleSansFlex',
                                         ),
                                       ),
                                       subtitle: Text(
                                         '${album.fileCount} items',
                                         style: TextStyle(
-                                          fontFamily: 'ProductSans',
+                                          fontFamily: 'GoogleSansFlex',
                                           fontSize: 12,
                                           color: context.textTertiary,
                                         ),
@@ -2021,14 +2021,14 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
         title: Text(
           'Unhide Files',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textPrimary,
           ),
         ),
         content: Text(
           'Are you sure you want to unhide ${selectedFiles.length} file(s)? This will restore them to your device gallery (DCIM/Restored folder) and remove them from the vault.',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textSecondary,
           ),
         ),
@@ -2038,7 +2038,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
             child: Text(
               'Cancel',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
               ),
             ),
@@ -2048,7 +2048,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
             child: Text(
               'Unhide',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.accentColor,
                 fontWeight: FontWeight.bold,
               ),
@@ -2073,14 +2073,14 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
         title: Text(
           'Delete Files',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textPrimary,
           ),
         ),
         content: Text(
           'Delete ${selectedFiles.length} file(s)? Recover them in Recently Deleted when retention is enabled. If retention is set to Immediate deletion, this cannot be undone.',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textSecondary,
           ),
         ),
@@ -2090,7 +2090,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
             child: Text(
               'Cancel',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
               ),
             ),
@@ -2100,7 +2100,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
             child: Text(
               'Delete',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: AppColors.error,
               ),
             ),
@@ -2166,7 +2166,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                               color: context.textPrimary,
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                             ),
                           ),
                         ],
@@ -2175,7 +2175,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                       Text(
                         'Set up a fake vault that shows when using a different PIN/password. Perfect for situations where you might be forced to open the app.',
                         style: TextStyle(
-                          fontFamily: 'ProductSans',
+                          fontFamily: 'GoogleSansFlex',
                           color: context.textSecondary,
                           fontSize: 14,
                         ),
@@ -2190,7 +2190,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                             SwitchListTile(
                               title: const Text(
                                 'Enable Decoy Mode',
-                                style: TextStyle(fontFamily: 'ProductSans'),
+                                style: TextStyle(fontFamily: 'GoogleSansFlex'),
                               ),
                               value: settings.isEnabled,
                               onChanged: (value) async {
@@ -2218,14 +2218,14 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
                                 ),
                                 title: const Text(
                                   'Set Decoy PIN',
-                                  style: TextStyle(fontFamily: 'ProductSans'),
+                                  style: TextStyle(fontFamily: 'GoogleSansFlex'),
                                 ),
                                 subtitle: Text(
                                   settings.hasPinSet
                                       ? 'Decoy PIN is set'
                                       : 'Not configured',
                                   style: TextStyle(
-                                    fontFamily: 'ProductSans',
+                                    fontFamily: 'GoogleSansFlex',
                                     fontSize: 12,
                                     color: context.textTertiary,
                                   ),
@@ -2262,7 +2262,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
         title: Text(
           'Set Decoy PIN',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textPrimary,
           ),
         ),
@@ -2272,7 +2272,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
             Text(
               'This PIN will show your decoy vault instead of your real files.',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
                 fontSize: 14,
               ),
@@ -2286,7 +2286,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
               decoration: InputDecoration(
                 labelText: 'Decoy PIN (4-6 digits)',
                 labelStyle: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   color: context.textSecondary,
                 ),
                 border: OutlineInputBorder(
@@ -2306,7 +2306,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
             child: Text(
               'Cancel',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
               ),
             ),
@@ -2336,7 +2336,7 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
             ),
             child: const Text(
               'Set PIN',
-              style: TextStyle(fontFamily: 'ProductSans'),
+              style: TextStyle(fontFamily: 'GoogleSansFlex'),
             ),
           ),
         ],

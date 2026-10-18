@@ -301,7 +301,7 @@ class _OperationProgressHostState extends ConsumerState<OperationProgressHost> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: context.textPrimary,
@@ -312,7 +312,7 @@ class _OperationProgressHostState extends ConsumerState<OperationProgressHost> {
                 Text(
                   _controller.isRunning ? progressLabel : _resultLabel,
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     fontSize: 14,
                     color: context.textSecondary,
                   ),
@@ -346,7 +346,7 @@ class _OperationProgressHostState extends ConsumerState<OperationProgressHost> {
                     child: Text(
                       _controller.type!.title,
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontWeight: FontWeight.w600,
                         fontSize: 16,
                         color: context.textPrimary,

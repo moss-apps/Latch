@@ -56,7 +56,7 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
               label: const Text(
                 'New Folder',
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
                 ),
@@ -86,7 +86,7 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
       title: Text(
         title,
         style: TextStyle(
-          fontFamily: 'ProductSans',
+          fontFamily: 'GoogleSansFlex',
           fontWeight: FontWeight.bold,
           fontSize: 18,
           color: context.textPrimary,
@@ -131,7 +131,7 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
       ),
       title: Text(
         '${selectedFiles.length} selected',
-        style: const TextStyle(fontFamily: 'ProductSans', color: Colors.white),
+        style: const TextStyle(fontFamily: 'GoogleSansFlex', color: Colors.white),
       ),
       actions: [
         if (files.isNotEmpty)
@@ -140,7 +140,7 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
             child: Text(
               allSelected ? 'Deselect All' : 'Select All',
               style: const TextStyle(
-                  color: Colors.white, fontFamily: 'ProductSans'),
+                  color: Colors.white, fontFamily: 'GoogleSansFlex'),
             ),
           ),
         if (selectedFiles.isNotEmpty)
@@ -257,14 +257,14 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
         title: Text(
           'Delete Files',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textPrimary,
           ),
         ),
         content: Text(
           'Delete ${selectedFiles.length} file(s)? Recover them in Recently Deleted when retention is enabled. If retention is set to Immediate deletion, this cannot be undone.',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textSecondary,
           ),
         ),
@@ -274,7 +274,7 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
             child: Text(
               'Cancel',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
               ),
             ),
@@ -284,7 +284,7 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
             child: Text(
               'Delete',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: AppColors.error,
               ),
             ),
@@ -338,7 +338,7 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                             color: ctx.textPrimary,
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -359,12 +359,12 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
                                       title: Text(
                                         album.name,
                                         style: const TextStyle(
-                                            fontFamily: 'ProductSans'),
+                                            fontFamily: 'GoogleSansFlex'),
                                       ),
                                       subtitle: Text(
                                         '${album.fileCount} items',
                                         style: TextStyle(
-                                          fontFamily: 'ProductSans',
+                                          fontFamily: 'GoogleSansFlex',
                                           fontSize: 12,
                                           color: ctx.textTertiary,
                                         ),
@@ -435,14 +435,14 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
         title: Text(
           'Unhide Files',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: ctx.textPrimary,
           ),
         ),
         content: Text(
           'Are you sure you want to unhide ${selectedFiles.length} file(s)? This will restore them to your device gallery (DCIM/Restored folder) and remove them from the vault.',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: ctx.textSecondary,
           ),
         ),
@@ -452,7 +452,7 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
             child: Text(
               'Cancel',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: ctx.textSecondary,
               ),
             ),
@@ -462,7 +462,7 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
             child: Text(
               'Unhide',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: ctx.accentColor,
                 fontWeight: FontWeight.bold,
               ),
@@ -493,7 +493,7 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
         title: Text(
           currentFolderId != null ? 'Create Subfolder' : 'Create Folder',
           style:
-              TextStyle(fontFamily: 'ProductSans', color: context.textPrimary),
+              TextStyle(fontFamily: 'GoogleSansFlex', color: context.textPrimary),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -503,7 +503,7 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
               decoration: InputDecoration(
                 labelText: 'Folder Name',
                 labelStyle: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     color: this.context.textSecondary),
                 border:
                     OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -520,7 +520,7 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
               decoration: InputDecoration(
                 labelText: 'Description (optional)',
                 labelStyle: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     color: this.context.textSecondary),
                 border:
                     OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -539,7 +539,7 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
             child: Text(
               'Cancel',
               style: TextStyle(
-                  fontFamily: 'ProductSans', color: this.context.textSecondary),
+                  fontFamily: 'GoogleSansFlex', color: this.context.textSecondary),
             ),
           ),
           ElevatedButton(
@@ -573,7 +573,7 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
               foregroundColor: Colors.white,
             ),
             child: const Text('Create',
-                style: TextStyle(fontFamily: 'ProductSans')),
+                style: TextStyle(fontFamily: 'GoogleSansFlex')),
           ),
         ],
       ),
@@ -616,7 +616,7 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: this.context.textPrimary,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -668,13 +668,13 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         title: Text('Rename Folder',
             style: TextStyle(
-                fontFamily: 'ProductSans', color: this.context.textPrimary)),
+                fontFamily: 'GoogleSansFlex', color: this.context.textPrimary)),
         content: TextField(
           controller: controller,
           decoration: InputDecoration(
             labelText: 'Folder Name',
             labelStyle: TextStyle(
-                fontFamily: 'ProductSans', color: this.context.textSecondary),
+                fontFamily: 'GoogleSansFlex', color: this.context.textSecondary),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -688,7 +688,7 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
             onPressed: () => Navigator.pop(context),
             child: Text('Cancel',
                 style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     color: this.context.textSecondary)),
           ),
           ElevatedButton(
@@ -717,7 +717,7 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
               foregroundColor: Colors.white,
             ),
             child: const Text('Rename',
-                style: TextStyle(fontFamily: 'ProductSans')),
+                style: TextStyle(fontFamily: 'GoogleSansFlex')),
           ),
         ],
       ),
@@ -731,18 +731,18 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         title: Text('Delete Folder',
             style: TextStyle(
-                fontFamily: 'ProductSans', color: this.context.textPrimary)),
+                fontFamily: 'GoogleSansFlex', color: this.context.textPrimary)),
         content: Text(
           'Are you sure you want to delete "${folder.name}"? Files in this folder will not be deleted from the vault.',
           style: TextStyle(
-              fontFamily: 'ProductSans', color: this.context.textSecondary),
+              fontFamily: 'GoogleSansFlex', color: this.context.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text('Cancel',
                 style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     color: this.context.textSecondary)),
           ),
           ElevatedButton(
@@ -770,7 +770,7 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
               foregroundColor: Colors.white,
             ),
             child: const Text('Delete',
-                style: TextStyle(fontFamily: 'ProductSans')),
+                style: TextStyle(fontFamily: 'GoogleSansFlex')),
           ),
         ],
       ),
@@ -789,14 +789,14 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
       title: Text(
         label,
         style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: color ?? context.textPrimary,
             fontSize: 14),
       ),
       subtitle: subtitle != null
           ? Text(subtitle,
               style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   color: context.textTertiary,
                   fontSize: 12))
           : null,

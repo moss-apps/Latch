@@ -282,7 +282,7 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen>
         title: Text(
           'Record Audio',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textPrimary,
             fontWeight: FontWeight.w600,
           ),
@@ -354,7 +354,7 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen>
             color: isSelected ? Colors.white : context.textSecondary,
             fontWeight: FontWeight.w600,
             fontSize: 13,
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
           ),
         ),
       ),
@@ -365,7 +365,7 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen>
     return Text(
       _formatDuration(_recordingDuration),
       style: TextStyle(
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
         fontSize: 56,
         fontWeight: FontWeight.w300,
         color: _isRecording
@@ -475,7 +475,7 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen>
         Text(
           'Recording Ready',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontSize: 22,
             fontWeight: FontWeight.w700,
             color: context.textPrimary,
@@ -485,7 +485,7 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen>
         Text(
           '${_formatDuration(_recordingDuration)} • ${_format == AudioFormat.aac ? 'AAC' : 'WAV'}',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontSize: 14,
             color: context.textSecondary,
           ),
@@ -503,7 +503,7 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen>
                 Text(
                   isPlaying ? 'Playing...' : 'Tap to preview',
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     fontSize: 13,
                     color: context.textTertiary,
                   ),
@@ -538,7 +538,7 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen>
               Text(
                 'Retry',
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: context.textSecondary,
@@ -623,7 +623,7 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen>
             label: const Text(
               'Discard',
               style: TextStyle(
-                  fontFamily: 'ProductSans', fontWeight: FontWeight.w600),
+                  fontFamily: 'GoogleSansFlex', fontWeight: FontWeight.w600),
             ),
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.red,
@@ -643,7 +643,7 @@ class _AudioRecorderScreenState extends State<AudioRecorderScreen>
             label: const Text(
               'Hide',
               style: TextStyle(
-                  fontFamily: 'ProductSans', fontWeight: FontWeight.w600),
+                  fontFamily: 'GoogleSansFlex', fontWeight: FontWeight.w600),
             ),
             style: FilledButton.styleFrom(
               backgroundColor: context.accentColor,

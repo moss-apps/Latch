@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:ui' show PlatformDispatcher;
 
+import 'package:flutter/foundation.dart'
+    show LicenseEntryWithLineBreaks, LicenseRegistry;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -35,6 +37,11 @@ import 'providers/operation_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  LicenseRegistry.addLicense(() async* {
+    final license = await rootBundle.loadString('fonts/OFL.txt');
+    yield LicenseEntryWithLineBreaks(const ['Google Sans Flex'], license);
+  });
 
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
@@ -154,10 +161,10 @@ class _AppInitializerState extends ConsumerState<AppInitializer> {
       builder: (dialogContext) => AlertDialog(
         backgroundColor: Theme.of(dialogContext).scaffoldBackgroundColor,
         title: const Text('Update Available',
-            style: TextStyle(fontFamily: 'ProductSans')),
+            style: TextStyle(fontFamily: 'GoogleSansFlex')),
         content: Text(
           message,
-          style: const TextStyle(fontFamily: 'ProductSans'),
+          style: const TextStyle(fontFamily: 'GoogleSansFlex'),
         ),
         actions: [
           TextButton(

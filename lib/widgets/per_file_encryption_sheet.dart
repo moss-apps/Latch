@@ -108,7 +108,7 @@ class _PerFileEncryptionSheetState extends State<PerFileEncryptionSheet> {
                   child: Text(
                     'Encryption Settings',
                     style: TextStyle(
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                       fontSize: 20,
                       fontWeight: FontWeight.w600,
                       color: context.textPrimary,
@@ -120,7 +120,7 @@ class _PerFileEncryptionSheetState extends State<PerFileEncryptionSheet> {
                   child: Text(
                     'Cancel',
                     style: TextStyle(
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                       color: context.textSecondary,
                     ),
                   ),
@@ -134,7 +134,7 @@ class _PerFileEncryptionSheetState extends State<PerFileEncryptionSheet> {
                   ),
                   child: const Text(
                     'Confirm',
-                    style: TextStyle(fontFamily: 'ProductSans'),
+                    style: TextStyle(fontFamily: 'GoogleSansFlex'),
                   ),
                 ),
               ],
@@ -154,7 +154,7 @@ class _PerFileEncryptionSheetState extends State<PerFileEncryptionSheet> {
                 Text(
                   '${_files.length} file(s) selected',
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     fontSize: 12,
                     color: context.textTertiary,
                   ),
@@ -184,7 +184,7 @@ class _PerFileEncryptionSheetState extends State<PerFileEncryptionSheet> {
           child: Text(
             'Encrypt all files',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               fontSize: 16,
               color: context.textPrimary,
             ),
@@ -224,7 +224,7 @@ class _PerFileEncryptionSheetState extends State<PerFileEncryptionSheet> {
               'Encrypted files also scramble the stored bytes and thumbnails, '
               'so they cannot be previewed without your vault key.',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontSize: 12,
                 height: 1.4,
                 color: context.textSecondary,
@@ -244,7 +244,7 @@ class _PerFileEncryptionSheetState extends State<PerFileEncryptionSheet> {
           child: Text(
             'Algorithm',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               fontSize: 14,
               color: context.textSecondary,
             ),
@@ -259,7 +259,7 @@ class _PerFileEncryptionSheetState extends State<PerFileEncryptionSheet> {
               child: Text(
                 algo == EncryptionAlgorithm.aes256Ctr ? 'AES-CTR' : 'AES-GCM',
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontSize: 14,
                   color: context.textPrimary,
                 ),
@@ -304,7 +304,7 @@ class _PerFileEncryptionSheetState extends State<PerFileEncryptionSheet> {
                       Text(
                         file.fileName,
                         style: TextStyle(
-                          fontFamily: 'ProductSans',
+                          fontFamily: 'GoogleSansFlex',
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
                           color: context.textPrimary,
@@ -323,7 +323,7 @@ class _PerFileEncryptionSheetState extends State<PerFileEncryptionSheet> {
                           Text(
                             _formatSize(file.fileSize),
                             style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               fontSize: 12,
                               color: context.textTertiary,
                             ),
@@ -336,7 +336,7 @@ class _PerFileEncryptionSheetState extends State<PerFileEncryptionSheet> {
                             ? 'Encrypted (bytes + thumbnails)'
                             : 'Hidden only (not encrypted)',
                         style: TextStyle(
-                          fontFamily: 'ProductSans',
+                          fontFamily: 'GoogleSansFlex',
                           fontSize: 11,
                           color: file.encrypt
                               ? context.accentColor
@@ -365,7 +365,7 @@ class _PerFileEncryptionSheetState extends State<PerFileEncryptionSheet> {
                     Text(
                       'Algorithm: ',
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontSize: 12,
                         color: context.textSecondary,
                       ),
@@ -384,7 +384,7 @@ class _PerFileEncryptionSheetState extends State<PerFileEncryptionSheet> {
                           const Text(
                             'CTR',
                             style: TextStyle(
-                                fontFamily: 'ProductSans', fontSize: 11),
+                                fontFamily: 'GoogleSansFlex', fontSize: 11),
                           ),
                         ],
                       ),
@@ -418,7 +418,7 @@ class _PerFileEncryptionSheetState extends State<PerFileEncryptionSheet> {
                           const Text(
                             'GCM',
                             style: TextStyle(
-                                fontFamily: 'ProductSans', fontSize: 11),
+                                fontFamily: 'GoogleSansFlex', fontSize: 11),
                           ),
                         ],
                       ),

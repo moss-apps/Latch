@@ -195,13 +195,13 @@ class _BackupFileSelectionScreenState extends State<BackupFileSelectionScreen> {
       child: TextField(
         controller: _searchController,
         style: TextStyle(
-          fontFamily: 'ProductSans',
+          fontFamily: 'GoogleSansFlex',
           color: context.textPrimary,
         ),
         decoration: InputDecoration(
           hintText: 'Search files',
           hintStyle: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textTertiary,
           ),
           prefixIcon: Icon(Icons.search, color: context.textTertiary),
@@ -265,7 +265,7 @@ class _BackupFileSelectionScreenState extends State<BackupFileSelectionScreen> {
                         Text(
                           file.originalName,
                           style: TextStyle(
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                             fontSize: 15,
                             fontWeight: FontWeight.w500,
                             color: context.textPrimary,
@@ -277,7 +277,7 @@ class _BackupFileSelectionScreenState extends State<BackupFileSelectionScreen> {
                         Text(
                           '${file.type.displayName} · ${file.formattedSize} · ${file.formattedDateAdded}',
                           style: TextStyle(
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                             fontSize: 12,
                             color: context.textSecondary,
                           ),
@@ -322,7 +322,7 @@ class _BackupFileSelectionScreenState extends State<BackupFileSelectionScreen> {
       child: Text(
         'Tip: long-press and slide across files to select or clear several at once.',
         style: TextStyle(
-          fontFamily: 'ProductSans',
+          fontFamily: 'GoogleSansFlex',
           fontSize: 12,
           color: context.textTertiary,
         ),
@@ -358,7 +358,7 @@ class _BackupFileSelectionScreenState extends State<BackupFileSelectionScreen> {
               title,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
                 color: context.textPrimary,
@@ -369,7 +369,7 @@ class _BackupFileSelectionScreenState extends State<BackupFileSelectionScreen> {
               subtitle,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontSize: 14,
                 color: context.textTertiary,
               ),
@@ -403,7 +403,7 @@ class _BackupFileSelectionScreenState extends State<BackupFileSelectionScreen> {
               Text(
                 '${visibleFiles.length} file${visibleFiles.length == 1 ? '' : 's'}',
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontSize: 13,
                   color: context.textTertiary,
                 ),
@@ -447,7 +447,7 @@ class _BackupFileSelectionScreenState extends State<BackupFileSelectionScreen> {
                         ? '1 file selected'
                         : '$selectedCount files selected',
                     style: TextStyle(
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                       color: context.textPrimary,
@@ -484,7 +484,7 @@ class _BackupFileSelectionScreenState extends State<BackupFileSelectionScreen> {
         title: Text(
           'Select backup files',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontWeight: FontWeight.w600,
             color: context.textPrimary,
           ),

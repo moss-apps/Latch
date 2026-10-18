@@ -84,7 +84,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
         title: Text(
           'Biometric Setup',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textPrimary,
           ),
         ),
@@ -161,7 +161,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
         fontSize: 28,
         fontWeight: FontWeight.w700,
         color: context.textPrimary,
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
       ),
       textAlign: TextAlign.center,
     );
@@ -173,7 +173,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
       style: TextStyle(
         fontSize: 16,
         color: context.textSecondary,
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
         height: 1.5,
       ),
       textAlign: TextAlign.center,
@@ -200,7 +200,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
             style: TextStyle(
               color: AppColors.error,
               fontSize: 14,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
             ),
             textAlign: TextAlign.center,
           ),
@@ -252,7 +252,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   color: Colors.white,
                 ),
               ),

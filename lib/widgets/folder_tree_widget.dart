@@ -65,7 +65,7 @@ class _FolderTreeWidgetState extends ConsumerState<FolderTreeWidget> {
                   child: Text(
                     'Failed to load folders',
                     style: TextStyle(
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                       color: context.textSecondary,
                       fontSize: 12,
                     ),
@@ -79,7 +79,7 @@ class _FolderTreeWidgetState extends ConsumerState<FolderTreeWidget> {
                     child: Text(
                       'No folders created yet.',
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         color: context.textTertiary,
                         fontSize: 13,
                       ),
@@ -135,7 +135,7 @@ class _FolderTreeWidgetState extends ConsumerState<FolderTreeWidget> {
               child: Text(
                 'My Vault',
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                   color: isSelected ? context.accentColor : context.textPrimary,
                   fontSize: 14,
@@ -219,7 +219,7 @@ class _FolderTreeWidgetState extends ConsumerState<FolderTreeWidget> {
                   child: Text(
                     folder.name,
                     style: TextStyle(
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                       fontWeight:
                           isSelected ? FontWeight.bold : FontWeight.normal,
                       color: isSelected
@@ -242,7 +242,7 @@ class _FolderTreeWidgetState extends ConsumerState<FolderTreeWidget> {
                     child: Text(
                       '${folder.fileCount}',
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontSize: 10,
                         color: context.textTertiary,
                       ),

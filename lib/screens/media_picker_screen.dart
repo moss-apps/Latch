@@ -407,7 +407,7 @@ class _MediaPickerScreenState extends State<MediaPickerScreen> {
       return Text(
         widget.title,
         style: TextStyle(
-          fontFamily: 'ProductSans',
+          fontFamily: 'GoogleSansFlex',
           color: context.textPrimary,
           fontWeight: FontWeight.w600,
         ),
@@ -429,7 +429,7 @@ class _MediaPickerScreenState extends State<MediaPickerScreen> {
             child: Text(
               _currentAlbum?.name ?? widget.title,
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textPrimary,
                 fontWeight: FontWeight.w600,
                 fontSize: 18,
@@ -449,7 +449,7 @@ class _MediaPickerScreenState extends State<MediaPickerScreen> {
               final count = snapshot.data ?? 0;
               return Text(
                 '${album.name} ($count)',
-                style: const TextStyle(fontFamily: 'ProductSans'),
+                style: const TextStyle(fontFamily: 'GoogleSansFlex'),
               );
             },
           ),
@@ -472,7 +472,7 @@ class _MediaPickerScreenState extends State<MediaPickerScreen> {
           Text(
             'No media found',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               fontSize: 18,
               color: context.textSecondary,
             ),
@@ -621,7 +621,7 @@ class _MediaPickerScreenState extends State<MediaPickerScreen> {
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 10,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                       ),
                     ),
                   ],
@@ -661,7 +661,7 @@ class _MediaPickerScreenState extends State<MediaPickerScreen> {
                           color: Colors.white,
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          fontFamily: 'ProductSans',
+                          fontFamily: 'GoogleSansFlex',
                         ),
                       ),
                     )
@@ -697,7 +697,7 @@ class _MediaPickerScreenState extends State<MediaPickerScreen> {
             child: Text(
               '${_selectedAssets.length} selected',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: context.textPrimary,

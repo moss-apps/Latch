@@ -79,7 +79,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         title: Text(
           isEditing ? 'Edit Note' : 'New Note',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontSize: 18,
             fontWeight: FontWeight.w600,
             color: context.textPrimary,
@@ -145,7 +145,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                 child: TextField(
                   controller: _titleController,
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     fontSize: 22,
                     fontWeight: FontWeight.w600,
                     color: context.textPrimary,
@@ -153,7 +153,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                   decoration: InputDecoration(
                     hintText: 'Title',
                     hintStyle: TextStyle(
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                       fontSize: 22,
                       fontWeight: FontWeight.w600,
                       color: context.textTertiary,
@@ -190,7 +190,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                                 error: (_, __) => 'Error',
                               ),
                           style: TextStyle(
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                             fontSize: 12,
                             color: context.textTertiary,
                           ),
@@ -215,24 +215,24 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                         data: _contentController.text,
                         styleSheet: MarkdownStyleSheet(
                           p: TextStyle(
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                             fontSize: 15,
                             color: context.textPrimary,
                           ),
                           h1: TextStyle(
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
                             color: context.textPrimary,
                           ),
                           h2: TextStyle(
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                             color: context.textPrimary,
                           ),
                           h3: TextStyle(
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                             color: context.textPrimary,
@@ -265,7 +265,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                           expands: true,
                           textAlignVertical: TextAlignVertical.top,
                           style: TextStyle(
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                             fontSize: 15,
                             color: context.textPrimary,
                             height: 1.5,
@@ -273,7 +273,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                           decoration: InputDecoration(
                             hintText: 'Start writing...',
                             hintStyle: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               fontSize: 15,
                               color: context.textTertiary,
                             ),
@@ -374,7 +374,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                 child: Text(
                   'Select Folder',
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: context.textPrimary,
@@ -387,7 +387,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                 title: Text(
                   'No Folder',
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     color: context.textPrimary,
                   ),
                 ),
@@ -398,7 +398,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                     title: Text(
                       folder.name,
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         color: context.textPrimary,
                       ),
                     ),

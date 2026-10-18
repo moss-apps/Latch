@@ -48,7 +48,7 @@ class PasswordCard extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
                 color: context.textPrimary,
@@ -62,7 +62,7 @@ class PasswordCard extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
-          fontFamily: 'ProductSans',
+          fontFamily: 'GoogleSansFlex',
           fontSize: 12,
           color: context.textTertiary,
         ),

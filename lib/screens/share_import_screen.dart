@@ -49,7 +49,7 @@ class _ShareImportScreenState extends ConsumerState<ShareImportScreen> {
           title: Text(
             'Share to Latch',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               fontSize: 18,
               fontWeight: FontWeight.w600,
               color: context.textPrimary,
@@ -83,7 +83,7 @@ class _ShareImportScreenState extends ConsumerState<ShareImportScreen> {
                   child: Text(
                     'No shared files remaining',
                     style: TextStyle(
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                       color: context.textSecondary,
                     ),
                   ),
@@ -103,14 +103,14 @@ class _ShareImportScreenState extends ConsumerState<ShareImportScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontFamily: 'ProductSans',
+                          fontFamily: 'GoogleSansFlex',
                           color: context.textPrimary,
                         ),
                       ),
                       subtitle: Text(
                         _formatSize(item.sizeBytes),
                         style: TextStyle(
-                          fontFamily: 'ProductSans',
+                          fontFamily: 'GoogleSansFlex',
                           color: context.textSecondary,
                         ),
                       ),
@@ -129,7 +129,7 @@ class _ShareImportScreenState extends ConsumerState<ShareImportScreen> {
                   'Files are copied into Latch. The originals stay in the '
                   'source app.',
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     fontSize: 12,
                     color: context.textTertiary,
                   ),
@@ -193,7 +193,7 @@ class _ShareImportScreenState extends ConsumerState<ShareImportScreen> {
               _status,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontSize: 14,
                 color: context.textSecondary,
               ),
@@ -221,7 +221,7 @@ class _ShareImportScreenState extends ConsumerState<ShareImportScreen> {
             Text(
               _resultTitle,
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
                 color: context.textPrimary,
@@ -232,7 +232,7 @@ class _ShareImportScreenState extends ConsumerState<ShareImportScreen> {
               _resultMessage,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontSize: 14,
                 color: context.textSecondary,
               ),
@@ -413,14 +413,14 @@ class _ShareImportScreenState extends ConsumerState<ShareImportScreen> {
         title: Text(
           'Discard shared files?',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: dialogContext.textPrimary,
           ),
         ),
         content: Text(
           'They will not be imported into Latch.',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: dialogContext.textSecondary,
           ),
         ),

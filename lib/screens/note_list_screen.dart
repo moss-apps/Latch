@@ -44,7 +44,7 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
               title: Text(
                 'Notes',
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontSize: 20,
                   fontWeight: FontWeight.w600,
                   color: context.textPrimary,
@@ -74,13 +74,13 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
                 ref.read(noteSearchQueryProvider.notifier).state = value;
               },
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textPrimary,
               ),
               decoration: InputDecoration(
                 hintText: 'Search notes',
                 hintStyle: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   color: context.textTertiary,
                 ),
                 prefixIcon:
@@ -121,7 +121,7 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontSize: 13,
                         color: context.textSecondary,
                       ),
@@ -160,7 +160,7 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
                               ? 'No notes found'
                               : 'No notes yet',
                           style: TextStyle(
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                             fontSize: 15,
                             color: context.textTertiary,
                           ),
@@ -222,7 +222,7 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
                 child: Text(
                   'Error loading notes',
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     color: context.textTertiary,
                   ),
                 ),
@@ -261,7 +261,7 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
       title: Text(
         '${_selectedNoteIds.length} selected',
         style: TextStyle(
-          fontFamily: 'ProductSans',
+          fontFamily: 'GoogleSansFlex',
           fontSize: 18,
           fontWeight: FontWeight.w600,
           color: context.textPrimary,
@@ -307,7 +307,7 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
         title: Text(
           count == 1 ? 'Delete Note' : 'Delete Notes',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontWeight: FontWeight.w600,
             color: context.textPrimary,
           ),
@@ -315,7 +315,7 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
         content: Text(
           'Delete $count ${count == 1 ? 'note' : 'notes'}? Recover them in Recently Deleted when retention is enabled. If retention is set to Immediate deletion, this cannot be undone.',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textSecondary,
           ),
         ),
@@ -325,7 +325,7 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
             child: Text(
               'Cancel',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
               ),
             ),
@@ -335,7 +335,7 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
             child: Text(
               'Delete',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: AppColors.error,
               ),
             ),

@@ -81,7 +81,7 @@ class _ReEncryptFilePickerScreenState
         title: Text(
           'Select Files to Re-Encrypt',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textPrimary,
             fontWeight: FontWeight.w600,
           ),
@@ -107,7 +107,7 @@ class _ReEncryptFilePickerScreenState
                     ? 'Deselect All'
                     : 'Select All',
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   color: context.accentColor,
                 ),
               ),
@@ -122,7 +122,7 @@ class _ReEncryptFilePickerScreenState
           child: Text(
             'Failed to load files',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: context.textPrimary,
             ),
           ),
@@ -138,7 +138,7 @@ class _ReEncryptFilePickerScreenState
                   Text(
                     'No encrypted files',
                     style: TextStyle(
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                       fontSize: 18,
                       color: context.textSecondary,
                     ),
@@ -167,7 +167,7 @@ class _ReEncryptFilePickerScreenState
                         'Target: ${widget.targetAlgorithm.displayName}\n'
                         '${_selectedIds.length} of ${filteredFiles.length} selected',
                         style: TextStyle(
-                          fontFamily: 'ProductSans',
+                          fontFamily: 'GoogleSansFlex',
                           fontSize: 13,
                           color: context.textPrimary,
                         ),
@@ -181,14 +181,14 @@ class _ReEncryptFilePickerScreenState
                 child: TextField(
                   onChanged: _setSearchQuery,
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     color: context.textPrimary,
                     fontSize: 14,
                   ),
                   decoration: InputDecoration(
                     hintText: 'Search files...',
                     hintStyle: TextStyle(
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                       color: context.textTertiary,
                     ),
                     prefixIcon: Icon(Icons.search, color: context.textTertiary),
@@ -224,7 +224,7 @@ class _ReEncryptFilePickerScreenState
                         child: Text(
                           'No files match your search',
                           style: TextStyle(
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                             fontSize: 16,
                             color: context.textSecondary,
                           ),
@@ -264,7 +264,7 @@ class _ReEncryptFilePickerScreenState
                                 title: Text(
                                   file.originalName,
                                   style: TextStyle(
-                                    fontFamily: 'ProductSans',
+                                    fontFamily: 'GoogleSansFlex',
                                     fontSize: 14,
                                     color: context.textPrimary,
                                   ),
@@ -284,7 +284,7 @@ class _ReEncryptFilePickerScreenState
                                         '${_formatSize(file.fileSize)} • ${_formatAlgorithm(file.encryptionAlgorithm)}'
                                         '${needsReEncrypt ? ' → ${_formatAlgorithm(widget.targetAlgorithm)}' : ' (no change)'}',
                                         style: TextStyle(
-                                          fontFamily: 'ProductSans',
+                                          fontFamily: 'GoogleSansFlex',
                                           fontSize: 12,
                                           color: needsReEncrypt
                                               ? context.textSecondary
@@ -337,7 +337,7 @@ class _ReEncryptFilePickerScreenState
                     icon: const Icon(Icons.sync),
                     label: Text(
                       'Re-Encrypt ${_selectedIds.length} File(s)',
-                      style: const TextStyle(fontFamily: 'ProductSans'),
+                      style: const TextStyle(fontFamily: 'GoogleSansFlex'),
                     ),
                     style: FilledButton.styleFrom(
                       backgroundColor: context.accentColor,
@@ -392,7 +392,7 @@ class _ReEncryptFilePickerScreenState
                 child: Text(
                   'Large Files Detected',
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     color: context.textPrimary,
                   ),
                 ),
@@ -406,7 +406,7 @@ class _ReEncryptFilePickerScreenState
               Text(
                 '${largeFiles.length} file(s) over 50MB will be re-encrypted. This may take a long time and could corrupt files if interrupted.',
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   color: context.textSecondary,
                   fontSize: 14,
                 ),
@@ -417,7 +417,7 @@ class _ReEncryptFilePickerScreenState
                     child: Text(
                       '• ${f.originalName} (${_formatSize(f.fileSize)})',
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontSize: 12,
                         color: context.textTertiary,
                       ),
@@ -427,7 +427,7 @@ class _ReEncryptFilePickerScreenState
                 Text(
                   '...and ${largeFiles.length - 5} more',
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     fontSize: 12,
                     color: context.textTertiary,
                   ),

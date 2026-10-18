@@ -110,7 +110,7 @@ class FolderBreadcrumbWidget extends ConsumerWidget {
         child: Text(
           title,
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontSize: 13,
             fontWeight: isLast ? FontWeight.bold : FontWeight.w500,
             color: isLast ? context.textPrimary : context.accentColor,
