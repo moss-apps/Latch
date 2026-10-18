@@ -320,7 +320,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
               const SizedBox(width: 20),
               Expanded(
                   child: Text('Exporting ${widget.file.originalName}...',
-                      style: const TextStyle(fontFamily: 'ProductSans'))),
+                      style: const TextStyle(fontFamily: 'GoogleSansFlex'))),
             ],
           ),
         ),
@@ -369,7 +369,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
               const SizedBox(width: 20),
               Expanded(
                   child: Text('Preparing ${widget.file.originalName}...',
-                      style: const TextStyle(fontFamily: 'ProductSans'))),
+                      style: const TextStyle(fontFamily: 'GoogleSansFlex'))),
             ],
           ),
         ),
@@ -422,7 +422,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
             Text(
               widget.file.originalName,
               style: const TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontWeight: FontWeight.w600,
                 fontSize: 16,
               ),
@@ -433,7 +433,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
               Text(
                 'Page $_currentPage of $_totalPages',
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontSize: 12,
                   color: context.textTertiary,
                 ),
@@ -469,7 +469,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
             Text(
               _isConverting ? 'Converting to PDF...' : 'Loading document...',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
               ),
             ),
@@ -478,7 +478,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
               Text(
                 'This may take a moment',
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontSize: 12,
                   color: context.textTertiary,
                 ),
@@ -503,7 +503,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
             Text(
               _error!,
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
               ),
               textAlign: TextAlign.center,
@@ -539,7 +539,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
         child: Text(
           'No PDF data available',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textSecondary,
           ),
         ),
@@ -559,7 +559,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
                 child: Text(
                   'Converted from ${widget.file.extension.toUpperCase()} to PDF',
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     color: context.accentColor.withValues(alpha: 0.8),
                     fontSize: 13,
                   ),
@@ -610,7 +610,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
         child: Text(
           'No PDF data available',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textSecondary,
           ),
         ),
@@ -680,7 +680,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
           Text(
             widget.file.originalName,
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               fontSize: 18,
               fontWeight: FontWeight.w600,
               color: context.textPrimary,
@@ -691,7 +691,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
           Text(
             widget.file.formattedSize,
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: context.textTertiary,
             ),
           ),
@@ -705,7 +705,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
             child: Text(
               widget.file.extension.toUpperCase(),
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontWeight: FontWeight.w600,
                 color: _getDocumentColor(),
               ),
@@ -715,7 +715,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
           Text(
             'Preview not available for this document type',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: context.textSecondary,
             ),
           ),

@@ -387,7 +387,7 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
         fontSize: 32,
         fontWeight: FontWeight.w700,
         color: context.textPrimary,
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
         letterSpacing: -0.5,
       ),
       textAlign: TextAlign.center,
@@ -417,7 +417,7 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
       style: TextStyle(
         fontSize: 15,
         color: context.textSecondary,
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
       ),
       textAlign: TextAlign.center,
     );
@@ -483,7 +483,7 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
           autofillHints:
               _autofillEnabled ? const [AutofillHints.password] : null,
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontSize: 16,
             color: context.textPrimary,
           ),
@@ -491,11 +491,11 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
             labelText: 'Password',
             hintText: 'Enter your password',
             labelStyle: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: context.textSecondary,
             ),
             hintStyle: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: context.textTertiary,
             ),
             suffixIcon: IconButton(
@@ -562,7 +562,7 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
                     : 'Use Backup Password',
                 style: TextStyle(
                   color: context.textSecondary,
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontSize: 14,
                 ),
               ),
@@ -632,7 +632,7 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
               'Use biometric instead',
               style: TextStyle(
                 color: context.textSecondary,
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontSize: 14,
               ),
             ),
@@ -653,7 +653,7 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
         disabledBackgroundColor: context.accentColor.withValues(alpha: 0.35),
         minimumSize: const Size.fromHeight(52),
         textStyle: const TextStyle(
-          fontFamily: 'ProductSans',
+          fontFamily: 'GoogleSansFlex',
           fontSize: 16,
           fontWeight: FontWeight.w600,
         ),
@@ -702,7 +702,7 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
                       color: AppColors.error,
                       fontSize: 14,
                       height: 1.3,
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                     ),
                   ),
                 ),
@@ -761,7 +761,7 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
                   color: color,
                   fontSize: 13,
                   height: 1.3,
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontFeatures: [FontFeature.tabularFigures()],
                 ),
               ),

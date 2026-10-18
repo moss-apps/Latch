@@ -41,7 +41,7 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
           child: Text(
             'Error loading files',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: context.textSecondary,
             ),
           ),
@@ -58,7 +58,7 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
               label: const Text(
                 'Add Files',
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
                 ),
@@ -83,7 +83,7 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
         title: Text(
           '${_selectedFiles.length} selected',
           style: const TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: Colors.white,
           ),
         ),
@@ -95,7 +95,7 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
                 allSelected ? 'Deselect All' : 'Select All',
                 style: const TextStyle(
                   color: Colors.white,
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                 ),
               ),
             ),
@@ -123,7 +123,7 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
         data: (album) => Text(
           album?.name ?? 'Album',
           style: const TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -285,7 +285,7 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 10,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                       ),
                     ),
                   ],
@@ -370,7 +370,7 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
                 color: color,
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -407,7 +407,7 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
               fontSize: 20,
               fontWeight: FontWeight.w600,
               color: context.textPrimary,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
             ),
           ),
           const SizedBox(height: 8),
@@ -416,7 +416,7 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
             style: TextStyle(
               fontSize: 14,
               color: context.textSecondary,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
             ),
           ),
           const SizedBox(height: 24),
@@ -546,7 +546,7 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
                                     color: context.textPrimary,
-                                    fontFamily: 'ProductSans'),
+                                    fontFamily: 'GoogleSansFlex'),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -556,7 +556,7 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
                                 style: TextStyle(
                                     fontSize: 13,
                                     color: context.textSecondary,
-                                    fontFamily: 'ProductSans'),
+                                    fontFamily: 'GoogleSansFlex'),
                               ),
                             ],
                           ),
@@ -568,7 +568,7 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
                         style: TextStyle(
                             fontSize: 13,
                             color: context.textSecondary,
-                            fontFamily: 'ProductSans')),
+                            fontFamily: 'GoogleSansFlex')),
                     const SizedBox(height: 12),
                     ListTile(
                       leading: Container(
@@ -582,11 +582,11 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
                       ),
                       title: const Text('Export to Downloads',
                           style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               fontWeight: FontWeight.w500)),
                       subtitle: Text('Save decrypted file to Downloads folder',
                           style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               fontSize: 12,
                               color: AppColors.lightTextSecondary)),
                       contentPadding: EdgeInsets.zero,
@@ -608,11 +608,11 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
                       ),
                       title: const Text('Open with...',
                           style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               fontWeight: FontWeight.w500)),
                       subtitle: Text('Open file with an external app',
                           style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               fontSize: 12,
                               color: AppColors.lightTextSecondary)),
                       contentPadding: EdgeInsets.zero,
@@ -646,7 +646,7 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
               const SizedBox(width: 20),
               Expanded(
                   child: Text('Exporting ${file.originalName}...',
-                      style: const TextStyle(fontFamily: 'ProductSans'))),
+                      style: const TextStyle(fontFamily: 'GoogleSansFlex'))),
             ],
           ),
         ),
@@ -693,7 +693,7 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
               const SizedBox(width: 20),
               Expanded(
                   child: Text('Preparing ${file.originalName}...',
-                      style: const TextStyle(fontFamily: 'ProductSans'))),
+                      style: const TextStyle(fontFamily: 'GoogleSansFlex'))),
             ],
           ),
         ),
@@ -731,14 +731,14 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
         title: Text(
           'Remove from Album',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textPrimary,
           ),
         ),
         content: Text(
           'Remove ${_selectedFiles.length} file(s) from this album? The files will remain in your vault.',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textSecondary,
           ),
         ),
@@ -748,7 +748,7 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
             child: Text(
               'Cancel',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
               ),
             ),
@@ -761,7 +761,7 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
             ),
             child: const Text(
               'Remove',
-              style: TextStyle(fontFamily: 'ProductSans'),
+              style: TextStyle(fontFamily: 'GoogleSansFlex'),
             ),
           ),
         ],
@@ -797,14 +797,14 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
         title: Text(
           'Delete Files',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textPrimary,
           ),
         ),
         content: Text(
           'Delete ${_selectedFiles.length} file(s)? Recover them in Recently Deleted when retention is enabled. If retention is set to Immediate deletion, this cannot be undone.',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textSecondary,
           ),
         ),
@@ -814,7 +814,7 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
             child: Text(
               'Cancel',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
               ),
             ),
@@ -827,7 +827,7 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
             ),
             child: const Text(
               'Delete',
-              style: TextStyle(fontFamily: 'ProductSans'),
+              style: TextStyle(fontFamily: 'GoogleSansFlex'),
             ),
           ),
         ],
@@ -895,7 +895,7 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: context.textPrimary,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -911,7 +911,7 @@ class _AlbumDetailScreenState extends ConsumerState<AlbumDetailScreen> {
                           title: Text(
                             option.displayName,
                             style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               color: context.textPrimary,
                             ),
                           ),
@@ -1007,7 +1007,7 @@ class _AddFilesToAlbumSheetState extends ConsumerState<_AddFilesToAlbumSheet> {
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: context.textPrimary,
-                          fontFamily: 'ProductSans',
+                          fontFamily: 'GoogleSansFlex',
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -1016,7 +1016,7 @@ class _AddFilesToAlbumSheetState extends ConsumerState<_AddFilesToAlbumSheet> {
                         style: TextStyle(
                           fontSize: 14,
                           color: context.textSecondary,
-                          fontFamily: 'ProductSans',
+                          fontFamily: 'GoogleSansFlex',
                         ),
                       ),
                     ],
@@ -1043,7 +1043,8 @@ class _AddFilesToAlbumSheetState extends ConsumerState<_AddFilesToAlbumSheet> {
                           )
                         : Text(
                             'Add (${_selectedFiles.length})',
-                            style: const TextStyle(fontFamily: 'ProductSans'),
+                            style:
+                                const TextStyle(fontFamily: 'GoogleSansFlex'),
                           ),
                   ),
               ],
@@ -1057,7 +1058,7 @@ class _AddFilesToAlbumSheetState extends ConsumerState<_AddFilesToAlbumSheet> {
                 child: Text(
                   'Failed to load files',
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     color: context.textSecondary,
                   ),
                 ),
@@ -1086,7 +1087,7 @@ class _AddFilesToAlbumSheetState extends ConsumerState<_AddFilesToAlbumSheet> {
                         Text(
                           'All files are already in this album',
                           style: TextStyle(
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                             color: context.textSecondary,
                           ),
                         ),
@@ -1280,7 +1281,7 @@ class _AddFilesToAlbumSheetState extends ConsumerState<_AddFilesToAlbumSheet> {
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
                 color: color,
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,

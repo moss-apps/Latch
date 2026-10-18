@@ -51,7 +51,7 @@ class ExplorerToolbar extends ConsumerWidget {
                       label: Text(
                         'Up',
                         style: TextStyle(
-                          fontFamily: 'ProductSans',
+                          fontFamily: 'GoogleSansFlex',
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: context.accentColor,
@@ -126,7 +126,7 @@ class ExplorerToolbar extends ConsumerWidget {
                         Text(
                           option.displayName,
                           style: TextStyle(
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                             fontWeight: isSelected
                                 ? FontWeight.bold
                                 : FontWeight.normal,

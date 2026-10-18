@@ -216,7 +216,7 @@ class _ToastCard extends StatelessWidget {
           message.message,
           style: TextStyle(
             color: foreground,
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontSize: 14,
             height: 1.3,
           ),

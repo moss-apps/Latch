@@ -23,7 +23,7 @@ Future<String?> showSmartCollectionNameDialog(
       title: Text(
         title,
         style: TextStyle(
-          fontFamily: 'ProductSans',
+          fontFamily: 'GoogleSansFlex',
           color: dialogContext.textPrimary,
         ),
       ),
@@ -32,7 +32,7 @@ Future<String?> showSmartCollectionNameDialog(
         autofocus: true,
         textCapitalization: TextCapitalization.sentences,
         style: TextStyle(
-          fontFamily: 'ProductSans',
+          fontFamily: 'GoogleSansFlex',
           color: dialogContext.textPrimary,
         ),
         decoration: InputDecoration(
@@ -52,7 +52,7 @@ Future<String?> showSmartCollectionNameDialog(
           child: Text(
             'Cancel',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: dialogContext.textSecondary,
             ),
           ),
@@ -65,7 +65,7 @@ Future<String?> showSmartCollectionNameDialog(
           child: Text(
             actionLabel,
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: dialogContext.accentColor,
             ),
           ),
@@ -96,7 +96,7 @@ class SmartCollectionsScreen extends ConsumerWidget {
         title: Text(
           'Smart Collections',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontWeight: FontWeight.w600,
             color: context.textPrimary,
           ),
@@ -110,7 +110,7 @@ class SmartCollectionsScreen extends ConsumerWidget {
         label: const Text(
           'New Collection',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontWeight: FontWeight.w600,
             color: Colors.white,
           ),
@@ -135,7 +135,7 @@ class SmartCollectionsScreen extends ConsumerWidget {
           Text(
             'Failed to load collections',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: context.textSecondary,
             ),
           ),
@@ -202,7 +202,7 @@ class SmartCollectionsScreen extends ConsumerWidget {
           fontWeight: FontWeight.w600,
           letterSpacing: 0.4,
           color: context.textSecondary,
-          fontFamily: 'ProductSans',
+          fontFamily: 'GoogleSansFlex',
         ),
       ),
     );
@@ -222,7 +222,7 @@ class SmartCollectionsScreen extends ConsumerWidget {
               fontSize: 16,
               fontWeight: FontWeight.w600,
               color: context.textPrimary,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
             ),
           ),
           const SizedBox(height: 6),
@@ -231,7 +231,7 @@ class SmartCollectionsScreen extends ConsumerWidget {
             style: TextStyle(
               fontSize: 13,
               color: context.textSecondary,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
             ),
             textAlign: TextAlign.center,
           ),
@@ -288,7 +288,7 @@ class SmartCollectionsScreen extends ConsumerWidget {
                     Text(
                       collection.name,
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontWeight: FontWeight.w600,
                         fontSize: 16,
                         color: context.textPrimary,
@@ -298,7 +298,7 @@ class SmartCollectionsScreen extends ConsumerWidget {
                     Text(
                       '$count ${count == 1 ? 'file' : 'files'} · ${_describeFilter(collection)}',
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontSize: 12,
                         color: context.textSecondary,
                       ),
@@ -432,7 +432,7 @@ class SmartCollectionsScreen extends ConsumerWidget {
                 title: Text(
                   'Edit Filter',
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     color: context.textPrimary,
                   ),
                 ),
@@ -444,7 +444,7 @@ class SmartCollectionsScreen extends ConsumerWidget {
                   title: Text(
                     'Adjust Size Threshold',
                     style: TextStyle(
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                       color: context.textPrimary,
                     ),
                   ),
@@ -457,7 +457,7 @@ class SmartCollectionsScreen extends ConsumerWidget {
                   title: Text(
                     'Rename',
                     style: TextStyle(
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                       color: context.textPrimary,
                     ),
                   ),
@@ -470,7 +470,7 @@ class SmartCollectionsScreen extends ConsumerWidget {
                   title: const Text(
                     'Delete',
                     style: TextStyle(
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                       color: AppColors.error,
                     ),
                   ),
@@ -535,7 +535,7 @@ class SmartCollectionsScreen extends ConsumerWidget {
         title: Text(
           'Large Video Threshold',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: dialogContext.textPrimary,
           ),
         ),
@@ -556,7 +556,7 @@ class SmartCollectionsScreen extends ConsumerWidget {
             child: Text(
               'Cancel',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: dialogContext.textSecondary,
               ),
             ),
@@ -571,7 +571,7 @@ class SmartCollectionsScreen extends ConsumerWidget {
             child: Text(
               'Save',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: dialogContext.accentColor,
               ),
             ),
@@ -633,14 +633,14 @@ class SmartCollectionsScreen extends ConsumerWidget {
         title: Text(
           'Delete Collection',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: dialogContext.textPrimary,
           ),
         ),
         content: Text(
           'Delete "${collection.name}"? Files stay in the vault.',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: dialogContext.textSecondary,
           ),
         ),
@@ -650,7 +650,7 @@ class SmartCollectionsScreen extends ConsumerWidget {
             child: Text(
               'Cancel',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: dialogContext.textSecondary,
               ),
             ),
@@ -660,7 +660,7 @@ class SmartCollectionsScreen extends ConsumerWidget {
             child: const Text(
               'Delete',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: AppColors.error,
               ),
             ),

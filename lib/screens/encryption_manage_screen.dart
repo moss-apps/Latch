@@ -105,7 +105,7 @@ class _EncryptionManageScreenState
         title: Text(
           'Select Files to $_actionVerb',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textPrimary,
             fontWeight: FontWeight.w600,
           ),
@@ -131,7 +131,7 @@ class _EncryptionManageScreenState
                     ? 'Deselect All'
                     : 'Select All',
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   color: context.accentColor,
                 ),
               ),
@@ -146,7 +146,7 @@ class _EncryptionManageScreenState
           child: Text(
             'Failed to load files',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: context.textPrimary,
             ),
           ),
@@ -166,7 +166,7 @@ class _EncryptionManageScreenState
                   Text(
                     _isEncrypt ? 'No unencrypted files' : 'No encrypted files',
                     style: TextStyle(
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                       fontSize: 18,
                       color: context.textSecondary,
                     ),
@@ -198,7 +198,7 @@ class _EncryptionManageScreenState
                             : 'Encryption will be removed (files stored as plaintext)\n'
                                 '${_selectedIds.length} of ${filtered.length} selected',
                         style: TextStyle(
-                          fontFamily: 'ProductSans',
+                          fontFamily: 'GoogleSansFlex',
                           fontSize: 13,
                           color: context.textPrimary,
                         ),
@@ -212,14 +212,14 @@ class _EncryptionManageScreenState
                 child: TextField(
                   onChanged: _setSearchQuery,
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     color: context.textPrimary,
                     fontSize: 14,
                   ),
                   decoration: InputDecoration(
                     hintText: 'Search files...',
                     hintStyle: TextStyle(
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                       color: context.textTertiary,
                     ),
                     prefixIcon: Icon(Icons.search, color: context.textTertiary),
@@ -255,7 +255,7 @@ class _EncryptionManageScreenState
                         child: Text(
                           'No files match your search',
                           style: TextStyle(
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                             fontSize: 16,
                             color: context.textSecondary,
                           ),
@@ -292,7 +292,7 @@ class _EncryptionManageScreenState
                                 title: Text(
                                   file.originalName,
                                   style: TextStyle(
-                                    fontFamily: 'ProductSans',
+                                    fontFamily: 'GoogleSansFlex',
                                     fontSize: 14,
                                     color: context.textPrimary,
                                   ),
@@ -311,7 +311,7 @@ class _EncryptionManageScreenState
                                       child: Text(
                                         '${_formatSize(file.fileSize)} • ${_formatAlgorithm(file.encryptionAlgorithm)}',
                                         style: TextStyle(
-                                          fontFamily: 'ProductSans',
+                                          fontFamily: 'GoogleSansFlex',
                                           fontSize: 12,
                                           color: context.textSecondary,
                                         ),
@@ -362,7 +362,7 @@ class _EncryptionManageScreenState
                         Icon(_isEncrypt ? Icons.lock_outline : Icons.lock_open),
                     label: Text(
                       '$_actionVerb ${_selectedIds.length} File(s)',
-                      style: const TextStyle(fontFamily: 'ProductSans'),
+                      style: const TextStyle(fontFamily: 'GoogleSansFlex'),
                     ),
                     style: FilledButton.styleFrom(
                       backgroundColor: context.accentColor,
@@ -401,7 +401,7 @@ class _EncryptionManageScreenState
                 child: Text(
                   'Large Files Detected',
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     color: context.textPrimary,
                   ),
                 ),
@@ -412,7 +412,7 @@ class _EncryptionManageScreenState
             '${largeFiles.length} file(s) over 50MB will be processed. This may '
             'take a long time and could corrupt files if interrupted.',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: context.textSecondary,
               fontSize: 14,
             ),
@@ -449,7 +449,7 @@ class _EncryptionManageScreenState
               child: Text(
                 '$_actionVerb Warning',
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontWeight: FontWeight.bold,
                   color: context.textPrimary,
                   fontSize: 20,
@@ -471,7 +471,7 @@ class _EncryptionManageScreenState
                   'Ensure your device is charged and has enough free storage '
                   'before continuing.',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textSecondary,
             fontSize: 14,
             height: 1.4,
@@ -492,7 +492,7 @@ class _EncryptionManageScreenState
                   borderRadius: BorderRadius.circular(20)),
             ),
             child: const Text('I Understand, Continue',
-                style: TextStyle(fontFamily: 'ProductSans')),
+                style: TextStyle(fontFamily: 'GoogleSansFlex')),
           ),
         ],
       ),

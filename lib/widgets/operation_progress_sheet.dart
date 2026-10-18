@@ -90,7 +90,7 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                             color: context.textPrimary,
                           ),
                         ),
@@ -99,7 +99,7 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
                           _getSubtitle(),
                           style: TextStyle(
                             fontSize: 14,
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                             color: context.textTertiary,
                           ),
                         ),
@@ -129,7 +129,7 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         color: Colors.white,
                       ),
                     ),
@@ -245,7 +245,7 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
               'Progress',
               style: TextStyle(
                 fontSize: 14,
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
               ),
             ),
@@ -256,7 +256,7 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textPrimary,
               ),
             ),
@@ -284,7 +284,7 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
               'Data Processed',
               style: TextStyle(
                 fontSize: 14,
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
               ),
             ),
@@ -295,7 +295,7 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textPrimary,
               ),
             ),
@@ -340,7 +340,7 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     color: context.textPrimary,
                   ),
                   maxLines: 1,
@@ -351,7 +351,7 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
                   widget.statusMessage,
                   style: TextStyle(
                     fontSize: 12,
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     color: context.textTertiary,
                   ),
                 ),
@@ -437,7 +437,7 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
             'This operation cannot be cancelled safely. Minimize to keep browsing.',
             style: TextStyle(
               fontSize: 12,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: context.textSecondary,
             ),
           ),
@@ -479,7 +479,7 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     color: context.textPrimary,
                   ),
                 ),
@@ -531,7 +531,7 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
               label,
               style: TextStyle(
                 fontSize: 12,
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textTertiary,
               ),
             ),
@@ -541,7 +541,7 @@ class _OperationProgressSheetState extends State<OperationProgressSheet> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textPrimary,
               ),
             ),
@@ -602,7 +602,7 @@ class OperationCancelButton extends StatelessWidget {
                     color: Colors.white,
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                   ),
                 ),
         ),

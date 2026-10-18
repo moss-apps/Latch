@@ -23,7 +23,7 @@ class AccentColorPickerScreen extends ConsumerWidget {
         title: Text(
           'Accent Color',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textPrimary,
             fontWeight: FontWeight.w600,
           ),
@@ -45,7 +45,7 @@ class AccentColorPickerScreen extends ConsumerWidget {
                     style: TextStyle(
                       fontSize: 18,
                       color: context.textSecondary,
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -160,7 +160,7 @@ class AccentColorPickerScreen extends ConsumerWidget {
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                       shadows: [
                         Shadow(
                           color: Colors.black26,
@@ -186,7 +186,7 @@ class AccentColorPickerScreen extends ConsumerWidget {
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
-                          fontFamily: 'ProductSans',
+                          fontFamily: 'GoogleSansFlex',
                         ),
                       ),
                     ),

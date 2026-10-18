@@ -39,7 +39,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
             child: Text(
               'Office Documents Detected',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontWeight: FontWeight.bold,
                 color: context.textPrimary,
                 fontSize: 18,
@@ -56,7 +56,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
             Text(
               'The following Office documents will be converted to PDF for secure storage and easy viewing:',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
                 fontSize: 14,
                 height: 1.4,
@@ -93,7 +93,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
                             Text(
                               file.fileName,
                               style: TextStyle(
-                                fontFamily: 'ProductSans',
+                                fontFamily: 'GoogleSansFlex',
                                 fontWeight: FontWeight.w500,
                                 color: context.textPrimary,
                                 fontSize: 13,
@@ -104,7 +104,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
                             Text(
                               file.typeName,
                               style: TextStyle(
-                                fontFamily: 'ProductSans',
+                                fontFamily: 'GoogleSansFlex',
                                 color: context.textTertiary,
                                 fontSize: 11,
                               ),
@@ -123,7 +123,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
                           child: Text(
                             'Skip',
                             style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               color: Colors.orange.shade800,
                               fontSize: 10,
                               fontWeight: FontWeight.w500,
@@ -141,7 +141,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
                           child: Text(
                             '→ PDF',
                             style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               color: Colors.green.shade800,
                               fontSize: 10,
                               fontWeight: FontWeight.w500,
@@ -195,7 +195,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
                     Text(
                       'Why convert to PDF?',
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         color: Colors.blue,
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
@@ -214,7 +214,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
           child: Text(
             'Cancel',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: context.textSecondary,
             ),
           ),
@@ -245,7 +245,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
           child: Text(
             text,
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: context.textSecondary,
               fontSize: 12,
             ),
@@ -268,7 +268,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
             Text(
               'Why Convert to PDF?',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontWeight: FontWeight.bold,
                 color: context.textPrimary,
                 fontSize: 18,
@@ -315,7 +315,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
             child: Text(
               'Got it',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: AppColors.accent,
                 fontWeight: FontWeight.w600,
               ),
@@ -347,7 +347,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
               Text(
                 title,
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontWeight: FontWeight.w600,
                   color: context.textPrimary,
                   fontSize: 14,
@@ -357,7 +357,7 @@ class OfficeConversionConfirmDialog extends StatelessWidget {
               Text(
                 description,
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   color: context.textSecondary,
                   fontSize: 12,
                   height: 1.4,

@@ -147,7 +147,7 @@ class _VaultFilterSheetState extends ConsumerState<VaultFilterSheet> {
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
                       color: context.textPrimary,
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                     ),
                   ),
                 ),
@@ -250,7 +250,7 @@ class _VaultFilterSheetState extends ConsumerState<VaultFilterSheet> {
                       style: TextStyle(
                         fontSize: 12,
                         color: context.textTertiary,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                       ),
                     ),
                   ],
@@ -263,7 +263,7 @@ class _VaultFilterSheetState extends ConsumerState<VaultFilterSheet> {
                       style: TextStyle(
                         fontSize: 13,
                         color: context.textSecondary,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                       ),
                     )
                   else ...[
@@ -291,7 +291,7 @@ class _VaultFilterSheetState extends ConsumerState<VaultFilterSheet> {
                       style: TextStyle(
                         fontSize: 12,
                         color: context.textTertiary,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                       ),
                     ),
                   ],
@@ -372,7 +372,7 @@ class _VaultFilterSheetState extends ConsumerState<VaultFilterSheet> {
         fontWeight: FontWeight.w600,
         letterSpacing: 0.4,
         color: context.textSecondary,
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
       ),
     );
   }
@@ -407,7 +407,7 @@ class _VaultFilterSheetState extends ConsumerState<VaultFilterSheet> {
                     style: TextStyle(
                       fontSize: 11,
                       color: context.textTertiary,
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                     ),
                   ),
                   Text(
@@ -415,7 +415,7 @@ class _VaultFilterSheetState extends ConsumerState<VaultFilterSheet> {
                     style: TextStyle(
                       fontSize: 14,
                       color: context.textPrimary,
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),

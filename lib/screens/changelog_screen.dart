@@ -104,7 +104,7 @@ class _ChangelogScreenState extends State<ChangelogScreen> {
         title: Text(
           'Changelog',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textPrimary,
             fontWeight: FontWeight.w600,
           ),
@@ -129,42 +129,42 @@ class _ChangelogScreenState extends State<ChangelogScreen> {
     final isDark = context.isDarkMode;
     return MarkdownStyleSheet(
       h1: TextStyle(
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
         fontSize: 24,
         fontWeight: FontWeight.w700,
         color: context.textPrimary,
       ),
       h2: TextStyle(
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
         fontSize: 19,
         fontWeight: FontWeight.w700,
         color: context.textPrimary,
       ),
       h3: TextStyle(
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
         fontSize: 15,
         fontWeight: FontWeight.w600,
         color: context.accentColor,
       ),
       p: TextStyle(
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
         fontSize: 14,
         color: context.textSecondary,
         height: 1.5,
       ),
       strong: TextStyle(
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
         fontWeight: FontWeight.w600,
         color: context.textPrimary,
       ),
       listBullet: TextStyle(
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
         fontSize: 14,
         color: context.textSecondary,
       ),
       listBulletPadding: const EdgeInsets.symmetric(horizontal: 8),
       blockquote: TextStyle(
-        fontFamily: 'ProductSans',
+        fontFamily: 'GoogleSansFlex',
         fontSize: 14,
         fontStyle: FontStyle.italic,
         color: context.textSecondary,

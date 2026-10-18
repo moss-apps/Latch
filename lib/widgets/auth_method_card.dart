@@ -59,7 +59,7 @@ class AuthMethodCard extends StatelessWidget {
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
                         color: context.textPrimary,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -68,7 +68,7 @@ class AuthMethodCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 14,
                         color: context.textSecondary,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                       ),
                     ),
                   ],

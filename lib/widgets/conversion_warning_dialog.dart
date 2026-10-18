@@ -39,7 +39,7 @@ class ConversionWarningDialog extends StatelessWidget {
             child: Text(
               'Convert to PDF',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontWeight: FontWeight.bold,
                 color: context.textPrimary,
                 fontSize: 20,
@@ -82,7 +82,7 @@ class ConversionWarningDialog extends StatelessWidget {
                       Text(
                         fileName,
                         style: TextStyle(
-                          fontFamily: 'ProductSans',
+                          fontFamily: 'GoogleSansFlex',
                           fontWeight: FontWeight.w600,
                           color: context.textPrimary,
                           fontSize: 14,
@@ -94,7 +94,7 @@ class ConversionWarningDialog extends StatelessWidget {
                       Text(
                         fileTypeName,
                         style: TextStyle(
-                          fontFamily: 'ProductSans',
+                          fontFamily: 'GoogleSansFlex',
                           color: context.textSecondary,
                           fontSize: 12,
                         ),
@@ -113,7 +113,7 @@ class ConversionWarningDialog extends StatelessWidget {
                 ? 'This document will be converted to PDF for viewing. The conversion extracts text content while preserving basic formatting.'
                 : 'This document format cannot be converted on-device. Would you like to open it with an external app?',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: context.textSecondary,
               fontSize: 14,
               height: 1.4,
@@ -146,7 +146,7 @@ class ConversionWarningDialog extends StatelessWidget {
                     Text(
                       'Why is this needed?',
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         color: context.accentColor,
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
@@ -175,7 +175,7 @@ class ConversionWarningDialog extends StatelessWidget {
                     child: Text(
                       'Complex formatting may not be fully preserved.',
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         color: Colors.orange.shade800,
                         fontSize: 12,
                       ),
@@ -193,7 +193,7 @@ class ConversionWarningDialog extends StatelessWidget {
           child: Text(
             'Cancel',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: context.textSecondary,
             ),
           ),
@@ -241,7 +241,7 @@ class ConversionWarningDialog extends StatelessWidget {
             Text(
               'Why Convert to PDF?',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontWeight: FontWeight.bold,
                 color: context.textPrimary,
                 fontSize: 18,
@@ -288,7 +288,7 @@ class ConversionWarningDialog extends StatelessWidget {
             child: Text(
               'Got it',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: AppColors.accent,
                 fontWeight: FontWeight.w600,
               ),
@@ -320,7 +320,7 @@ class ConversionWarningDialog extends StatelessWidget {
               Text(
                 title,
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontWeight: FontWeight.w600,
                   color: context.textPrimary,
                   fontSize: 14,
@@ -330,7 +330,7 @@ class ConversionWarningDialog extends StatelessWidget {
               Text(
                 description,
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   color: context.textSecondary,
                   fontSize: 12,
                   height: 1.4,

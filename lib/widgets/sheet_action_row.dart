@@ -43,7 +43,7 @@ class SheetActionRow extends StatelessWidget {
                 child: Text(
                   label,
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
                     color: isDestructive ? color : context.textPrimary,

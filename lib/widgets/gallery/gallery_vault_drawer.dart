@@ -113,7 +113,7 @@ class GalleryVaultDrawer extends ConsumerWidget {
             const SizedBox(height: 16),
             const Text('Latch',
                 style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     color: Colors.white,
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
@@ -123,7 +123,7 @@ class GalleryVaultDrawer extends ConsumerWidget {
                 '${ref.watch(fileCountSummaryProvider).value ?? '...'} • '
                 '${ref.watch(formattedStorageProvider).value ?? '...'}',
                 style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     color: Colors.white.withValues(alpha: 0.9),
                     fontSize: 14)),
           ]),
@@ -134,7 +134,7 @@ class GalleryVaultDrawer extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(28, 20, 16, 8),
       child: Text(title.toUpperCase(),
           style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               fontSize: 12,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.5,
@@ -169,7 +169,7 @@ class GalleryVaultDrawer extends ConsumerWidget {
                         children: [
                       Text(title,
                           style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               fontSize: 16,
                               fontWeight: FontWeight.w500,
                               color: context.textPrimary)),
@@ -177,7 +177,7 @@ class GalleryVaultDrawer extends ConsumerWidget {
                         const SizedBox(height: 2),
                         Text(subtitle,
                             style: TextStyle(
-                                fontFamily: 'ProductSans',
+                                fontFamily: 'GoogleSansFlex',
                                 fontSize: 12,
                                 color: context.textSecondary)),
                       ],
@@ -191,7 +191,7 @@ class GalleryVaultDrawer extends ConsumerWidget {
                           borderRadius: BorderRadius.circular(20)),
                       child: Text('$badge',
                           style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                               color: context.accentColor)))

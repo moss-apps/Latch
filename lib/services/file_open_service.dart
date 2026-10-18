@@ -312,7 +312,7 @@ class _OpenSheet extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                             ),
@@ -321,7 +321,7 @@ class _OpenSheet extends StatelessWidget {
                           Text(
                             s.phase,
                             style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               fontSize: 13,
                               color: context.textSecondary,
                             ),
@@ -350,7 +350,7 @@ class _OpenSheet extends StatelessWidget {
                           '$pct%',
                           textAlign: TextAlign.right,
                           style: TextStyle(
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: context.textSecondary,

@@ -79,7 +79,7 @@
 }
 
 @theme inline {
-  --font-sans: "ProductSans", "Segoe UI", system-ui, sans-serif;
+  --font-sans: "GoogleSansFlex", "Segoe UI", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "Cascadia Code", ui-monospace, monospace;
 
   --color-background: var(--background);
@@ -134,29 +134,29 @@
 }
 
 @font-face {
-  font-family: "ProductSans";
-  src: url("/fonts/productsans_regular.ttf") format("truetype");
+  font-family: "GoogleSansFlex";
+  src: url("/fonts/googlesansflex_regular.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
-  font-family: "ProductSans";
-  src: url("/fonts/productsans_italic.ttf") format("truetype");
+  font-family: "GoogleSansFlex";
+  src: url("/fonts/googlesansflex_italic.woff2") format("woff2");
   font-weight: 400;
   font-style: italic;
   font-display: swap;
 }
 @font-face {
-  font-family: "ProductSans";
-  src: url("/fonts/productsans_bold.ttf") format("truetype");
+  font-family: "GoogleSansFlex";
+  src: url("/fonts/googlesansflex_bold.woff2") format("woff2");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
-  font-family: "ProductSans";
-  src: url("/fonts/productsans_bold_italic.ttf") format("truetype");
+  font-family: "GoogleSansFlex";
+  src: url("/fonts/googlesansflex_bold_italic.woff2") format("woff2");
   font-weight: 700;
   font-style: italic;
   font-display: swap;

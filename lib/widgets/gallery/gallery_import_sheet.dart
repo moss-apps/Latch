@@ -36,7 +36,7 @@ class GalleryImportSheet extends StatelessWidget {
                         Expanded(
                             child: Text('Import Files',
                                 style: TextStyle(
-                                    fontFamily: 'ProductSans',
+                                    fontFamily: 'GoogleSansFlex',
                                     fontSize: 24,
                                     fontWeight: FontWeight.bold,
                                     color: context.textPrimary))),
@@ -48,14 +48,14 @@ class GalleryImportSheet extends StatelessWidget {
                       const SizedBox(height: 8),
                       Text('Hide files, with encryption chosen at import',
                           style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               fontSize: 14,
                               color: context.textSecondary)),
                       for (final group in GalleryImportAction.groups) ...[
                         const SizedBox(height: 24),
                         Text(group.$1,
                             style: TextStyle(
-                                fontFamily: 'ProductSans',
+                                fontFamily: 'GoogleSansFlex',
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
                                 letterSpacing: 0.5,
@@ -102,7 +102,7 @@ class GalleryImportSheet extends StatelessWidget {
             Text(label,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: color)),

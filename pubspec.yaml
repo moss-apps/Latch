@@ -104,6 +104,7 @@ flutter:
     - legal/privacy.md
     - CHANGELOG.md
     - whats_new.json
+    - fonts/OFL.txt
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware
   # For details regarding adding assets from package dependencies, see
@@ -114,11 +115,17 @@ flutter:
   # list giving the asset and other descriptors for the font. For
   # example:
   fonts:
-    - family: ProductSans
+    - family: GoogleSansFlex
       fonts:
-        - asset: fonts/productsans_regular.ttf
-        - asset: fonts/productsans_italic.ttf
-        - asset: fonts/productsans_bold.ttf
-        - asset: fonts/productsans_bold_italic.ttf
+        - asset: fonts/googlesansflex_regular.ttf
+          weight: 400
+        - asset: fonts/googlesansflex_italic.ttf
+          weight: 400
+          style: italic
+        - asset: fonts/googlesansflex_bold.ttf
+          weight: 700
+        - asset: fonts/googlesansflex_bold_italic.ttf
+          weight: 700
+          style: italic
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/custom-fonts/#from-packages

@@ -50,7 +50,7 @@ class ExplorerFileGrid extends ConsumerWidget {
               child: Text(
                 'Error loading folders',
                 style: TextStyle(
-                    fontFamily: 'ProductSans', color: context.textSecondary),
+                    fontFamily: 'GoogleSansFlex', color: context.textSecondary),
               ),
             ),
             data: (folders) {
@@ -60,7 +60,7 @@ class ExplorerFileGrid extends ConsumerWidget {
                   child: Text(
                     'Error loading files',
                     style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         color: context.textSecondary),
                   ),
                 ),
@@ -209,7 +209,7 @@ class ExplorerFileGrid extends ConsumerWidget {
         label: Text(
           label,
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
             color: isActive ? Colors.white : context.textPrimary,
             fontSize: 12,
@@ -289,7 +289,7 @@ class ExplorerFileGrid extends ConsumerWidget {
                     Text(
                       folder.name,
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                         color: context.textPrimary,
@@ -302,7 +302,7 @@ class ExplorerFileGrid extends ConsumerWidget {
                     Text(
                       '${folder.fileCount} file${folder.fileCount == 1 ? '' : 's'}',
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontSize: 9,
                         color: context.textTertiary,
                       ),
@@ -352,7 +352,7 @@ class ExplorerFileGrid extends ConsumerWidget {
           title: Text(
             folder.name,
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               fontSize: 14,
               fontWeight: FontWeight.w600,
               color: context.textPrimary,
@@ -363,7 +363,7 @@ class ExplorerFileGrid extends ConsumerWidget {
           subtitle: Text(
             '${folder.fileCount} file${folder.fileCount == 1 ? '' : 's'}',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               fontSize: 11,
               color: context.textSecondary,
             ),
@@ -459,7 +459,7 @@ class ExplorerFileGrid extends ConsumerWidget {
                 child: Text(
                   file.originalName,
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: context.textPrimary,
@@ -473,7 +473,7 @@ class ExplorerFileGrid extends ConsumerWidget {
           subtitle: Text(
             '${file.type.displayName} \u2022 ${file.formattedSize} \u2022 ${file.formattedDateAdded}',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               fontSize: 11,
               color: context.textSecondary,
             ),
@@ -582,7 +582,7 @@ class ExplorerFileGrid extends ConsumerWidget {
                         style: const TextStyle(
                           color: Colors.white70,
                           fontSize: 8,
-                          fontFamily: 'ProductSans',
+                          fontFamily: 'GoogleSansFlex',
                           fontWeight: FontWeight.w500,
                         ),
                         maxLines: 1,
@@ -597,7 +597,7 @@ class ExplorerFileGrid extends ConsumerWidget {
                         style: const TextStyle(
                           color: Colors.white70,
                           fontSize: 8,
-                          fontFamily: 'ProductSans',
+                          fontFamily: 'GoogleSansFlex',
                         ),
                       ),
                     ],
@@ -776,7 +776,7 @@ class ExplorerFileGrid extends ConsumerWidget {
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
                                 color: ctx.textPrimary,
-                                fontFamily: 'ProductSans',
+                                fontFamily: 'GoogleSansFlex',
                               ),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
@@ -787,7 +787,7 @@ class ExplorerFileGrid extends ConsumerWidget {
                               style: TextStyle(
                                 fontSize: 13,
                                 color: ctx.textSecondary,
-                                fontFamily: 'ProductSans',
+                                fontFamily: 'GoogleSansFlex',
                               ),
                             ),
                           ],
@@ -801,7 +801,7 @@ class ExplorerFileGrid extends ConsumerWidget {
                     style: TextStyle(
                       fontSize: 13,
                       color: ctx.textSecondary,
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -821,14 +821,14 @@ class ExplorerFileGrid extends ConsumerWidget {
                     title: const Text(
                       'Export to Downloads',
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                     subtitle: Text(
                       'Save decrypted file to Downloads folder',
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontSize: 12,
                         color: ctx.textSecondary,
                       ),
@@ -856,14 +856,14 @@ class ExplorerFileGrid extends ConsumerWidget {
                     title: const Text(
                       'Open with...',
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                     subtitle: Text(
                       'Open file with an external app',
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontSize: 12,
                         color: ctx.textSecondary,
                       ),
@@ -891,14 +891,14 @@ class ExplorerFileGrid extends ConsumerWidget {
                     title: const Text(
                       'File Info',
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                     subtitle: Text(
                       'View file details',
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         fontSize: 12,
                         color: ctx.textSecondary,
                       ),
@@ -957,14 +957,14 @@ class ExplorerFileGrid extends ConsumerWidget {
         title: Text(
           'Delete File',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: ctx.textPrimary,
           ),
         ),
         content: Text(
           'Delete "${file.originalName}"? Recover it in Recently Deleted when retention is enabled. If retention is set to Immediate deletion, this cannot be undone.',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: ctx.textSecondary,
           ),
         ),
@@ -974,7 +974,7 @@ class ExplorerFileGrid extends ConsumerWidget {
             child: Text(
               'Cancel',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: ctx.textSecondary,
               ),
             ),
@@ -987,7 +987,7 @@ class ExplorerFileGrid extends ConsumerWidget {
             ),
             child: const Text(
               'Delete',
-              style: TextStyle(fontFamily: 'ProductSans'),
+              style: TextStyle(fontFamily: 'GoogleSansFlex'),
             ),
           ),
         ],
@@ -1025,7 +1025,7 @@ class ExplorerFileGrid extends ConsumerWidget {
               Expanded(
                 child: Text(
                   'Exporting ${file.originalName}...',
-                  style: const TextStyle(fontFamily: 'ProductSans'),
+                  style: const TextStyle(fontFamily: 'GoogleSansFlex'),
                 ),
               ),
             ],
@@ -1081,7 +1081,7 @@ class ExplorerFileGrid extends ConsumerWidget {
               Expanded(
                 child: Text(
                   'Preparing ${file.originalName}...',
-                  style: const TextStyle(fontFamily: 'ProductSans'),
+                  style: const TextStyle(fontFamily: 'GoogleSansFlex'),
                 ),
               ),
             ],
@@ -1191,7 +1191,7 @@ class ExplorerFileGrid extends ConsumerWidget {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: context.textPrimary,
             ),
           ),
@@ -1200,7 +1200,7 @@ class ExplorerFileGrid extends ConsumerWidget {
             'Add some files or create subfolders.',
             style: TextStyle(
               fontSize: 12,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: context.textSecondary,
             ),
           ),

@@ -54,7 +54,7 @@ class _LegalDocScreenState extends State<LegalDocScreen> {
         title: Text(
           widget.title,
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: primary,
             fontWeight: FontWeight.w600,
           ),
@@ -71,17 +71,17 @@ class _LegalDocScreenState extends State<LegalDocScreen> {
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
               styleSheet: MarkdownStyleSheet(
                 h1: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     fontSize: 24,
                     fontWeight: FontWeight.w700,
                     color: primary),
                 h2: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: primary),
                 p: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     fontSize: 14,
                     color: secondary,
                     height: 1.5),

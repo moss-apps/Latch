@@ -159,7 +159,7 @@ class _AuthMethodSelectionScreenState extends State<AuthMethodSelectionScreen>
                     fontSize: 32,
                     fontWeight: FontWeight.w700,
                     color: context.textPrimary,
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                   ),
                 ),
               ),
@@ -176,7 +176,7 @@ class _AuthMethodSelectionScreenState extends State<AuthMethodSelectionScreen>
                   style: TextStyle(
                     fontSize: 16,
                     color: context.textSecondary,
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                   ),
                 ),
               ),
@@ -243,8 +243,8 @@ class _AuthMethodSelectionScreenState extends State<AuthMethodSelectionScreen>
                                   SnackBar(
                                     content: Text(
                                       'Biometric authentication is not available on this device',
-                                      style:
-                                          TextStyle(fontFamily: 'ProductSans'),
+                                      style: TextStyle(
+                                          fontFamily: 'GoogleSansFlex'),
                                     ),
                                     backgroundColor: AppColors.error,
                                   ),

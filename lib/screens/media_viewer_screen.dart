@@ -450,14 +450,14 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: context.textPrimary,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                       ),
                     ),
                     const SizedBox(height: 20),
                     Text(
                       'Duration per slide',
                       style: TextStyle(
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                         color: context.textSecondary,
                       ),
                     ),
@@ -483,7 +483,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                                   color: _slideshowDuration == seconds
                                       ? Colors.white
                                       : context.textSecondary,
-                                  fontFamily: 'ProductSans',
+                                  fontFamily: 'GoogleSansFlex',
                                 ),
                               ),
                             ),
@@ -505,7 +505,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                         ),
                         child: Text(
                           _isSlideshow ? 'Stop Slideshow' : 'Start Slideshow',
-                          style: const TextStyle(fontFamily: 'ProductSans'),
+                          style: const TextStyle(fontFamily: 'GoogleSansFlex'),
                         ),
                       ),
                     ),
@@ -619,7 +619,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: context.textPrimary,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -636,11 +636,11 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                       ),
                       title: const Text('Export to Downloads',
                           style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               fontWeight: FontWeight.w500)),
                       subtitle: Text('Save file to Downloads folder',
                           style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               fontSize: 12,
                               color: AppColors.lightTextSecondary)),
                       contentPadding: EdgeInsets.zero,
@@ -663,11 +663,11 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                       ),
                       title: const Text('Open with...',
                           style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               fontWeight: FontWeight.w500)),
                       subtitle: Text('Open file with an external app',
                           style: TextStyle(
-                              fontFamily: 'ProductSans',
+                              fontFamily: 'GoogleSansFlex',
                               fontSize: 12,
                               color: AppColors.lightTextSecondary)),
                       contentPadding: EdgeInsets.zero,
@@ -701,7 +701,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
               const SizedBox(width: 20),
               Expanded(
                   child: Text('Exporting ${file.originalName}...',
-                      style: const TextStyle(fontFamily: 'ProductSans'))),
+                      style: const TextStyle(fontFamily: 'GoogleSansFlex'))),
             ],
           ),
         ),
@@ -748,7 +748,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
               const SizedBox(width: 20),
               Expanded(
                   child: Text('Preparing ${file.originalName}...',
-                      style: const TextStyle(fontFamily: 'ProductSans'))),
+                      style: const TextStyle(fontFamily: 'GoogleSansFlex'))),
             ],
           ),
         ),
@@ -836,7 +836,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                           'Slideshow',
                           style: const TextStyle(
                             color: Colors.white,
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -930,7 +930,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
             style: const TextStyle(
               color: Colors.white,
               fontSize: 16,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
             ),
             textAlign: TextAlign.center,
           ),
@@ -957,7 +957,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
             style: const TextStyle(
               color: Colors.white,
               fontSize: 16,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
             ),
             textAlign: TextAlign.center,
           ),
@@ -967,7 +967,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
             style: TextStyle(
               color: Colors.white54,
               fontSize: 14,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
             ),
           ),
           const SizedBox(height: 4),
@@ -976,7 +976,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
             style: TextStyle(
               color: Colors.white38,
               fontSize: 12,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
             ),
             textAlign: TextAlign.center,
           ),
@@ -1097,7 +1097,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
             style: const TextStyle(
               color: Colors.white,
               fontSize: 16,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
             ),
             textAlign: TextAlign.center,
           ),
@@ -1107,7 +1107,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
             style: TextStyle(
               color: Colors.white54,
               fontSize: 14,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
             ),
           ),
         ],
@@ -1151,7 +1151,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                       color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -1161,7 +1161,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                     style: TextStyle(
                       color: Colors.white70,
                       fontSize: 12,
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                     ),
                   ),
                 ],
@@ -1245,7 +1245,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                     _formatDuration(position),
                     style: const TextStyle(
                       color: Colors.white,
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                       fontSize: 12,
                     ),
                   ),
@@ -1276,7 +1276,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                     _formatDuration(duration),
                     style: const TextStyle(
                       color: Colors.white,
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                       fontSize: 12,
                     ),
                   ),
@@ -1326,7 +1326,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                       ),
                     ),
                     tooltip: 'Playback speed',
@@ -1458,14 +1458,14 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
         title: Text(
           'Delete File',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textPrimary,
           ),
         ),
         content: Text(
           'Delete "${file.originalName}"? Recover it in Recently Deleted when retention is enabled. If retention is set to Immediate deletion, this cannot be undone.',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: context.textSecondary,
           ),
         ),
@@ -1475,7 +1475,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
             child: Text(
               'Cancel',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: context.textSecondary,
               ),
             ),
@@ -1526,7 +1526,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
             ),
             child: const Text(
               'Delete',
-              style: TextStyle(fontFamily: 'ProductSans'),
+              style: TextStyle(fontFamily: 'GoogleSansFlex'),
             ),
           ),
         ],

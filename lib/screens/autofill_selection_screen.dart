@@ -195,7 +195,7 @@ class _AutofillSelectionScreenState extends State<AutofillSelectionScreen> {
           title: Text(
             'Select Password',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               fontSize: 18,
               fontWeight: FontWeight.w600,
               color: context.textPrimary,
@@ -220,7 +220,7 @@ class _AutofillSelectionScreenState extends State<AutofillSelectionScreen> {
             Text(
               _isDecrypting ? 'Decrypting...' : 'Authenticating...',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontSize: 14,
                 color: context.textSecondary,
               ),
@@ -300,7 +300,7 @@ class _AutofillSelectionScreenState extends State<AutofillSelectionScreen> {
               title,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
                 color: context.textPrimary,
@@ -311,7 +311,7 @@ class _AutofillSelectionScreenState extends State<AutofillSelectionScreen> {
               subtitle,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontSize: 14,
                 color: context.textSecondary,
               ),
@@ -326,7 +326,7 @@ class _AutofillSelectionScreenState extends State<AutofillSelectionScreen> {
                 child: Text(
                   'Retry',
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     color: Colors.white,
                   ),
                 ),
@@ -345,14 +345,14 @@ class _AutofillSelectionScreenState extends State<AutofillSelectionScreen> {
         controller: _searchController,
         onChanged: _filterEntries,
         style: TextStyle(
-          fontFamily: 'ProductSans',
+          fontFamily: 'GoogleSansFlex',
           fontSize: 15,
           color: context.textPrimary,
         ),
         decoration: InputDecoration(
           hintText: 'Search passwords...',
           hintStyle: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontSize: 15,
             color: context.textTertiary,
           ),
@@ -383,7 +383,7 @@ class _AutofillSelectionScreenState extends State<AutofillSelectionScreen> {
         child: Text(
           'No matches',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontSize: 14,
             color: context.textTertiary,
           ),
@@ -421,7 +421,7 @@ class _AutofillSelectionScreenState extends State<AutofillSelectionScreen> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             fontSize: 15,
             fontWeight: FontWeight.w600,
             color: context.textPrimary,
@@ -433,7 +433,7 @@ class _AutofillSelectionScreenState extends State<AutofillSelectionScreen> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   fontSize: 12,
                   color: context.textTertiary,
                 ),

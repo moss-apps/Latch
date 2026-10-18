@@ -116,7 +116,7 @@ class _Header extends StatelessWidget {
             fontSize: 20,
             fontWeight: FontWeight.w600,
             color: context.textPrimary,
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
           ),
         ),
         const SizedBox(height: 6),
@@ -134,7 +134,7 @@ class _Header extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               color: context.accentColor,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -161,7 +161,7 @@ class _SectionView extends StatelessWidget {
               fontSize: 13,
               fontWeight: FontWeight.w600,
               color: context.textSecondary,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               letterSpacing: 0.3,
             ),
           ),
@@ -207,7 +207,7 @@ class _ItemTile extends StatelessWidget {
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: context.textPrimary,
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -216,7 +216,7 @@ class _ItemTile extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13,
                     color: context.textSecondary,
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     height: 1.35,
                   ),
                 ),
@@ -258,7 +258,7 @@ class _Footer extends StatelessWidget {
                   label: Text(
                     'Full changelog',
                     style: TextStyle(
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                       fontWeight: FontWeight.w500,
                       color: context.accentColor,
                     ),
@@ -279,7 +279,7 @@ class _Footer extends StatelessWidget {
                   child: const Text(
                     'Got it',
                     style: TextStyle(
-                      fontFamily: 'ProductSans',
+                      fontFamily: 'GoogleSansFlex',
                       fontWeight: FontWeight.w600,
                     ),
                   ),

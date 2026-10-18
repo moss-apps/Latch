@@ -78,7 +78,7 @@ class _SmartCollectionScreenState extends ConsumerState<SmartCollectionScreen>
           child: Text(
             'Collection not found',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: context.textSecondary,
             ),
           ),
@@ -105,7 +105,7 @@ class _SmartCollectionScreenState extends ConsumerState<SmartCollectionScreen>
               Text(
                 'Failed to load files',
                 style: TextStyle(
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                   color: context.textSecondary,
                 ),
               ),
@@ -147,7 +147,7 @@ class _SmartCollectionScreenState extends ConsumerState<SmartCollectionScreen>
         title: Text(
           '${_selectedFiles.length} selected',
           style: const TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: Colors.white,
           ),
         ),
@@ -159,7 +159,7 @@ class _SmartCollectionScreenState extends ConsumerState<SmartCollectionScreen>
                 allSelected ? 'Deselect All' : 'Select All',
                 style: const TextStyle(
                   color: Colors.white,
-                  fontFamily: 'ProductSans',
+                  fontFamily: 'GoogleSansFlex',
                 ),
               ),
             ),
@@ -184,7 +184,7 @@ class _SmartCollectionScreenState extends ConsumerState<SmartCollectionScreen>
           Text(
             name,
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               color: context.textPrimary,
               fontWeight: FontWeight.w600,
             ),
@@ -192,7 +192,7 @@ class _SmartCollectionScreenState extends ConsumerState<SmartCollectionScreen>
           Text(
             '$fileCount ${fileCount == 1 ? 'item' : 'items'}',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               fontSize: 12,
               color: context.textSecondary,
             ),
@@ -341,7 +341,7 @@ class _SmartCollectionScreenState extends ConsumerState<SmartCollectionScreen>
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 10,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                       ),
                     ),
                   ],
@@ -364,7 +364,7 @@ class _SmartCollectionScreenState extends ConsumerState<SmartCollectionScreen>
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 10,
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -478,7 +478,7 @@ class _SmartCollectionScreenState extends ConsumerState<SmartCollectionScreen>
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
                 color: color,
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -515,7 +515,7 @@ class _SmartCollectionScreenState extends ConsumerState<SmartCollectionScreen>
               fontSize: 20,
               fontWeight: FontWeight.w600,
               color: context.textPrimary,
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
             ),
           ),
           const SizedBox(height: 8),
@@ -526,7 +526,7 @@ class _SmartCollectionScreenState extends ConsumerState<SmartCollectionScreen>
               style: TextStyle(
                 fontSize: 14,
                 color: context.textSecondary,
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
               ),
               textAlign: TextAlign.center,
             ),
@@ -651,14 +651,14 @@ class _SmartCollectionScreenState extends ConsumerState<SmartCollectionScreen>
         title: Text(
           'Delete Files',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: dialogContext.textPrimary,
           ),
         ),
         content: Text(
           'Delete ${_selectedFiles.length} file(s)? Recover them in Recently Deleted when retention is enabled. If retention is set to Immediate deletion, this cannot be undone.',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: dialogContext.textSecondary,
           ),
         ),
@@ -668,7 +668,7 @@ class _SmartCollectionScreenState extends ConsumerState<SmartCollectionScreen>
             child: Text(
               'Cancel',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: dialogContext.textSecondary,
               ),
             ),
@@ -678,7 +678,7 @@ class _SmartCollectionScreenState extends ConsumerState<SmartCollectionScreen>
             child: const Text(
               'Delete',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: AppColors.error,
               ),
             ),
@@ -744,7 +744,7 @@ class _SmartCollectionScreenState extends ConsumerState<SmartCollectionScreen>
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: context.textPrimary,
-                        fontFamily: 'ProductSans',
+                        fontFamily: 'GoogleSansFlex',
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -761,7 +761,7 @@ class _SmartCollectionScreenState extends ConsumerState<SmartCollectionScreen>
                         title: Text(
                           option.displayName,
                           style: TextStyle(
-                            fontFamily: 'ProductSans',
+                            fontFamily: 'GoogleSansFlex',
                             color: context.textPrimary,
                           ),
                         ),
@@ -844,7 +844,7 @@ class _SmartCollectionScreenState extends ConsumerState<SmartCollectionScreen>
         title: Text(
           'Large Video Threshold',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: dialogContext.textPrimary,
           ),
         ),
@@ -865,7 +865,7 @@ class _SmartCollectionScreenState extends ConsumerState<SmartCollectionScreen>
             child: Text(
               'Cancel',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: dialogContext.textSecondary,
               ),
             ),
@@ -880,7 +880,7 @@ class _SmartCollectionScreenState extends ConsumerState<SmartCollectionScreen>
             child: Text(
               'Save',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: dialogContext.accentColor,
               ),
             ),
@@ -913,14 +913,14 @@ class _SmartCollectionScreenState extends ConsumerState<SmartCollectionScreen>
         title: Text(
           'Delete Collection',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: dialogContext.textPrimary,
           ),
         ),
         content: Text(
           'Delete "${collection.name}"? Files stay in the vault.',
           style: TextStyle(
-            fontFamily: 'ProductSans',
+            fontFamily: 'GoogleSansFlex',
             color: dialogContext.textSecondary,
           ),
         ),
@@ -930,7 +930,7 @@ class _SmartCollectionScreenState extends ConsumerState<SmartCollectionScreen>
             child: Text(
               'Cancel',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: dialogContext.textSecondary,
               ),
             ),
@@ -940,7 +940,7 @@ class _SmartCollectionScreenState extends ConsumerState<SmartCollectionScreen>
             child: const Text(
               'Delete',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 color: AppColors.error,
               ),
             ),

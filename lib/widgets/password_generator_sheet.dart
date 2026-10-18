@@ -104,7 +104,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
           Text(
             'Password Generator',
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               fontSize: 18,
               fontWeight: FontWeight.bold,
               color: context.textPrimary,
@@ -195,7 +195,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
           Text(
             _generated.isEmpty ? 'Select at least one charset' : _generated,
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               fontSize: 16,
               fontWeight: FontWeight.w600,
               color: _generated.isEmpty
@@ -210,7 +210,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
                 Text(
                   _strengthLabel,
                   style: TextStyle(
-                    fontFamily: 'ProductSans',
+                    fontFamily: 'GoogleSansFlex',
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: _strengthColor,
@@ -254,7 +254,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
             Text(
               'Length',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontSize: 14,
                 color: context.textSecondary,
               ),
@@ -262,7 +262,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
             Text(
               '${_length.round()}',
               style: TextStyle(
-                fontFamily: 'ProductSans',
+                fontFamily: 'GoogleSansFlex',
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
                 color: context.accentColor,
@@ -298,7 +298,7 @@ class _PasswordGeneratorSheetState extends State<PasswordGeneratorSheet> {
           Text(
             label,
             style: TextStyle(
-              fontFamily: 'ProductSans',
+              fontFamily: 'GoogleSansFlex',
               fontSize: 14,
               color: context.textSecondary,
             ),
