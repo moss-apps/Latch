@@ -95,16 +95,18 @@ class ThumbnailService {
   }
 
   Future<Uint8List?> _regenerateThumbnail(VaultedFile file) =>
+      // The global lease already blocks deletions/re-encryption while the
+      // source is being read. Do not reserve the source file id: video frame
+      // extraction can take seconds, and reserving it makes a concurrent
+      // viewer's getVaultedFile return null instead of decrypting the file.
       FileOperationGate.instance.mutate(() async {
-        // Regeneration writes both a payload and its IV. Reserve that whole
-        // commit so browsing cannot race a minimized re-encryption/deletion.
         final current =
             await fileService.getFileById(file.id, isDecoy: file.isDecoy);
         if (current == null || !FileOperationGate.instance.allowsMutation) {
           return null;
         }
         return _regenerateThumbnailReserved(current);
-      }, blockedResult: null, fileIds: {file.id});
+      }, blockedResult: null);
 
   Future<Uint8List?> _regenerateThumbnailReserved(VaultedFile file) async {
     final plaintext =

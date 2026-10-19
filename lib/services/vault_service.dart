@@ -181,8 +181,10 @@ class VaultService {
           const <VaultedFile>[]);
 
   Future<VaultedFile?> updateFile(VaultedFile updatedFile) =>
-      _mutate(() => _files.updateFile(updatedFile), null,
-          fileIds: {updatedFile.id});
+      // Metadata-only: updateFile rewrites the index, not the vault payload.
+      // Reserving the id here would make a viewer's concurrent read return
+      // null, e.g. when marking a video viewed right after a swipe.
+      _mutate(() => _files.updateFile(updatedFile), null);
 
   Future<String> hashFile(String path) => FileService.hashFile(path);
 
@@ -242,6 +244,8 @@ class VaultService {
           {bool isDecoy = false}) =>
       _files.getDecryptedFileData(fileId, isDecoy: isDecoy);
 
+  // Export reads the vault payload and writes outside it, so it must not
+  // reserve the source id against concurrent viewers.
   Future<File?> exportFile(
     String fileId,
     String destinationPath, {
@@ -255,8 +259,7 @@ class VaultService {
                 isDecoy: isDecoy,
                 onProgress: onProgress,
               ),
-          null,
-          fileIds: {fileId});
+          null);
 
   Future<int> reEncryptVault(
     EncryptionAlgorithm targetAlgorithm, {
@@ -494,12 +497,13 @@ class VaultService {
 
   Future<List<VaultedFile>> getUntaggedFiles() => _tags.getUntaggedFiles();
 
+  // Tag and favorite edits rewrite index metadata only. Reserving the payload
+  // id would block a viewer that is decrypting the same file.
   Future<VaultedFile?> addTagToFile(String fileId, String tag) =>
-      _mutate(() => _tags.addTagToFile(fileId, tag), null, fileIds: {fileId});
+      _mutate(() => _tags.addTagToFile(fileId, tag), null);
 
   Future<VaultedFile?> removeTagFromFile(String fileId, String tag) =>
-      _mutate(() => _tags.removeTagFromFile(fileId, tag), null,
-          fileIds: {fileId});
+      _mutate(() => _tags.removeTagFromFile(fileId, tag), null);
 
   Future<TagInfo> createTag(String name, [int? colorValue]) =>
       _tags.createTag(name, colorValue);
@@ -513,7 +517,7 @@ class VaultService {
   // ---- Favorites ----
 
   Future<VaultedFile?> toggleFavorite(String fileId) =>
-      _mutate(() => _tags.toggleFavorite(fileId), null, fileIds: {fileId});
+      _mutate(() => _tags.toggleFavorite(fileId), null);
 
   Future<List<VaultedFile>> getFavoriteFiles() => _tags.getFavoriteFiles();
 
