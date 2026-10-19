@@ -23,8 +23,30 @@ class FileOperationGate {
         !_active!.fileIds.contains(fileId);
   }
 
+  /// Waits for a transient reservation of [fileId] to clear.
+  ///
+  /// Readers use this instead of failing immediately when another operation
+  /// briefly owns the file (for example, a metadata commit). Returns false on
+  /// timeout or when [shouldAbort] asks to stop.
+  Future<bool> waitForReadable(
+    String fileId, {
+    Duration timeout = const Duration(seconds: 10),
+    bool Function()? shouldAbort,
+  }) async {
+    final deadline = DateTime.now().add(timeout);
+    while (!canRead(fileId)) {
+      if (shouldAbort?.call() ?? false) return false;
+      if (!DateTime.now().isBefore(deadline)) return false;
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+    return true;
+  }
+
   /// Non-progress mutations (sharing, single-file actions) also reserve IO so a
   /// new batch cannot begin while an earlier service call is still committing.
+  ///
+  /// [fileIds] must only name payloads the task actually modifies. Reserving a
+  /// read-only source blocks other screens from opening it for the whole task.
   Future<T> mutate<T>(Future<T> Function() task,
       {required T blockedResult, Set<String> fileIds = const {}}) {
     if (!allowsMutation) return Future.value(blockedResult);

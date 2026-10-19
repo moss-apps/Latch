@@ -14,16 +14,23 @@ class EncryptedThumbnail extends ConsumerStatefulWidget {
 }
 
 class _EncryptedThumbnailState extends ConsumerState<EncryptedThumbnail> {
-  late final Future<Uint8List?> _future;
-
-  @override
-  void initState() {
-    super.initState();
-    _future = ref.read(vaultServiceProvider).getThumbnailBytes(widget.file);
-  }
+  Future<Uint8List?>? _future;
 
   @override
   Widget build(BuildContext context) {
+    final settings = ref.watch(vaultSettingsProvider);
+
+    // Wait for the persisted setting before decrypting anything, otherwise a
+    // hidden thumbnail would still be decrypted on first build.
+    if (settings.isLoading && !settings.hasValue) {
+      return const _ThumbLoading();
+    }
+    if (settings.value?.hideEncryptedThumbnails ?? false) {
+      return _ThumbPlaceholder(type: widget.file.type);
+    }
+
+    _future ??= ref.read(vaultServiceProvider).getThumbnailBytes(widget.file);
+
     return FutureBuilder<Uint8List?>(
       future: _future,
       builder: (context, snapshot) {

@@ -380,6 +380,29 @@ void main() {
           isEmpty);
     });
 
+    test('marking a file viewed does not block an in-flight read', () async {
+      final vault = await _freshVault(storage: storage, tmpDir: tmpDir);
+      final source = File('${tmpDir.path}/swipe-video.mp4')
+        ..writeAsBytesSync(const [1, 2, 3]);
+      await vault.registerNoteEntry(
+        noteId: 'swipe-video',
+        title: 'swipe-video',
+        encryptedContentPath: source.path,
+      );
+      final file = (await vault.getAllFiles()).single;
+
+      // The viewer starts decrypting the swipe target, then marks it viewed.
+      // That metadata commit must not reserve the payload id: the read must
+      // still resolve instead of returning null mid-flight.
+      final read = vault.getVaultedFile(file.id);
+      final marked = await vault.updateFile(file.markViewed());
+      final readFile = await read;
+
+      expect(marked, isNotNull);
+      expect(readFile, isNotNull);
+      expect(readFile!.path, source.path);
+    });
+
     test('a minimized owner blocks foreign deletion and stale metadata updates',
         () async {
       final vault = await _freshVault(storage: storage, tmpDir: tmpDir);

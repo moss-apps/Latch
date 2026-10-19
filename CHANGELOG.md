@@ -49,6 +49,7 @@ Notable changes to Latch.
 
 ### Settings & UI
 - **Hide unencrypted thumbnails** setting — replace previews with file-type icons for unencrypted files
+- **Hide encrypted thumbnails** setting — skip decryption and show file-type icons for encrypted files
 - Performance, local backup, and encryption settings screens simplified
 - Unlock screen converted to Riverpod with key export support
 - ProductSans font removed from sync settings

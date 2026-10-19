@@ -10,13 +10,14 @@ import 'package:video_player/video_player.dart';
 import '../models/vaulted_file.dart';
 import '../providers/vault_providers.dart';
 import '../services/auto_kill_service.dart';
+import '../services/file_operation_gate.dart';
 import '../services/vault_service.dart';
 import '../themes/app_colors.dart';
 import '../utils/toast_utils.dart';
 import '../widgets/file_info_sheet.dart';
 import '../widgets/add_tags_sheet.dart';
 
-enum _VideoLoadPhase { idle, decrypting, initializing, ready }
+enum _VideoLoadPhase { idle, decrypting, initializing, ready, failed }
 
 // Full-screen media viewer: images, videos, slideshow.
 class MediaViewerScreen extends ConsumerStatefulWidget {
@@ -58,12 +59,18 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   bool _isMuted = false;
   bool _forceLandscape = false;
   double? _decryptProgress;
+  String? _videoLoadError;
 
   // Cancel token for in-flight video loads
   Completer<void>? _videoLoadCancel;
 
   // Image.file streams from disk; Image.memory stalled main-isolate decode on large images.
   final Map<String, File> _decryptedFileCache = {};
+
+  // Deduplicates decryption of the same image. Prefetch, page-change and
+  // page-build can all request the same file; without this they race on the
+  // same temp path and one of the decrypt jobs fails.
+  final Map<String, Future<File?>> _imageLoads = {};
 
   // Debounce timer for video player updates (reduces setState calls)
   Timer? _videoUpdateTimer;
@@ -92,6 +99,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
     _pageController.dispose();
     // Clear decrypted cache to free memory immediately
     _decryptedFileCache.clear();
+    _imageLoads.clear();
     // Clean up temp decrypted files in background
     _cleanupTempFiles();
     // Restore system UI
@@ -127,20 +135,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
     // Resolve the decrypted File path for encrypted images. We keep the File
     // (not its bytes) so Image.file can stream the decode off the main isolate.
     // Works the same for encrypted and plain files; plain files need no cache.
-    if (file.isEncrypted &&
-        file.isImage &&
-        !_decryptedFileCache.containsKey(file.id)) {
-      final decryptedFile = file.id == widget.initialFile.id
-          ? widget.initialDecryptedFile
-          : await ref.read(vaultServiceProvider).getVaultedFile(file.id);
-
-      if (decryptedFile != null && await decryptedFile.exists()) {
-        if (mounted) {
-          setState(() {
-            _decryptedFileCache[file.id] = decryptedFile;
-          });
-        }
-      }
+    // Do not await: prefetch neighbours immediately, and share this exact load
+    // with the PageView builder via _ensureImageLoaded.
+    if (file.isEncrypted && file.isImage) {
+      unawaited(_ensureImageLoaded(file));
     }
 
     _prefetchNeighbourImages();
@@ -162,9 +160,26 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
     }
   }
 
-  Future<void> _ensureImageLoaded(VaultedFile file) async {
-    if (!file.isImage || !file.isEncrypted) return;
-    if (_decryptedFileCache.containsKey(file.id)) return;
+  Future<File?> _ensureImageLoaded(VaultedFile file) async {
+    if (!file.isImage || !file.isEncrypted) return null;
+    final cached = _decryptedFileCache[file.id];
+    if (cached != null) return cached;
+
+    final inFlight = _imageLoads[file.id];
+    if (inFlight != null) return inFlight;
+
+    final future = _loadImage(file);
+    _imageLoads[file.id] = future;
+    try {
+      return await future;
+    } finally {
+      if (identical(_imageLoads[file.id], future)) {
+        _imageLoads.remove(file.id);
+      }
+    }
+  }
+
+  Future<File?> _loadImage(VaultedFile file) async {
     try {
       final decryptedFile = file.id == widget.initialFile.id
           ? widget.initialDecryptedFile
@@ -176,10 +191,12 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
         setState(() {
           _decryptedFileCache[file.id] = decryptedFile;
         });
+        return decryptedFile;
       }
     } catch (e) {
-      debugPrint('Error preloading image ${file.originalName}: $e');
+      debugPrint('Error loading image ${file.originalName}: $e');
     }
+    return null;
   }
 
   Future<void> _initializeVideo(VaultedFile file) async {
@@ -189,6 +206,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
     _videoLoadCancel = cancel;
 
     if (!file.isVideo) return;
+
+    debugPrint('[MediaViewer] video ${file.id} load started');
 
     try {
       // If the caller already prepared a decrypted file, use it directly.
@@ -220,10 +239,12 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
         if (mounted && !cancel.isCompleted) {
           setState(() {
             _videoPhase = _VideoLoadPhase.decrypting;
+            _videoLoadError = null;
             _decryptProgress = 0.0;
           });
         }
 
+        final started = DateTime.now();
         final decryptedFile =
             await ref.read(vaultServiceProvider).getVaultedFile(
           file.id,
@@ -236,12 +257,24 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
           },
         );
 
-        if (cancel.isCompleted || decryptedFile == null) {
-          if (decryptedFile == null) {
-            ToastUtils.showError('Failed to decrypt video');
+        if (cancel.isCompleted) return;
+        if (decryptedFile == null) {
+          final gate = FileOperationGate.instance;
+          debugPrint('[MediaViewer] video ${file.id} decrypt returned null '
+              'after ${DateTime.now().difference(started).inMilliseconds}ms '
+              '(gateBusy=${gate.isBusy}, readable=${gate.canRead(file.id)})');
+          if (mounted) {
+            setState(() {
+              _videoPhase = _VideoLoadPhase.failed;
+              _videoLoadError = 'Could not decrypt this video.';
+              _decryptProgress = null;
+            });
           }
+          ToastUtils.showError('Failed to decrypt video');
           return;
         }
+        debugPrint('[MediaViewer] video ${file.id} decrypted in '
+            '${DateTime.now().difference(started).inMilliseconds}ms');
 
         // Phase 2: init player
         if (mounted && !cancel.isCompleted) {
@@ -279,12 +312,32 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
       }
 
       await _setupController(controller);
-    } catch (e) {
-      debugPrint('Error initializing video: $e');
+    } catch (e, stack) {
+      debugPrint('[MediaViewer] video ${file.id} load failed: $e\n$stack');
       if (!cancel.isCompleted) {
+        if (mounted) {
+          setState(() {
+            _videoPhase = _VideoLoadPhase.failed;
+            _videoLoadError = 'Could not load this video.';
+            _decryptProgress = null;
+          });
+        }
         ToastUtils.showError('Failed to load video');
       }
     }
+  }
+
+  void _retryVideo(VaultedFile file) {
+    if (_videoPhase == _VideoLoadPhase.decrypting ||
+        _videoPhase == _VideoLoadPhase.initializing) {
+      return;
+    }
+    setState(() {
+      _videoPhase = _VideoLoadPhase.idle;
+      _videoLoadError = null;
+      _decryptProgress = null;
+    });
+    _initializeVideo(file);
   }
 
   Future<void> _setupController(VideoPlayerController controller) async {
@@ -329,6 +382,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
       _currentIndex = index;
       _videoController = null;
       _videoPhase = _VideoLoadPhase.idle;
+      _videoLoadError = null;
       _isVideoPlaying = false;
       _decryptProgress = null;
       if (!_files[index].isVideo && _forceLandscape) {
@@ -986,6 +1040,47 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   }
 
   Widget _buildVideoPlayer(VaultedFile file) {
+    if (_videoPhase == _VideoLoadPhase.failed) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white70, size: 48),
+              const SizedBox(height: 16),
+              Text(
+                _videoLoadError ?? 'Could not load this video.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white70, fontSize: 15),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                file.originalName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white38,
+                  fontSize: 12,
+                  fontFamily: 'GoogleSansFlex',
+                ),
+              ),
+              const SizedBox(height: 20),
+              OutlinedButton.icon(
+                onPressed: () => _retryVideo(file),
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('Try again'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white38),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     if (_videoPhase != _VideoLoadPhase.ready || _videoController == null) {
       return Center(
         child: Column(
@@ -1510,6 +1605,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                       _currentIndex -= 1;
                     }
                     _videoPhase = _VideoLoadPhase.idle;
+                    _videoLoadError = null;
                     _isVideoPlaying = false;
                     _decryptProgress = null;
                   });

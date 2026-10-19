@@ -86,6 +86,11 @@ class BulkDeleteResult {
 class FileService {
   static const int _maxConcurrentBatchAdds = 3;
 
+  // Each decrypt gets a unique destination so concurrent readers of the same
+  // file cannot rename or delete each other's plaintext. Thumbnail generation
+  // and the media viewer routinely decrypt the same video at the same time.
+  static int _tempDecryptSerial = 0;
+
   final VaultStore _store;
   final EncryptionService _encryptionService;
   final ThumbnailService _thumbnailService;
@@ -840,6 +845,11 @@ class FileService {
     }
   }
 
+  File? _unavailable(String fileId, String reason) {
+    debugPrint('[Vault] getVaultedFile($fileId) -> null: $reason');
+    return null;
+  }
+
   /// Get the actual file from vault (decrypts if needed).
   Future<File?> getVaultedFile(
     String fileId, {
@@ -847,32 +857,72 @@ class FileService {
     Function(int processed, int total)? onProgress,
     CancelToken? cancelToken,
   }) async {
-    if (!_operationGate.canRead(fileId)) return null;
+    if (!_operationGate.canRead(fileId)) {
+      if (!_operationGate.isBusy) {
+        return _unavailable(fileId, 'file operation lease is invalid');
+      }
+      // Metadata commits and other short operations can reserve a file for a
+      // few milliseconds. Wait for them instead of reporting a hard failure
+      // while the user is swiping to this file.
+      debugPrint(
+          '[Vault] getVaultedFile($fileId) waiting for active file operation');
+      final readable = await _operationGate.waitForReadable(
+        fileId,
+        shouldAbort: () => cancelToken?.isCancelled == true,
+      );
+      if (!readable) {
+        return _unavailable(
+          fileId,
+          cancelToken?.isCancelled == true
+              ? 'cancelled while waiting for file operation'
+              : 'file stayed reserved by an active operation',
+        );
+      }
+    }
+
     final generation = _encryptionService.cacheGeneration;
-    if (!_encryptionService.isCurrentSession(generation) ||
-        !_operationGate.canRead(fileId)) {
-      return null;
+    if (!_encryptionService.isCurrentSession(generation)) {
+      return _unavailable(fileId, 'session changed before open');
+    }
+    if (!_operationGate.canRead(fileId)) {
+      return _unavailable(fileId, 'file operation started while opening');
     }
     final vaultedFile = await getFileById(fileId, isDecoy: isDecoy);
-    if (vaultedFile == null || !_operationGate.canRead(fileId)) return null;
+    if (vaultedFile == null) {
+      return _unavailable(fileId, 'file not found in index');
+    }
+    if (!_operationGate.canRead(fileId)) {
+      return _unavailable(fileId, 'file operation reserved it while loading');
+    }
 
     final file = File(vaultedFile.vaultPath);
-    if (!await file.exists()) return null;
-    if (!_encryptionService.isCurrentSession(generation)) return null;
+    if (!await file.exists()) {
+      return _unavailable(fileId, 'vault payload missing');
+    }
+    if (!_encryptionService.isCurrentSession(generation)) {
+      return _unavailable(fileId, 'session changed while checking payload');
+    }
 
     if (vaultedFile.isEncrypted && vaultedFile.encryptionIv != null) {
       final tempDir = await _store.ensureVaultDirectory();
+      final unique =
+          '${DateTime.now().microsecondsSinceEpoch}_${_tempDecryptSerial++}';
       final tempPath =
-          '${tempDir.path}/temp/${vaultedFile.id}_${generation}_${vaultedFile.originalName}';
+          '${tempDir.path}/temp/${vaultedFile.id}_${generation}_${unique}_${vaultedFile.originalName}';
 
       final format = _encryptionService.detectFileFormat(vaultedFile.vaultPath);
       final isLegacyCbc = (format == 0 || format == 3);
       final derivedKey = await deriveKeyForFile(vaultedFile, isDecoy: isDecoy);
 
-      if (cancelToken?.isCancelled == true ||
-          !_encryptionService.isCurrentSession(generation) ||
-          !_operationGate.canRead(fileId)) {
-        return null;
+      if (cancelToken?.isCancelled == true) {
+        return _unavailable(fileId, 'cancelled before decryption');
+      }
+      if (!_encryptionService.isCurrentSession(generation)) {
+        return _unavailable(fileId, 'session changed before decryption');
+      }
+      if (!_operationGate.canRead(fileId)) {
+        return _unavailable(
+            fileId, 'file operation reserved it before decryption');
       }
 
       FileDecryptionResult result;
@@ -904,18 +954,29 @@ class FileService {
         );
       }
 
-      if (!_encryptionService.isCurrentSession(generation) ||
-          !_operationGate.canRead(fileId)) {
+      if (!_encryptionService.isCurrentSession(generation)) {
         await _store.deleteFileIfExists(tempPath);
         await _store.deleteFileIfExists('$tempPath.tmp');
-        return null;
+        return _unavailable(
+            fileId, 'session changed during decryption; discarded temp');
       }
-      if (cancelToken?.isCancelled == true) return null;
+      if (!_operationGate.canRead(fileId)) {
+        await _store.deleteFileIfExists(tempPath);
+        await _store.deleteFileIfExists('$tempPath.tmp');
+        return _unavailable(fileId,
+            'file operation reserved it during decryption; discarded temp');
+      }
+      if (cancelToken?.isCancelled == true) {
+        return _unavailable(fileId, 'cancelled after decryption');
+      }
 
       if (result.success && result.decryptedPath != null) {
+        debugPrint('[Vault] getVaultedFile($fileId) ready '
+            '(${result.decryptedSize ?? '?'} bytes)');
         return File(result.decryptedPath!);
       }
-      return null;
+      return _unavailable(
+          fileId, 'decryption failed: ${result.error ?? 'unknown error'}');
     }
 
     return file;
