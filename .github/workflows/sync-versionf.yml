@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: sync-versionf
@@ -20,6 +21,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Merge main into versionF
+        id: merge
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -34,3 +36,10 @@ jobs:
             -f base=versionF \
             -f head=main \
             -f commit_message="Merge branch 'main' into versionF"
+          echo "merged=true" >> "$GITHUB_OUTPUT"
+
+      - name: Run CI on versionF
+        if: steps.merge.outputs.merged == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run ci.yml --ref versionF
