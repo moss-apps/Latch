@@ -1,0 +1,33 @@
+name: Sync versionF
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-versionf
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge main into versionF
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          repo="${{ github.repository }}"
+          behind=$(gh api "repos/$repo/compare/main...versionF" --jq '.behind_by')
+          if [ "$behind" -eq 0 ]; then
+            echo "versionF already contains main."
+            exit 0
+          fi
+          echo "versionF is $behind commit(s) behind main; merging."
+          gh api "repos/$repo/merges" -X POST \
+            -f base=versionF \
+            -f head=main \
+            -f commit_message="Merge branch 'main' into versionF"
