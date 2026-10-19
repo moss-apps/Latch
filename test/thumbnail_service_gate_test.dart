@@ -142,7 +142,8 @@ void main() {
       );
 
       viewerFile = await fileService.getVaultedFile(file.id);
-      expect(viewerFile, isNotNull, reason: 'the viewer decryption was blocked');
+      expect(viewerFile, isNotNull,
+          reason: 'the viewer decryption was blocked');
       if (viewerFile != null) {
         expect(await viewerFile.exists(), isTrue);
         expect(viewerFile.path, isNot(thumbnailPlaintext.path));
