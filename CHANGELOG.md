@@ -2,7 +2,7 @@
 
 Notable changes to Latch.
 
-## 0.18.0-beta.1
+## 0.19.0-beta.1
 
 ### Recovery & Product Polish
 - **Recently Deleted** — local-only recovery with 30-day default retention,
@@ -17,6 +17,20 @@ Notable changes to Latch.
   focused components; display and selection now share structured filters.
 - README/setup and recovery/sync policy documentation refreshed; device checks
   documented separately from automated verification.
+
+### Sharing & Smart Collections
+- **Share to Latch** — receive files shared from other apps, review the
+  staged items, and import them into the vault in one flow.
+- **Smart Collections** — save structured file filters as named
+  collections with live counts, reachable from the gallery drawer.
+- Search, gallery filtering, and smart collections now share a single
+  file-filter model, including the consolidated filter sheet.
+
+### Operation Progress
+- Imports, deletions, and other vault mutations run through a shared
+  operation gate that reports progress and prevents overlapping work.
+- SnackBars replaced with a custom `ToastHost` overlay for consistent
+  in-app feedback.
 
 ### Typography
 - Replaced proprietary Product Sans with OFL-licensed **Google Sans Flex** in the

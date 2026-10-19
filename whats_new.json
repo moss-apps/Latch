@@ -1,5 +1,30 @@
 {
-  "0.18.0-beta.1": [
+  "0.19.0-beta.1": [
+    {
+      "title": "New & Noteworthy",
+      "items": [
+        {
+          "icon": "auto_awesome_outlined",
+          "title": "Recently Deleted",
+          "description": "Deleted files stay recoverable for 30 days by default — restore them or remove them permanently whenever you like."
+        },
+        {
+          "icon": "folder_outlined",
+          "title": "Share to Latch",
+          "description": "Send photos and files from other apps straight into your vault, review them, and import in one step."
+        },
+        {
+          "icon": "filter_list",
+          "title": "Smart Collections",
+          "description": "Save the filters you use most as named collections with live file counts, ready from the gallery drawer."
+        },
+        {
+          "icon": "palette_outlined",
+          "title": "Google Sans Flex",
+          "description": "Latch now uses Google Sans Flex throughout the app, with a fully open-source font license."
+        }
+      ]
+    },
     {
       "title": "Desktop Backup",
       "items": [
