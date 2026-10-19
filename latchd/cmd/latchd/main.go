@@ -34,7 +34,7 @@ const defaultDir = "latch-backup"
 const defaultAddr = "127.0.0.1:7800"
 
 // version is stamped at release time from the app-version tag:
-// -ldflags "-X main.version=0.18.0-beta.1" (mirrors the mobile release).
+// -ldflags "-X main.version=0.19.0-beta.1" (mirrors the mobile release).
 var version = "dev"
 
 func main() {
