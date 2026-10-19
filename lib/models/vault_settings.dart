@@ -31,6 +31,7 @@ class VaultSettings {
   final bool showPermissionWarning;
   final bool tapOpensMedia;
   final bool hideUnencryptedThumbnails;
+  final bool hideEncryptedThumbnails;
 
   // Encrypted-at-rest sync (see docs/local_server_sync.md)
   final bool syncEnabled;
@@ -66,6 +67,7 @@ class VaultSettings {
     this.showPermissionWarning = true,
     this.tapOpensMedia = true,
     this.hideUnencryptedThumbnails = false,
+    this.hideEncryptedThumbnails = false,
     this.syncEnabled = false,
     this.syncProfileId,
     this.pbEnabled = true,
@@ -97,6 +99,7 @@ class VaultSettings {
     bool? showPermissionWarning,
     bool? tapOpensMedia,
     bool? hideUnencryptedThumbnails,
+    bool? hideEncryptedThumbnails,
     bool? syncEnabled,
     String? syncProfileId,
     bool? pbEnabled,
@@ -138,6 +141,8 @@ class VaultSettings {
       tapOpensMedia: tapOpensMedia ?? this.tapOpensMedia,
       hideUnencryptedThumbnails:
           hideUnencryptedThumbnails ?? this.hideUnencryptedThumbnails,
+      hideEncryptedThumbnails:
+          hideEncryptedThumbnails ?? this.hideEncryptedThumbnails,
       syncEnabled: syncEnabled ?? this.syncEnabled,
       syncProfileId: syncProfileId ?? this.syncProfileId,
       pbEnabled: pbEnabled ?? this.pbEnabled,
@@ -170,6 +175,7 @@ class VaultSettings {
         'showPermissionWarning': showPermissionWarning,
         'tapOpensMedia': tapOpensMedia,
         'hideUnencryptedThumbnails': hideUnencryptedThumbnails,
+        'hideEncryptedThumbnails': hideEncryptedThumbnails,
         'syncEnabled': syncEnabled,
         'syncProfileId': syncProfileId,
         'pbEnabled': pbEnabled,
@@ -219,6 +225,8 @@ class VaultSettings {
       tapOpensMedia: json['tapOpensMedia'] as bool? ?? true,
       hideUnencryptedThumbnails:
           json['hideUnencryptedThumbnails'] as bool? ?? false,
+      hideEncryptedThumbnails:
+          json['hideEncryptedThumbnails'] as bool? ?? false,
       syncEnabled: json['syncEnabled'] as bool? ?? false,
       syncProfileId: json['syncProfileId'] as String?,
       pbEnabled: json['pbEnabled'] as bool? ?? true,

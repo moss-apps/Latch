@@ -426,6 +426,32 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                 activeThumbColor: context.accentColor,
                 contentPadding: EdgeInsets.zero,
               ),
+              SwitchListTile(
+                secondary: Icon(
+                  Icons.lock_outline,
+                  color: context.accentColor,
+                ),
+                title: const Text(
+                  'Hide Encrypted Thumbnails',
+                  style: TextStyle(fontFamily: 'GoogleSansFlex'),
+                ),
+                subtitle: Text(
+                  'Show file type icons instead of decrypted previews for encrypted files',
+                  style: TextStyle(
+                    fontFamily: 'GoogleSansFlex',
+                    fontSize: 12,
+                    color: context.textTertiary,
+                  ),
+                ),
+                value: settings.hideEncryptedThumbnails,
+                onChanged: (value) async {
+                  await _saveVaultSettings(
+                    settings.copyWith(hideEncryptedThumbnails: value),
+                  );
+                },
+                activeThumbColor: context.accentColor,
+                contentPadding: EdgeInsets.zero,
+              ),
               const SizedBox(height: 20),
               Divider(color: context.borderColor),
               const SizedBox(height: 20),
