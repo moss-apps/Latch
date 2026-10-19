@@ -42,4 +42,6 @@ jobs:
         if: steps.merge.outputs.merged == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run ci.yml --ref versionF
+        run: |
+          gh api "repos/${{ github.repository }}/actions/workflows/ci.yml/dispatches" \
+            -X POST -f ref=versionF
