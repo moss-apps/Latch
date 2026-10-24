@@ -33,7 +33,7 @@ import 'file_operation_gate.dart';
 /// the UI instantly. The derivation itself finishes on its background isolate
 /// and its result is discarded.
 class FileOpenService {
-  static bool _isOpening = false;
+  static CancelToken? _activeOpenToken;
 
   /// Open a [file] from the vault.
   ///
@@ -51,7 +51,7 @@ class FileOpenService {
     ValueChanged<String>? onOpenNote,
     ValueChanged<String>? onOpenPassword,
   }) async {
-    if (_isOpening) return;
+    if (_activeOpenToken != null) return;
     if (!context.mounted) return;
     if (!FileOperationGate.instance.canRead(file.id)) {
       ToastUtils.showInfo(
@@ -62,16 +62,23 @@ class FileOpenService {
         .where((file) => FileOperationGate.instance.canRead(file.id))
         .toList();
 
-    _isOpening = true;
-
     final needsDecryption = file.isEncrypted && file.encryptionIv != null;
     final token = CancelToken();
+    _activeOpenToken = token;
     final status = ValueNotifier<_OpenStatus>(
       _OpenStatus(needsDecryption ? 'Preparing key…' : 'Opening…'),
     );
     BuildContext? sheetContext;
     Timer? sheetTimer;
     var sheetShown = false;
+
+    void releaseOpen() {
+      // A cancelled key derivation may finish after another open has started.
+      // Only the request that owns the guard may release it.
+      if (identical(_activeOpenToken, token)) {
+        _activeOpenToken = null;
+      }
+    }
 
     void hideSheet() {
       sheetTimer?.cancel();
@@ -83,6 +90,9 @@ class FileOpenService {
 
     void requestCancel() {
       token.cancel();
+      // Key preparation cannot be interrupted; don't keep other files blocked
+      // while its background work finishes.
+      releaseOpen();
       hideSheet();
     }
 
@@ -163,7 +173,7 @@ class FileOpenService {
         }
       }
 
-      if (!context.mounted) {
+      if (token.isCancelled || !context.mounted) {
         hideSheet();
         return;
       }
@@ -194,7 +204,7 @@ class FileOpenService {
       }
     } finally {
       status.dispose();
-      _isOpening = false;
+      releaseOpen();
     }
   }
 
