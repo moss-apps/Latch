@@ -11,6 +11,10 @@ permissions:
   contents: write
   actions: write
 
+# versionF is a permanent integration branch. Repository auto-delete on merge
+# is disabled so merging a versionF pull request does not remove it. The
+# "Ensure versionF exists" step below is a safety net only.
+
 concurrency:
   group: sync-versionf
   cancel-in-progress: false
@@ -20,8 +24,26 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Ensure versionF exists
+        id: ensure
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          repo="${{ github.repository }}"
+          if gh api "repos/$repo/branches/versionF" --silent 2>/dev/null; then
+            echo "versionF already exists."
+            exit 0
+          fi
+          main_sha=$(gh api "repos/$repo/branches/main" --jq '.commit.sha')
+          echo "versionF is missing; recreating it at main ($main_sha)."
+          gh api "repos/$repo/git/refs" -X POST \
+            -f ref=refs/heads/versionF \
+            -f sha="$main_sha"
+          echo "created=true" >> "$GITHUB_OUTPUT"
+
       - name: Merge main into versionF
         id: merge
+        if: steps.ensure.outputs.created != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -39,7 +61,7 @@ jobs:
           echo "merged=true" >> "$GITHUB_OUTPUT"
 
       - name: Run CI on versionF
-        if: steps.merge.outputs.merged == 'true'
+        if: steps.ensure.outputs.created == 'true' || steps.merge.outputs.merged == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
