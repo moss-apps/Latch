@@ -11,6 +11,10 @@ permissions:
   contents: write
   actions: write
 
+# versionF is a permanent integration branch. Repository auto-delete on merge
+# is disabled so merging a versionF pull request does not remove it. The
+# "Ensure versionF exists" step below is a safety net only.
+
 concurrency:
   group: sync-versionf
   cancel-in-progress: false
