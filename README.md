@@ -127,7 +127,7 @@ curl -fsSL https://raw.githubusercontent.com/moss-apps/Latch/HEAD/scripts/instal
 ```
 
 Installer overrides (environment variables): `LATCHD_BINDIR` (install
-directory), `LATCHD_VERSION` (pin a release tag, e.g. `0.19.0-beta.1`),
+directory), `LATCHD_VERSION` (pin a release tag, e.g. `0.19.1-beta.1`),
 `LATCHD_REPO` (alternative fork).
 
 **Windows** — download `latchd-windows-amd64.exe` from
