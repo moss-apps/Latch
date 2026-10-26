@@ -967,6 +967,8 @@ class FileService {
             'file operation reserved it during decryption; discarded temp');
       }
       if (cancelToken?.isCancelled == true) {
+        await _store.deleteFileIfExists(tempPath);
+        await _store.deleteFileIfExists('$tempPath.tmp');
         return _unavailable(fileId, 'cancelled after decryption');
       }
 

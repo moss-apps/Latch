@@ -1253,12 +1253,12 @@ class _GalleryVaultScreenState extends ConsumerState<GalleryVaultScreen> {
   }
 
   void _openFile(VaultedFile file) {
-    final filesAsync = ref.read(vaultNotifierProvider);
     FileOpenService.open(
       context,
       ref,
       file,
-      currentFiles: filesAsync.value ?? [],
+      currentFiles: _getVisibleFiles(),
+      enableFileBrowsing: true,
       onUnsupported: () => _showFileOptionsSheet(file),
       onOpenNote: (noteId) => _openNoteFromVault(noteId),
       onOpenPassword: (passwordId) => _openPasswordFromVault(passwordId),

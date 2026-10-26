@@ -23,10 +23,19 @@ class DocumentViewerScreen extends ConsumerStatefulWidget {
   /// performed on the main thread.
   final File? decryptedFile;
 
+  /// The surrounding browser owns navigation and temporary-file cleanup.
+  final bool embedded;
+
+  /// File-level paging for unzoomed PDFs, whose pan recognizer owns the drag.
+  /// Positive directions advance; negative directions go to the previous file.
+  final ValueChanged<int>? onFileSwipe;
+
   const DocumentViewerScreen({
     super.key,
     required this.file,
     this.decryptedFile,
+    this.embedded = false,
+    this.onFileSwipe,
   });
 
   @override
@@ -47,6 +56,9 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
   // PdfViewer.file so pdfrx loads off the main isolate (PdfViewer.data ANRs on big PDFs).
   String? _pdfPath;
   String? _convertedPdfPath;
+  Offset _pdfSwipeOrigin = Offset.zero;
+  Offset _pdfSwipeDelta = Offset.zero;
+  bool _canSwipeFile = false;
 
   @override
   void initState() {
@@ -77,7 +89,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
       } catch (_) {}
     }
     // Clean up temp decrypted files to prevent disk leaks
-    _cleanupTempFiles();
+    if (!widget.embedded) _cleanupTempFiles();
     super.dispose();
   }
 
@@ -91,6 +103,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
 
   /// Show conversion warning dialog for Office documents
   Future<void> _showConversionDialog() async {
+    if (!mounted) return;
     final canConvert =
         OfficeConverterService.canConvertOnDevice(widget.file.extension);
 
@@ -110,6 +123,8 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
       setState(() {
         _isLoading = false;
       });
+    } else if (widget.embedded) {
+      setState(() => _isLoading = false);
     } else {
       // User cancelled
       Navigator.pop(context);
@@ -142,6 +157,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
         fileData = await File(widget.file.vaultPath).readAsBytes();
       }
 
+      if (!mounted) return;
       if (fileData == null) {
         setState(() {
           _error = 'Failed to read document';
@@ -217,7 +233,10 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
           final decryptedFile = await ref
               .read(vaultServiceProvider)
               .getVaultedFile(widget.file.id);
-          if (decryptedFile == null || !await decryptedFile.exists()) {
+          if (!mounted) return;
+          final exists = decryptedFile != null && await decryptedFile.exists();
+          if (!mounted) return;
+          if (!exists) {
             setState(() {
               _error = 'Failed to decrypt document';
               _isLoading = false;
@@ -242,6 +261,7 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
               : await ref
                   .read(vaultServiceProvider)
                   .getDecryptedFileData(widget.file.id);
+          if (!mounted) return;
           if (bytes == null) {
             setState(() {
               _error = 'Failed to decrypt document';
@@ -256,8 +276,10 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
         await _loadTextContent();
       }
 
+      if (!mounted) return;
       setState(() => _isLoading = false);
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = 'Failed to load document';
         _isLoading = false;
@@ -580,6 +602,12 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
                 offset: const Offset(0, 2),
               ),
               scrollPhysics: const ClampingScrollPhysics(),
+              onInteractionStart:
+                  widget.onFileSwipe != null ? _startPdfSwipe : null,
+              onInteractionUpdate:
+                  widget.onFileSwipe != null ? _updatePdfSwipe : null,
+              onInteractionEnd:
+                  widget.onFileSwipe != null ? _endPdfSwipe : null,
               viewerOverlayBuilder: (context, size, handleLinkTap) => [
                 PdfViewerScrollThumb(
                   controller: _pdfController!,
@@ -627,6 +655,10 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
           offset: const Offset(0, 2),
         ),
         scrollPhysics: const ClampingScrollPhysics(),
+        onInteractionStart: widget.onFileSwipe != null ? _startPdfSwipe : null,
+        onInteractionUpdate:
+            widget.onFileSwipe != null ? _updatePdfSwipe : null,
+        onInteractionEnd: widget.onFileSwipe != null ? _endPdfSwipe : null,
         viewerOverlayBuilder: (context, size, handleLinkTap) => [
           PdfViewerScrollThumb(
             controller: _pdfController!,
@@ -664,6 +696,37 @@ class _DocumentViewerScreenState extends ConsumerState<DocumentViewerScreen> {
         ),
       ),
     );
+  }
+
+  void _startPdfSwipe(ScaleStartDetails details) {
+    _pdfSwipeOrigin = details.focalPoint;
+    _pdfSwipeDelta = Offset.zero;
+    final controller = _pdfController!;
+    // Horizontal panning must continue to work when a document is zoomed in.
+    _canSwipeFile = details.pointerCount == 1 &&
+        controller.isReady &&
+        controller.documentSize.width * controller.currentZoom <=
+            controller.viewSize.width + 2;
+  }
+
+  void _updatePdfSwipe(ScaleUpdateDetails details) {
+    if (details.pointerCount != 1 || (details.scale - 1).abs() > 0.02) {
+      _canSwipeFile = false;
+    }
+    _pdfSwipeDelta = details.focalPoint - _pdfSwipeOrigin;
+  }
+
+  void _endPdfSwipe(ScaleEndDetails details) {
+    if (!_canSwipeFile ||
+        _pdfSwipeDelta.dx.abs() < 72 ||
+        _pdfSwipeDelta.dx.abs() < _pdfSwipeDelta.dy.abs() * 1.5) {
+      return;
+    }
+    _canSwipeFile = false;
+    final forward = Directionality.of(context) == TextDirection.ltr
+        ? _pdfSwipeDelta.dx < 0
+        : _pdfSwipeDelta.dx > 0;
+    widget.onFileSwipe?.call(forward ? 1 : -1);
   }
 
   Widget _buildUnsupportedViewer() {
