@@ -2,6 +2,31 @@
 
 Notable changes to Latch.
 
+## 0.19.1-beta.2
+
+### Gallery File Browsing
+- **Browse documents and songs from the gallery** — opening a document or song
+  now opens a pager with previous/next controls, swipe navigation, and a
+  position indicator for files of the same kind.
+- **Only the active page runs** — off-screen entries are not decrypted, played,
+  or allowed to start document conversion, and prepared files are cleaned up
+  when the browser closes.
+- **Shared viewer context** — image/video, song, and document paging now use one
+  helper that preserves gallery order and excludes virtual notes and passwords.
+- **Swipe through documents** — the document viewer pages between files when it
+  is not zoomed; a dedicated navigation strip keeps paging available for PDFs,
+  whose pan gestures would otherwise capture the swipe.
+
+### Reliability
+- **Fixed stale open guard** — cancelling or failing a file-open no longer
+  blocks the next file, and late results from a cancelled request are ignored.
+- Cancelled decryptions remove their temporary files; viewers now check mounted
+  state after async work to avoid updates after disposal.
+
+### Maintenance
+- The `versionF` sync workflow recreates the integration branch if it is missing
+  and documents that it must not be auto-deleted.
+
 ## 0.19.0-beta.1
 
 ### Recovery & Product Polish

@@ -22,10 +22,14 @@ class SongPlayerScreen extends ConsumerStatefulWidget {
   /// performed on the main thread.
   final File? decryptedFile;
 
+  /// The surrounding file browser owns temporary-file cleanup when embedded.
+  final bool embedded;
+
   const SongPlayerScreen({
     super.key,
     required this.file,
     this.decryptedFile,
+    this.embedded = false,
   });
 
   @override
@@ -52,7 +56,7 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen> {
   void dispose() {
     _player.dispose();
     // Clean up temp decrypted files to prevent disk leaks
-    _cleanupTempFiles();
+    if (!widget.embedded) _cleanupTempFiles();
     super.dispose();
   }
 
@@ -87,7 +91,9 @@ class _SongPlayerScreenState extends ConsumerState<SongPlayerScreen> {
               ? await vaultService.getVaultedFile(widget.file.id)
               : File(widget.file.vaultPath));
 
-      if (file == null || !await file.exists()) {
+      final exists = file != null && await file.exists();
+      if (!mounted) return;
+      if (!exists) {
         setState(() {
           _error = 'Failed to prepare song';
           _isLoading = false;

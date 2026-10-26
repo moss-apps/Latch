@@ -8,12 +8,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/vaulted_file.dart';
 import '../providers/vault_providers.dart';
 import '../screens/document_viewer_screen.dart';
+import '../screens/file_browser_screen.dart';
 import '../screens/media_viewer_screen.dart';
 import '../screens/song_player_screen.dart';
 import '../themes/app_colors.dart';
 import '../utils/toast_utils.dart';
 import 'crypto_isolate_pool.dart';
 import 'file_operation_gate.dart';
+import 'file_viewer_context.dart';
 
 /// Centralized, atomic file opener.
 ///
@@ -39,6 +41,8 @@ class FileOpenService {
   ///
   /// [currentFiles] is the list of files currently visible to the user; it is
   /// used to build the swipeable gallery context for images and videos.
+  /// [enableFileBrowsing] also enables scoped song/Docs paging for the gallery;
+  /// other entry points keep their existing single-file viewers.
   /// [onUnsupported] is called when the file has no built-in viewer.
   /// [onOpenNote] is called when the vault entry represents a note.
   /// [onOpenPassword] is called when the vault entry represents a password.
@@ -47,6 +51,7 @@ class FileOpenService {
     WidgetRef ref,
     VaultedFile file, {
     required List<VaultedFile> currentFiles,
+    bool enableFileBrowsing = false,
     VoidCallback? onUnsupported,
     ValueChanged<String>? onOpenNote,
     ValueChanged<String>? onOpenPassword,
@@ -189,6 +194,7 @@ class FileOpenService {
         context,
         file,
         currentFiles: currentFiles,
+        enableFileBrowsing: enableFileBrowsing,
         decryptedFile: decryptedFile,
         onUnsupported: onUnsupported,
       );
@@ -212,12 +218,12 @@ class FileOpenService {
     BuildContext context,
     VaultedFile file, {
     required List<VaultedFile> currentFiles,
+    required bool enableFileBrowsing,
     File? decryptedFile,
     VoidCallback? onUnsupported,
   }) async {
     if (file.isImage || file.isVideo) {
-      final viewerFiles =
-          currentFiles.where((f) => f.isImage || f.isVideo).toList();
+      final viewerFiles = fileViewerContext(file, currentFiles);
       final startIndex = viewerFiles.indexWhere((f) => f.id == file.id);
 
       await Navigator.push(
@@ -225,8 +231,19 @@ class FileOpenService {
         MaterialPageRoute(
           builder: (context) => MediaViewerScreen(
             initialFile: file,
-            files: viewerFiles.isNotEmpty ? viewerFiles : [file],
-            initialIndex: startIndex >= 0 ? startIndex : 0,
+            files: viewerFiles,
+            initialIndex: startIndex,
+            initialDecryptedFile: decryptedFile,
+          ),
+        ),
+      );
+    } else if (enableFileBrowsing) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => FileBrowserScreen(
+            initialFile: file,
+            files: fileViewerContext(file, currentFiles),
             initialDecryptedFile: decryptedFile,
           ),
         ),

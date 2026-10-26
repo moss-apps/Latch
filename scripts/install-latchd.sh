@@ -5,7 +5,7 @@
 # Usage:
 #	curl -fsSL https://raw.githubusercontent.com/moss-apps/Latch/HEAD/scripts/install-latchd.sh | sh
 #
-# Overrides: LATCHD_REPO, LATCHD_VERSION (an app-version tag, e.g. 0.19.1-beta.1), LATCHD_BINDIR.
+# Overrides: LATCHD_REPO, LATCHD_VERSION (an app-version tag, e.g. 0.19.1-beta.2), LATCHD_BINDIR.
 set -eu
 
 REPO="${LATCHD_REPO:-moss-apps/Latch}"

@@ -1,4 +1,31 @@
 {
+  "0.19.1-beta.2": [
+    {
+      "title": "File Browsing",
+      "items": [
+        {
+          "icon": "folder_outlined",
+          "title": "Browse from the gallery",
+          "description": "Open a document or song and page through the rest of that kind with a swipe or the previous/next controls."
+        },
+        {
+          "icon": "touch_app_outlined",
+          "title": "Swipe between documents",
+          "description": "Documents now page between files when you're not zoomed in, with a navigation strip for PDFs."
+        }
+      ]
+    },
+    {
+      "title": "Reliability",
+      "items": [
+        {
+          "icon": "build_outlined",
+          "title": "More reliable opens",
+          "description": "Cancelled opens no longer block later files, and temporary decrypted copies are cleaned up when a viewer closes."
+        }
+      ]
+    }
+  ],
   "0.19.0-beta.1": [
     {
       "title": "New & Noteworthy",
