@@ -8,7 +8,7 @@
 ; installer EULA and the web gate agree by construction (both from legal/).
 ;
 ; Built by CI (release-latchd.yml) or locally:
-;   cd latchd/windows-setup && python3 build-license.py && iscc latch.iss /DMyAppVersion=0.19.1-beta.1
+;   cd latchd/windows-setup && python3 build-license.py && iscc latch.iss /DMyAppVersion=0.19.1-beta.2
 #define MyAppName "Latch"
 #ifndef MyAppVersion
   #define MyAppVersion "dev"
