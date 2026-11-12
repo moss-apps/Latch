@@ -88,3 +88,15 @@ dependencies {
 flutter {
     source = "../.."
 }
+
+// Fail closed on missing/stale sidecars, even for direct Flutter release builds.
+// This reads build artifacts only; it never installs or runs either application.
+def flutterProjectRoot = rootProject.projectDir.parentFile
+def verifyPocketBaseRelease = tasks.register("verifyPocketBaseRelease", Exec) {
+    workingDir flutterProjectRoot
+    commandLine "python3", "scripts/pocketbase_artifact.py", "verify",
+            "android/app/src/main/jniLibs/arm64-v8a/libpocketbase.so"
+}
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    dependsOn verifyPocketBaseRelease
+}
