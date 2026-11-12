@@ -8,10 +8,14 @@ replace Android picker, camera, Autofill, TalkBack, or real-server checks.
 
 ## Preparation
 
-- Use a disposable/test vault and keep an external backup. Do not wipe real
-  data or change the device clock to test retention.
-- Install the debug APK (`build/app/outputs/flutter-apk/app-debug.apk`) by your
-  usual method. Confirm existing settings/data are preserved when upgrading.
+- First complete the approval/isolation preflight in
+  [Stable release checks](stable_release_checklist.md). No automatic installs,
+  overwrites, uninstall/reinstall, or clear-data operations on a live vault.
+- Use a disposable/test vault and an independently verified fixture backup.
+  Do not wipe real data or change the device clock to test retention.
+- Stable sign-off uses the exact approved release artifact and records its hash.
+  Debug checks are useful but not a substitute. Test upgrades from the prior
+  version only on the disposable target; confirm settings/data/key continuity.
 - Prepare a photo, video, song, PDF, another document, an encrypted file with a
   thumbnail, a hidden-only file, a note, and a password entry. Tag/favorite some
   items and place them in an album/folder. Use dummy login data only.
