@@ -34,6 +34,19 @@ void main() {
       }
     });
 
+    test('bundled privacy policy matches the canonical policy', () {
+      expect(File('assets/privacy_policy.md').readAsStringSync(),
+          File('legal/privacy.md').readAsStringSync());
+    });
+
+    test('version 1 acceptance requires renewed consent', () async {
+      SharedPreferences.setMockInitialValues({'legal_accepted_version': 1});
+      final service = LegalConsentService();
+      expect(await service.isAccepted(), isFalse);
+      await service.accept();
+      expect(await service.isAccepted(), isTrue);
+    });
+
     testWidgets('consent screen shows tabs and records acceptance',
         (tester) async {
       SharedPreferences.setMockInitialValues({});
