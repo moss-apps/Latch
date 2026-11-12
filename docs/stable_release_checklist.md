@@ -112,13 +112,16 @@ irreplaceable files.
 
 ## Evidence record — 2026-11-12
 
-Scope: local working tree based on `19afbd517c8ede482bfc16f8effdf04abd0930fc`,
-including the owner's uncommitted QR scanner work and these release-safety
-changes. This is not a clean tagged release or a new remote CI result.
+Scope: committed and pushed on `versionF` as
+`3fc89c70ffac205af42a8d63a405d5fe233f904b`, merging the release-safety work
+(based on `19afbd517c8ede482bfc16f8effdf04abd0930fc`, plus the owner's QR
+scanner work) with `origin/versionF`. Remote CI run `43184997129` passed both
+jobs. This is still not a tagged stable release or hardware acceptance.
 
 | Check | Result |
 |---|---|
 | Packaging regression tests | 13 pass; fake/temp artifacts only; the preserved old native binary is also rejected without execution |
+| Remote CI on pushed commit | Run `43184997129` passed `analyze-and-test` and `native-and-android` (native tooling, both Go suites, arm64 debug APK payload verification) |
 | Mobile legal/consent tests | 7 pass, including stale version-1 acceptance and bundled privacy equality |
 | Desktop web assets | TypeScript + Vite production build passes using existing dependencies |
 | `latchd` Go tests | Pass, including canonical/embedded legal consistency and renewed version-2 consent |
@@ -147,6 +150,12 @@ Knowledge-graph refresh was attempted with `graphify update .`. Its existing
 semantic-node preservation guard refused the update; the saved graph was not
 force-overwritten or deleted. This is a tooling limitation, not a passing graph
 refresh or an Android build failure.
+
+GitHub reports 10 open Dependabot alerts for `latchd/web-src` development
+tooling (Vite and its `fast-uri` dependency). The shipped web UI is prebuilt
+static output; neither package runs in the app or latchd binary. Treat them as
+build-environment maintenance, not runtime stable gates, and keep the committed
+build reproducible when updating.
 
 ## Release authorization
 
