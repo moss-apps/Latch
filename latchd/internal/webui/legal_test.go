@@ -56,6 +56,34 @@ func TestEmbeddedLegalDocsMatchCanonical(t *testing.T) {
 	}
 }
 
+func TestOldLegalConsentRequiresRenewedAcceptance(t *testing.T) {
+	withIsolatedConfig(t)
+	s := &Session{targetDir: t.TempDir()}
+	old, err := json.Marshal(legalRecord{Version: 1, AcceptedAt: "2026-09-16T00:00:00Z"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(legalAcceptancePath(s.targetDir), old, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if s.isLegalAccepted() {
+		t.Fatal("version 1 acceptance must not accept the revised disclosures")
+	}
+	w := httptest.NewRecorder()
+	s.requireLegal(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})(w, httptest.NewRequest(http.MethodPost, "/api/pair/start", nil))
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("old acceptance bypassed gate: %d", w.Code)
+	}
+	if err := s.acceptLegal(); err != nil {
+		t.Fatal(err)
+	}
+	if !s.isLegalAccepted() || acceptedLegalVersion(s.targetDir) != LegalVersion {
+		t.Fatal("renewed acceptance was not persisted")
+	}
+}
+
 func TestLegalGateBlocksThenAccepts(t *testing.T) {
 	withIsolatedConfig(t)
 	s := &Session{targetDir: t.TempDir(), thumbs: newThumbCache()}
