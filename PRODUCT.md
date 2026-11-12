@@ -1,6 +1,6 @@
 # Latch
 
-Latch is a local encrypted file vault with a Flutter phone app and a Go desktop
+Latch is a local file vault with opt-in encryption, a Flutter phone app and a Go desktop
 backup companion. The companion keeps a snapshot of the phone vault on the
 user's own computer. It supports receiving a backup, restoring to a phone,
 unlocking, browsing, previewing, verifying, and exporting readable files locally.
@@ -9,8 +9,10 @@ There are no accounts or cloud storage in this flow.
 ## Desktop companion brief
 
 The browser interface is served on localhost. A token-gated LAN receiver opens
-only for a pairing session. Transfers carry encrypted files over plain HTTP;
-the interface must explain that users should pair on trusted networks.
+only for a pairing session. Transfers preserve files as stored: hidden-only
+files stay unencrypted. The manifest and wrapped key bundle are encrypted;
+plain HTTP does not encrypt transport. Explain this before transfer and use
+trusted LAN/USB rather than public networks.
 
 The approved redesign covers the shared shell, full-page settings, and phone
 pairing, including responsive browser layouts. Settings is a sidebar destination,

@@ -1,10 +1,11 @@
 # Security Policy
 
-Latch keeps photos, videos, and documents in an encrypted local vault on the
-device. There is no account, no telemetry, and no cloud. The only network
-surfaces are the embedded PocketBase sync layer (local), the optional
-loopback-only `latchd` desktop companion, and user-configured WebDAV/SMB sync.
-We want to keep it that way.
+Latch hides photos, videos, and documents in a local Android vault. **File
+encryption is opt-in; hiding does not encrypt bytes.** There is no project-run
+backend, account system, or telemetry. Network surfaces include loopback
+PocketBase, the optional `latchd` desktop companion (loopback web UI plus a
+temporary LAN/USB pairing receiver), user-configured sync, and explicit update
+checks or external-app actions.
 
 ## Supported versions
 
@@ -32,7 +33,7 @@ private media.
   per-file key derivation) or in `flutter_secure_storage` usage
 - Bypasses of the decoy vault, auto-kill, or screenshot protection that expose
   vault contents
-- Unexpected network traffic (media must leave the device only encrypted)
+- Unexpected network traffic or misleading encryption/transfer disclosures
 - `latchd` issues: pairing token bypass, non-loopback exposure of the web UI,
   backup archive or manifest weaknesses
 - Vulnerabilities in the Android surface (exported components, `locker://`
@@ -47,12 +48,19 @@ private media.
 
 ## Design guarantees we aim to uphold
 
-- Secrets live only in `flutter_secure_storage` (Android Keystore); never in
-  logs, prefs, or error messages.
-- Vault contents are encrypted at rest; desktop backups and sync carry
-  ciphertext only.
+- Credentials and local key material use `flutter_secure_storage` (Android
+  Keystore). Never log secrets or put them in ordinary prefs/error messages.
+  Desktop backup intentionally exports a **wrapped**, not plaintext, master-key
+  bundle; restoring it requires the original credential. Decrypted exports are
+  explicitly outside the vault's protection.
+- File encryption follows each file's chosen policy. Desktop backup and WebDAV
+  preserve payloads **as stored**, including plaintext hidden-only files. Their
+  manifests are encrypted; this does not encrypt the payloads. Desktop pairing
+  uses token-gated HTTP, not TLS; tokens are access control, not transport
+  confidentiality. Use trusted LAN/USB; prefer HTTPS for WebDAV.
 - `latchd`'s web UI binds loopback only (`127.0.0.1:7800`); pairing is
   token-gated and exists only while a session is active.
-- No analytics, crash reporting, or cloud sync of any kind.
+- No analytics, external crash reporting, or project-operated cloud storage.
+  User-directed backup, sync, sharing, and exports may copy data off the device.
 
 Thank you for helping keep users safe.

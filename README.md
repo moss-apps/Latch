@@ -214,19 +214,26 @@ Full spec: [docs/desktop_backup.md](docs/desktop_backup.md).
 - JDK 17 and the Android SDK/NDK required by that Flutter toolchain; compile/target
   SDK and NDK versions come from Flutter's Gradle configuration.
 - Android 8.0 (API 26)+ device/emulator. The bundled PocketBase sidecar build
-  currently targets **arm64-v8a**; rebuilding it needs **Go 1.27+** and Make
+  currently targets **arm64-v8a**; rebuilding it needs **Go 1.27+**, Python 3 and Make
   (`pocketbase/go.mod`). `make pb-linux` is available for host-side development.
 - For release signing, configure your own untracked `android/key.properties`
   and keystore; never commit signing secrets or private symbol files.
 
 ```bash
-flutter pub get
-make pb                                      # rebuild ARM64 sidecar when needed
-flutter run                                  # debug
-flutter run -d <device-id>                   # specific device
-flutter build apk --release --obfuscate --split-debug-info=./build/symbols
+flutter pub get --enforce-lockfile
+make pb                                      # fresh, fingerprinted ARM64 sidecar
+make pb-verify                               # reads artifact; never runs it
+make android-release-aab                     # build + verify only; does NOT install
 flutter pub run flutter_launcher_icons       # regenerate icons (optional)
 ```
+
+Release builds reject a missing/stale PocketBase sidecar. Python 3 and Go are
+required for this read-only build gate. To verify an existing APK/AAB, run
+`python3 scripts/pocketbase_artifact.py verify <artifact-path>`.
+Do not use `flutter run`, install, uninstall, or clear app data on a live-vault
+device as a release test. Follow the approval/isolation preflight in the
+[stable release checklist](docs/stable_release_checklist.md); build success is
+not hardware acceptance or permission to publish.
 
 Checks: `dart format --output=none --set-exit-if-changed lib test`,
 `flutter analyze --no-pub`, and `flutter test --no-pub`. Building `latchd` is
@@ -262,6 +269,7 @@ are separate components/services rather than one screen. See
 - [WebDAV Sync](docs/local_server_sync.md): setup model, server requirements, conflicts, and key continuity
 - [Recently Deleted](docs/recently_deleted.md): retention, permanent deletion, backup, and sync policy
 - [Phase 5 Device Checks](docs/phase5_testing.md): recovery, accessibility, and gallery regression checklist
+- [Stable Release Checklist](docs/stable_release_checklist.md): no-install build checks, isolation, and recorded hardware sign-off
 - [Flick Integration Guide](docs/flick_integration.md): Flick playback handoff contract
 
 ## Contributing

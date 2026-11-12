@@ -2,6 +2,18 @@
 
 Notable changes to Latch.
 
+## Unreleased
+
+### Release safety
+- Corrected security/privacy disclosures: hiding is not encryption, backups
+  preserve payload encryption choices, and HTTP pairing is not TLS. Legal
+  version 2 requires renewed consent on mobile and desktop.
+- Clarified existing-vault restore as merge/replace-by-ID, not wholesale wipe.
+- Added fingerprinted native builds and release checks that reject missing or
+  stale PocketBase payloads, including verification inside APK/AAB artifacts.
+- Added an approval-gated, isolated hardware acceptance checklist. Build/check
+  commands do not install applications or authorize release publication.
+
 ## 0.19.1-beta.2
 
 ### Gallery File Browsing
