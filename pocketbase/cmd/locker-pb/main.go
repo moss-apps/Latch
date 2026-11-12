@@ -31,7 +31,15 @@ import (
 
 const tokenHeader = "X-Locker-Token"
 
+// Set by the build-only packaging script. The marker survives Android stripping
+// so an APK/AAB can be checked without installing or executing its sidecar.
+var buildSource = "LATCH_PB_SOURCE_SHA256:unverified:END"
+
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "--build-info" {
+		fmt.Println(buildSource)
+		return // no listener, migrations, or data directory
+	}
 	app := pocketbase.NewWithConfig(pocketbase.Config{HideStartBanner: true})
 
 	var httpAddr string

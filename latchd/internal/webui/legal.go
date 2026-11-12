@@ -30,7 +30,7 @@ import (
 
 // LegalVersion mirrors legal/version.txt at the repo root. Bump both
 // together — a mismatch fails TestLegalVersionMatchesCanonical.
-const LegalVersion = 1
+const LegalVersion = 2
 
 //go:embed legaldocs/*.md
 var legalDocsFS embed.FS

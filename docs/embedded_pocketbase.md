@@ -110,15 +110,15 @@ extracted files on disk.
 
 Dependency: a custom Go binary wrapping PocketBase core (`main.go`, ~150
 lines), plus `package:http` on the Dart side (it was NOT available
-transitively — added explicitly in P0). PocketBase pinned at `v0.39.10` in
+transitively — added explicitly in P0). PocketBase pinned at `v0.40.4` in
 `pocketbase/go.mod`.
 
 ## Security model
 
 | Asset | Where | Exposure if device is compromised |
 |---|---|---|
-| Media ciphertext | On-disk encrypted files (unchanged) | Safe. AES-256-GCM/CTR, per-file key from master key. PB never touches the bytes. |
-| Structured metadata (names, tags, albums, folders) | PB SQLite, app-encrypted columns | Safe: a dump yields ciphertext envelopes only, same as the current manifest. |
+| Media payloads | On-disk files (unchanged) | Encryption is opt-in: hidden-only files remain plaintext. Encrypted-file confidentiality depends on keeping the key secret. PB never touches the bytes. |
+| Structured metadata (names, tags, albums, folders) | PB SQLite, app-encrypted columns | Secret fields are ciphertext envelopes; confidentiality depends on keeping the key secret. Operational fields below remain readable. |
 | Indexable fields (`modified_at`, `deleted`, `blob_ref`) | PB SQLite, plaintext | Low risk: timestamps, booleans, content hashes. |
 | PB SQLite file | App-private storage | Readable on a rooted device; contains no plaintext secrets. |
 | Localhost PB API | Loopback only, not exposed to network | Co-resident apps could probe it; mitigated by ephemeral random port + auth token held in Dart memory. |
@@ -127,9 +127,11 @@ transitively — added explicitly in P0). PocketBase pinned at `v0.39.10` in
 
 Hard rules:
 
-- **Plaintext never leaves the app process.** PB stores ciphertext
-  envelopes for secret fields. The Go binary never holds the master key and
-  cannot decrypt anything it stores.
+- **Secret fields are encrypted before sending them to PB.** PB stores
+  ciphertext envelopes for those fields. The Go binary never holds the master
+  key and cannot decrypt them. This is a metadata-storage boundary, not a claim
+  that all media files are encrypted or that user-directed exports/transfers
+  cannot carry plaintext.
 - **Loopback only.** PB binds `127.0.0.1` on an ephemeral random port
   chosen at start — never `0.0.0.0`, never a fixed port. Dart learns the
   port from the binary's stdout. A random auth token (emitted by the Go
@@ -175,7 +177,7 @@ Phases are ordered by dependency. **P0 is a go/no-go gate.**
 | # | Task | Location | Status |
 |---|---|---|---|
 | P0.1 | Trivial Go HTTP server, cross-compile `GOOS=android GOARCH=arm64 CGO_ENABLED=0`; verify PocketBase's pure-Go `modernc.org/sqlite` backend means no CGO/NDK | `pocketbase/` (new Go module) | done — `modernc.org/sqlite` confirmed pure-Go; arm64 ELF (`/system/bin/linker64` interpreter) builds clean |
-| P0.2 | Bundle as `jniLibs/arm64-v8a/libpocketbase.so`; from a throwaway Dart screen locate via `applicationInfo.nativeLibraryDir`, `Process.start`, parse port | `android/app/src/main/jniLibs/` | done — `make pb` bundles (gitignored artifact); spike screen `lib/screens/pb_spike_screen.dart` + `pb` method channel in `MainActivity.kt`; `extractNativeLibs="true"` set. on-device run pending |
+| P0.2 | Bundle as `jniLibs/arm64-v8a/libpocketbase.so`; from a throwaway Dart screen locate via `applicationInfo.nativeLibraryDir`, `Process.start`, parse port | `android/app/src/main/jniLibs/` | build done — `make pb` bundles a fingerprinted gitignored artifact; `pb` method channel in `MainActivity.kt`; Gradle `jniLibs.useLegacyPackaging=true` enables extraction. on-device run pending; follow [approval/isolation preflight](stable_release_checklist.md) |
 | P0.3 | Hit `/api/health` over loopback, assert 200 | throwaway screen | done on host — 401 without token / 200 with. on-device run pending |
 
 **Verify:** the binary runs, serves HTTP on loopback, and Dart reaches it.
@@ -196,7 +198,7 @@ only the handshake — no superuser-creation JWT is ever printed.
 | P1.1 | `main.go` wrapping `pocketbase.NewWithConfig`: `--dir`, `--http=127.0.0.1:0` (ephemeral port printed to stdout), `--auth-token` (random, printed to stdout), `--hooks` | `pocketbase/cmd/locker-pb/main.go` | done — uses `app.Execute()` (not `Start()`) so PB's default `serve`/`superuser` commands (0.0.0.0:8090) are never registered; listener pre-bound in an OnServe hook for a race-free ephemeral port; `--auth-token` optional (random 256-bit default); `--hooks` dropped as unused |
 | P1.2 | JS migrations for `vault_files`, `albums`, `tags`, `folders` | `pocketbase/migrations/*.js` | done — `0001`–`0004`; embedded via `go:embed` (`migrations/embed.go`) and extracted to `<dir>/migrations` at every boot, so the `.so` is self-contained; `make pb-types` vendors the canonical editor `types.d.ts` (gitignored) |
 | P1.3 | Cross-compile per chosen ABI (open decision 2); strip symbols | `Makefile` | done — `make pb` (arm64-v8a only, `-ldflags "-s -w" -trimpath`, 32 MB); host `strip` can't read arm64 ELF so symbols are dropped at link time; `make pb-linux` + `make pb-types` targets too |
-| P1.4 | Pin PocketBase version in `go.mod` and document it | `pocketbase/go.mod` | done — `github.com/pocketbase/pocketbase v0.39.10` (+ `modernc.org/sqlite v1.55.0` indirect) |
+| P1.4 | Pin PocketBase version in `go.mod` and document it | `pocketbase/go.mod` | done — `github.com/pocketbase/pocketbase v0.40.4` (+ `modernc.org/sqlite v1.57.0` indirect), Go 1.27+; release artifact checks reject stale versions/sources |
 
 #### Findings from P0/P1 (review before P2)
 
@@ -210,9 +212,10 @@ only the handshake — no superuser-creation JWT is ever printed.
   `LOCKER_PB_PORT=<n>`, `LOCKER_PB_TOKEN=<64-hex>`, `LOCKER_PB_READY=1` on
   stdout, nothing else. Dart parses by prefix and must ignore any other
   lines defensively.
-- **`extractNativeLibs="true"` is required.** Modern AGP keeps `.so` files
+- **Native extraction is required.** Modern AGP can keep `.so` files
   unextracted inside the APK mount (dlopen-able, typically not exec-able);
-  the sidecar needs exec, so the manifest now forces extraction.
+  the sidecar needs exec, so Gradle's `jniLibs.useLegacyPackaging=true` forces
+  extraction (replacing the old manifest attribute on the current toolchain).
 - **Collection rules are `""` (public) by design.** The token gate at the
   HTTP layer is the only access control; PB-level rules would only block
   our own token-bearing client (no user accounts in the embedded role).
@@ -257,10 +260,11 @@ sidecar. One happy-path test per phase lives in `test/pb_runtime_test.dart`
 
 ### P5 — Polish (deferred)
 
-Status: deferred entirely. PB-vs-legacy toggle in settings, recovery UI
-if the binary fails to start, size optimization (`upx` / symbol strip), CI
-for the Go cross-compile, foreground Service for background PB survival.
-Ship P4 first; build P5 only if the feature gets used.
+PB-vs-legacy settings, recovery UI, further size optimization and a foreground
+Service remain deferred. Native cross-compile and APK provenance CI checks were
+added in November 2026; they do not replace the pending Android execution gate.
+See [stable release checks](stable_release_checklist.md) before any hardware test
+or release decision.
 
 ## Files
 

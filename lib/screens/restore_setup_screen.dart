@@ -8,6 +8,7 @@ import '../services/desktop_link/usb_link.dart';
 import '../services/encryption_service.dart';
 import '../services/vault_service.dart';
 import '../themes/app_colors.dart';
+import '../widgets/pairing_qr_scanner.dart';
 import 'auth_method_selection_screen.dart';
 
 /// Restore-before-setup (P6.3, mode 2). Fresh install, no vault yet: the user
@@ -77,7 +78,11 @@ class _RestoreSetupScreenState extends State<RestoreSetupScreen> {
 
   void _enterScan() {
     _teardownScanner();
-    _scanner = MobileScannerController();
+    _scanner = MobileScannerController(
+      formats: const [BarcodeFormat.qrCode],
+      cameraResolution: const Size(1920, 1080),
+      autoZoom: true,
+    );
     setState(() => _mode = _Mode.scan);
   }
 
@@ -354,36 +359,44 @@ class _RestoreSetupScreenState extends State<RestoreSetupScreen> {
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-            children: _buildBody(),
-          ),
+          child: _buildBody(),
         ),
       ),
     );
   }
 
-  List<Widget> _buildBody() {
+  Widget _buildBody() {
     switch (_mode) {
       case _Mode.choose:
-        return _chooseChildren();
+        return _scrollBody(_chooseChildren());
       case _Mode.scan:
-        return _scanChildren();
+        return PairingQrScanner(
+          controller: _scanner!,
+          onDetect: _onDetect,
+          onManual: _enterManual,
+        );
       case _Mode.manual:
-        return _manualChildren();
+        return _scrollBody(_manualChildren());
       case _Mode.usb:
-        return _usbChildren();
+        return _scrollBody(_usbChildren());
       case _Mode.checking:
-        return _busyChildren('Checking the code…');
+        return _scrollBody(_busyChildren('Checking the code…'));
       case _Mode.confirm:
-        return _confirmChildren();
+        return _scrollBody(_confirmChildren());
       case _Mode.restoring:
-        return _restoringChildren();
+        return _scrollBody(_restoringChildren());
       case _Mode.done:
-        return _doneChildren();
+        return _scrollBody(_doneChildren());
       case _Mode.error:
-        return _errorChildren();
+        return _scrollBody(_errorChildren());
     }
+  }
+
+  Widget _scrollBody(List<Widget> children) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+      children: children,
+    );
   }
 
   Widget _sectionTitle(String title) {
@@ -477,7 +490,7 @@ class _RestoreSetupScreenState extends State<RestoreSetupScreen> {
       const SizedBox(height: 24),
       _sectionTitle('What happens'),
       _hint(
-        'The encrypted backup is copied to this phone, and its unlock key '
+        'The backup is copied to this phone, and its wrapped unlock key '
         'becomes this device\'s vault key once you confirm it with the '
         'ORIGINAL vault password. You then choose how to unlock the vault '
         'here (PIN, password or biometrics) — that choice replaces the '
@@ -485,35 +498,10 @@ class _RestoreSetupScreenState extends State<RestoreSetupScreen> {
       ),
       const SizedBox(height: 16),
       _hint(
-        'Plain HTTP on your local network. Only restore on networks you '
-        'trust, and close the session on your computer when you are done.',
+        'Plain HTTP, not TLS. Hidden-only files remain unencrypted '
+        'during transfer. Only restore over trusted LAN or USB, and '
+        'close the session on your computer when you are done.',
       ),
-    ];
-  }
-
-  List<Widget> _scanChildren() {
-    return [
-      _sectionTitle('Scan'),
-      _hint('Hold your camera up to the QR code on the computer screen.'),
-      const SizedBox(height: 16),
-      ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: SizedBox(
-          height: 240,
-          width: double.infinity,
-          child: MobileScanner(
-            controller: _scanner,
-            onDetect: _onDetect,
-            errorBuilder: (context, error) => _ScannerError(
-              message: error.errorCode.name,
-              onManual: _enterManual,
-            ),
-          ),
-        ),
-      ),
-      const SizedBox(height: 8),
-      _textAction(
-          label: 'Type the address and code instead', onTap: _enterManual),
     ];
   }
 
@@ -742,8 +730,6 @@ class _RestoreSetupScreenState extends State<RestoreSetupScreen> {
   List<Widget> _doneChildren() {
     final report = _report;
     return [
-      _sectionTitle('Done'),
-      const SizedBox(height: 16),
       Icon(Icons.check_circle, color: context.accentColor, size: 44),
       const SizedBox(height: 12),
       Center(
@@ -806,43 +792,5 @@ class _RestoreSetupScreenState extends State<RestoreSetupScreen> {
       return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
     }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
-  }
-}
-
-/// Camera-unavailable fallback inside the scanner box.
-class _ScannerError extends StatelessWidget {
-  const _ScannerError({required this.message, required this.onManual});
-
-  final String message;
-  final VoidCallback onManual;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: Theme.of(context).scaffoldBackgroundColor,
-      padding: const EdgeInsets.all(16),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.no_photography, size: 32, color: context.textTertiary),
-            const SizedBox(height: 8),
-            Text(
-              'Camera unavailable ($message).',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 13,
-                color: context.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: onManual,
-              child: const Text('Type the address and code instead'),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

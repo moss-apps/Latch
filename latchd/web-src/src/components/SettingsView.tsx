@@ -51,7 +51,7 @@ export function SettingsView({ stats, unlocked, hasLocal, onPairAgain, onUnlock 
     setVerify({ kind: "busy", text: "Checking every file against its stored hash…" })
     try {
       const data = await api<{ ok: boolean; files: number; error?: string }>("/api/verify")
-      setVerify(data.ok ? { kind: "ok", text: `All ${data.files} encrypted files match their hashes.` } : { kind: "err", text: `Verification failed: ${data.error || "hash mismatch"}. Back up from your phone again to replace the damaged file.` })
+      setVerify(data.ok ? { kind: "ok", text: `All ${data.files} files match their hashes.` } : { kind: "err", text: `Verification failed: ${data.error || "hash mismatch"}. Back up from your phone again to replace the damaged file.` })
     } catch (err) {
       setVerify({ kind: "err", text: `Couldn't verify the backup: ${(err as Error).message}. Unlock the vault and try again.` })
     }
@@ -85,13 +85,13 @@ export function SettingsView({ stats, unlocked, hasLocal, onPairAgain, onUnlock 
 
     <section aria-labelledby="backup-settings" className="settings-section">
       <h2 id="backup-settings" className="text-lg font-bold">Backup & export</h2>
-      <SettingRow title="Local backup" description={hasLocal ? `${stats.files} encrypted files · ${unlocked ? "Vault unlocked" : "Vault locked"}` : "No backup on this computer yet."}>
+      <SettingRow title="Local backup" description={hasLocal ? `${stats.files} files · ${unlocked ? "Vault unlocked" : "Vault locked"}` : "No backup on this computer yet."}>
         <div className="text-sm text-text2"><p className="break-all">{stats.dir || "Backup location unavailable"}</p><p className="mt-1 text-xs">{stats.lastBackup ? `Last backup: ${fmtDate(stats.lastBackup)}` : "No completed backup yet"}</p></div>
       </SettingRow>
-      <SettingRow title="Phone backup" description="Receive an encrypted snapshot from your phone, or restore this computer's backup to it.">
+      <SettingRow title="Phone backup" description="Back up or restore your phone. Files keep their encryption state; hidden-only files remain unencrypted.">
         <Button variant="outline" className="h-11 px-4" onClick={onPairAgain}><Mi n="smartphone" className="text-[18px]" />Back up from phone</Button>
       </SettingRow>
-      <SettingRow title="Verify backup" description="Check that the encrypted files on disk are intact.">
+      <SettingRow title="Verify backup" description="Check stored file hashes for damage. This does not verify that files are encrypted.">
         <Button variant="outline" className="h-11 px-4" disabled={!unlocked || verify.kind === "busy"} onClick={runVerify}><Mi n="verified" className="text-[18px]" />{verify.kind === "busy" ? "Verifying…" : "Verify backup"}</Button>
         <div className="mt-2 break-words"><StatusLine kind={verify.kind} text={verify.text} /></div>
       </SettingRow>

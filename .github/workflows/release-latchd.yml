@@ -99,9 +99,11 @@ jobs:
           body: |
             ## Desktop companion (latchd)
 
-            Host Latch Web on your desktop — pairing QR plus encrypted vault
-            backup over Wi-Fi or USB. The web UI binds loopback only; nothing
-            leaves your machine.
+            Host Latch Web on your desktop — pairing QR plus vault backup over
+            Wi-Fi or USB. Manifests are encrypted; file payloads keep their
+            existing encryption state, including plaintext hidden-only files.
+            The web UI binds loopback only. Pairing uses token-gated HTTP, not
+            TLS: use trusted LAN or USB.
 
             **Linux**
 
@@ -129,7 +131,7 @@ jobs:
 
             **Latch app:** public on
             [Google Play](https://play.google.com/store/apps/details?id=com.mossapps.locker) —
-            the release no longer attaches an APK.
+            check the store or this release's assets for Android availability.
 
   # Post-release smoke: download the shipped asset like a user would,
   # checksum it, and prove `serve` answers on the loopback UI. Runs the

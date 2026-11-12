@@ -1,10 +1,11 @@
 # Privacy Policy
 
-**Last updated: May 4, 2026**
+**Version 2 — Last updated: 2026-11-12**
 
-Latch is built on-device-first. It does not collect, store, transmit, or
-share any personal information. Everything you do in Latch stays on your
-device, and your vault key never leaves it.
+Latch is on-device-first. The project operates no account service or hosted
+vault and collects no telemetry. Your files stay local unless you choose an
+export, share, desktop backup/restore, or server sync. Those actions can copy
+file contents and metadata to destinations you control or select.
 
 ## Data we do not collect
 
@@ -17,22 +18,25 @@ device, and your vault key never leaves it.
 - No contacts, messages, or call logs
 - No browsing history or app usage data
 
-## Camera access
+## Camera and microphone access
 
-Requested only when you scan a QR code or take a photo to import into your
-vault. Never used in the background; captured media is stored locally and
-encrypted, never transmitted.
+Camera access is used to scan pairing QR codes or capture media you choose to
+import. Microphone access is used for audio/video recording you request.
+Captured files follow your encryption choices and may later be transferred
+through the explicit actions described below.
 
 ## Media & files
 
-Files you import are AES-256 encrypted and stored locally. Latch never
-uploads, scans, analyzes, shares, or accesses your files without your
-explicit action.
+Hiding is the default; **file encryption is opt-in**, globally or per file.
+Hidden-only files retain readable bytes on disk. Files you choose to encrypt
+use AES-256. Hiding, a locked interface, and an encrypted manifest do not make
+an unencrypted file's contents encrypted.
 
 ## Storage permission
 
-Required to read files you want to vault and to write encrypted files to
-your device — used only on explicit import/export.
+Used to read files you choose to import and to write, restore, export, or
+remove files through the app. Source deletion and permanent deletion require
+your chosen settings/actions; flash-storage erasure cannot be guaranteed.
 
 ## Biometric authentication
 
@@ -41,18 +45,32 @@ success/failure signal and never stores or accesses your biometric data.
 
 ## Third-party services
 
-Latch integrates with no analytics, advertising, or tracking services. The
-only external connections are:
+Latch integrates with no analytics, advertising, or tracking services.
+User-directed connections can include:
 
-- Play Store update check (optional, user-triggered)
+- Desktop backup/restore over LAN or USB, and a WebDAV server you configure
+- App-store or GitHub update/release checks and links
+- External apps you choose for sharing, export, playback, or credential filling
 - Ko-fi donation link (optional, opened in your browser)
 
-Neither transmits personal data from Latch.
+These destinations may receive the content or connection information needed
+for your action and are subject to their own policies. We do not operate them.
 
-## Local backups
+## Backups, sync, and keys
 
-Backup files are saved to a location you choose on your device. Latch does
-not upload backups anywhere — you are responsible for securing them.
+- Desktop backups and WebDAV sync encrypt the manifest but transfer file
+  payloads **as stored**. Hidden-only files remain unencrypted at the destination.
+- Desktop pairing uses token-gated **HTTP, not TLS**. The token does not encrypt
+  network traffic. Use trusted LAN/USB, especially for hidden-only files. Prefer
+  HTTPS for WebDAV; HTTP is unsuitable for untrusted networks.
+- Desktop backup exports the master key only as a credential-wrapped key bundle;
+  a fresh-install restore needs the original credential. WebDAV does not upload
+  that key bundle. Decryption temporarily uses keys in app/companion memory.
+- ZIP backup and decrypted export write readable copies to your chosen location.
+  Protect those copies and any hidden-only backup files yourself.
+- New backups exclude Recently Deleted. Permanent local deletion does not erase
+  earlier backups or retained remote blobs. Uninstalling/clearing app data removes
+  the local vault and key material; keep an independently verified backup.
 
 ## Children's privacy
 

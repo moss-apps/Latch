@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// again. Stored in SharedPreferences so it survives app updates but resets
 /// on a full uninstall — matching user expectations on mobile.
 class LegalConsentService {
-  static const int legalVersion = 1;
+  static const int legalVersion = 2;
 
   static const String _acceptedVersionKey = 'legal_accepted_version';
 

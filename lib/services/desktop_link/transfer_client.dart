@@ -10,8 +10,8 @@ import '../encryption_service.dart';
 import '../sync_profile_service.dart';
 import '../sync_service.dart';
 
-/// Immutable snapshot of the encrypted vault, ready to push to a latchd
-/// pairing receiver. Blob bytes are the on-disk encrypted vault files,
+/// Immutable snapshot of the vault, ready to push to a latchd
+/// pairing receiver. Blob bytes are the on-disk files, as stored,
 /// keyed by their sha256 hex digest — the same semantics as the sync push
 /// phase ([SyncService]) — so manifest content hashes always match the
 /// pushed blobs. Files missing on disk keep their stored remoteHash and
@@ -28,13 +28,13 @@ class DesktopVaultSnapshot {
   /// Live (non-deleted) files represented by the manifest.
   final int fileCount;
 
-  /// Total ciphertext size of [blobs].
+  /// Total as-stored size of [blobs], including hidden-only plaintext.
   final int totalBytes;
 
   /// Encrypted manifest bytes (RemoteManifest v2, GCM envelope).
   final Uint8List manifestBytes;
 
-  /// sha256 hex digest -> encrypted file bytes.
+  /// sha256 hex digest -> as-stored file bytes (not always encrypted).
   final Map<String, Uint8List> blobs;
 
   /// Wrapped-key bundle for the desktop, or null for legacy unwrapped
@@ -164,7 +164,7 @@ class DesktopUnreachableException implements Exception {
   String toString() => 'desktop unreachable: $cause';
 }
 
-/// Pushes an encrypted vault snapshot to a latchd pairing receiver.
+/// Pushes a vault snapshot with as-stored payloads to a latchd pairing receiver.
 ///
 /// Protocol (desktop-backup spec, flipped architecture): the desktop hosts
 /// a token-gated HTTP receiver while its pairing window is open. The phone

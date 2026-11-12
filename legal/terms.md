@@ -1,6 +1,6 @@
 # Latch Terms and Conditions
 
-**Version 1 — Last updated: 2026-09-16**
+**Version 2 — Last updated: 2026-11-12**
 
 These Terms govern your use of Latch (mobile app) and latchd / Latch Web (desktop companion). By using the software you accept these Terms plus the EULA (`eula.md`) and Privacy Policy (`privacy.md`).
 
@@ -18,18 +18,19 @@ We collect nothing. No analytics, no telemetry, no crash reports sent externally
 
 ## 4. Security properties and limits
 
-- Vault contents are AES-256 encrypted with keys derived from your credential (Argon2id/PBKDF2 + AES-GCM unwrap, per-file keys).
-- The desktop transfer moves ciphertext only; the vault password is never sent to the phone or written to disk by latchd (memory only).
+- Hiding is the default; file encryption is opt-in. Hidden-only files remain readable on disk. Encrypted files use AES-256 with per-file keys; the master key is wrapped using a credential-derived key (Argon2id/PBKDF2 and AES-GCM unwrap).
+- Desktop backup and WebDAV transfer file payloads as stored, including plaintext hidden-only files. Manifests are encrypted. Desktop backup also exports a wrapped master-key bundle, not the plaintext key; restoring onto a fresh install requires the original credential. The companion uses your entered vault password in memory, not as a saved plaintext credential.
 - Pairing uses a per-session 256-bit token and closes on completion, cancel, or 5-minute idle timeout. The web UI binds loopback (`127.0.0.1`) only; only the pairing receiver touches the LAN, and only while a session is active.
-- Plain HTTP on the LAN is used with an explicit warning (same stance as WebDAV sync). The token gates the session; encryption gates the content.
+- Desktop pairing uses plain HTTP, not TLS, with an explicit warning. The token gates access, not network confidentiality; hidden-only file contents can be exposed. Use trusted LAN/USB and prefer HTTPS for WebDAV.
 - No software is perfectly secure. A compromised OS, a stolen unlocked device, or a weak password can defeat any local vault. Use a strong password, keep your OS updated, and lock your devices.
 
 ## 5. Backups, restore, export
 
-- Backup is a full encrypted snapshot (manifest + content-addressed blobs + key bundle). A backup is complete only if the manifest decrypts and every referenced blob verifies.
-- Restoring over an existing vault replaces it wholesale — confirm explicitly in the UI.
+- Desktop backup contains an encrypted manifest, as-stored content-addressed payloads, and a wrapped key bundle. Verify the manifest and every referenced blob, and test restore with the original credential. New backups exclude Recently Deleted; folder/album definitions and saved smart collections are not included.
+- Existing-vault restore keeps the current key, replaces matching file IDs and adds new entries; unrelated local entries remain. A backup from another key cannot be merged this way. Fresh-install restore installs the received wrapped key after credential verification. Missing blobs are reported as skipped, not restored.
 - "Export decrypted" writes plaintext to `~/latchd-exports/<folder>` (desktop) or your chosen location (mobile ZIP export). That output is no longer protected by Latch.
 - You are responsible for the confidentiality, integrity, and retention of backup media.
+- Local deletion does not erase older backups or retained server blobs. Uninstalling or clearing app data removes the local vault and keys; do not use a live vault for reinstall/clear-data testing.
 
 ## 6. Updates
 

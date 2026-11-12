@@ -247,7 +247,7 @@ export function PairingView({ hasLocal, unlocked, visible, onEnterMain, backLabe
 
   return <div className="utility-page max-w-[1040px]">
     <Button variant="ghost" className="mb-4 -ml-3 h-11" onClick={() => callbacks.current.onEnterMain(callbacks.current.unlocked)}><Mi n="chevron_left" className="text-[20px]" />{backLabel}</Button>
-    <header><h1 className="text-[26px] font-bold tracking-tight">Phone backup</h1><p className="mt-1.5 max-w-[65ch] text-sm leading-relaxed text-text2">{restore ? "Restore the encrypted snapshot on this computer to your phone." : "Keep an encrypted snapshot of your phone vault on this computer."}</p></header>
+    <header><h1 className="text-[26px] font-bold tracking-tight">Phone backup</h1><p className="mt-1.5 max-w-[65ch] text-sm leading-relaxed text-text2">{restore ? "Restore this computer's backup to your phone." : "Keep a backup of your phone vault on this computer."} Files keep their existing encryption state; hidden-only files remain unencrypted.</p></header>
 
     <div role="tablist" aria-label="Session mode" className="mt-6 flex border-b border-divider">
       {([["push", "Receive backup"], ["restore", "Restore to phone"]] as const).map(([value, label]) => <button key={value} id={`pair-tab-${value}`} type="button" role="tab" aria-selected={mode === value} aria-controls="pair-session" tabIndex={mode === value ? 0 : -1} disabled={changing || busy || (value === "restore" && !hasLocal)} onClick={() => { if (mode !== value) startSession(value, true) }} onKeyDown={(e) => {
@@ -310,7 +310,7 @@ export function PairingView({ hasLocal, unlocked, visible, onEnterMain, backLabe
     </div>
 
     <footer className="mt-8 border-t border-divider pt-5">
-      <p role="note" className="flex max-w-[75ch] items-start gap-2.5 text-xs leading-relaxed text-text2"><Mi n="warning" className="mt-0.5 shrink-0 text-[16px]" /><span>This session uses plain HTTP on your local network. Files stay encrypted and the pairing token gates access. Only connect on networks you trust. The session closes after five idle minutes{restore ? "." : " or when the backup finishes."}</span></p>
+      <p role="note" className="flex max-w-[75ch] items-start gap-2.5 text-xs leading-relaxed text-text2"><Mi n="warning" className="mt-0.5 shrink-0 text-[16px]" /><span>This session uses HTTP, not TLS. The pairing token gates access but does not encrypt traffic. Hidden-only files can cross the network as plaintext. Use trusted LAN or USB. The session closes after five idle minutes{restore ? "." : " or when the backup finishes."}</span></p>
       <Button variant="ghost" className="mt-3 -ml-3 h-11 px-3 text-text2" disabled={!active || changing} onClick={cancelSession}>Cancel session</Button>
     </footer>
   </div>

@@ -513,7 +513,7 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                   style: TextStyle(fontFamily: 'GoogleSansFlex'),
                 ),
                 subtitle: Text(
-                  'Encrypted backup to a WebDAV server (NAS/cloud)',
+                  'Back up as-stored files to your WebDAV server',
                   style: TextStyle(
                     fontFamily: 'GoogleSansFlex',
                     fontSize: 12,
@@ -538,7 +538,7 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                   style: TextStyle(fontFamily: 'GoogleSansFlex'),
                 ),
                 subtitle: Text(
-                  'Send encrypted backup to a computer on your Wi-Fi',
+                  'Back up as-stored files to your computer',
                   style: TextStyle(
                     fontFamily: 'GoogleSansFlex',
                     fontSize: 12,

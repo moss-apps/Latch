@@ -8,13 +8,14 @@ JSON or embedded PocketBase), the manual *decrypted* ZIP export
 missing is the case the 2026-09-05 incident exposed: a direct, restorable
 backup of the whole vault onto storage the user physically controls — an
 external USB drive or a desktop machine — without a server to set up and
-without plaintext ever leaving the phone in transit.
+without a project-run service. File payloads retain their on-device encryption
+state: **hidden-only files are plaintext**, including during HTTP transfer.
 
 This document specifies **P6**: a desktop companion process (`latchd`)
 that the phone pairs with over Wi-Fi or USB. **The companion creates the
 pairing credentials** — it runs a token-gated LAN receiver while a pairing
 session is active and shows a QR code in its web UI; the phone scans (or
-enters the address + code by hand) and **pushes** the encrypted snapshot
+enters the address + code by hand) and **pushes** the snapshot
 to it. The companion stores it on any local path, verifies it, and can
 restore it back — including into a fresh install that has no vault set up
 yet. The companion's primary interface is a web UI served on the desktop's
@@ -34,23 +35,24 @@ Relationship to the existing paths:
 | Path | Sees plaintext | Restorable | Needs server setup | Survives app uninstall |
 |---|---|---|---|---|
 | `BackupService` ZIP (kept, unchanged) | Yes — on local export | Manual, by hand | No | Yes (wherever written) |
-| WebDAV sync | No | Yes | Yes (WebDAV host) | Yes |
-| **Desktop backup (this doc)** | **No — in transit** | **Yes, one click** | No | Yes |
+| WebDAV sync | Hidden-only payloads; use HTTPS for transport | With the same master key | Yes (WebDAV host) | Remote data survives; key continuity required |
+| **Desktop backup (this doc)** | **Hidden-only payloads, including in HTTP transit** | **With a valid backup and original credential** | No | Yes; verify before relying on it |
 
 ## Goals
 
-- One-click encrypted full-vault backup from the phone to a
+- Back up active file contents/metadata and a wrapped key bundle from the phone to a
   user-chosen directory on the desktop or an external drive mounted on it
   (e.g. `/run/media/…/backups`).
 - One-click restore, including the disaster case: fresh install after an
   uninstall, no vault configured yet.
-- Ciphertext-only transfer; the companion decrypts locally, only after
-  the user enters the vault password in its UI.
+- Preserve file encryption choices during transfer. Encrypt the manifest;
+  send file payloads as stored. The companion decrypts encrypted files locally
+  after the user enters the vault credential in its UI.
 - Optional explicit "export decrypted" in the companion, writing readable
   files to the target directory (decryption happens on the desktop, after
-  transfer — plaintext still never crosses the network).
+  transfer). Hidden-only files already contain plaintext before export.
 - Wi-Fi and USB transports, same pairing model.
-- No server setup, no accounts, no cloud.
+- No server setup, no project-run accounts or cloud storage.
 
 ## Non-goals
 
@@ -64,8 +66,8 @@ Relationship to the existing paths:
 - **Decoy vault.** Out of scope, per the standing rule in both prior docs.
 - **Remote access.** The companion web UI binds loopback only; the pairing
   receiver binds the LAN only while a session is active and requires a
-  256-bit session token. Neither is reachable from outside the LAN/USB
-  pair.
+  256-bit session token. Do not expose either service publicly or configure
+  port forwarding; access still depends on the host's routing/firewall.
 - **Incremental snapshots / retention management.** Content addressing
   already avoids re-transferring unchanged blobs; dated-snapshot retention
   and pruning are P6.5.
@@ -74,17 +76,17 @@ Relationship to the existing paths:
 
 | Asset | Where | Exposure if the backup drive / desktop is compromised |
 |---|---|---|
-| Media ciphertext | Backup dir (`ab/cd/<sha256>.enc`) | Safe. AES-256-GCM/CTR, per-file keys from the master key. Identical blobs to the sync layout. |
-| Manifest (names, albums, tags, folders) | Backup dir, `manifest.enc` | Safe. Encrypted with the vault master key (same envelope as the sync manifest, v2). |
-| Wrapped master key + Argon2id salt/IV + KDF params | Backup dir, `keybundle.json` | Safe by construction: it is the same material `flutter_secure_storage` holds on the phone; unwrapping still requires the vault password (Argon2id + AES-GCM unwrap). Losing the drive loses nothing but ciphertext. |
+| File payloads | Backup dir (`ab/cd/<sha256>.enc`) | As stored: encrypted files need the key; hidden-only files are readable. The `.enc` suffix is not proof of encryption. |
+| Manifest (file metadata and collection references, not collection definitions) | Backup dir, `manifest.enc` | Encrypted with the vault master key (sync manifest v2). Compromise of an unlocked device/key can expose it. |
+| Wrapped master key + Argon2id salt/IV + KDF params | Backup dir, `keybundle.json` | Unwrapping requires the original credential. Protect this bundle against offline credential guessing; do not assume a lost backup drive contains only ciphertext. |
 | Pairing token | Companion memory + web UI QR | One-time, per-session, regenerates on every pairing session. A stolen old token is useless once the session stops (completion, cancel, or idle timeout). |
 | Vault password | Typed in the companion web UI; held in memory only | Never written to disk by the companion; never sent to the phone. |
 
 Hard rules:
 
-- **Plaintext never crosses the network.** Both directions move
-  ciphertext only; decryption happens in the companion process after
-  transfer. This extends the standing rule in `local_server_sync.md`.
+- **Never claim hiding is encryption.** Both directions preserve payload bytes.
+  Hidden-only files can cross HTTP as plaintext. Encrypt files first when that
+  protection is required; backing them up does not add encryption.
 - **The PB sidecar stays loopback-only.** The pairing receiver is a
   separate Go listener, not the PocketBase process; the
   `embedded_pocketbase.md` rule ("never `0.0.0.0`") applies to the sidecar
@@ -95,8 +97,8 @@ Hard rules:
   long-running.
 - **Plain HTTP on the LAN is allowed only with an explicit warning** in
   both UIs (same stance as WebDAV sync: warn, never silently downgrade).
-  v1 has no per-pair TLS; the token gates the session, the crypto gates
-  the content.
+  v1 has no per-pair TLS. The token gates access, not network confidentiality;
+  a network observer may read hidden-only payloads and capture the token.
 - **The companion web UI binds `127.0.0.1` only.** The UI is not
   reachable from other machines; only the token-gated receiver is, and
   only while a session is active.
@@ -141,7 +143,7 @@ verbatim.
 <target>/latch-backup/
   manifest.enc        # sync-manifest v2 envelope: IV + AES-GCM(master key)
   keybundle.json      # { wrappedKey, wrapSalt, wrapIv, argon2: {t, m, p} }
-  ab/cd/<sha256>.enc  # verbatim vault blobs, content-addressed by ciphertext
+  ab/cd/<sha256>.enc  # verbatim vault bytes, content-addressed as stored
 ```
 
 A backup is "complete" iff `manifest.enc` decrypts, its GCM tag verifies,
@@ -209,7 +211,7 @@ Receiver endpoints (all bearer-gated; anything else is 401):
 |---|---|---|
 | `GET /info` | phone→desktop | `{app, protocol, hasManifest, hasKeybundle, hashes[]}` — the blob digests the desktop already holds, so the phone can diff |
 | `PUT /keybundle` | push | Install/refresh key bundle JSON (validated shape) |
-| `PUT /blob/<sha256>` | push | One ciphertext blob, streamed; sha256 checked before it touches disk (422 on mismatch) |
+| `PUT /blob/<sha256>` | push | One as-stored blob; sha256 checked before publication (422 on mismatch) |
 | `PUT /manifest` | push | Completion signal: atomic swap, then verify + reap; 200 only if the resulting backup verifies |
 | `POST /usb-hello` | phone→desktop (USB) | Tap-to-approve handshake: `{device, mode}` → pending until the desktop allows, then the session token. Loopback-only; anything else gets a bare 404 |
 
@@ -243,13 +245,15 @@ bearer-gated). The UI must not assume endpoints beyond this table.
 
 ## Sync model — none; snapshot semantics
 
-- A backup is a **full snapshot**: the phone builds the manifest from the
+- A backup is a snapshot of **active files**: the phone builds the manifest from the
   live vault, diffs its content hashes against the desktop's `/info`
   hash list, transfers only missing/changed blobs (content addressing
   makes this free), then PUTs the manifest last. Semantically it is
-  always "the whole vault as of now".
-- No tombstones, no LWW, no conflict UI. Restoring a snapshot over an
-  existing vault replaces it wholesale (explicit confirmation in the UI).
+  the active file contents/metadata and key bundle, not Recently Deleted,
+  folder/album definitions, saved smart collections, or all app settings.
+- No LWW or conflict UI. Existing-vault restore replaces entries by file ID,
+  adds new entries, and leaves unrelated local entries intact. It is not a
+  wholesale replacement or a way to merge independently keyed vaults.
 - Deleted-on-phone since last backup simply disappears from the new
   snapshot; superseded blobs are reaped from the backup dir during the
   receiver's post-manifest `verify` pass (they are unreferenced after
@@ -261,10 +265,11 @@ Two modes, same data:
 
 1. **Into an existing unlocked vault** (device-to-device or undo): the
    desktop opens a restore session; the phone pulls blobs + manifest,
-   imports manifest v2 entries through the same path as the WebDAV pull
-   (GCM-tag + `contentHash` verification per file), and commits. The
-   existing master key is kept; entries whose blobs are absent from the
-   snapshot are left untouched.
+   decrypts the manifest and checks each available blob's `contentHash`
+   before import. File decryption happens when opened; the transfer hash
+   check alone is not per-file authenticated decryption. The existing master
+   key is kept. Matching file IDs are replaced, new IDs added, and local IDs
+   absent from the manifest retained. Missing blobs are reported as skipped.
 2. **Restore-before-setup** (the incident case): a fresh install, no
    vault yet. First-run offers "Restore from desktop backup"; the user
    scans the desktop's QR (or enters address + code), the phone pulls
@@ -337,6 +342,11 @@ Makefile                               + latchd / clean-latchd targets   [P6.2]
   warning UX pattern (`sync_settings_screen.dart`).
 
 ## Verification discipline
+
+**Hardware sign-off is not recorded yet.** Follow the approval and isolation
+preflight in [Stable release checks](stable_release_checklist.md) before any
+installation, upgrade, restore, or wipe. Do not test against a live phone vault
+or an existing desktop backup. Build-only checks do not install either app.
 
 Per the repo's test rules: no per-method suites. Per phase one runnable
 check:

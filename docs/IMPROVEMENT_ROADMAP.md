@@ -1,5 +1,9 @@
 # Latch Product Improvement Roadmap
 
+Implementation completion is **not stable-release approval**. See the
+[stable release checklist](stable_release_checklist.md) for build provenance,
+the November 2026 policy corrections, and pending isolated hardware sign-off.
+
 This roadmap turns the product review into phased, actionable work. Phases are ordered to reduce data-loss and security risks before expanding the feature set. The initial source and documentation review was performed on 2026-10-02; subsequent implementation dates and automated checks are recorded below. Physical-device verification is separate and is not implied by automated checks.
 
 ## Status legend

@@ -6,7 +6,7 @@ level catches a different class of breakage.
 
 ## 0. Prerequisites
 
-- Go (any recent version; the wrapper is pure-Go, no NDK)
+- Go 1.27+ (see `pocketbase/go.mod`; pure-Go, no NDK), Python 3 and Make
 - Flutter SDK
 - For device tests: an **arm64** Android phone/emulator with USB debugging
 - Package id: `com.mossapps.locker` (needed for `adb shell run-as`)
@@ -76,23 +76,30 @@ Kill with Ctrl-C when done; delete `/tmp/opencode/locker-pb` to reset.
 
 ## 3. On-device (the real gate)
 
-This is the check the plan still flags as outstanding: the sidecar has
-never run on real hardware.
+Recorded physical-device sign-off is still outstanding. Host checks do not
+prove Android execution, migration, or upgrade safety. Follow the approval and
+isolation preflight in [Stable release checks](stable_release_checklist.md).
+Do not install, clear data, or uninstall on a live-vault device for this test.
 
-### 3a. Build + install
+### 3a. Build only; installation requires separate approval
 
 ```sh
-make pb                      # cross-compile → jniLibs/arm64-v8a/libpocketbase.so (~32 MB)
-flutter run --release        # or --profile; debug works too
+flutter pub get --enforce-lockfile
+make android-release-aab     # rebuild, fingerprint and verify packaged native code
 ```
 
-`make pb` must run before the build — the `.so` is a bundled artifact
-(gitignored). If it's missing, `PocketBaseRuntime.start()` throws
-"PocketBase binary missing" and the app silently stays on the legacy store.
+This produces an AAB, not an installation. `make pb` builds the gitignored
+sidecar atomically with a source fingerprint. Direct release builds fail if it
+is missing or stale; `make pb-verify` checks it without running it. Verify a
+derived APK with `python3 scripts/pocketbase_artifact.py verify <apk-path>`.
+Debug builds can still fall back to legacy when the sidecar is missing, so
+debug success alone is not release evidence. An approved isolated target and
+the exact artifact hash are required before the hardware steps below.
 
 ### 3b. Drive the app
 
-1. Unlock the **real** vault (not the decoy PIN — decoy never starts PB).
+1. Unlock the **main test vault** on the approved isolated target (not the
+   decoy PIN — decoy never starts PB). Never use personal vault contents.
 2. The unlock screen now, in order: starts the sidecar, runs the one-time
    legacy→PB migration, attaches PB as the preferred store, refreshes.
 
@@ -110,9 +117,9 @@ Look for:
 - No `[PB] … falling back to legacy` lines — those mean a PB call failed
   after startup and the store degraded (works, but not the thing under test).
 
-Then exercise the app normally and confirm no regressions: add a file,
-create/rename an album, tag something, run a sync, clear the vault. Every
-one of those now writes through PB when it's active.
+Then exercise disposable fixtures: add a file, create/rename an album, tag
+something, and sync to an isolated test server. Any clear/reset test requires
+separate explicit approval on that disposable target. Never clear a live vault.
 
 Optional — inspect the DB on a debug build (debuggable APKs allow run-as):
 

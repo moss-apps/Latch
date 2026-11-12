@@ -306,7 +306,7 @@ class _AutofillWarningDialogState extends State<_AutofillWarningDialog> {
           ),
           const SizedBox(height: 12),
           Text(
-            'Biometric unlock is the safer no-type alternative — your key never leaves the hardware Keystore.',
+            'Biometric unlock avoids typing your credential. Android handles biometric matching; Latch uses the unlocked key in memory.',
             style: TextStyle(
               fontSize: 13,
               color: context.textSecondary,

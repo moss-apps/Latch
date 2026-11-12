@@ -29,3 +29,35 @@ jobs:
       - run: dart format --output=none --set-exit-if-changed lib test
       - run: flutter analyze
       - run: flutter test
+
+  native-and-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: pocketbase/go.mod
+          cache-dependency-path: |
+            pocketbase/go.sum
+            latchd/go.sum
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.2
+          cache: true
+      - run: make packaging-test
+      - run: go test ./...
+        working-directory: pocketbase
+      - run: go test ./...
+        working-directory: latchd
+      - run: make pb
+      - run: flutter pub get --enforce-lockfile
+      # No release keystore in CI. Check the actual packaged native payload in
+      # an arm64 debug APK; signed release/device acceptance remains separate.
+      - run: flutter build apk --debug --target-platform android-arm64 --no-pub
+      - run: python3 scripts/pocketbase_artifact.py verify build/app/outputs/flutter-apk/app-debug.apk

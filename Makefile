@@ -11,8 +11,8 @@ LDFLAGS    := -s -w
 JNI_DIR    := android/app/src/main/jniLibs
 ## arm64-v8a only for v1 (open decision 2). Add armeabi-v7a / x86_64 if needed.
 ABIS       := arm64-v8a
-## PocketBase version is pinned in pocketbase/go.mod; resolve it for pb-types.
-PB_VERSION := $(shell cd $(PB_MODULE) && go list -m -f '{{.Version}}' github.com/pocketbase/pocketbase)
+## Resolve lazily: unrelated targets must not trigger a Go toolchain download.
+PB_VERSION = $(shell cd $(PB_MODULE) && go list -m -f '{{.Version}}' github.com/pocketbase/pocketbase)
 
 GOOS       := android
 GOARCH     := arm64
@@ -28,13 +28,22 @@ pb:
 			x86_64)      goarch=amd64 ;; \
 			*) echo "unknown abi: $$abi" >&2; exit 1 ;; \
 		esac; \
-		out=$(CURDIR)/$(JNI_DIR)/$$abi/libpocketbase.so; \
-		mkdir -p $$(dirname $$out); \
+		out="$(CURDIR)/$(JNI_DIR)/$$abi/libpocketbase.so"; \
 		echo ">> building $$abi ($$goarch)"; \
-		(cd $(PB_MODULE) && GOOS=$(GOOS) GOARCH=$$goarch CGO_ENABLED=$(CGO) \
-			go build -ldflags="$(LDFLAGS)" -trimpath -o $$out $(PB_PKG)); \
-		echo "   -> $(JNI_DIR)/$$abi/libpocketbase.so ($$(du -h $$out | cut -f1))"; \
+		python3 scripts/pocketbase_artifact.py build "$$out" --arch "$$goarch"; \
 	done
+
+.PHONY: pb-verify android-release-aab packaging-test
+pb-verify:
+	python3 scripts/pocketbase_artifact.py verify $(JNI_DIR)/arm64-v8a/libpocketbase.so
+
+## Build only. No adb, install, app launch, or desktop executable replacement.
+android-release-aab: pb legal-sync
+	flutter build appbundle --release --target-platform android-arm64 --no-pub
+	python3 scripts/pocketbase_artifact.py verify build/app/outputs/bundle/release/app-release.aab
+
+packaging-test:
+	python3 -m unittest discover -s scripts -p 'test_*.py'
 
 ## Local native build for quick desktop verification of the wrapper/migrations.
 pb-linux:
@@ -52,7 +61,7 @@ clean:
 	rm -rf $(JNI_DIR)/arm64-v8a/libpocketbase.so locker-pb
 
 ## Desktop backup companion (P6.2, docs/desktop_backup.md).
-## latchd pulls the encrypted vault from the phone into latch-backup/.
+## latchd receives as-stored vault payloads into latch-backup/.
 LATCHD_MODULE := latchd
 LATCHD_BIN    := latchd/latchd
 ## Release version: the app-version tag at HEAD (0.x.y-beta.z, same as
@@ -66,6 +75,7 @@ LATCHD_VERSION ?= $(shell v=$$(git describe --tags --exact-match --match '0.*' 2
 legal-sync:
 	@mkdir -p $(LATCHD_MODULE)/internal/webui/legaldocs
 	@cp legal/eula.md legal/terms.md legal/privacy.md $(LATCHD_MODULE)/internal/webui/legaldocs/
+	@cp legal/privacy.md assets/privacy_policy.md
 
 latchd: legal-sync $(shell find $(LATCHD_MODULE) -name '*.go' -o -path '*internal/webui/web/*' -type f)
 	cd $(LATCHD_MODULE) && CGO_ENABLED=0 go build -trimpath -o $(CURDIR)/$(LATCHD_BIN) ./cmd/latchd
