@@ -10,13 +10,14 @@ import '../services/desktop_link/transfer_client.dart';
 import '../services/desktop_link/usb_link.dart';
 import '../services/vault_service.dart';
 import '../themes/app_colors.dart';
+import '../widgets/pairing_qr_scanner.dart';
 
 /// Desktop backup screen, flipped architecture (P6.1r).
 ///
 /// The desktop's latchd web UI generates a one-time pairing code (QR +
 /// address + code) while its receiver is open. This screen accepts that
 /// code two equal ways, scanning the QR or typing the address and code,
-/// confirms what will be sent, and pushes the encrypted vault to the
+/// confirms what will be sent, and pushes the as-stored vault to the
 /// computer: key bundle first, missing blobs, manifest last. Centered
 /// max-width flat list layout so the screen looks identical on phones
 /// and tablets.
@@ -86,7 +87,11 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
 
   void _enterScan() {
     _teardownScanner();
-    _scanner = MobileScannerController();
+    _scanner = MobileScannerController(
+      formats: const [BarcodeFormat.qrCode],
+      cameraResolution: const Size(1920, 1080),
+      autoZoom: true,
+    );
     setState(() => _mode = _Mode.scan);
   }
 
@@ -423,38 +428,46 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-            children: _buildBody(),
-          ),
+          child: _buildBody(),
         ),
       ),
     );
   }
 
-  List<Widget> _buildBody() {
+  Widget _buildBody() {
     switch (_mode) {
       case _Mode.choose:
-        return _chooseChildren();
+        return _scrollBody(_chooseChildren());
       case _Mode.scan:
-        return _scanChildren();
+        return PairingQrScanner(
+          controller: _scanner!,
+          onDetect: _onDetect,
+          onManual: _enterManual,
+        );
       case _Mode.manual:
-        return _manualChildren();
+        return _scrollBody(_manualChildren());
       case _Mode.usb:
-        return _usbChildren();
+        return _scrollBody(_usbChildren());
       case _Mode.checking:
-        return _busyChildren('Checking the code…');
+        return _scrollBody(_busyChildren('Checking the code…'));
       case _Mode.confirm:
-        return _confirmChildren();
+        return _scrollBody(_confirmChildren());
       case _Mode.preparing:
-        return _busyChildren('Preparing the backup…');
+        return _scrollBody(_busyChildren('Preparing the backup…'));
       case _Mode.sending:
-        return _sendingChildren();
+        return _scrollBody(_sendingChildren());
       case _Mode.done:
-        return _doneChildren();
+        return _scrollBody(_doneChildren());
       case _Mode.error:
-        return _errorChildren();
+        return _scrollBody(_errorChildren());
     }
+  }
+
+  Widget _scrollBody(List<Widget> children) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+      children: children,
+    );
   }
 
   Widget _sectionTitle(String title) {
@@ -576,9 +589,9 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
       const SizedBox(height: 24),
       _sectionTitle('Know the risks'),
       _hint(
-        'Plain HTTP on your local network. Anyone on the same Wi-Fi '
-        'who grabs the code can copy the encrypted backup while '
-        'pairing is open. Only pair on networks you trust, and close '
+        'Plain HTTP, not TLS. Hidden-only files remain unencrypted, '
+        'including during transfer. The pairing code controls access '
+        'but does not encrypt traffic. Use trusted LAN or USB, and close '
         'the pairing window on your computer when you are done.',
       ),
       const SizedBox(height: 16),
@@ -586,32 +599,6 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
         'Pairing on the desktop closes automatically once the backup '
         'completes, or after five idle minutes.',
       ),
-    ];
-  }
-
-  List<Widget> _scanChildren() {
-    return [
-      _sectionTitle('Scan'),
-      _hint('Hold your camera up to the QR code on the computer screen.'),
-      const SizedBox(height: 16),
-      ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: SizedBox(
-          height: 240,
-          width: double.infinity,
-          child: MobileScanner(
-            controller: _scanner,
-            onDetect: _onDetect,
-            errorBuilder: (context, error) => _ScannerError(
-              message: error.errorCode.name,
-              onManual: _enterManual,
-            ),
-          ),
-        ),
-      ),
-      const SizedBox(height: 8),
-      _textAction(
-          label: 'Type the address and code instead', onTap: _enterManual),
     ];
   }
 
@@ -789,16 +776,17 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
         switch ((receiver?.hasManifest ?? false, receiver?.blobCount ?? 0)) {
           (false, 0) => 'no backup yet, this is the first one',
           (true, var n) => 'an earlier backup exists '
-              '($n encrypted files stored)',
-          (_, var n) => '$n encrypted files from an interrupted pairing',
+              '($n files stored)',
+          (_, var n) => '$n files from an interrupted pairing',
         },
       ),
       _kv('On this phone', '$live files'),
       const SizedBox(height: 16),
       _hint(
-        'Only files missing on the computer are sent. The wrapped '
-        'unlock key travels with them; nobody on the network can read '
-        'the backup without your vault password.',
+        'Only missing files are sent, with the wrapped unlock key and '
+        'an encrypted manifest. File bytes keep their current encryption '
+        'state: hidden-only files remain readable on the computer and '
+        'during HTTP transfer. Enable file encryption first if needed.',
       ),
       const SizedBox(height: 16),
       _primaryButton(
@@ -814,7 +802,7 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
     return [
       _sectionTitle('Confirm restore'),
       _kv('Computer', '${_base!.host}:${_base!.port}${_computerName()}'),
-      _kv('In the backup', '${_source?.blobCount ?? 0} encrypted files'),
+      _kv('In the backup', '${_source?.blobCount ?? 0} files'),
       _kv('On this phone', '$live files'),
       const SizedBox(height: 16),
       _hint(
@@ -898,8 +886,6 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
     if (_flow == _Flow.restore) return _doneRestoreChildren();
     final report = _report;
     return [
-      _sectionTitle('Done'),
-      const SizedBox(height: 16),
       Icon(Icons.check_circle, color: context.accentColor, size: 44),
       const SizedBox(height: 12),
       Center(
@@ -943,8 +929,6 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
   List<Widget> _doneRestoreChildren() {
     final report = _rreport;
     return [
-      _sectionTitle('Done'),
-      const SizedBox(height: 16),
       Icon(Icons.check_circle, color: context.accentColor, size: 44),
       const SizedBox(height: 12),
       Center(
@@ -1008,43 +992,5 @@ class _DesktopBackupScreenState extends ConsumerState<DesktopBackupScreen> {
       return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
     }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
-  }
-}
-
-/// Camera-unavailable fallback inside the scanner box.
-class _ScannerError extends StatelessWidget {
-  const _ScannerError({required this.message, required this.onManual});
-
-  final String message;
-  final VoidCallback onManual;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: Theme.of(context).scaffoldBackgroundColor,
-      padding: const EdgeInsets.all(16),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.no_photography, size: 32, color: context.textTertiary),
-            const SizedBox(height: 8),
-            Text(
-              'Camera unavailable ($message).',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 13,
-                color: context.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: onManual,
-              child: const Text('Type the address and code instead'),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
