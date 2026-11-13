@@ -31,6 +31,7 @@
 package receiver
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -85,13 +86,13 @@ const (
 
 // Stats is a point-in-time snapshot for the web UI.
 type Stats struct {
-	State     string `json:"state"`
-	Received  int    `json:"received"`     // blobs accepted this session (push)
-	Bytes     int64  `json:"bytes"`        // blob bytes accepted this session (push)
-	Files     int    `json:"files"`        // blobs on disk after the verify pass
-	Served    int    `json:"served"`      // blobs served this session (restore)
-	ServedBytes int64 `json:"servedBytes"` // blob bytes served this session (restore)
-	LastError string `json:"lastError,omitempty"`
+	State       string `json:"state"`
+	Received    int    `json:"received"`    // blobs accepted this session (push)
+	Bytes       int64  `json:"bytes"`       // blob bytes accepted this session (push)
+	Files       int    `json:"files"`       // blobs on disk after the verify pass
+	Served      int    `json:"served"`      // blobs served this session (restore)
+	ServedBytes int64  `json:"servedBytes"` // blob bytes served this session (restore)
+	LastError   string `json:"lastError,omitempty"`
 }
 
 // Receiver is one pairing session.
@@ -250,6 +251,18 @@ func (r *Receiver) Stop(reason string) {
 	}
 	r.ln.Close()
 	close(r.done)
+	// Closing the listener refuses new dials, but an accepted keep-alive
+	// connection would otherwise stay usable after the session ends. Shutdown
+	// waits for the in-flight response to finish, then closes idle connections.
+	// The handler that called Stop still owns its response, so this cannot
+	// truncate the completion reply.
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := r.srv.Shutdown(ctx); err != nil {
+			_ = r.srv.Close()
+		}
+	}()
 }
 
 func (r *Receiver) idleWatch() {
