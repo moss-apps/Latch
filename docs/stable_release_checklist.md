@@ -121,7 +121,7 @@ This is still not a tagged stable release or hardware acceptance.
 | Check | Result |
 |---|---|
 | Packaging regression tests | 13 pass; fake/temp artifacts only; the preserved old native binary is also rejected without execution |
-| Remote CI on pushed commit | `versionF` run `43184997129` passed both jobs; `main` run `43194966766` failed `TestReceiverPushRoundtrip` (keep-alive reuse), fixed by `aa9b7b8` in PR #135 |
+| Remote CI on pushed commit | `versionF` run `43184997129` passed both jobs; `main` run `43194966766` failed `TestReceiverPushRoundtrip` (keep-alive reuse), fixed by `aa9b7b8`; PR #135 run `43341442515` passed both jobs |
 | Pairing receiver shutdown | Idle keep-alive connections are drained on stop; 100 repeated receiver-package runs, the full `latchd` suite, and `go vet` pass |
 | Mobile legal/consent tests | 7 pass, including stale version-1 acceptance and bundled privacy equality |
 | Desktop web assets | TypeScript + Vite production build passes using existing dependencies |
