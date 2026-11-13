@@ -145,7 +145,10 @@ func TestReceiverPushRoundtrip(t *testing.T) {
 		t.Fatal("keybundle not stored verbatim")
 	}
 
-	// After completion the listener is closed: further requests fail.
+	// After completion the listener is closed: further requests fail. Drop
+	// pooled keep-alive connections first; otherwise the client can reuse a
+	// connection accepted before the session ended.
+	client.CloseIdleConnections()
 	if _, err := client.Get(base + "/info"); err == nil {
 		t.Fatal("listener should be closed after completion")
 	}

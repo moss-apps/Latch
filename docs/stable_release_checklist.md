@@ -112,16 +112,17 @@ irreplaceable files.
 
 ## Evidence record — 2026-11-12
 
-Scope: committed and pushed on `versionF` as
-`3fc89c70ffac205af42a8d63a405d5fe233f904b`, merging the release-safety work
-(based on `19afbd517c8ede482bfc16f8effdf04abd0930fc`, plus the owner's QR
-scanner work) with `origin/versionF`. Remote CI run `43184997129` passed both
-jobs. This is still not a tagged stable release or hardware acceptance.
+Scope: committed and pushed on `versionF` through `aa9b7b8`, based on the
+release-safety work in `3fc89c7` (from
+`19afbd517c8ede482bfc16f8effdf04abd0930fc`, plus the owner's QR scanner work).
+PR #130 merged that work into `main`; PR #135 carries the receiver shutdown fix.
+This is still not a tagged stable release or hardware acceptance.
 
 | Check | Result |
 |---|---|
 | Packaging regression tests | 13 pass; fake/temp artifacts only; the preserved old native binary is also rejected without execution |
-| Remote CI on pushed commit | Run `43184997129` passed `analyze-and-test` and `native-and-android` (native tooling, both Go suites, arm64 debug APK payload verification) |
+| Remote CI on pushed commit | `versionF` run `43184997129` passed both jobs; `main` run `43194966766` failed `TestReceiverPushRoundtrip` (keep-alive reuse), fixed by `aa9b7b8`; PR #135 run `43341442515` passed both jobs |
+| Pairing receiver shutdown | Idle keep-alive connections are drained on stop; 100 repeated receiver-package runs, the full `latchd` suite, and `go vet` pass |
 | Mobile legal/consent tests | 7 pass, including stale version-1 acceptance and bundled privacy equality |
 | Desktop web assets | TypeScript + Vite production build passes using existing dependencies |
 | `latchd` Go tests | Pass, including canonical/embedded legal consistency and renewed version-2 consent |
@@ -151,11 +152,12 @@ semantic-node preservation guard refused the update; the saved graph was not
 force-overwritten or deleted. This is a tooling limitation, not a passing graph
 refresh or an Android build failure.
 
-GitHub reports 10 open Dependabot alerts for `latchd/web-src` development
-tooling (Vite and its `fast-uri` dependency). The shipped web UI is prebuilt
-static output; neither package runs in the app or latchd binary. Treat them as
-build-environment maintenance, not runtime stable gates, and keep the committed
-build reproducible when updating.
+GitHub reports 14 open Dependabot alerts for `latchd/web-src` development
+tooling (Vite, its `fast-uri` dependency, and CLI transitive packages such as
+`@hono/node-server`, `minimatch`, `systeminformation`, and `deepmerge`). The
+shipped web UI is prebuilt static output; these packages do not run in the app
+or latchd binary. Treat them as build-environment maintenance, not runtime
+stable gates, and keep the committed build reproducible when updating.
 
 ## Release authorization
 

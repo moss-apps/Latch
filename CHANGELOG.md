@@ -13,6 +13,8 @@ Notable changes to Latch.
   stale PocketBase payloads, including verification inside APK/AAB artifacts.
 - Added an approval-gated, isolated hardware acceptance checklist. Build/check
   commands do not install applications or authorize release publication.
+- Closed pairing sessions now drain idle keep-alive connections instead of
+  leaving an accepted connection able to issue further requests.
 
 ## 0.19.1-beta.2
 
