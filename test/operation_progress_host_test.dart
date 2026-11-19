@@ -104,7 +104,7 @@ void main() {
     expect(button.style!.backgroundColor!.resolve({}), const Color(0xFFB3261E));
     expect(button.style!.foregroundColor!.resolve({}), Colors.white);
     expect(button.style!.backgroundColor!.resolve({WidgetState.disabled}),
-        const Color(0xFF8C4542));
+        const Color(0xFF8F1711));
     expect(tester.widget<Text>(find.text('Cancel')).style!.color, Colors.white);
     expect(find.textContaining('cannot be cancelled safely'), findsOneWidget);
     await minimize(tester);

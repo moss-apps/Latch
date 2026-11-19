@@ -585,7 +585,7 @@ class OperationCancelButton extends StatelessWidget {
           style: FilledButton.styleFrom(
             backgroundColor: const Color(0xFFB3261E),
             foregroundColor: Colors.white,
-            disabledBackgroundColor: const Color(0xFF8C4542),
+            disabledBackgroundColor: const Color(0xFF8F1711),
             disabledForegroundColor: Colors.white,
             padding: compact ? null : const EdgeInsets.symmetric(vertical: 16),
             shape: compact
