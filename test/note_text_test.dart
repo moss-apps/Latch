@@ -84,7 +84,8 @@ void main() {
     final now = DateTime(2026, 11, 22, 12);
 
     test('formats recent times compactly', () {
-      expect(formatNoteDate(now.subtract(const Duration(seconds: 10)), now: now),
+      expect(
+          formatNoteDate(now.subtract(const Duration(seconds: 10)), now: now),
           'Just now');
       expect(formatNoteDate(now.subtract(const Duration(minutes: 5)), now: now),
           '5m ago');
