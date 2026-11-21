@@ -40,7 +40,10 @@ class _NoteListScreenState extends ConsumerState<NoteListScreen> {
           : AppBar(
               backgroundColor: context.backgroundColor,
               elevation: 0,
-              automaticallyImplyLeading: false,
+              leading: IconButton(
+                icon: Icon(Icons.arrow_back, color: context.textPrimary),
+                onPressed: () => Navigator.pop(context),
+              ),
               title: Text(
                 'Notes',
                 style: TextStyle(
