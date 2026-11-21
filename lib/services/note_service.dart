@@ -10,6 +10,7 @@ import 'package:uuid/uuid.dart';
 import '../models/note.dart';
 import '../models/encryption_algorithm.dart';
 import 'encryption_service.dart';
+import 'file_operation_gate.dart';
 import 'vault_service.dart';
 
 class NoteService {
@@ -43,10 +44,13 @@ class NoteService {
     }
   }
 
-  Future<List<Note>> loadNotes({bool isDecoy = false}) async {
+  Future<List<Note>> loadNotes({
+    bool isDecoy = false,
+    bool forceReload = false,
+  }) async {
     final generation = _cacheGeneration;
     final cached = _notesCache[isDecoy];
-    if (cached != null) {
+    if (!forceReload && cached != null) {
       final visible = await _visibleNotes(cached, isDecoy);
       if (generation != _cacheGeneration) {
         throw StateError('Notes session changed');
@@ -120,9 +124,7 @@ class NoteService {
     );
   }
 
-  Future<void> _saveNotes({bool isDecoy = false}) async {
-    final notes = _notesCache[isDecoy];
-    if (notes == null) return;
+  Future<void> _saveNotes(List<Note> notes, {required bool isDecoy}) async {
     final json = jsonEncode(notes.map((n) => n.toJson()).toList());
     await _secureStorage.write(
       key: isDecoy ? _notesIndexDecoyKey : _notesIndexKey,
@@ -130,10 +132,13 @@ class NoteService {
     );
   }
 
-  Future<List<NoteFolder>> loadFolders({bool isDecoy = false}) async {
+  Future<List<NoteFolder>> loadFolders({
+    bool isDecoy = false,
+    bool forceReload = false,
+  }) async {
     final generation = _cacheGeneration;
     final cached = _foldersCache[isDecoy];
-    if (cached != null) return cached;
+    if (!forceReload && cached != null) return cached;
     final json = await _secureStorage.read(
       key: isDecoy ? _noteFoldersDecoyKey : _noteFoldersKey,
     );
@@ -181,104 +186,126 @@ class NoteService {
     required String content,
     String? folderId,
     bool isMarkdown = false,
+    bool isPinned = false,
     String fileExtension = 'txt',
     bool encrypt = false,
     EncryptionAlgorithm encryptionAlgorithm = EncryptionAlgorithm.aes256Gcm,
     int kdfIterations = _defaultKdfIterations,
     bool isDecoy = false,
     void Function(String status, {bool isEncrypting})? onProgress,
-  }) async {
-    onProgress?.call('Preparing...', isEncrypting: false);
-    await _ensureNotesDir(isDecoy: isDecoy);
-    final notes = await loadNotes(isDecoy: isDecoy);
+  }) =>
+      _mutate(() async {
+        final format = NoteFileFormat.fromExtension(fileExtension);
+        if (format == null) {
+          throw ArgumentError.value(fileExtension, 'fileExtension');
+        }
+        final generation = _cacheGeneration;
+        onProgress?.call('Preparing...', isEncrypting: false);
+        await _ensureNotesDir(isDecoy: isDecoy);
+        final notes = await loadNotes(isDecoy: isDecoy, forceReload: true);
 
-    final id = const Uuid().v4();
-    final now = DateTime.now();
-    final notesDir = await _getNotesDir(isDecoy: isDecoy);
+        final id = const Uuid().v4();
+        final now = DateTime.now();
+        final notesDir = await _getNotesDir(isDecoy: isDecoy);
 
-    String contentPath;
-    String iv;
-    String salt;
-    int kdf;
+        String contentPath;
+        String iv;
+        String salt;
+        int kdf;
 
-    if (encrypt) {
-      onProgress?.call('Encrypting note...', isEncrypting: true);
-      final filePath = '$notesDir/$id.enc';
-      final masterKey = await _encryptionService.getMasterKey(isDecoy: isDecoy);
-      final saltBytes = _encryptionService.generateFileSalt();
-      final derivedKey = await _encryptionService.deriveFileKeyAsync(
-        masterKey,
-        saltBytes,
-        kdfIterations,
-      );
+        if (encrypt) {
+          onProgress?.call('Encrypting note...', isEncrypting: true);
+          final filePath = '$notesDir/$id.enc';
+          final masterKey =
+              await _encryptionService.getMasterKey(isDecoy: isDecoy);
+          final saltBytes = _encryptionService.generateFileSalt();
+          final derivedKey = await _encryptionService.deriveFileKeyAsync(
+            masterKey,
+            saltBytes,
+            kdfIterations,
+          );
 
-      final data = Uint8List.fromList(utf8.encode(content));
-      final result = encryptionAlgorithm == EncryptionAlgorithm.aes256Gcm
-          ? await _encryptionService.encryptBytesStreamedGcm(
-              data,
-              filePath,
-              isDecoy: isDecoy,
-              derivedKey: derivedKey,
-            )
-          : await _encryptionService.encryptBytesStreamed(
-              data,
-              filePath,
-              isDecoy: isDecoy,
-              derivedKey: derivedKey,
-            );
+          final data = Uint8List.fromList(utf8.encode(content));
+          final result = encryptionAlgorithm == EncryptionAlgorithm.aes256Gcm
+              ? await _encryptionService.encryptBytesStreamedGcm(
+                  data,
+                  filePath,
+                  isDecoy: isDecoy,
+                  derivedKey: derivedKey,
+                )
+              : await _encryptionService.encryptBytesStreamed(
+                  data,
+                  filePath,
+                  isDecoy: isDecoy,
+                  derivedKey: derivedKey,
+                );
 
-      if (!result.success) {
-        throw Exception('Failed to encrypt note content');
-      }
+          if (!result.success) {
+            throw Exception('Failed to encrypt note content');
+          }
 
-      contentPath = result.encryptedPath!;
-      iv = result.iv!;
-      salt = base64Encode(saltBytes);
-      kdf = kdfIterations;
-    } else {
-      onProgress?.call('Saving note...', isEncrypting: false);
-      final filePath = '$notesDir/$id.$fileExtension';
-      final file = File(filePath);
-      await file.writeAsString(content);
-      contentPath = filePath;
-      iv = '';
-      salt = '';
-      kdf = 0;
-    }
+          contentPath = result.encryptedPath!;
+          iv = result.iv!;
+          salt = base64Encode(saltBytes);
+          kdf = kdfIterations;
+        } else {
+          onProgress?.call('Saving note...', isEncrypting: false);
+          final filePath = '$notesDir/$id.${format.extension}';
+          final file = File(filePath);
+          try {
+            await file.writeAsString(content, flush: true);
+          } catch (_) {
+            await _deleteIfPossible(file);
+            rethrow;
+          }
+          contentPath = filePath;
+          iv = '';
+          salt = '';
+          kdf = 0;
+        }
 
-    onProgress?.call('Registering in vault...', isEncrypting: false);
-    final note = Note(
-      id: id,
-      title: title,
-      encryptedContentPath: contentPath,
-      iv: iv,
-      keyDerivationSalt: salt,
-      kdfIterations: kdf,
-      folderId: folderId,
-      isMarkdown: isMarkdown,
-      isEncrypted: encrypt,
-      encryptionAlgorithm: encryptionAlgorithm,
-      createdAt: now,
-      updatedAt: now,
-    );
+        onProgress?.call('Registering in vault...', isEncrypting: false);
+        final note = Note(
+          id: id,
+          title: title,
+          encryptedContentPath: contentPath,
+          iv: iv,
+          keyDerivationSalt: salt,
+          kdfIterations: kdf,
+          folderId: folderId,
+          isMarkdown: isMarkdown,
+          fileFormat: format,
+          isPinned: isPinned,
+          isEncrypted: encrypt,
+          encryptionAlgorithm: encryptionAlgorithm,
+          createdAt: now,
+          updatedAt: now,
+        );
 
-    notes.insert(0, note);
-    await _saveNotes(isDecoy: isDecoy);
+        final updatedNotes = [note, ...notes];
+        try {
+          _checkSession(generation);
+          await _saveNotes(updatedNotes, isDecoy: isDecoy);
+        } catch (_) {
+          await _deleteIfPossible(File(contentPath));
+          rethrow;
+        }
+        if (generation == _cacheGeneration) _notesCache[isDecoy] = updatedNotes;
 
-    await VaultService.instance.registerNoteEntry(
-      noteId: note.id,
-      title: note.title,
-      encryptedContentPath: note.encryptedContentPath,
-      fileExtension: fileExtension,
-      isEncrypted: encrypt,
-      encryptionAlgorithm: encryptionAlgorithm,
-      kdfIterations: kdfIterations,
-      folderId: note.folderId,
-      isDecoy: isDecoy,
-    );
+        await VaultService.instance.registerNoteEntry(
+          noteId: note.id,
+          title: note.title,
+          encryptedContentPath: note.encryptedContentPath,
+          fileExtension: format.extension,
+          isEncrypted: note.isEncrypted,
+          encryptionAlgorithm: note.encryptionAlgorithm,
+          kdfIterations: note.kdfIterations,
+          folderId: note.folderId,
+          isDecoy: isDecoy,
+        );
 
-    return note;
-  }
+        return note;
+      });
 
   Future<String> decryptNoteContent(Note note, {bool isDecoy = false}) async {
     if (!note.isEncrypted) {
@@ -312,6 +339,23 @@ class NoteService {
     return utf8.decode(result.data!);
   }
 
+  Future<NoteFileFormat> resolveNoteFormat(Note note,
+      {bool isDecoy = false}) async {
+    final knownFormat =
+        note.fileFormat ?? NoteFileFormat.fromPath(note.encryptedContentPath);
+    if (knownFormat != null) return knownFormat;
+
+    // Older encrypted notes use .enc on disk. Their logical extension was
+    // recorded only in the vault file entry.
+    final files = await VaultService.instance.getAllFiles(isDecoy: isDecoy);
+    final entry =
+        files.where((file) => file.metadata?['noteId'] == note.id).firstOrNull;
+    return (entry == null
+            ? null
+            : NoteFileFormat.fromPath(entry.originalName)) ??
+        NoteFileFormat.plainText;
+  }
+
   Future<Note> updateNote(
     Note note, {
     String? title,
@@ -319,91 +363,137 @@ class NoteService {
     String? folderId,
     bool? clearFolder,
     bool? isMarkdown,
-    String fileExtension = 'txt',
-    bool encrypt = false,
-    EncryptionAlgorithm? encryptionAlgorithm,
-    int? kdfIterations,
+    bool? isPinned,
     bool isDecoy = false,
-  }) async {
-    final notes = await loadNotes(isDecoy: isDecoy);
-    final algorithm = encryptionAlgorithm ?? note.encryptionAlgorithm;
-    final kdf = kdfIterations ?? note.kdfIterations;
+  }) =>
+      _mutate(() async {
+        final generation = _cacheGeneration;
+        final notes = await loadNotes(isDecoy: isDecoy, forceReload: true);
+        final index = notes.indexWhere((n) => n.id == note.id);
+        if (index == -1) throw StateError('Note is no longer in this vault');
+        final original = notes[index];
+        final format = await resolveNoteFormat(original, isDecoy: isDecoy);
+        final algorithm = original.encryptionAlgorithm;
+        final kdf = original.kdfIterations;
 
-    var updated = note.copyWith(
-      title: title,
-      folderId: folderId,
-      clearFolder: clearFolder,
-      isMarkdown: isMarkdown,
-      isEncrypted: encrypt || note.isEncrypted,
-      encryptionAlgorithm: algorithm,
-      updatedAt: DateTime.now(),
-    );
-
-    if (content != null) {
-      if (updated.isEncrypted) {
-        final masterKey =
-            await _encryptionService.getMasterKey(isDecoy: isDecoy);
-        final salt = _encryptionService.generateFileSalt();
-        final derivedKey = await _encryptionService.deriveFileKeyAsync(
-          masterKey,
-          salt,
-          kdf,
+        var updated = original.copyWith(
+          title: title,
+          folderId: folderId,
+          clearFolder: clearFolder,
+          isMarkdown: isMarkdown,
+          fileFormat: format,
+          isPinned: isPinned,
+          updatedAt: DateTime.now(),
         );
 
-        final data = Uint8List.fromList(utf8.encode(content));
-        // write to temp then rename so a failed re-encrypt can't destroy the only copy
-        final tmpPath = '${note.encryptedContentPath}.tmp';
-        final result = algorithm == EncryptionAlgorithm.aes256Gcm
-            ? await _encryptionService.encryptBytesStreamedGcm(
-                data,
-                tmpPath,
-                isDecoy: isDecoy,
-                derivedKey: derivedKey,
-              )
-            : await _encryptionService.encryptBytesStreamed(
-                data,
-                tmpPath,
-                isDecoy: isDecoy,
-                derivedKey: derivedKey,
+        final path = original.encryptedContentPath;
+        final suffix = const Uuid().v4();
+        final staged = File('$path.$suffix.tmp');
+        final backup = File('$path.$suffix.bak');
+        var replaced = false;
+        var keepBackup = false;
+        try {
+          if (content != null) {
+            if (updated.isEncrypted) {
+              final masterKey =
+                  await _encryptionService.getMasterKey(isDecoy: isDecoy);
+              final salt = _encryptionService.generateFileSalt();
+              final derivedKey = await _encryptionService.deriveFileKeyAsync(
+                masterKey,
+                salt,
+                kdf,
               );
 
-        if (!result.success) {
-          final tmp = File(tmpPath);
-          if (await tmp.exists()) await tmp.delete();
-          throw Exception('Failed to re-encrypt note content');
+              final data = Uint8List.fromList(utf8.encode(content));
+              final result = algorithm == EncryptionAlgorithm.aes256Gcm
+                  ? await _encryptionService.encryptBytesStreamedGcm(
+                      data,
+                      staged.path,
+                      isDecoy: isDecoy,
+                      derivedKey: derivedKey,
+                    )
+                  : await _encryptionService.encryptBytesStreamed(
+                      data,
+                      staged.path,
+                      isDecoy: isDecoy,
+                      derivedKey: derivedKey,
+                    );
+
+              if (!result.success) {
+                throw Exception('Failed to re-encrypt note content');
+              }
+
+              updated = updated.copyWith(
+                iv: result.iv,
+                keyDerivationSalt: base64Encode(salt),
+                kdfIterations: kdf,
+              );
+            } else {
+              await staged.writeAsString(content, flush: true);
+            }
+            // Preserve the old payload until the new note metadata is durable.
+            await File(path).copy(backup.path);
+            _checkSession(generation);
+            await staged.rename(path);
+            replaced = true;
+          }
+          _checkSession(generation);
+          final updatedNotes = [...notes]..[index] = updated;
+          await _saveNotes(updatedNotes, isDecoy: isDecoy);
+          if (generation == _cacheGeneration) {
+            _notesCache[isDecoy] = updatedNotes;
+          }
+        } catch (_) {
+          if (replaced) {
+            keepBackup = true;
+            await backup.rename(path);
+            keepBackup = false;
+          }
+          rethrow;
+        } finally {
+          if (content != null) {
+            await _deleteIfPossible(staged);
+            if (!keepBackup) await _deleteIfPossible(backup);
+          }
         }
 
-        await File(tmpPath).rename(note.encryptedContentPath);
-        updated = updated.copyWith(
-          iv: result.iv,
-          keyDerivationSalt: base64Encode(salt),
-          kdfIterations: kdf,
+        await VaultService.instance.registerNoteEntry(
+          noteId: updated.id,
+          title: updated.title,
+          encryptedContentPath: updated.encryptedContentPath,
+          fileExtension: format.extension,
+          isEncrypted: updated.isEncrypted,
+          encryptionAlgorithm: updated.encryptionAlgorithm,
+          kdfIterations: updated.kdfIterations,
+          folderId: updated.folderId,
+          isDecoy: isDecoy,
         );
-      } else {
-        final file = File(note.encryptedContentPath);
-        await file.writeAsString(content);
-      }
+        return updated;
+      }, fileIds: content == null ? const {} : {note.id});
+
+  Future<T> _mutate<T>(Future<T> Function() action,
+      {Set<String> fileIds = const {}}) {
+    final gate = FileOperationGate.instance;
+    final lease = gate.acquire(fileIds);
+    if (lease == null) {
+      return Future.error(StateError('Another vault change is in progress'));
     }
+    return gate.run(lease, action);
+  }
 
-    final index = notes.indexWhere((n) => n.id == note.id);
-    if (index != -1) {
-      notes[index] = updated;
-      await _saveNotes(isDecoy: isDecoy);
-
-      await VaultService.instance.registerNoteEntry(
-        noteId: updated.id,
-        title: updated.title,
-        encryptedContentPath: updated.encryptedContentPath,
-        fileExtension: fileExtension,
-        isEncrypted: updated.isEncrypted,
-        encryptionAlgorithm: updated.encryptionAlgorithm,
-        kdfIterations: updated.kdfIterations,
-        folderId: updated.folderId,
-        isDecoy: isDecoy,
-      );
+  void _checkSession(int generation) {
+    if (generation != _cacheGeneration ||
+        !FileOperationGate.instance.allowsMutation) {
+      throw StateError('Notes session changed');
     }
+  }
 
-    return updated;
+  Future<void> _deleteIfPossible(File file) async {
+    try {
+      await file.delete();
+    } on FileSystemException {
+      // Cleanup must not turn a committed save into a reported failure.
+    }
   }
 
   Future<void> deleteNote(Note note, {bool isDecoy = false}) async {
@@ -425,16 +515,22 @@ class NoteService {
     }
   }
 
-  Future<Note> togglePin(Note note, {bool isDecoy = false}) async {
-    final notes = await loadNotes(isDecoy: isDecoy);
-    final toggled = note.togglePin();
-    final index = notes.indexWhere((n) => n.id == note.id);
-    if (index != -1) {
-      notes[index] = toggled;
-      await _saveNotes(isDecoy: isDecoy);
-    }
-    return toggled;
-  }
+  Future<Note> togglePin(Note note, {bool isDecoy = false}) =>
+      _mutate(() async {
+        final generation = _cacheGeneration;
+        final notes = await loadNotes(isDecoy: isDecoy, forceReload: true);
+        final index = notes.indexWhere((n) => n.id == note.id);
+        if (index == -1) throw StateError('Note is no longer in this vault');
+        final toggled = notes[index].copyWith(
+          isPinned: !note.isPinned,
+          updatedAt: DateTime.now(),
+        );
+        final updatedNotes = [...notes]..[index] = toggled;
+        _checkSession(generation);
+        await _saveNotes(updatedNotes, isDecoy: isDecoy);
+        if (generation == _cacheGeneration) _notesCache[isDecoy] = updatedNotes;
+        return toggled;
+      });
 
   Future<NoteFolder> createFolder(String name, {bool isDecoy = false}) async {
     final folders = await loadFolders(isDecoy: isDecoy);
@@ -465,27 +561,51 @@ class NoteService {
     return renamed;
   }
 
-  Future<void> deleteFolder(NoteFolder folder, {bool isDecoy = false}) async {
-    final folders = await loadFolders(isDecoy: isDecoy);
-    final notes = await loadNotes(isDecoy: isDecoy);
+  Future<void> deleteFolder(NoteFolder folder, {bool isDecoy = false}) =>
+      _mutate(() async {
+        final generation = _cacheGeneration;
+        final folders = await loadFolders(isDecoy: isDecoy);
+        final notes = await loadNotes(isDecoy: isDecoy, forceReload: true);
+        final updatedNotes = [
+          for (final note in notes)
+            note.folderId == folder.id
+                ? note.copyWith(clearFolder: true)
+                : note,
+        ];
+        _checkSession(generation);
+        await _saveNotes(updatedNotes, isDecoy: isDecoy);
+        if (generation == _cacheGeneration) _notesCache[isDecoy] = updatedNotes;
 
-    for (var i = 0; i < notes.length; i++) {
-      if (notes[i].folderId == folder.id) {
-        notes[i] = notes[i].copyWith(
-          clearFolder: true,
-          updatedAt: DateTime.now(),
-        );
-      }
-    }
-    await _saveNotes(isDecoy: isDecoy);
-
-    folders.removeWhere((f) => f.id == folder.id);
-    await _saveFolders(isDecoy: isDecoy);
-  }
+        _checkSession(generation);
+        folders.removeWhere((f) => f.id == folder.id);
+        await _saveFolders(isDecoy: isDecoy);
+      });
 
   List<Note> getNotesInFolder(String? folderId) {
     return _notesCache[false]?.where((n) => n.folderId == folderId).toList() ??
         [];
+  }
+
+  /// Plaintext bodies for unencrypted notes, keyed by note id.
+  ///
+  /// Used by the list screen for previews and body search. Encrypted notes are
+  /// deliberately absent: their content is only decrypted when opened.
+  Future<Map<String, String>> loadPlaintextContents(List<Note> notes) async {
+    final generation = _cacheGeneration;
+    final contents = <String, String>{};
+    for (final note in notes) {
+      if (generation != _cacheGeneration) return const {};
+      if (note.isEncrypted) continue;
+      try {
+        final file = File(note.encryptedContentPath);
+        contents[note.id] = await file.readAsString();
+      } on FileSystemException {
+        // A missing or unreadable note should not hide the rest of the list.
+      } on FormatException {
+        // Skip a note whose contents are no longer valid UTF-8.
+      }
+    }
+    return generation == _cacheGeneration ? contents : const {};
   }
 
   List<Note> searchNotes(String query) {
