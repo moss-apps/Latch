@@ -353,7 +353,7 @@ void main() {
     expect(await File(restored.encryptedContentPath).readAsBytes(), [1, 2, 3]);
   });
 
-  test('editor deletion and restoration preserve note/password crypto records',
+  test('editor restore preserves note format and note/password crypto records',
       () async {
     final noteFile =
         (await fixture.file('note')).copyWith(metadata: {'noteId': 'note'});
@@ -366,6 +366,7 @@ void main() {
         iv: 'note-iv',
         keyDerivationSalt: 'note-salt',
         isEncrypted: true,
+        fileFormat: NoteFileFormat.html,
         createdAt: now,
         updatedAt: now,
         isPinned: true);
@@ -400,6 +401,7 @@ void main() {
     expect(restoredNote.iv, note.iv);
     expect(restoredNote.keyDerivationSalt, note.keyDerivationSalt);
     expect(restoredNote.isPinned, isTrue);
+    expect(restoredNote.fileFormat, NoteFileFormat.html);
     expect(restoredPassword.iv, password.iv);
     expect(restoredPassword.keyDerivationSalt, password.keyDerivationSalt);
     expect(restoredPassword.tags, password.tags);

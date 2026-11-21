@@ -65,7 +65,10 @@ class EncryptionService {
   String? _pendingDecoyCredential;
   bool _restoredKeyNeedsRewrap = false;
 
-  // memo keyed by salt:iterations — re-encrypt mints a new salt, so entries self-invalidate.
+  // A salt can be requested with either vault's master key. Use a weak identity
+  // token so cache keys don't retain or contain the master key itself.
+  final Expando<int> _masterKeyCacheIds = Expando<int>();
+  int _nextMasterKeyCacheId = 0;
   final Map<String, Uint8List> _fileKeyCache = {};
   static const int _fileKeyCacheLimit = 100;
 
@@ -496,7 +499,9 @@ class EncryptionService {
       Uint8List masterKey, Uint8List salt, int iterations) async {
     _requireKeys();
     final generation = _cacheGeneration;
-    final cacheKey = '${base64Encode(salt)}:$iterations';
+    final masterKeyId =
+        _masterKeyCacheIds[masterKey] ??= _nextMasterKeyCacheId++;
+    final cacheKey = '$masterKeyId:${base64Encode(salt)}:$iterations';
     final cached = _fileKeyCache[cacheKey];
     if (cached != null) return cached;
     final key =

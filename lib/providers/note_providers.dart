@@ -10,14 +10,30 @@ final noteServiceProvider = Provider<NoteService>((ref) {
   return NoteService.instance;
 });
 
-final noteSearchQueryProvider = StateProvider<String>((ref) => '');
+final noteSearchQueryProvider = StateProvider<String>((ref) {
+  ref.watch(isDecoyModeProvider);
+  return '';
+});
 
-final selectedNoteFolderProvider = StateProvider<String?>((ref) => null);
+final selectedNoteFolderProvider = StateProvider<String?>((ref) {
+  ref.watch(isDecoyModeProvider);
+  return null;
+});
+
+/// Plaintext bodies of unencrypted notes, used for previews and body search.
+final notePlaintextProvider =
+    FutureProvider.autoDispose<Map<String, String>>((ref) async {
+  final notes = ref.watch(notesNotifierProvider).asData?.value;
+  if (notes == null || notes.isEmpty) return const {};
+  return ref.watch(noteServiceProvider).loadPlaintextContents(notes);
+});
 
 class NotesNotifier extends Notifier<AsyncValue<List<Note>>> {
+  int _loadId = 0;
+
   @override
   AsyncValue<List<Note>> build() {
-    loadNotes();
+    _loadNotes(ref.watch(isDecoyModeProvider));
     return const AsyncValue.loading();
   }
 
@@ -25,14 +41,23 @@ class NotesNotifier extends Notifier<AsyncValue<List<Note>>> {
 
   bool get _isDecoy => ref.read(isDecoyModeProvider);
 
-  Future<void> loadNotes() async {
+  Future<void> loadNotes() {
     state = const AsyncValue.loading();
+    return _loadNotes(_isDecoy);
+  }
+
+  Future<void> _loadNotes(bool isDecoy) async {
+    final id = ++_loadId;
     try {
-      _noteService.clearCache();
-      final notes = await _noteService.loadNotes(isDecoy: _isDecoy);
-      state = AsyncValue.data(notes);
+      final notes =
+          await _noteService.loadNotes(isDecoy: isDecoy, forceReload: true);
+      if (ref.mounted && id == _loadId && isDecoy == _isDecoy) {
+        state = AsyncValue.data(notes);
+      }
     } catch (e, st) {
-      state = AsyncValue.error(e, st);
+      if (ref.mounted && id == _loadId && isDecoy == _isDecoy) {
+        state = AsyncValue.error(e, st);
+      }
     }
   }
 
@@ -41,6 +66,7 @@ class NotesNotifier extends Notifier<AsyncValue<List<Note>>> {
     required String content,
     String? folderId,
     bool isMarkdown = false,
+    bool isPinned = false,
     String fileExtension = 'txt',
     bool encrypt = false,
     EncryptionAlgorithm encryptionAlgorithm = EncryptionAlgorithm.aes256Gcm,
@@ -52,6 +78,7 @@ class NotesNotifier extends Notifier<AsyncValue<List<Note>>> {
       content: content,
       folderId: folderId,
       isMarkdown: isMarkdown,
+      isPinned: isPinned,
       fileExtension: fileExtension,
       encrypt: encrypt,
       encryptionAlgorithm: encryptionAlgorithm,
@@ -59,8 +86,10 @@ class NotesNotifier extends Notifier<AsyncValue<List<Note>>> {
       isDecoy: _isDecoy,
       onProgress: onProgress,
     );
-    await loadNotes();
-    _refreshVault();
+    if (ref.mounted) {
+      await loadNotes();
+      if (ref.mounted) _refreshVault();
+    }
     return note;
   }
 
@@ -71,7 +100,7 @@ class NotesNotifier extends Notifier<AsyncValue<List<Note>>> {
     String? folderId,
     bool? clearFolder,
     bool? isMarkdown,
-    String fileExtension = 'txt',
+    bool? isPinned,
   }) async {
     final updated = await _noteService.updateNote(
       note,
@@ -80,32 +109,34 @@ class NotesNotifier extends Notifier<AsyncValue<List<Note>>> {
       folderId: folderId,
       clearFolder: clearFolder,
       isMarkdown: isMarkdown,
-      fileExtension: fileExtension,
-      encrypt: note.isEncrypted,
-      encryptionAlgorithm: note.encryptionAlgorithm,
-      kdfIterations: note.kdfIterations,
+      isPinned: isPinned,
       isDecoy: _isDecoy,
     );
-    await loadNotes();
-    _refreshVault();
+    if (ref.mounted) {
+      await loadNotes();
+      if (ref.mounted) _refreshVault();
+    }
     return updated;
   }
 
   Future<void> deleteNote(Note note) async {
-    await _noteService.deleteNote(note, isDecoy: _isDecoy);
-    await loadNotes();
-    _refreshVault();
+    await deleteNotes([note]);
   }
 
   Future<void> deleteNotes(List<Note> notes) async {
-    await _noteService.deleteNotes(notes, isDecoy: _isDecoy);
-    await loadNotes();
-    _refreshVault();
+    try {
+      await _noteService.deleteNotes(notes, isDecoy: _isDecoy);
+    } finally {
+      if (ref.mounted) {
+        await loadNotes();
+        if (ref.mounted) _refreshVault();
+      }
+    }
   }
 
   Future<Note> togglePin(Note note) async {
     final toggled = await _noteService.togglePin(note, isDecoy: _isDecoy);
-    await loadNotes();
+    if (ref.mounted) await loadNotes();
     return toggled;
   }
 
@@ -120,9 +151,11 @@ final notesNotifierProvider =
 });
 
 class NoteFoldersNotifier extends Notifier<AsyncValue<List<NoteFolder>>> {
+  int _loadId = 0;
+
   @override
   AsyncValue<List<NoteFolder>> build() {
-    loadFolders();
+    _loadFolders(ref.watch(isDecoyModeProvider));
     return const AsyncValue.loading();
   }
 
@@ -130,20 +163,29 @@ class NoteFoldersNotifier extends Notifier<AsyncValue<List<NoteFolder>>> {
 
   bool get _isDecoy => ref.read(isDecoyModeProvider);
 
-  Future<void> loadFolders() async {
+  Future<void> loadFolders() {
     state = const AsyncValue.loading();
+    return _loadFolders(_isDecoy);
+  }
+
+  Future<void> _loadFolders(bool isDecoy) async {
+    final id = ++_loadId;
     try {
-      _noteService.clearCache();
-      final folders = await _noteService.loadFolders(isDecoy: _isDecoy);
-      state = AsyncValue.data(folders);
+      final folders =
+          await _noteService.loadFolders(isDecoy: isDecoy, forceReload: true);
+      if (ref.mounted && id == _loadId && isDecoy == _isDecoy) {
+        state = AsyncValue.data(folders);
+      }
     } catch (e, st) {
-      state = AsyncValue.error(e, st);
+      if (ref.mounted && id == _loadId && isDecoy == _isDecoy) {
+        state = AsyncValue.error(e, st);
+      }
     }
   }
 
   Future<NoteFolder> createFolder(String name) async {
     final folder = await _noteService.createFolder(name, isDecoy: _isDecoy);
-    await loadFolders();
+    if (ref.mounted) await loadFolders();
     return folder;
   }
 
@@ -153,12 +195,17 @@ class NoteFoldersNotifier extends Notifier<AsyncValue<List<NoteFolder>>> {
       newName,
       isDecoy: _isDecoy,
     );
-    await loadFolders();
+    if (ref.mounted) await loadFolders();
     return renamed;
   }
 
   Future<void> deleteFolder(NoteFolder folder) async {
     await _noteService.deleteFolder(folder, isDecoy: _isDecoy);
+    if (!ref.mounted) return;
+    if (ref.read(selectedNoteFolderProvider) == folder.id) {
+      ref.read(selectedNoteFolderProvider.notifier).state = null;
+    }
+    ref.invalidate(notesNotifierProvider);
     await loadFolders();
   }
 }
