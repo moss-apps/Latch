@@ -65,6 +65,32 @@ class NoteFolder {
   String toString() => 'NoteFolder(id: $id, name: $name)';
 }
 
+enum NoteFileFormat {
+  plainText('txt', 'Plain text'),
+  markdown('md', 'Markdown'),
+  html('html', 'HTML');
+
+  const NoteFileFormat(this.extension, this.label);
+
+  final String extension;
+  final String label;
+
+  static NoteFileFormat? fromExtension(Object? extension) =>
+      switch (extension) {
+        'txt' => plainText,
+        'md' => markdown,
+        'html' => html,
+        _ => null,
+      };
+
+  static NoteFileFormat? fromPath(String path) {
+    final dot = path.lastIndexOf('.');
+    return dot < 0
+        ? null
+        : fromExtension(path.substring(dot + 1).toLowerCase());
+  }
+}
+
 class Note {
   final String id;
   final String title;
@@ -75,6 +101,7 @@ class Note {
   final String? folderId;
   final bool isPinned;
   final bool isMarkdown;
+  final NoteFileFormat? fileFormat;
   final bool isEncrypted;
   final EncryptionAlgorithm encryptionAlgorithm;
   final DateTime createdAt;
@@ -90,6 +117,7 @@ class Note {
     this.folderId,
     this.isPinned = false,
     this.isMarkdown = false,
+    this.fileFormat,
     this.isEncrypted = false,
     this.encryptionAlgorithm = EncryptionAlgorithm.aes256Gcm,
     required this.createdAt,
@@ -107,6 +135,7 @@ class Note {
     bool? clearFolder,
     bool? isPinned,
     bool? isMarkdown,
+    NoteFileFormat? fileFormat,
     bool? isEncrypted,
     EncryptionAlgorithm? encryptionAlgorithm,
     DateTime? createdAt,
@@ -122,6 +151,7 @@ class Note {
       folderId: clearFolder == true ? null : (folderId ?? this.folderId),
       isPinned: isPinned ?? this.isPinned,
       isMarkdown: isMarkdown ?? this.isMarkdown,
+      fileFormat: fileFormat ?? this.fileFormat,
       isEncrypted: isEncrypted ?? this.isEncrypted,
       encryptionAlgorithm: encryptionAlgorithm ?? this.encryptionAlgorithm,
       createdAt: createdAt ?? this.createdAt,
@@ -142,6 +172,7 @@ class Note {
       'folderId': folderId,
       'isPinned': isPinned,
       'isMarkdown': isMarkdown,
+      if (fileFormat != null) 'fileExtension': fileFormat!.extension,
       'isEncrypted': isEncrypted,
       'encryptionAlgorithm': encryptionAlgorithm.name,
       'createdAt': createdAt.toIso8601String(),
@@ -160,6 +191,7 @@ class Note {
       folderId: json['folderId'] as String?,
       isPinned: json['isPinned'] as bool? ?? false,
       isMarkdown: json['isMarkdown'] as bool? ?? false,
+      fileFormat: NoteFileFormat.fromExtension(json['fileExtension']),
       isEncrypted: json['isEncrypted'] as bool? ?? false,
       encryptionAlgorithm: json['encryptionAlgorithm'] != null
           ? EncryptionAlgorithm.values.firstWhere(
