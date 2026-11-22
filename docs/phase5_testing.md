@@ -54,6 +54,25 @@ replace Android picker, camera, Autofill, TalkBack, or real-server checks.
    batch on disposable data; unlock and use Retry cleanup. Each item must be
    active or represented by a pending/restorable receipt, never silently lost.
 
+## Website Autofill diagnostics
+
+On the approved test device or profile, enable Latch as Android's Autofill
+provider and enable Biometric Unlock in Latch. In the browser, enable external
+Autofill if offered. Tap the password field on a public test form such as
+[The Internet](https://the-internet.herokuapp.com/login); don't submit the form.
+
+- If **Choose a password in Latch** opens a warning, record its `AF` code, the
+  Android version, and the browser version. `AF01` means Android doesn't expose
+  the field's scheme; `AF02` or `AF03` means the field has no reported domain
+  or scheme, respectively. `AF04` means the reported scheme isn't HTTPS;
+  `AF05` means the reported domain could not be parsed. These failures occur
+  before Latch opens the vault. The saved URL cannot change them.
+- If no suggestion appears or it closes immediately, run
+  `adb logcat -v brief -s LatchAutofill:D` with the debug build on the test
+  target. Reproduce once and stop with Ctrl+C. Share only the lines from that
+  attempt, or report that none appeared. The tag records fixed outcomes and
+  counts, not URLs, form values, or credentials. Do not share an unfiltered log.
+
 ## Backups and WebDAV
 
 1. Delete one dummy file/login and leave another active. Create a new ZIP and a
