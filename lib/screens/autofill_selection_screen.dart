@@ -30,7 +30,10 @@ class _AutofillSelectionScreenState extends State<AutofillSelectionScreen> {
   bool _biometricsUnavailable = false;
   bool _isLoadingEntries = false;
   bool _isDecrypting = false;
+  String? _websiteFailure;
   String? _error;
+  String? _webHost;
+  String? _selectionError;
 
   List<PasswordEntry> _allEntries = [];
   List<PasswordEntry> _filteredEntries = [];
@@ -50,6 +53,20 @@ class _AutofillSelectionScreenState extends State<AutofillSelectionScreen> {
     });
 
     try {
+      final target = await _channel.invokeMapMethod<String, Object?>(
+        'getFillTarget',
+      );
+      if (!mounted) return;
+      final websiteFailure = target?['websiteFailure'] as String?;
+      if (websiteFailure != null) {
+        setState(() {
+          _websiteFailure = websiteFailure;
+          _isAuthenticating = false;
+        });
+        return;
+      }
+      _webHost = target?['webHost'] as String?;
+
       final authService = AuthService();
       final isBiometricEnabled = await authService.isBiometricEnabled();
       if (!isBiometricEnabled) {
@@ -147,18 +164,34 @@ class _AutofillSelectionScreenState extends State<AutofillSelectionScreen> {
   }
 
   Future<void> _selectEntry(PasswordEntry entry) async {
-    setState(() => _isDecrypting = true);
+    if (_isDecrypting) return;
+    setState(() {
+      _isDecrypting = true;
+      _selectionError = null;
+    });
 
     try {
       final content = await PasswordService.instance.decryptContent(entry);
+      if (!mounted) return;
       await _channel.invokeMethod('fillCredentials', {
         'username': content.username,
         'password': content.password,
-        'title': entry.title,
+        'url': content.url,
       });
-    } catch (e) {
+    } on PlatformException catch (e) {
+      if (!mounted) return;
       setState(() {
-        _error = 'Failed to decrypt entry';
+        _selectionError = switch (e.code) {
+          'website_mismatch' => 'This entry needs an HTTPS URL for $_webHost.',
+          'no_values' => 'This entry has no value for the requested fields.',
+          _ => 'Could not fill this entry.',
+        };
+        _isDecrypting = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _selectionError = 'Failed to decrypt entry.';
         _isDecrypting = false;
       });
     }
@@ -208,6 +241,23 @@ class _AutofillSelectionScreenState extends State<AutofillSelectionScreen> {
   }
 
   Widget _buildBody() {
+    if (_websiteFailure != null) {
+      final reason = switch (_websiteFailure) {
+        'AF01' => 'Website autofill requires Android 9 or later.',
+        'AF02' => 'The browser did not report a website for this field.',
+        'AF03' => 'The browser did not say whether this field uses HTTPS.',
+        'AF04' => 'This field was not reported as HTTPS.',
+        'AF05' => 'The website reported for this field could not be read.',
+        _ => 'Latch could not verify the website for this field.',
+      };
+      return _buildMessageState(
+        icon: Icons.language,
+        title: 'Cannot verify this website',
+        subtitle: '$reason\n\nAutofill code: $_websiteFailure',
+        showRetry: false,
+      );
+    }
+
     if (_isAuthenticating || _isDecrypting) {
       return Center(
         child: Column(
@@ -276,6 +326,27 @@ class _AutofillSelectionScreenState extends State<AutofillSelectionScreen> {
 
     return Column(
       children: [
+        if (_webHost != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+            child: Text(
+              'Filling on $_webHost',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: context.textSecondary),
+            ),
+          ),
+        if (_selectionError != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+            child: Semantics(
+              liveRegion: true,
+              child: Text(
+                _selectionError!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ),
+          ),
         _buildSearchField(),
         Expanded(child: _buildList()),
       ],
