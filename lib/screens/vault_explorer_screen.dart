@@ -74,44 +74,53 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
       return _buildSelectionAppBar(selectedFiles);
     }
 
-    final title = folderAsync.when(
-      loading: () => 'File Explorer',
-      error: (_, __) => 'File Explorer',
-      data: (folder) => folder?.name ?? 'File Explorer',
-    );
+    // `.value` keeps the previous folder name during refreshes, so the title
+    // doesn't flip back to "My Vault" while provider data is reloading.
+    final title = folderAsync.value?.name ?? 'My Vault';
 
     return AppBar(
       backgroundColor: Colors.transparent,
       elevation: 0,
-      title: Text(
-        title,
-        style: TextStyle(
-          fontFamily: 'GoogleSansFlex',
-          fontWeight: FontWeight.bold,
-          fontSize: 18,
-          color: context.textPrimary,
-        ),
-      ),
+      title: FolderBreadcrumbWidget(title: title),
       actions: [
-        IconButton(
-          icon: Icon(Icons.note_outlined, color: context.textSecondary),
-          tooltip: 'Notes',
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const NoteListScreen()),
-            );
+        PopupMenuButton<String>(
+          icon: Icon(Icons.more_vert, color: context.textSecondary),
+          tooltip: 'More options',
+          onSelected: (value) {
+            if (value == 'notes') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const NoteListScreen()),
+              );
+            } else if (value == 'passwords') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const PasswordListScreen()),
+              );
+            }
           },
-        ),
-        IconButton(
-          icon: Icon(Icons.password, color: context.textSecondary),
-          tooltip: 'Passwords',
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const PasswordListScreen()),
-            );
-          },
+          itemBuilder: (context) => const [
+            PopupMenuItem<String>(
+              value: 'notes',
+              child: Row(
+                children: [
+                  Icon(Icons.note_outlined, size: 20),
+                  SizedBox(width: 12),
+                  Text('Notes'),
+                ],
+              ),
+            ),
+            PopupMenuItem<String>(
+              value: 'passwords',
+              child: Row(
+                children: [
+                  Icon(Icons.password, size: 20),
+                  SizedBox(width: 12),
+                  Text('Passwords'),
+                ],
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -157,7 +166,6 @@ class _VaultExplorerScreenState extends ConsumerState<VaultExplorerScreen> {
   Widget _buildBody() {
     return Column(
       children: [
-        const FolderBreadcrumbWidget(),
         const ExplorerToolbar(),
         Expanded(
           child: ExplorerFileGrid(
