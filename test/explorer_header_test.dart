@@ -10,11 +10,7 @@ import 'package:locker/widgets/folder_breadcrumb_widget.dart';
 void main() {
   final now = DateTime(2026);
   final folders = [
-    VaultFolder(
-        id: 'photos',
-        name: 'Photos',
-        createdAt: now,
-        updatedAt: now),
+    VaultFolder(id: 'photos', name: 'Photos', createdAt: now, updatedAt: now),
     VaultFolder(
         id: 'trips',
         name: 'Trips',
@@ -102,9 +98,7 @@ void main() {
   });
 
   testWidgets('header survives large text on a narrow screen', (tester) async {
-    await pumpAt(
-        tester,
-        subject(width: 320, folderId: 'trips', textScale: 2.0),
+    await pumpAt(tester, subject(width: 320, folderId: 'trips', textScale: 2.0),
         const Size(320, 640));
 
     expect(tester.takeException(), isNull);
