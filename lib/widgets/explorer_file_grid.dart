@@ -36,204 +36,117 @@ class ExplorerFileGrid extends ConsumerWidget {
     final tapOpensMedia =
         ref.watch(vaultSettingsProvider).value?.tapOpensMedia ?? true;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Type Filter Chips Bar
-        _buildTypeFilterBar(ref),
-
-        // Grid Content
-        Expanded(
-          child: subfoldersAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, _) => Center(
-              child: Text(
-                'Error loading folders',
-                style: TextStyle(
-                    fontFamily: 'GoogleSansFlex', color: context.textSecondary),
-              ),
-            ),
-            data: (folders) {
-              return filesAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (error, _) => Center(
-                  child: Text(
-                    'Error loading files',
-                    style: TextStyle(
-                        fontFamily: 'GoogleSansFlex',
-                        color: context.textSecondary),
-                  ),
-                ),
-                data: (files) {
-                  final isListView = viewMode == ExplorerViewMode.list;
-                  final displayFolders = folders;
-
-                  if (displayFolders.isEmpty && files.isEmpty) {
-                    return _buildEmptyState(context);
-                  }
-
-                  // Combine folders and files into a single mixed list index
-                  final folderCount = displayFolders.length;
-                  final totalItems = folderCount + files.length;
-
-                  return RefreshIndicator(
-                    onRefresh: () async {
-                      ref.invalidate(explorerSubfoldersProvider);
-                      ref.invalidate(explorerFilesProvider);
-                      ref.invalidate(unfiledFilesProvider);
-                    },
-                    color: context.accentColor,
-                    child: isListView
-                        ? ListView.builder(
-                            padding: const EdgeInsets.all(12),
-                            itemCount: totalItems,
-                            itemBuilder: (context, index) {
-                              if (index < folderCount) {
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 8),
-                                  child: _buildFolderListItem(
-                                    context,
-                                    ref,
-                                    displayFolders[index],
-                                  ),
-                                );
-                              }
-                              final file = files[index - folderCount];
-                              final isSelected =
-                                  selectedFiles.contains(file.id);
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: _buildFileListItem(
-                                  context,
-                                  ref,
-                                  file,
-                                  files,
-                                  isSelected,
-                                  isSelectionMode,
-                                  tapOpensMedia,
-                                ),
-                              );
-                            },
-                          )
-                        : GridView.builder(
-                            padding: const EdgeInsets.all(12),
-                            gridDelegate: ResponsiveGridDelegate.responsive(
-                              context,
-                              compact: 3,
-                              medium: 4,
-                              expanded: 6,
-                              crossAxisSpacing: 8,
-                              mainAxisSpacing: 8,
-                              childAspectRatio: 1,
-                            ),
-                            itemCount: totalItems,
-                            itemBuilder: (context, index) {
-                              if (index < folderCount) {
-                                // Render Folder Card
-                                return _buildFolderGridItem(
-                                  context,
-                                  ref,
-                                  displayFolders[index],
-                                );
-                              } else {
-                                // Render File Card
-                                final fileIndex = index - folderCount;
-                                final file = files[fileIndex];
-                                final isSelected =
-                                    selectedFiles.contains(file.id);
-
-                                return _buildFileGridItem(
-                                  context,
-                                  ref,
-                                  file,
-                                  files, // Pass displaying files list for the viewer carousel
-                                  isSelected,
-                                  isSelectionMode,
-                                  tapOpensMedia,
-                                );
-                              }
-                            },
-                          ),
-                  );
-                },
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTypeFilterBar(WidgetRef ref) {
-    final activeFilter = ref.watch(explorerFileTypeFilterProvider);
-
-    return Container(
-      height: 48,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: [
-          _buildFilterChip(ref,
-              label: 'All', value: null, isActive: activeFilter == null),
-          _buildFilterChip(ref,
-              label: 'Images',
-              value: VaultedFileType.image,
-              isActive: activeFilter == VaultedFileType.image),
-          _buildFilterChip(ref,
-              label: 'Videos',
-              value: VaultedFileType.video,
-              isActive: activeFilter == VaultedFileType.video),
-          _buildFilterChip(ref,
-              label: 'Songs',
-              value: VaultedFileType.song,
-              isActive: activeFilter == VaultedFileType.song),
-          _buildFilterChip(ref,
-              label: 'Documents',
-              value: VaultedFileType.document,
-              isActive: activeFilter == VaultedFileType.document),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterChip(
-    WidgetRef ref, {
-    required String label,
-    required VaultedFileType? value,
-    required bool isActive,
-  }) {
-    final context = ref.context;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 8.0),
-      child: FilterChip(
-        label: Text(
-          label,
+    return subfoldersAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, _) => Center(
+        child: Text(
+          'Error loading folders',
           style: TextStyle(
-            fontFamily: 'GoogleSansFlex',
-            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-            color: isActive ? Colors.white : context.textPrimary,
-            fontSize: 12,
-          ),
-        ),
-        selected: isActive,
-        onSelected: (_) {
-          ref.read(explorerFileTypeFilterProvider.notifier).state = value;
-        },
-        selectedColor: context.accentColor,
-        backgroundColor: context.backgroundSecondary,
-        checkmarkColor: Colors.white,
-        showCheckmark: false,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(
-            color: isActive
-                ? context.accentColor
-                : context.borderColor.withValues(alpha: 0.5),
-            width: 1,
-          ),
+              fontFamily: 'GoogleSansFlex', color: context.textSecondary),
         ),
       ),
+      data: (folders) {
+        return filesAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, _) => Center(
+            child: Text(
+              'Error loading files',
+              style: TextStyle(
+                  fontFamily: 'GoogleSansFlex', color: context.textSecondary),
+            ),
+          ),
+          data: (files) {
+            final isListView = viewMode == ExplorerViewMode.list;
+            final displayFolders = folders;
+
+            if (displayFolders.isEmpty && files.isEmpty) {
+              return _buildEmptyState(context);
+            }
+
+            // Combine folders and files into a single mixed list index
+            final folderCount = displayFolders.length;
+            final totalItems = folderCount + files.length;
+
+            return RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(explorerSubfoldersProvider);
+                ref.invalidate(explorerFilesProvider);
+                ref.invalidate(unfiledFilesProvider);
+              },
+              color: context.accentColor,
+              child: isListView
+                  ? ListView.builder(
+                      padding: const EdgeInsets.all(12),
+                      itemCount: totalItems,
+                      itemBuilder: (context, index) {
+                        if (index < folderCount) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: _buildFolderListItem(
+                              context,
+                              ref,
+                              displayFolders[index],
+                            ),
+                          );
+                        }
+                        final file = files[index - folderCount];
+                        final isSelected = selectedFiles.contains(file.id);
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _buildFileListItem(
+                            context,
+                            ref,
+                            file,
+                            files,
+                            isSelected,
+                            isSelectionMode,
+                            tapOpensMedia,
+                          ),
+                        );
+                      },
+                    )
+                  : GridView.builder(
+                      padding: const EdgeInsets.all(12),
+                      gridDelegate: ResponsiveGridDelegate.responsive(
+                        context,
+                        compact: 3,
+                        medium: 4,
+                        expanded: 6,
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
+                        childAspectRatio: 1,
+                      ),
+                      itemCount: totalItems,
+                      itemBuilder: (context, index) {
+                        if (index < folderCount) {
+                          // Render Folder Card
+                          return _buildFolderGridItem(
+                            context,
+                            ref,
+                            displayFolders[index],
+                          );
+                        } else {
+                          // Render File Card
+                          final fileIndex = index - folderCount;
+                          final file = files[fileIndex];
+                          final isSelected = selectedFiles.contains(file.id);
+
+                          return _buildFileGridItem(
+                            context,
+                            ref,
+                            file,
+                            files, // Pass displaying files list for the viewer carousel
+                            isSelected,
+                            isSelectionMode,
+                            tapOpensMedia,
+                          );
+                        }
+                      },
+                    ),
+            );
+          },
+        );
+      },
     );
   }
 

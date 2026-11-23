@@ -5,123 +5,136 @@ import '../providers/vault_providers.dart';
 import '../providers/explorer_providers.dart';
 import '../themes/app_colors.dart';
 
+/// Compact app bar title for the file explorer.
+///
+/// Shows "My Vault" at the root, or the current folder name when inside a
+/// folder. Tapping it opens the folder path as a menu so any ancestor (including
+/// My Vault) can be opened directly, replacing the full-width breadcrumb strip.
 class FolderBreadcrumbWidget extends ConsumerWidget {
-  const FolderBreadcrumbWidget({super.key});
+  final String title;
+
+  const FolderBreadcrumbWidget({super.key, required this.title});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentId = ref.watch(explorerCurrentFolderIdProvider);
-    final foldersAsync = ref.watch(foldersProvider);
+    final allFolders =
+        ref.watch(foldersProvider).value ?? const <VaultFolder>[];
+    final path = _resolvePath(allFolders, currentId);
 
-    return foldersAsync.when(
-      loading: () => const SizedBox(height: 48),
-      error: (_, __) => const SizedBox(height: 48),
-      data: (allFolders) {
-        // Resolve path to current folder
-        final path = <VaultFolder>[];
-        String? tempId = currentId;
-
-        while (tempId != null) {
-          final match = allFolders.where((f) => f.id == tempId);
-          if (match.isEmpty) break;
-          final folder = match.first;
-          path.insert(0, folder);
-          tempId = folder.parentId;
-        }
-
-        return Container(
-          height: 48,
-          alignment: Alignment.centerLeft,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: context.backgroundSecondary.withValues(alpha: 0.5),
-            border: Border(
-              bottom: BorderSide(
-                color: context.borderColor,
-                width: 1,
+    return PopupMenuButton<String?>(
+      onSelected: (id) {
+        ref.read(explorerCurrentFolderIdProvider.notifier).state = id;
+      },
+      offset: const Offset(0, 44),
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 200),
+      itemBuilder: (context) => _buildPathItems(context, path, currentId),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.sizeOf(context).width * 0.45,
+            ),
+            child: Text(
+              title,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'GoogleSansFlex',
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: context.textPrimary,
               ),
             ),
           ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // "My Vault" (Root Segment)
-                _buildBreadcrumbSegment(
-                  context,
-                  ref,
-                  title: 'My Vault',
-                  id: null,
-                  isLast: path.isEmpty,
-                ),
-
-                // Folder segments
-                ...path.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final folder = entry.value;
-                  final isLast = index == path.length - 1;
-
-                  return Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                        child: Icon(
-                          Icons.chevron_right,
-                          size: 16,
-                          color: context.textTertiary,
-                        ),
-                      ),
-                      _buildBreadcrumbSegment(
-                        context,
-                        ref,
-                        title: folder.name,
-                        id: folder.id,
-                        isLast: isLast,
-                      ),
-                    ],
-                  );
-                }),
-              ],
-            ),
-          ),
-        );
-      },
+          const SizedBox(width: 4),
+          Icon(Icons.expand_more, size: 18, color: context.textSecondary),
+        ],
+      ),
     );
   }
 
-  Widget _buildBreadcrumbSegment(
+  /// Walks parent links to build the folder chain from root to current folder.
+  List<VaultFolder> _resolvePath(
+    List<VaultFolder> allFolders,
+    String? currentId,
+  ) {
+    final path = <VaultFolder>[];
+    String? cursor = currentId;
+
+    while (cursor != null) {
+      final index = allFolders.indexWhere((folder) => folder.id == cursor);
+      if (index == -1) break;
+      final folder = allFolders[index];
+      path.insert(0, folder);
+      cursor = folder.parentId;
+    }
+
+    return path;
+  }
+
+  List<PopupMenuEntry<String?>> _buildPathItems(
     BuildContext context,
-    WidgetRef ref, {
-    required String title,
-    required String? id,
-    required bool isLast,
+    List<VaultFolder> path,
+    String? currentId,
+  ) {
+    return [
+      _buildPathItem(
+        context,
+        value: null,
+        label: 'My Vault',
+        depth: 0,
+        isCurrent: currentId == null,
+      ),
+      ...path.asMap().entries.map((entry) {
+        final folder = entry.value;
+        return _buildPathItem(
+          context,
+          value: folder.id,
+          label: folder.name,
+          depth: entry.key + 1,
+          isCurrent: folder.id == currentId,
+        );
+      }),
+    ];
+  }
+
+  PopupMenuItem<String?> _buildPathItem(
+    BuildContext context, {
+    required String? value,
+    required String label,
+    required int depth,
+    required bool isCurrent,
   }) {
-    return InkWell(
-      onTap: isLast
-          ? null
-          : () {
-              ref.read(explorerCurrentFolderIdProvider.notifier).state = id;
-            },
-      borderRadius: BorderRadius.circular(4),
+    return PopupMenuItem<String?>(
+      value: value,
+      enabled: !isCurrent,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-        child: Text(
-          title,
-          style: TextStyle(
-            fontFamily: 'GoogleSansFlex',
-            fontSize: 13,
-            fontWeight: isLast ? FontWeight.bold : FontWeight.w500,
-            color: isLast ? context.textPrimary : context.accentColor,
-          ),
+        padding: EdgeInsets.only(left: depth * 12.0),
+        child: Row(
+          children: [
+            Icon(
+              depth == 0 ? Icons.home_outlined : Icons.folder_outlined,
+              size: 18,
+              color: isCurrent ? context.accentColor : context.textSecondary,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontFamily: 'GoogleSansFlex',
+                  fontSize: 13,
+                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                  color: isCurrent ? context.accentColor : context.textPrimary,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
-}
-
-// Custom helper alignment class to bypass standard Alignment center vertical limitations
-class CenterPlayAlign {
-  static const Alignment center = Alignment(0.0, 0.0);
 }
