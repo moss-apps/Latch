@@ -1,167 +1,131 @@
-# Media Encryption & Compression
+# Media encryption and compression
 
-## System Overview
+This is the short version of how files get into the vault, get compressed, and
+get encrypted.
+
+## How it fits together
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         User Interface                          │
-│   Gallery / Explorer / Viewer / Note & Password editors         │
-└──────────────────────────────┬──────────────────────────────────┘
-                               │
-┌──────────────────────────────▼──────────────────────────────────┐
-│                     Riverpod Providers                          │
-│   VaultNotifier · AlbumsNotifier · FoldersNotifier · etc.       │
-└──────────────────────────────┬──────────────────────────────────┘
-                               │
-┌──────────────────────────────▼──────────────────────────────────┐
-│                        Service Layer                            │
-│  VaultService ── FileImportService ── CompressionService        │
-│       │                              │            │             │
-│       │                   EncryptionService (facade)            │
-│       │                              │            │             │
-│       ▼                              ▼            ▼             │
-│  CryptoIsolatePool            lib/crypto/ (pure)                │
-│  (2 background workers)       AesGcmCipher · AesCtrCipher       │
-│                               KeyDerivation · HeaderCodec       │
-│                               KeyWrap                           │
-└─────────────────────────────────────────────────────────────────┘
+UI (gallery, explorer, viewer, note/password editors)
+        │
+        ▼
+Riverpod providers (VaultNotifier, AlbumsNotifier, FoldersNotifier, …)
+        │
+        ▼
+Service layer
+  VaultService ── FileImportService ── CompressionService
+                        │
+                 EncryptionService (facade)
+                        │
+              CryptoIsolatePool (2 workers)
+                        │
+          lib/crypto/ (pure crypto code)
+          AesGcmCipher · AesCtrCipher
+          KeyDerivation · HeaderCodec · KeyWrap
 ```
 
-`EncryptionService` is a facade: it owns key storage (secure storage I/O),
-key caching, and file-streaming orchestration, delegating crypto to the
-pure modules in `lib/crypto/`. Heavy encrypt/decrypt runs on a 2-worker
-`CryptoIsolatePool` to keep the UI thread responsive.
+`EncryptionService` is a facade. It handles key storage in secure storage, key
+caching, and file-streaming orchestration, and hands the actual crypto to the
+pure modules in `lib/crypto/`. Heavy encrypt/decrypt work runs on a two-worker
+`CryptoIsolatePool` so the UI doesn't freeze.
 
-## Import Pipeline
+## Import pipeline
 
-1. User selects file(s) from gallery / documents / camera
-2. `FileImportService` orchestrates: duplicate detection (`MediaScannerService`) → optional compression → streaming encryption (`CryptoIsolatePool`) → index update (`VaultService`)
-3. `VaultedFile` metadata written to `vault_file_index`
+1. You pick files from the gallery, documents, or camera.
+2. `FileImportService` runs duplicate detection (`MediaScannerService`), optional
+   compression, streaming encryption on the isolate pool, then updates the index
+   through `VaultService`.
+3. `VaultedFile` metadata is written through `LocalStore` — PocketBase first,
+   with the legacy secure-storage index as fallback.
 
 ## Compression
 
-Opt-in per import, handled by `CompressionService`:
+Compression is opt-in per import and handled by `CompressionService`.
 
-- **Images**: bicubic resize (max 4096×4096) via `flutter_bicubic_resize`, JPEG quality 95. PNGs pass through uncompressed.
-- **Video**: `video_compress` is the primary path. An `ffmpeg` shell-out (`libx264`, CRF 18, AAC 192k) exists but only works where a system `ffmpeg` binary is present, and is effectively a no-op on stock Android.
+- **Images:** bicubic resize (max 4096×4096) using `flutter_bicubic_resize`,
+  JPEG quality 95. PNGs pass through unchanged.
+- **Video:** `video_compress` is the main path. There's also an `ffmpeg`
+  shell-out (`libx264`, CRF 18, AAC 192k), but it only works when a system
+  `ffmpeg` binary exists, which effectively means it does nothing on stock
+  Android.
 
-## Encryption Modes
+## Encryption modes
 
-Selectable via the Encryption Settings screen:
+You choose the mode in Encryption Settings.
 
 ### AES-256-GCM (default)
+
 - 16-byte IV + 16-byte auth tag
 - Magic bytes: `0x4C4B5232` (v2 header)
-- Authenticated encryption; default for new media
+- Authenticated encryption, and the default for new media
 
 ### AES-256-CTR
+
 - 16-byte IV, no auth tag
 - Magic bytes: `0x4C4B5253`
-- Opt-in for performance
+- Opt-in, mainly for performance
+
+Encrypted files are laid out as:
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                     Encryption Flow                          │
-├──────────────────────────────────────────────────────────────┤
-│                                                              │
-│  ┌──────────────┐                                            │
-│  │ Source File  │                                            │
-│  └──────┬───────┘                                            │
-│         ↓                                                    │
-│  ┌──────────────────────────────────────────────────────────┐│
-│  │              Algorithm Selection                  │       │
-│  │  ┌─────────────────┐   ┌─────────────────────┐   │       │
-│  │  │   AES-256-CTR   │   │    AES-256-GCM      │   │       │
-│  │  │  16-byte IV     │   │   16-byte IV        │   │       │
-│  │  │  No auth tag    │   │   16-byte auth tag  │   │       │
-│  │  └────────┬────────┘   └──────────┬──────────┘   │       │
-│  └───────────┼───────────────────────┼──────────────┘       │
-│              ↓                       ↓                       │
-│  ┌─────────────────┐   ┌─────────────────────────┐         │
-│  │ Stream encrypt  │   │ Encrypt + auth tag      │         │
-│  │ in 1MB chunks   │   │ appended to each file   │         │
-│  └────────┬────────┘   └────────────┬────────────┘         │
-│           ↓                          ↓                      │
-│  ┌────────────────────────────────────────────────┐         │
-│  │              Vault Storage                     │         │
-│  │  [magic][IV][ciphertext][auth tag (GCM)]      │         │
-│  └────────────────────────────────────────────────┘         │
-│                                                              │
-└──────────────────────────────────────────────────────────────┘
+[magic][IV][ciphertext][auth tag (GCM only)]
 ```
 
-## Key Derivation
+Files are stream-encrypted in 1 MB chunks.
 
-### Master key wrapping (H1)
+## Key derivation
 
-The vault master key is wrapped by an Argon2id-derived key-wrapping key
-(KWK) from the user's credential:
+### Wrapping the master key
 
-```
-User Password/PIN
-         │
-         ↓
-┌──────────────────────────────┐
-│  Argon2id                    │
-│  • iterations: 3             │
-│  • memory: 2^14 KiB          │
-│  • salt: 32-byte random      │
-│  • key length: 32 bytes      │
-└──────────────┬───────────────┘
-               ↓
-       256-bit Key-Wrapping Key (KWK)
-               │
-               ↓
-┌──────────────────────────────┐
-│  AES-256-GCM (KeyWrap)       │
-│  wraps the master key        │
-└──────────────────────────────┘
-```
-
-Legacy vaults (raw master key) migrate transparently on next unlock: raw
-key is read, wrapped, then deleted.
-
-### Per-file key derivation (PBKDF2)
-
-Each encrypted file derives a per-file key from the master key:
+The vault master key is wrapped by a key-wrapping key (KWK) derived from your
+PIN or password:
 
 ```
-Master Key
-         │
-         ↓
-┌──────────────────────────────┐
-│  PBKDF2-HMAC-SHA256          │
-│  • Iterations: 600,000       │
-│  • Salt: 32-byte random      │
-│  • Key length: 32 bytes      │
-│  • Configurable iterations   │
-└──────────────┬───────────────┘
-               ↓
-       Per-file 256-bit Key
+PIN/password
+    → Argon2id (3 iterations, 2^14 KiB memory, 32-byte random salt, 32-byte key)
+    → 256-bit KWK
+    → AES-256-GCM KeyWrap around the master key
 ```
 
-- Each credential and file gets a unique 32-byte random salt, stored alongside the derived hash, preventing rainbow-table attacks across vaults.
-- Pre-PBKDF2 vaults stored passwords as plain SHA-256; on unlock these are detected and auto-migrated to PBKDF2 (decoy credentials migrated with separate salted hashing).
+Legacy vaults that stored a raw master key migrate on the next unlock: Latch
+reads the raw key, wraps it, then deletes the raw copy.
 
-## Re-Encryption (Algorithm Migration)
+### Per-file keys
 
-Changing the encryption algorithm (e.g., CTR → GCM) re-encrypts existing
-vault files:
+Each encrypted file gets its own key derived from the master key:
 
-1. Select new algorithm in Encryption Settings.
+```
+master key
+    → PBKDF2-HMAC-SHA256 (600,000 iterations, 32-byte random salt, 32-byte key)
+    → per-file 256-bit key
+```
+
+Every credential and file gets its own 32-byte random salt, stored next to the
+derived hash, so rainbow tables don't help across vaults. Pre-PBKDF2 vaults
+stored passwords as plain SHA-256; those are detected on unlock and migrated
+automatically (decoy credentials get separate salted hashing too).
+
+## Re-encryption
+
+Switching algorithms (say CTR → GCM) re-encrypts existing vault files:
+
+1. Pick the new algorithm in Encryption Settings.
 2. Decrypt each vault file with the old algorithm.
-3. Encrypt plaintext with the new algorithm.
+3. Encrypt the plaintext with the new one.
 4. Verify integrity (GCM auth tag).
 5. Replace the vault file with the new-format file.
-6. Update vault index metadata.
+6. Update the vault index metadata.
 7. Secure-delete the temporary plaintext.
 
-`ReEncryptNotifier` tracks per-file progress and reports success/failure to
-the UI. On any failure the operation aborts and original files are
-untouched.
+`ReEncryptNotifier` tracks per-file progress and reports success/failure to the
+UI. If anything fails, the operation aborts and the original files are left
+alone.
 
-### Security guarantees
-- Plaintext intermediates go to app-private temp (`getApplicationDocumentsDirectory()/.locker_temp/`), never system temp, and are `secureDelete`d on completion or failure.
-- Small files use the in-memory GCM path (no plaintext on disk).
+## What this protects
+
+- Plaintext intermediates go to app-private temp
+  (`getApplicationDocumentsDirectory()/.locker_temp/`), never system temp, and
+  are `secureDelete`d on completion or failure.
+- Small files use the in-memory GCM path, so no plaintext touches disk.
 - On cancellation or failure, original vault files are untouched.
 - GCM auth-tag validation catches corruption during migration.

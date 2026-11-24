@@ -1,8 +1,8 @@
 # Phase 1 — Quick Wins Report
 
-**Date:** 2026-09-01  
-**Version:** 0.17.2-beta.3+24 (same code, asset/config changes only)  
-**Baseline:** `docs/PHASE0_BASELINE.md` + `docs/baseline_artifacts/` (AAB 126.5 MB disk / 121 MB analysis, arm64 delivery 47.37 MB)  
+**Date:** 2026-09-01
+**Version:** 0.17.2-beta.3+24 (same code, asset/config changes only)
+**Baseline:** `PHASE0_BASELINE.md` + `baseline_artifacts/` (AAB 126.5 MB disk / 121 MB analysis, arm64 delivery 47.37 MB)
 **Flutter:** 3.44.4 / Dart 3.12.2 / Gradle 8.11.1 / AGP 8.9.1 / R8 8.9.32
 
 ## 1. Changes (git-tracked)
@@ -100,7 +100,7 @@ No ProGuard rule narrowing or `android.enableR8.fullMode` yet (Phase 2).
 ## 5. Artifacts (new)
 
 ```
-docs/phase1_artifacts/
+phase1_artifacts/
   aab-code-size-analysis_phase1.json  13 MB precompiler trace (138k entities, same shape)
   aab_contents_phase1.txt             unzip -l for app-release.aab
   apk_arm64_contents_phase1.txt       unzip -l for split arm64 APK
@@ -108,7 +108,7 @@ docs/phase1_artifacts/
   bundletool_phase1_total.txt         MIN,MAX 6,513,759–28,878,088
   bundletool_phase1_dimensions.txt    SDK,ABI table (see §2)
   app-release.aab                     61 MB copy
-docs/baseline_artifacts/              retained for diff
+baseline_artifacts/              retained for diff
 ```
 
 ## 6. Repro (single-command verification)

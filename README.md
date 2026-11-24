@@ -12,176 +12,180 @@
 
 ---
 
-Latch is a private vault for Android, written in Flutter. It hides photos,
-videos, audio, documents, notes, and passwords behind PIN/password/biometric
-authentication. **Hiding is the default; file encryption is an explicit
-opt-in**, globally or per file. Session locking and optional background
-auto-kill control what happens when you leave the app.
+Latch is a private vault for Android. It keeps photos, videos, audio, documents,
+notes, and passwords behind a PIN, password, or biometric unlock. Hiding is the
+default. **Encrypting files is opt-in**, either globally or per file. Session
+locking and optional background auto-kill decide what happens when you leave
+the app.
 
-> On Google Play: [Download Latch](https://play.google.com/store/apps/details?id=com.mossapps.locker).
+> [Download Latch on Google Play](https://play.google.com/store/apps/details?id=com.mossapps.locker).
 
-## Features
+## What it does
 
 **Vault**
-- Import from gallery, camera, or files; optionally delete the originals
-- Share file attachments to Latch from other Android apps (sources stay intact)
-- Duplicate detection on import
-- Per-file encryption settings and compression
-- Local ZIP backup/restore, desktop backup/restore, and manual WebDAV sync
-- Recently Deleted: local recovery for 30 days by default; choose 7/30/90 days
-  or immediate deletion, restore before expiry, or explicitly delete permanently
+- Import from the gallery, camera, or files, and optionally delete the originals
+- Share files to Latch from other Android apps; the source stays where it is
+- Catch duplicate imports
+- Choose per-file encryption and compression
+- Back up locally as a ZIP, back up to a desktop, or sync with WebDAV
+- Recover deleted items for 30 days by default (7, 30, or 90 days, or delete
+  immediately), and restore them before the deadline
 
-**Organization**
+**Organizing**
 - Nested folders with drag-and-drop, breadcrumbs, and a tree view
-- Albums, color-coded tags, favorites
-- Grid/list explorer with filters, multi-select, sorting (date, name, size, type)
-- Search across name, tags, type, and date
-- Saved smart collections, including Untagged, Unencrypted, and Large Videos
-- Customizable bottom navigation with scrolling labels at narrow widths or large text sizes
+- Albums, color-coded tags, and favorites
+- Grid or list view with filters, multi-select, and sorting by date, name, size,
+  or type
+- Search by name, tag, type, or date
+- Saved smart collections such as Untagged, Unencrypted, and Large Videos
+- Customizable bottom navigation that still works at narrow widths and large
+  text sizes
 
 **Notes and passwords**
-- Plain-text and Markdown notes, with encryption choices and dedicated editors
-- Password entries with a dedicated editor and Android Autofill integration
-- To fill stored logins in other apps, choose **Latch** as the Android Autofill
-  service in system settings (usually Passwords & accounts → Autofill service)
-- Separately, optional **Autofill Credential** in Latch Security settings lets an
-  external password manager fill the *vault unlock* field; it is off by default
-  and is not the same feature as filling stored logins
+- Plain-text and Markdown notes with their own editors and encryption choices
+- Password entries with a dedicated editor and Android Autofill support
+- To fill saved logins in other apps, pick **Latch** as Android's Autofill
+  service (usually Passwords & accounts → Autofill service)
+- Separately, the optional **Autofill Credential** setting lets an external
+  password manager fill the *vault unlock* field. It's off by default and is not
+  the same thing as filling stored logins
 
 **Viewing**
-- Image viewer (pinch-zoom, slideshow)
-- Video player (speed, loop)
+- Image viewer with pinch-zoom and slideshow
+- Video player with speed and loop controls
 - Song player with Flick handoff
 - PDF and Office document viewer
-- Export to Downloads or external apps
+- Export to Downloads or another app
 
 **Security**
-- PIN or password unlock, with biometrics
-- AES-256-GCM (default algorithm when encryption is enabled) or AES-256-CTR,
-  with re-encryption of existing files; explicit per-file choices override the global default
-- Argon2id master-key wrapping; per-file PBKDF2
-- Inactivity/background session locking, Lock now, configurable auto-kill and screenshot protection
-- Best-effort secure deletion when permanently removing vault bytes or source files;
-  this does not guarantee erasure from flash storage
-- Decoy vault behind a separate PIN
+- PIN or password unlock, plus biometrics
+- AES-256-GCM by default when encryption is on, or AES-256-CTR; changing the
+  algorithm re-encrypts existing files, and per-file choices override the global
+  default
+- Argon2id wraps the master key; each file gets a PBKDF2-derived key
+- Session locking on inactivity or background, Lock now, optional auto-kill, and
+  screenshot protection
+- Best-effort secure deletion when you permanently remove files; this is not a
+  guarantee that flash storage is wiped
+- A decoy vault behind a separate PIN
 
 **Theme**
-- Accent colors, custom theming, glassmorphism unlock screen
+- Accent colors, custom themes, and a glassmorphism unlock screen
 
-## Recovery and backups
+## Recently Deleted and backups
 
 Open **Recently Deleted** from the vault drawer or Settings → Storage. Deleted
-items leave active lists, search, and password Autofill but still consume local
-storage, including thumbnails. Retention changes affect future deletions only.
-Expiry cleanup runs while unlocked and on the next unlock/resume, not as a
-guaranteed OS background job. New ZIP and desktop backups exclude trash.
+items disappear from lists, search, and password Autofill, but they still take
+up space, including thumbnails. Changing retention only affects future
+deletions. Cleanup runs while the vault is unlocked and again on unlock or
+resume; it is not a guaranteed background job. New ZIP and desktop backups skip
+the trash.
 
-Deletion records a WebDAV tombstone locally for the next sync; restoring makes
-the item eligible to sync again. Permanent deletion/expiry removes local bytes,
-**not existing backups or retained remote blobs**. See the
-[recovery policy](docs/recently_deleted.md) for interrupted-operation handling,
-storage accounting, and sync conflicts. Keep an external backup: uninstalling or
-clearing app data removes the local vault and Recently Deleted.
+A local delete records a WebDAV tombstone for the next sync. Restoring the item
+makes it eligible to sync again. Permanent deletion and expiry remove local
+bytes, but they do **not** touch existing backups or remote blobs that were
+already retained. The [recovery policy](docs/recently_deleted.md) covers
+interrupted operations, storage accounting, and sync conflicts. Keep an
+external backup: uninstalling or clearing app data removes the vault and its
+trash.
 
 ## WebDAV sync
 
-Settings → Storage → **Server Sync** connects the main vault to a user-chosen
-WebDAV server in push-only backup or two-way mode. Sync is manual, streams file
-transfers, reports byte progress, supports cancellation, and asks for review when
-versions conflict. The server must support the tested publication guards; unsafe
-servers are rejected rather than silently risking an overwrite.
+Settings → Storage → **Server Sync** connects the main vault to a WebDAV server
+you choose. You can run push-only backups or two-way sync. Sync is manual, streams
+files, reports byte progress, supports cancellation, and asks you to review
+conflicts instead of picking a winner for you. The server has to pass Latch's
+publication checks; an unsafe server is rejected rather than risking an
+overwrite.
 
 The manifest is encrypted, but **payloads are uploaded as stored**: hidden-only
-files remain unencrypted on the server. Enable file encryption if that is not
-acceptable. Prefer HTTPS; HTTP requires an explicit warning and is unsuitable
-for untrusted networks. WebDAV does not upload the vault master key, so a fresh
-device needs key continuity via desktop restore and the original vault credential.
-Album/folder definitions and smart-collection definitions do not sync. Details:
+files stay unencrypted on the server. Turn on file encryption if that's not okay.
+Use HTTPS. Plain HTTP needs an explicit warning and is a bad idea on an
+untrusted network. WebDAV never uploads the vault master key, so a fresh device
+needs key continuity from a desktop restore plus the original vault credential.
+Album, folder, and smart-collection definitions don't sync. More:
 [WebDAV design and recovery limits](docs/local_server_sync.md).
 
-## Moss Ecosystem
+## Flick
 
-Latch is part of the Moss ecosystem. **Flick** is the companion music
-player (UAC 2.0 DAC support). Latch can hand audio playback to Flick and
-return via `locker://return`. Details in the
-[Flick Integration Guide](docs/flick_integration.md).
+Latch can hand audio playback to **Flick**, the companion music player with UAC
+2.0 DAC support. Flick returns via `locker://return`. See the
+[Flick integration guide](docs/flick_integration.md).
 
-## Desktop Backup (Latch Web)
+## Desktop backup (latchd)
 
-`latchd` is a tiny companion you run on your desktop. It hosts a local
-web UI (`http://127.0.0.1:7800`, loopback only), shows a pairing QR, and
-receives vault backups from the phone over Wi-Fi or USB without a hosted
-account. The manifest/key bundle is encrypted; file payloads keep their existing
-encryption state, so hidden-only files are **not** made encrypted by backup.
-The pairing receiver uses token-gated HTTP, not TLS: use a trusted LAN or USB,
-especially for unencrypted files. It can also browse, verify, restore, and
-export-decrypt a backup.
+`latchd` is a small Go program you run on a desktop or laptop. It serves a local
+web UI at `http://127.0.0.1:7800`, shows a pairing QR, and receives vault backups
+from your phone over Wi-Fi or USB. No account, no hosted service. The manifest
+and key bundle are encrypted. File payloads keep their existing state, so
+hidden-only files are **not** encrypted by the backup. The pairing receiver uses
+token-gated HTTP, not TLS, so use a trusted LAN or USB, especially if some files
+are unencrypted. You can also browse, verify, restore, and export decrypted
+files from a backup.
 
 ### Installation
 
-**Linux** (amd64 / arm64) — one-line installer, installs to
-`~/.local/bin/latchd` with sha256 verification:
+**Linux** (amd64 / arm64): the one-line installer puts `latchd` in
+`~/.local/bin` and checks the SHA-256:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/moss-apps/Latch/HEAD/scripts/install-latchd.sh | bash
 ```
 
-Installer overrides (environment variables): `LATCHD_BINDIR` (install
-directory), `LATCHD_VERSION` (pin a release tag, e.g. `0.19.1-beta.2`),
-`LATCHD_REPO` (alternative fork).
+Installer overrides: `LATCHD_BINDIR` (install directory), `LATCHD_VERSION` (pin
+a release tag, e.g. `0.19.1-beta.2`), and `LATCHD_REPO` (use a fork).
 
-**Windows** — download `latchd-windows-amd64.exe` from
+**Windows**: download `latchd-windows-amd64.exe` from
 [releases](https://github.com/moss-apps/Latch/releases).
 
-**From source** — needs Go 1.26+ and Make; no repo clone required for the installer
-paths above:
+**From source**: needs Go 1.26+ and Make.
 
 ```bash
 make latchd          # builds ./latchd/latchd
 ```
 
-macOS is not supported yet (prebuilt binaries are Linux/Windows only).
+macOS isn't supported yet. Prebuilt binaries are Linux and Windows only.
 
 ### Configuration
 
-`latchd` needs no config file. Subcommands and their options:
+`latchd` doesn't need a config file. Commands and options:
 
-| Command | Purpose | Options |
-|---------|---------|---------|
+| Command | What it does | Options |
+|---------|--------------|---------|
 | `latchd serve` | Loopback web UI: pairing QR, browse, restore | `--addr 127.0.0.1:7800` (listen address), `--dir latch-backup` (backup directory) |
-| `latchd verify` | Verify a local backup against its manifest | `--dir latch-backup`, `--password` |
+| `latchd verify` | Check a local backup against its manifest | `--dir latch-backup`, `--password` |
 | `latchd export-decrypted` | Decrypt a local backup to plaintext | `--out <dir>` (required), `--dir latch-backup`, `--password` |
 | `latchd version` | Print the build version | — |
 
-The vault password comes from `--password`, the `LATCHD_PASSWORD`
-environment variable, or an interactive prompt. It is never stored and
-kept in memory only — prefer the prompt or env var over the flag.
+The vault password can come from `--password`, the `LATCHD_PASSWORD`
+environment variable, or an interactive prompt. It's never stored and only
+lives in memory. Prefer the prompt or the environment variable over the flag.
 
 Network defaults:
 
-- **Web UI:** `127.0.0.1:7800`, loopback only — never exposed to the LAN.
-- **Pairing receiver:** `0.0.0.0:7801` (fixed port so one firewall rule
-  covers every session; falls back to an ephemeral port if taken). It
-  exists only while a pairing session is active and is token-gated. On
-  Linux/ufw, latchd prints the exact rule at session start, e.g.
+- **Web UI:** `127.0.0.1:7800`, loopback only, never exposed to the LAN.
+- **Pairing receiver:** `0.0.0.0:7801` (a fixed port so one firewall rule covers
+  every session; it falls back to an ephemeral port if 7801 is taken). It only
+  exists while a pairing session is active and is token-gated. On Linux/ufw,
+  latchd prints the exact rule when the session starts, for example
   `sudo ufw allow from <lan-subnet> to any port 7801 proto tcp`.
-- **USB:** `adb reverse tcp:<port> tcp:<port>` (shown in the web UI),
-  then tap Connect via USB on the phone and Allow once on the desktop.
+- **USB:** `adb reverse tcp:<port> tcp:<port>` (shown in the web UI). Then tap
+  Connect via USB on the phone and Allow once on the desktop.
 
 ### Quick start
 
-1. Run `latchd serve` and open <http://127.0.0.1:7800>
-2. Start a pairing session (if your firewall asks, latchd prints the exact rule)
-3. Phone: Latch → Settings → Storage → Desktop Backup → scan the QR
+1. Run `latchd serve` and open <http://127.0.0.1:7800>.
+2. Start a pairing session. If your firewall asks, latchd prints the exact rule.
+3. On the phone: Latch → Settings → Storage → Desktop Backup → scan the QR.
 
-Full spec: [docs/desktop_backup.md](docs/desktop_backup.md).
+Full details: [docs/desktop_backup.md](docs/desktop_backup.md).
 
-## Technology Stack
+## Tech stack
 
-**Flutter**
+**Flutter packages**
 
-| Package | Purpose |
-|---------|---------|
+| Package | What it's for |
+|---------|---------------|
 | `flutter_riverpod` | State management |
 | `flutter_secure_storage` | Credentials and metadata |
 | `pointycastle` | AES-256 encryption |
@@ -199,51 +203,53 @@ Full spec: [docs/desktop_backup.md](docs/desktop_backup.md).
 
 **Kotlin / Android**
 
-| Component | Purpose |
-|-----------|---------|
+| Component | What it's for |
+|-----------|---------------|
 | `MainActivity.kt` | Auto-kill, performance settings, content URI handling |
-| `AutoKillService` | Removes app from recents when backgrounded |
+| `AutoKillService` | Removes the app from recents when backgrounded |
 | `PermissionHandler` | Runtime permission management |
 
-## Getting Started
+## Getting started
 
 **Android app prerequisites**
 
-- Flutter **3.47.2 stable** (the CI version; bundled Dart 3.13.2). The
-  `pubspec.yaml` Dart constraint is `>=3.4.4 <4.0.0`, not a Flutter version requirement.
-- JDK 17 and the Android SDK/NDK required by that Flutter toolchain; compile/target
-  SDK and NDK versions come from Flutter's Gradle configuration.
-- Android 8.0 (API 26)+ device/emulator. The bundled PocketBase sidecar build
-  currently targets **arm64-v8a**; rebuilding it needs **Go 1.27+**, Python 3 and Make
-  (`pocketbase/go.mod`). `make pb-linux` is available for host-side development.
-- For release signing, configure your own untracked `android/key.properties`
-  and keystore; never commit signing secrets or private symbol files.
+- Flutter **3.47.2 stable** (the CI version, bundled Dart 3.13.2). The
+  `pubspec.yaml` Dart constraint is `>=3.4.4 <4.0.0`; that's a Dart constraint,
+  not a Flutter version requirement.
+- JDK 17 and the Android SDK/NDK that Flutter expects; compile/target SDK and
+  NDK versions come from Flutter's Gradle configuration.
+- Android 8.0 (API 26)+ device or emulator. The bundled PocketBase sidecar
+  currently builds for **arm64-v8a** only. Rebuilding it needs **Go 1.27+**,
+  Python 3, and Make (`pocketbase/go.mod`). `make pb-linux` is there for
+  host-side development.
+- For release signing, set up your own untracked `android/key.properties` and
+  keystore. Never commit signing secrets or private symbol files.
 
 ```bash
 flutter pub get --enforce-lockfile
 make pb                                      # fresh, fingerprinted ARM64 sidecar
-make pb-verify                               # reads artifact; never runs it
+make pb-verify                               # reads the artifact; never runs it
 make android-release-aab                     # build + verify only; does NOT install
 flutter pub run flutter_launcher_icons       # regenerate icons (optional)
 ```
 
-Release builds reject a missing/stale PocketBase sidecar. Python 3 and Go are
-required for this read-only build gate. To verify an existing APK/AAB, run
-`python3 scripts/pocketbase_artifact.py verify <artifact-path>`.
-Do not use `flutter run`, install, uninstall, or clear app data on a live-vault
-device as a release test. Follow the approval/isolation preflight in the
-[stable release checklist](docs/stable_release_checklist.md); build success is
-not hardware acceptance or permission to publish.
+Release builds fail if the PocketBase sidecar is missing or stale. Python 3 and
+Go are required for that read-only build check. To check an existing APK/AAB,
+run `python3 scripts/pocketbase_artifact.py verify <artifact-path>`.
+Don't use `flutter run`, install, uninstall, or clear app data on a live-vault
+device as a release test. Follow the approval and isolation steps in the
+[stable release checklist](docs/stable_release_checklist.md). A successful build
+is not hardware acceptance or permission to publish.
 
 Checks: `dart format --output=none --set-exit-if-changed lib test`,
 `flutter analyze --no-pub`, and `flutter test --no-pub`. Building `latchd` is
-separate from the Android app and needs Go 1.26+; Node is only needed to rebuild
-its web assets with `make latchd-web`, not to use the committed embedded assets.
+separate and needs Go 1.26+. Node is only needed to rebuild its web assets with
+`make latchd-web`; the committed assets are enough to build and run it.
 
 ## Permissions
 
-| Permission | Purpose |
-|------------|---------|
+| Permission | Why |
+|------------|-----|
 | READ_EXTERNAL_STORAGE / WRITE_EXTERNAL_STORAGE | File access (Android ≤12) |
 | READ_MEDIA_IMAGES / READ_MEDIA_VIDEO | Media access (Android 13+) |
 | MANAGE_EXTERNAL_STORAGE | Full file access for hide/unhide (Android 11+) |
@@ -253,40 +259,46 @@ its web assets with `make latchd-web`, not to use the committed embedded assets.
 
 ## Architecture
 
-Service-based, split into four layers: **Services** (auth, encryption,
-file ops, media), **Providers** (Riverpod reactive state), **Screens**
+The app is service-based and split into four layers: **services** (auth,
+encryption, file ops, media), **providers** (Riverpod state), **screens**
 (feature UI), and a **Kotlin backend** (auto-kill, permissions, camera).
-Credentials/key wraps and recovery metadata use `flutter_secure_storage`
-backed by Android platform security. Payload encryption follows the file's
-chosen policy. Gallery picker coordination, drawer, thumbnails, and filtering
-are separate components/services rather than one screen. See
-[Media Encryption & Compression](docs/architecture_media.md).
+Credentials, key wraps, and recovery metadata live in `flutter_secure_storage`,
+backed by Android platform security. Payload encryption follows each file's
+policy. Gallery picker coordination, the drawer, thumbnails, and filtering are
+separate components instead of one giant screen. See
+[Media encryption & compression](docs/architecture_media.md).
 
 ## Documentation
 
-- [Media Encryption & Compression](docs/architecture_media.md): compression, encryption, file ops
-- [Unlock Autofill](docs/unlock_autofill.md): unlock credential autofill and its security model
-- [WebDAV Sync](docs/local_server_sync.md): setup model, server requirements, conflicts, and key continuity
-- [Recently Deleted](docs/recently_deleted.md): retention, permanent deletion, backup, and sync policy
-- [Phase 5 Device Checks](docs/phase5_testing.md): recovery, accessibility, and gallery regression checklist
-- [Stable Release Checklist](docs/stable_release_checklist.md): no-install build checks, isolation, and recorded hardware sign-off
-- [Flick Integration Guide](docs/flick_integration.md): Flick playback handoff contract
+The [documentation index](docs/README.md) lists the current guides and the
+archive of completed plans.
+
+- [Media encryption & compression](docs/architecture_media.md): import pipeline, encryption, compression, and file operations
+- [Embedded PocketBase](docs/embedded_pocketbase.md): local metadata sidecar, security boundary, and hardware check
+- [Desktop backup & restore](docs/desktop_backup.md): latchd pairing, backup layout, restore, and limits
+- [Unlock Autofill](docs/unlock_autofill.md): unlock credential autofill and what it gives up
+- [WebDAV sync](docs/local_server_sync.md): server requirements, conflicts, and key continuity
+- [Recently Deleted](docs/recently_deleted.md): retention, permanent deletion, backups, and sync
+- [Device checks](docs/phase5_testing.md): recovery, accessibility, and gallery regression checklist
+- [Stable release checklist](docs/stable_release_checklist.md): build checks, isolation, and hardware sign-off
+- [Flick integration](docs/flick_integration.md): playback handoff contract
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, checks, and invariants.
-Security issues go through [SECURITY.md](SECURITY.md) — never a public issue.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, checks, and the rules we don't
+bend. Security issues go through [SECURITY.md](SECURITY.md), never a public
+issue.
 
 ## License
 
-MIT, see [LICENSE](LICENSE). Free, no ads, no paid features.
+MIT. Free, no ads, no paid features.
 
 ## Contributors
-  
+
 - [@ultraelectronica](https://github.com/ultraelectronica) (creator)
 
 ## Transparency
 
-I build this with [OpenCode](https://opencode.ai). It writes some of the
-comments and docs, and it's bailed me out of more than a few nasty-ass bugs.
-The code, the design calls, and the fuck-ups are all mine.
+I build this with [OpenCode](https://opencode.ai). It writes some of the comments
+and docs, and it has bailed me out of more than a few nasty bugs. The code, the
+design calls, and the fuck-ups are mine.

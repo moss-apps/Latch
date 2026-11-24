@@ -6,7 +6,7 @@
 **Gradle:** 8.11.1 / AGP 8.9.1 / Kotlin 2.1.0 / R8 8.9.32  
 **Device attached:** A063 (Android 15, SDK 35, arm64-v8a) — 7.4 GB RAM
 
-Artifacts saved under `docs/baseline_artifacts/`:
+Artifacts saved under `baseline_artifacts/`:
 - `aab-code-size-analysis_2026-09-01.json` — Dart DevTools app-size JSON (precompiler trace w/ 138k entities)
 - `aab_contents_2026-09-01.txt` — `unzip -l` for AAB
 - `apk_contents_2026-09-01.txt` — `unzip -l` for APK
@@ -217,11 +217,11 @@ Current static config (50 MB imageCache + 200-entry thumbnail cache + 33 MB PB r
 # 1. Fresh size analysis
 flutter build appbundle --analyze-size --target-platform android-arm64
 # Output logged to terminal; JSON at ~/.flutter-devtools/aab-code-size-analysis_01.json
-# (copied to docs/baseline_artifacts/aab-code-size-analysis_2026-09-01.json)
+# (copied to baseline_artifacts/aab-code-size-analysis_2026-09-01.json)
 
 # 2. ZIP listings
-unzip -l build/app/outputs/bundle/release/latch_0.17.2-beta.3.aab | sort -k1 -n -r > docs/baseline_artifacts/aab_contents_2026-09-01.txt
-unzip -l build/app/outputs/flutter-apk/latch_0.17.2-beta.3.apk | sort -k1 -n -r > docs/baseline_artifacts/apk_contents_2026-09-01.txt
+unzip -l build/app/outputs/bundle/release/latch_0.17.2-beta.3.aab | sort -k1 -n -r > baseline_artifacts/aab_contents_2026-09-01.txt
+unzip -l build/app/outputs/flutter-apk/latch_0.17.2-beta.3.apk | sort -k1 -n -r > baseline_artifacts/apk_contents_2026-09-01.txt
 
 # 3. Bundletool delivery simulation (requires curl fetch of bundletool 1.18.1 to /tmp/bundletool.jar)
 java -jar /tmp/bundletool.jar build-apks --bundle=build/app/outputs/bundle/release/latch_0.17.2-beta.3.aab --output=/tmp/locker.apks --overwrite
@@ -274,6 +274,6 @@ adb shell getprop ro.product.model; adb shell getprop ro.build.version.sdk; adb 
 
 ## 9. References
 
-- `docs/APP_SIZE_OPTIMIZATION_PLAN.md` — Phases 1–5, effort/savings matrix, quick-reference commands
-- `docs/baseline_artifacts/` — raw listings for diffing after Phase 1
+- `APP_SIZE_OPTIMIZATION_PLAN.md` — Phases 1–5, effort/savings matrix, quick-reference commands
+- `baseline_artifacts/` — raw listings for diffing after Phase 1
 - Flutter docs: `flutter build appbundle --analyze-size`, DevTools App Size tool (`dart devtools --appSizeBase=...`)
