@@ -1,11 +1,11 @@
-# Flick Integration
+# Flick integration
 
-Flick plays audio handed off from Latch. Latch sends a hidden song via a
-standard Android audio `VIEW` intent; Flick streams it without copying to
-public storage and exposes a `Back to Latch` action that returns to the
+Flick plays audio that Latch hands off to it. Latch sends a hidden song with a
+standard Android audio `VIEW` intent, Flick streams it without copying it to
+public storage, and Flick shows a `Back to Latch` action that returns you to the
 running Latch task.
 
-## Contract
+## The contract
 
 | Item | Value |
 |---|---|
@@ -15,18 +15,20 @@ running Latch task.
 | Latch launch mode | `singleTask` |
 | Return intent filter | `ACTION_VIEW` on `locker://return` |
 
-- Opening `locker://return` foregrounds a running Latch task, or cold-starts Latch.
-- Latch targets Flick's package directly, skipping the generic app chooser.
-- No custom action or permission is required from Flick for v1; standard `VIEW` for audio is enough.
+- Opening `locker://return` brings a running Latch task forward, or cold-starts
+  Latch if it isn't running.
+- Latch targets Flick's package directly and skips the generic app chooser.
+- Flick doesn't need a custom action or permission for v1. A normal `VIEW` intent
+  for audio is enough.
 
-## Flick requirements
+## What Flick needs to do
 
-| # | Requirement | Detail |
+| # | Requirement | Details |
 |---|---|---|
-| 1 | Accept audio `VIEW` intents | Exported playback activity, `content://` scheme, MIME `audio/*`. Do not require custom permissions. |
-| 2 | Stream the URI directly | Do not copy to shared storage, rescan into the media library, or assume the URI is permanent. Release URI + player on completion. |
-| 3 | Preserve Latch's privacy model | No background indexing, public caching, cloud sync, or gallery-visible thumbnails of Latch media. Cache for playback only inside Flick's private storage; clean up aggressively. |
-| 4 | Provide a `Back to Latch` action | Visible in the player UI (and error states). Do not rely on back-stack behavior alone. |
+| 1 | Accept audio `VIEW` intents | Export a playback activity that handles `content://` URIs with MIME `audio/*`. Don't require custom permissions. |
+| 2 | Stream the URI directly | Don't copy it to shared storage, scan it into the media library, or assume the URI sticks around. Release the URI and player when playback ends. |
+| 3 | Respect Latch's privacy model | No background indexing, public caching, cloud sync, or gallery-visible thumbnails of Latch media. Cache only for playback in Flick's private storage, and clean it up aggressively. |
+| 4 | Show a `Back to Latch` action | Put it in the player UI and in error states. Don't rely on the back stack alone. |
 
 ### Manifest
 
@@ -54,7 +56,7 @@ player.prepare()
 player.playWhenReady = true
 ```
 
-URI readability preflight via `ContentResolver`:
+Check readability first with `ContentResolver`:
 
 ```kotlin
 contentResolver.openAssetFileDescriptor(audioUri, "r")?.use {
@@ -62,7 +64,7 @@ contentResolver.openAssetFileDescriptor(audioUri, "r")?.use {
 }
 ```
 
-### Return to Latch
+### Returning to Latch
 
 ```kotlin
 private fun returnToLocker(context: Context) {
@@ -78,15 +80,19 @@ private fun returnToLocker(context: Context) {
 }
 ```
 
-`package` makes the return deterministic; `CLEAR_TOP` + `SINGLE_TOP` reuse the running Latch activity. Wrap in `try/catch` and fall back to `finish()` if Latch is unavailable.
+Setting `package` makes the return deterministic, and `CLEAR_TOP` + `SINGLE_TOP`
+reuse the running Latch activity. Wrap it in `try/catch` and fall back to
+`finish()` if Latch isn't available.
 
 ## Test checklist
 
 1. Launch an MP3 from Latch into Flick.
 2. Flick reads the URI without copying it to public storage.
 3. Playback works for `mp3`, `m4a`, and `ogg`.
-4. `Back to Latch` returns the existing Latch task; Latch is not duplicated in recents.
-5. The handed-off song does not appear in gallery/music scanners.
+4. `Back to Latch` returns to the existing Latch task, and Latch doesn't show up
+   twice in recents.
+5. The song doesn't appear in gallery or music scanners.
 6. Closing Flick leaves no stale temp playback state.
 
-UX touches: show an `Opened from Latch` label; keep the return action visible (not buried in a menu); offer it in the error state too.
+For UX, show an `Opened from Latch` label, keep the return action visible
+instead of burying it in a menu, and offer it in the error state too.

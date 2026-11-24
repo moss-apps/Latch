@@ -1,30 +1,30 @@
-# Embedded PocketBase Local Store
+# Embedded PocketBase local store
 
-## Status
+## Where it stands
 
-**Implemented (P0–P4); on-device validation pending.** PocketBase runs as an
-Android sidecar and stores vault metadata locally. The legacy
-`FlutterSecureStorage` JSON index remains as a fallback. P5 polish
-(foreground service, further size work) is deferred.
+PocketBase runs as an Android sidecar and stores vault metadata locally. It's
+built and wired up, but it hasn't been signed off on a real phone yet. The old
+`FlutterSecureStorage` JSON index is still there as a fallback. Foreground-service
+polish and more size work are deferred; they aren't blocking anything right now.
 
-The remaining release gate is real-hardware confirmation: unlock a debug build
-after `make pb` and confirm `[PB] sidecar up: pid=… port=…` in logcat, then run
-the checks in [PocketBase testing](pb_testing.md) and
-[Stable release checklist](stable_release_checklist.md). Do not treat
-build-only checks as hardware acceptance.
+The last release gate is simple: unlock a debug build after `make pb`, confirm
+`[PB] sidecar up: pid=… port=…` in logcat, then run the checks in
+[PocketBase testing](pb_testing.md) and the
+[stable release checklist](stable_release_checklist.md). A build passing is not
+the same as a phone passing.
 
-## Why
+## Why it's here
 
-The vault used a flat JSON metadata index in secure storage. PocketBase gives
-it a structured, queryable, relational local store without introducing a hosted
-server. Media blobs stay as encrypted files on disk; PocketBase indexes and
-relates them. WebDAV remains the only remote sync transport
-([local_server_sync.md](local_server_sync.md)).
+The vault used to keep all metadata in one flat JSON index in secure storage.
+PocketBase gives it a real local database with queries and relations, without
+adding a server or an account. Media bytes stay as encrypted files on disk;
+PocketBase only indexes them and connects the rows. WebDAV is still the only
+remote sync path ([local_server_sync.md](local_server_sync.md)).
 
-Non-goals: local-to-remote PocketBase replication, multi-user operation, iOS,
-media blobs inside PocketBase, and the PocketBase admin UI.
+It does not try to be a remote PocketBase, a multi-user service, an iOS thing, a
+media store, or a replacement for the PocketBase admin UI.
 
-## Architecture
+## How it fits
 
 ```
 UI ── Riverpod ── VaultService
@@ -48,12 +48,12 @@ UI ── Riverpod ── VaultService
 ```
 
 `PocketBaseStore` implements the same `LocalStore` surface as `VaultStore`.
-`VaultService` routes non-decoy loads, saves, and wipes through PocketBase and
-falls back to the legacy store on failure. The sidecar starts after unlock
-(never for the decoy vault), not at app launch, and stops when the activity
-detaches. `VaultSettings.pbEnabled` defaults to true.
+`VaultService` sends non-decoy loads, saves, and wipes through PocketBase, and
+falls back to the legacy store if that fails. The sidecar starts after unlock,
+never for the decoy vault, and stops when the activity detaches.
+`VaultSettings.pbEnabled` defaults to true.
 
-### Device layout
+### What lands on the device
 
 ```
 <app-data>/pocketbase/
@@ -66,65 +66,64 @@ detaches. `VaultSettings.pbEnabled` defaults to true.
 android/app/src/main/jniLibs/arm64-v8a/libpocketbase.so
 ```
 
-`libpocketbase.so` is a Go executable renamed as a native library. Android
-must extract it to disk before `execve`, so Gradle sets
+`libpocketbase.so` is really a Go executable renamed as a native library. Android
+has to extract it to disk before it can run it, so Gradle sets
 `jniLibs.useLegacyPackaging = true`. The old
-`android:extractNativeLibs="true"` manifest attribute is not used on the
-current AGP toolchain (AGP 9 removed it).
+`android:extractNativeLibs="true"` manifest attribute isn't used on the current
+AGP toolchain; AGP 9 removed it.
 
-### Bridge
+### The bridge
 
 The sidecar is a subprocess reached over loopback HTTP. The Go binary is a thin
-wrapper around `pocketbase.NewWithConfig`; schema lives in versioned JS
-migrations embedded with `go:embed`. No business logic lives in Go. The
-rejected alternatives were FFI (no data-path benefit) and a pure-Dart rewrite
-(no longer PocketBase); `sqflite` remains the documented fallback if the
-sidecar proves unworkable on device.
+wrapper around `pocketbase.NewWithConfig`, and the schema lives in versioned JS
+migrations embedded with `go:embed`. There's no business logic in Go. We looked
+at FFI (no benefit for the data path) and a pure-Dart rewrite (then it isn't
+PocketBase). `sqflite` is still the documented fallback if the sidecar turns out
+to be unworkable on device.
 
 ## Security model
 
-| Asset | Where | Exposure if the device is compromised |
+| Asset | Where it lives | What happens if the device is compromised |
 |---|---|---|
-| Media payloads | On-disk files | Encryption is opt-in: hidden-only files are plaintext. PocketBase never touches payload bytes. |
+| Media payloads | On-disk files | Encryption is opt-in, so hidden-only files are plaintext. PocketBase never touches payload bytes. |
 | Names, tags, albums, folders | PocketBase SQLite, app-encrypted columns | Ciphertext envelopes; confidentiality depends on the vault key. |
-| `modified_at`, `deleted`, `blob_ref` | PocketBase SQLite, plaintext | Low risk: timestamps, tombstones, content hashes. |
-| PocketBase database | App-private storage | Readable on a rooted device; no plaintext secrets. |
+| `modified_at`, `deleted`, `blob_ref` | PocketBase SQLite, plaintext | Low risk: timestamps, tombstones, and content hashes. |
+| PocketBase database | App-private storage | Readable on a rooted device, but there are no plaintext secrets in it. |
 | Local HTTP API | Loopback only | Ephemeral random port plus a 256-bit token held in Dart memory. |
-| Master key | Memory after unlock; Argon2id-wrapped on disk | Required to decrypt columns. |
+| Master key | Memory after unlock; Argon2id-wrapped on disk | Needed to decrypt the columns. |
 
-Hard rules:
+What keeps this safe:
 
-- **Secret fields are encrypted before insert.** PocketBase stores AES-GCM
-  envelopes and never receives the master key.
-- **Loopback only.** Bind `127.0.0.1` on an ephemeral port; never `0.0.0.0`
-  and never a fixed port.
-- **Encrypt when in doubt.** Only non-secret fields (`modified_at`,
-  `deleted`, `blob_ref`) are plaintext.
-- **The vault master key remains the single root of confidentiality** for both
-  blobs and metadata.
+- **Encrypt secret fields before insert.** PocketBase stores AES-GCM envelopes
+  and never gets the master key.
+- **Loopback only.** Bind `127.0.0.1` on an ephemeral port. Never `0.0.0.0`,
+  never a fixed port.
+- **Encrypt when in doubt.** Only non-secret fields (`modified_at`, `deleted`,
+  `blob_ref`) are plaintext.
+- **The vault master key stays the root of confidentiality** for both blobs and
+  metadata.
 - **The decoy vault never starts the sidecar.**
 
-This protects metadata at rest; it does not claim that user-directed exports or
-transfers cannot contain plaintext.
+This protects metadata at rest. It doesn't mean user-started exports or
+transfers can't contain plaintext.
 
 ## Data model
 
 Four collections, each with encrypted secret columns and plaintext index
 columns:
 
-- `vault_files` — `id`, `blob_ref`, `cipher_meta` (tags, albumIds, folderId,
+- `vault_files`: `id`, `blob_ref`, `cipher_meta` (tags, albumIds, folderId,
   originalName, dates), `modified_at`, `deleted`.
-- `albums` — `id`, `cipher_meta` (name, cover, order), `modified_at`,
-  `deleted`.
-- `tags` — `id`, `cipher_name`, `modified_at`, `deleted`.
-- `folders` — `id`, `cipher_meta` (name, parentId), `modified_at`, `deleted`.
+- `albums`: `id`, `cipher_meta` (name, cover, order), `modified_at`, `deleted`.
+- `tags`: `id`, `cipher_name`, `modified_at`, `deleted`.
+- `folders`: `id`, `cipher_meta` (name, parentId), `modified_at`, `deleted`.
 
 Encrypted columns use one `[16-byte IV][ciphertext+tag]` AES-GCM envelope per
-field, via `AesGcmCipher` and the vault master key. Migration from the legacy
-JSON indexes runs once after unlock, guarded by `pb_legacy_index_migrated`;
-the legacy index is retained, not deleted.
+field through `AesGcmCipher` and the vault master key. The legacy JSON indexes
+migrate once after unlock, guarded by `pb_legacy_index_migrated`. The old index
+is kept, not deleted.
 
-## Build and verification
+## Build and test
 
 ```bash
 make pb          # cross-compile arm64 → jniLibs (version-stamped)
@@ -132,22 +131,22 @@ make pb-linux    # host sidecar for local checks
 make pb-types    # vendor PocketBase JS editor types
 ```
 
-PocketBase is pinned at `v0.40.4` in `pocketbase/go.mod`; builds use
-`CGO_ENABLED=0` with the pure-Go `modernc.org/sqlite` backend. Release
-artifacts are checked by `python3 scripts/pocketbase_artifact.py verify …`.
+PocketBase is pinned at `v0.40.4` in `pocketbase/go.mod`. Builds use
+`CGO_ENABLED=0` with the pure-Go `modernc.org/sqlite` backend. Release artifacts
+are checked with `python3 scripts/pocketbase_artifact.py verify …`.
 
-Automated coverage includes the stdout handshake parser, ciphertext-at-rest
-round trips, DAO/store reconcile behavior, migration, and the PB-to-sync wire
-path. See [pb_testing.md](pb_testing.md) for host, debug-build, and on-device
-procedures.
+Automated tests cover the stdout handshake parser, ciphertext-at-rest round
+trips, DAO/store reconcile behavior, migration, and the PB-to-sync wire path.
+See [pb_testing.md](pb_testing.md) for host, debug-build, and on-device steps.
 
-## Remaining work
+## What's left
 
-1. Confirm the sidecar on real arm64 hardware (unlock, health, all four
-   collections, lock/restart lifecycle, no silent legacy fallback).
-2. Decide whether to keep the 32 MB arm64 binary as-is or shrink it (drop JS
-   migrations or add compression) before stable.
-3. P5 polish only if needed: foreground service, recovery UI, size work.
+1. Confirm the sidecar on real arm64 hardware: unlock, health, all four
+   collections, lock/restart lifecycle, and no silent fallback to legacy.
+2. Decide whether to keep the 32 MB arm64 binary as-is or shrink it (dropping JS
+   migrations or adding compression) before stable.
+3. Do the deferred polish only if it's needed: foreground service, recovery UI,
+   size work.
 
-Open product decisions: arm64 remains the only ABI for v1; remote replication
-is out of scope; WebDAV stays the remote path.
+The open product calls: arm64 is the only ABI for v1, remote replication is out
+of scope, and WebDAV stays the remote path.

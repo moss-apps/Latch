@@ -1,31 +1,33 @@
 # Latch
 
-Latch is a local file vault with opt-in encryption, a Flutter phone app and a Go desktop
-backup companion. The companion keeps a snapshot of the phone vault on the
-user's own computer. It supports receiving a backup, restoring to a phone,
-unlocking, browsing, previewing, verifying, and exporting readable files locally.
-There are no accounts or cloud storage in this flow.
+Latch is a local file vault with opt-in encryption: a Flutter phone app and a
+small Go desktop backup companion. The companion keeps a snapshot of the phone
+vault on your own computer. It can receive a backup, restore one to the phone,
+unlock it, browse and preview files, verify it, and export readable copies.
+There are no accounts and no cloud storage in that flow.
 
-## Desktop companion brief
+## Desktop companion
 
-The browser interface is served on localhost. A token-gated LAN receiver opens
-only for a pairing session. Transfers preserve files as stored: hidden-only
-files stay unencrypted. The manifest and wrapped key bundle are encrypted;
-plain HTTP does not encrypt transport. Explain this before transfer and use
-trusted LAN/USB rather than public networks.
+The browser UI runs on localhost. A token-gated receiver on the LAN opens only
+while a pairing session is active. Files transfer as stored, so hidden-only
+files stay unencrypted. The manifest and wrapped key bundle are encrypted, but
+plain HTTP does not encrypt transport. Say that plainly before a transfer and
+use a trusted LAN or USB, not a public network.
 
-The approved redesign covers the shared shell, full-page settings, and phone
-pairing, including responsive browser layouts. Settings is a sidebar destination,
-not a dialog. Use familiar Google Drive navigation and restrained Proton Drive
-control/panel treatment while retaining Latch's logo, Google Sans Flex, Material icons,
-light/dark themes, and saved accent choices. Preserve the existing file browser.
+The desktop UI has a shared shell, full-page settings, and phone pairing that
+works at browser widths. Settings is a sidebar destination, not a dialog. The
+navigation will feel familiar to anyone who has used Google Drive; the utility
+panels are restrained, in the spirit of Proton Drive. Keep Latch's logo, Google
+Sans Flex, Material icons, light/dark themes, and saved accent choices, and
+keep the existing file browser.
 
-Success means users can find preferences and backup operations quickly, connect
-their phone with a QR code or manual/USB instructions, and understand connection,
-transfer, completion, expiry, and error states. Navigation must preserve file-view
-selection and in-progress operation results. Narrow layouts must support touch,
-keyboard focus, and fully readable pairing credentials.
+The goal is simple: people should find preferences and backup actions quickly,
+connect a phone with a QR code or manual/USB instructions, and understand what
+is happening during connection, transfer, completion, expiry, and failure.
+Navigation should keep the current file view and any in-progress operation.
+Narrow layouts still need touch targets, keyboard focus, and pairing
+credentials that can be read in full.
 
-Implementation source: `latchd/web-src/`. Embedded output:
-`latchd/internal/webui/web/`. Visual reference:
-`latchd/internal/webui/DESIGN.md`. Protocol: `docs/desktop_backup.md`.
+Source: `latchd/web-src/`. Embedded output: `latchd/internal/webui/web/`.
+Visual reference: `latchd/internal/webui/DESIGN.md`. Protocol:
+`docs/desktop_backup.md`.

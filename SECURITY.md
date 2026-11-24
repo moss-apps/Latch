@@ -1,66 +1,68 @@
-# Security Policy
+# Security policy
 
 Latch hides photos, videos, and documents in a local Android vault. **File
-encryption is opt-in; hiding does not encrypt bytes.** There is no project-run
-backend, account system, or telemetry. Network surfaces include loopback
-PocketBase, the optional `latchd` desktop companion (loopback web UI plus a
-temporary LAN/USB pairing receiver), user-configured sync, and explicit update
-checks or external-app actions.
+encryption is opt-in. Hiding does not encrypt bytes.** There is no project-run
+backend, account system, or telemetry. The network surfaces are loopback
+PocketBase, the optional `latchd` desktop companion (a loopback web UI plus a
+temporary LAN/USB pairing receiver), sync the user configured, and explicit
+update checks or actions started by another app.
 
 ## Supported versions
 
 Only the latest Google Play release and the latest `0.*` GitHub release
-(including `latchd`) are supported. Beta builds are not.
+(including `latchd`) get fixes. Beta builds don't.
 
 ## Reporting a vulnerability
 
-**Do not open a public issue for security problems.**
+**Please don't open a public issue for a security problem.**
 
-- Preferred: use GitHub's private vulnerability reporting —
+- Preferred: use GitHub's private vulnerability reporting:
   [Report a vulnerability](https://github.com/moss-apps/Latch/security/advisories/new).
 - Or email **fyketonel@gmail.com** with steps to reproduce.
 
-You should get a response within a few days. Please include the app version,
-device/Android version, install source (Google Play, GitHub APK, or built from
-source), and as much detail as you can without exposing real credentials or
-private media.
+You should hear back within a few days. Include the app version, device and
+Android version, install source (Google Play, GitHub APK, or built from source),
+and as much detail as you can without exposing real credentials or private
+media.
 
-## In scope
+## What counts
 
-- Leakage of vault passwords, PINs, or keys into logs, crash output, prefs,
+- Vault passwords, PINs, or keys leaking into logs, crash output, preferences,
   thumbnails, or the UI
 - Weaknesses in vault encryption (AES-256-GCM/CTR, Argon2id key wrapping,
-  per-file key derivation) or in `flutter_secure_storage` usage
-- Bypasses of the decoy vault, auto-kill, or screenshot protection that expose
+  per-file key derivation) or in how `flutter_secure_storage` is used
+- Ways around the decoy vault, auto-kill, or screenshot protection that expose
   vault contents
 - Unexpected network traffic or misleading encryption/transfer disclosures
-- `latchd` issues: pairing token bypass, non-loopback exposure of the web UI,
-  backup archive or manifest weaknesses
-- Vulnerabilities in the Android surface (exported components, `locker://`
-  deep links, permissions)
+- `latchd` problems: pairing token bypass, exposing the web UI beyond loopback,
+  or weaknesses in the backup archive or manifest
+- Android surface issues: exported components, `locker://` deep links,
+  permissions
 
-## Out of scope
+## What doesn't
 
-- Issues in third-party apps or SDKs (Flick, WebDAV/SMB servers, …)
+- Bugs in third-party apps or SDKs (Flick, WebDAV/SMB servers, …)
 - Compromised, rooted, or physically accessed devices
-- Denial of service from large files or user-chosen inputs
+- Denial of service from large files or user-chosen input
 - Social engineering
 
-## Design guarantees we aim to uphold
+## What we try to guarantee
 
 - Credentials and local key material use `flutter_secure_storage` (Android
-  Keystore). Never log secrets or put them in ordinary prefs/error messages.
-  Desktop backup intentionally exports a **wrapped**, not plaintext, master-key
-  bundle; restoring it requires the original credential. Decrypted exports are
-  explicitly outside the vault's protection.
+  Keystore). Secrets never go in logs or ordinary preferences and error
+  messages. Desktop backup intentionally exports a **wrapped** master-key
+  bundle, not a plaintext one; restoring it needs the original credential.
+  Decrypted exports are explicitly outside the vault's protection.
 - File encryption follows each file's chosen policy. Desktop backup and WebDAV
-  preserve payloads **as stored**, including plaintext hidden-only files. Their
-  manifests are encrypted; this does not encrypt the payloads. Desktop pairing
-  uses token-gated HTTP, not TLS; tokens are access control, not transport
-  confidentiality. Use trusted LAN/USB; prefer HTTPS for WebDAV.
-- `latchd`'s web UI binds loopback only (`127.0.0.1:7800`); pairing is
-  token-gated and exists only while a session is active.
+  preserve payloads **as stored**, including hidden-only files that are
+  plaintext. Their manifests are encrypted; that does not encrypt the payloads.
+  Desktop pairing uses token-gated HTTP, not TLS. Tokens are access control, not
+  transport confidentiality. Use a trusted LAN or USB, and prefer HTTPS for
+  WebDAV.
+- `latchd`'s web UI binds to loopback only (`127.0.0.1:7800`). Pairing is
+  token-gated and only exists while a session is active.
 - No analytics, external crash reporting, or project-operated cloud storage.
-  User-directed backup, sync, sharing, and exports may copy data off the device.
+  Backup, sync, sharing, and exports that the user starts can copy data off the
+  device.
 
-Thank you for helping keep users safe.
+Thanks for helping keep users safe.

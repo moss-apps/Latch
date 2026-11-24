@@ -1,27 +1,27 @@
-# Latch Documentation
+# Latch documentation
 
-`docs/` holds the design, operational, and test references for Latch. The
-root [README](../README.md) is the product overview; [CONTRIBUTING](../CONTRIBUTING.md)
-is the setup and pull-request guide.
+`docs/` holds the design, operations, and test references for Latch. The root
+[README](../README.md) is the product overview. [CONTRIBUTING](../CONTRIBUTING.md)
+covers setup and pull requests.
 
-## Current
+## Current docs
 
-| Document | Use it for |
+| Doc | What it's for |
 |---|---|
-| [Stable release checklist](stable_release_checklist.md) | Release gates, no-install build checks, and the recorded hardware sign-off. Start here before any release or hardware test. |
-| [Embedded PocketBase](embedded_pocketbase.md) | How the local metadata sidecar works, its security boundary, and its on-device validation gate. |
-| [Desktop backup & restore](desktop_backup.md) | `latchd` companion setup, pairing, backup layout, restore modes, and security limits. |
-| [WebDAV sync](local_server_sync.md) | Sync model, server requirements, conflict handling, and key continuity. |
-| [WebDAV test runbook](local_server_testing.md) | Local WebDAV fixture, live tests, and hardware verification steps. |
-| [PocketBase test runbook](pb_testing.md) | Host and on-device sidecar checks and failure triage. |
+| [Stable release checklist](stable_release_checklist.md) | Release gates, build-only checks, and the hardware sign-off. Read it before any release or device test. |
+| [Embedded PocketBase](embedded_pocketbase.md) | How the local metadata sidecar works, what it protects, and what still needs a real phone. |
+| [Desktop backup & restore](desktop_backup.md) | Setting up `latchd`, pairing, backup layout, restore modes, and limits. |
+| [WebDAV sync](local_server_sync.md) | How sync works, what the server must support, conflicts, and key continuity. |
+| [WebDAV test runbook](local_server_testing.md) | Local WebDAV fixture, live tests, and the hardware checklist. |
+| [PocketBase test runbook](pb_testing.md) | Host and on-device sidecar checks, plus failure triage. |
 | [Media encryption & compression](architecture_media.md) | Import pipeline, encryption choices, compression, and file operations. |
-| [Recently Deleted](recently_deleted.md) | Retention, permanent deletion, backup, and sync policy. |
-| [Unlock Autofill](unlock_autofill.md) | Unlock credential autofill and its security model. |
+| [Recently Deleted](recently_deleted.md) | Retention, permanent deletion, backups, and sync behavior. |
+| [Unlock Autofill](unlock_autofill.md) | Letting a password manager fill the vault unlock field. |
 | [Flick integration](flick_integration.md) | Playback handoff contract with Flick. |
-| [Phase 5 device checks](phase5_testing.md) | Recovery, autofill, backup, and gallery regression checklist. |
+| [Device checks](phase5_testing.md) | Recovery, autofill, backup, and gallery regression checklist for a real device. |
 
-## Archived
+## Archived docs
 
-Completed plans and one-off reports live in [archive/](archive/README.md).
-They are kept for history and are not maintained against the current code.
-Use the documents above for current behavior.
+Completed plans and one-off reports are in [archive/](archive/README.md). They're
+kept for history and aren't maintained against the current code. Use the docs
+above for current behavior.

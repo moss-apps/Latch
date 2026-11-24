@@ -182,25 +182,23 @@ components:
 
 ## Overview
 
-**Creative North Star: "A coherent, calm local file-management app"**
+The desktop UI borrows the familiar navigation of Google Drive and the restrained utility panels of Proton Drive, but keeps Latch's own logo, palette, Google Sans Flex, and Material icons. It's flat, real app UI: files, settings, and phone backup are useful destinations, with task titles and controls in the first viewport instead of a big brand splash. There are no decorative materials.
 
-Latch uses familiar Google Drive navigation and Proton's restrained utility-panel treatment with Latch's own logo, palette, Google Sans Flex, and Material icons. The world is flat, real application UI: files, settings, and phone backup are useful destinations, with task titles and controls in the first viewport rather than an oversized brand presentation. There are no physical decorative materials in this approved direction.
+The redesign covers the shared shell, full-page settings, phone pairing, and responsive browser layout. The existing table/grid browser and viewer stay as the functional reference. Settings uses grouped rows; pairing puts a scannable QR beside phone instructions, with manual and USB details. These describe the current direction, not a layout requirement for every future screen.
 
-The redesign boundary is the shared shell, full-page settings, phone pairing, and responsive browser layout. The incumbent table/grid browser and viewer remain the functional reference. Settings uses grouped rows; pairing places a scannable QR beside phone instructions with manual and USB disclosures. These are expressions of the confirmed direction, not composition requirements for every future screen.
-
-**Key Characteristics:**
-- Familiar destination navigation with retained file-view state.
+**Key characteristics:**
+- Familiar destination navigation that keeps your file-view state.
 - Flat tonal surfaces, hairline dividers, and restrained utility panels.
 - Latch identity with saved light/dark and accent preferences.
 - Readable task titles, controls, credentials, and recovery states.
 
-This is an approved merge of the incumbent design record with the current implementation. Evidence is `latchd/web-src/src/index.css`, `src/lib/theme.ts`, `src/components/{Sidebar,SettingsView,PairingView,MainView,BrowserPane}.tsx`, `src/App.tsx`, and the shared `src/components/ui/` primitives. Root `PRODUCT.md` supplies the durable local-only product context; `docs/desktop_backup.md` owns protocol details.
+This doc combines the old design record with the current implementation. Evidence is `latchd/web-src/src/index.css`, `src/lib/theme.ts`, `src/components/{Sidebar,SettingsView,PairingView,MainView,BrowserPane}.tsx`, `src/App.tsx`, and the shared `src/components/ui/` primitives. Root `PRODUCT.md` has the product context; `docs/desktop_backup.md` owns protocol details.
 
-Source is `latchd/web-src/` (Vite, React, TypeScript, Tailwind v4, shadcn/Radix); the embedded artifact is `latchd/internal/webui/web/`. The incumbent delivery convention commits the built output so the desktop binary needs no Node runtime. Application changes use `make latchd-web` to refresh that output. This documentation refresh changes neither source nor embedded assets.
+Source is `latchd/web-src/` (Vite, React, TypeScript, Tailwind v4, shadcn/Radix); the embedded artifact is `latchd/internal/webui/web/`. The built output is committed on purpose so the desktop binary doesn't need a Node runtime. Use `make latchd-web` to refresh it after app changes. This documentation pass changes neither source nor embedded assets.
 
 ## Colors
 
-Latch's existing accent sits against neutral light/dark surfaces; status and file-kind colors keep their established meanings. Frontmatter records source values, with `-dark` counterparts documenting the `.dark` theme. Component frontmatter records the light/default role assignment; rendered components must use the live CSS variables so theme and saved accent choices apply.
+Latch's existing accent sits against neutral light/dark surfaces; status and file-kind colors keep their established meanings. Frontmatter has the source values, and `-dark` entries document the `.dark` theme. Component frontmatter records the light/default role; components should use the live CSS variables so theme and saved accent choices apply.
 
 ### Primary
 
@@ -220,7 +218,7 @@ Latch's existing accent sits against neutral light/dark surfaces; status and fil
 - **Feedback** (`success`, `error`, `ok-text`, `err-text`): status marks and readable success/error text. The text-specific green and red differ from the light indicator colors.
 - **File kinds:** image follows the selected accent; video uses the red light/dark pair; song uses the purple variant pair; document uses `file-document`; other uses `text3`. Favorites use `favorite` in both themes.
 
-**The Live Latch Palette Rule.** Use the existing CSS roles and saved accent choices; derive identity values from Latch's source tokens rather than estimating replacement colors.
+**Use the live palette.** Stick to the existing CSS roles and saved accent choices. Derive identity values from Latch's source tokens instead of guessing replacement colors.
 
 Raw custom properties in `index.css` map to shadcn roles: `--background` → `--bg`, `--foreground` → `--text`, `--primary`/`--ring` → `--latch-accent`, `--primary-foreground` → `--on-accent`, `--border` → `--divider`, and `--input` → `--line`. Theme persistence stays at `latchd-theme` and `latchd-accent`.
 
@@ -237,13 +235,13 @@ Raw custom properties in `index.css` map to shadcn roles: `--background` → `--
 - **Section title:** settings group headings; pairing subheadings use a smaller bold body-sized step (16px).
 - **Body / label:** compact explanations and navigation; setting-row labels are bold. Longer explanations use relaxed line height (1.625), while ordinary body text uses the frontmatter body role.
 - **Meta / caption:** file-grid names and code use the small step; timestamps, counts, legal navigation context, and network notes use compact supporting text.
-- **Table label:** bold, uppercase with the incumbent spaced tracking. This is a table convention, not a requirement to uppercase ordinary labels.
+- **Table label:** bold, uppercase with the existing spaced tracking. This is a table convention, not a requirement to uppercase ordinary labels.
 
-There is no display/hero type role in the scoped surfaces. The observed ramp is task-oriented, not a geometric marketing scale. Setting descriptions cap at 48ch; pairing introduction and network note cap at 65ch and 75ch respectively.
+There's no display/hero type role here. The scale is task-oriented, not a marketing scale. Setting descriptions cap at 48ch; the pairing intro and network note cap at 65ch and 75ch.
 
 Product glyphs retain Flutter's `MaterialIcons-Regular.otf`, addressed by codepoint through `src/lib/glyphs.ts` and `<Mi>`, not ligatures. The Latch logomark remains the 21-circle dot-matrix L (`viewBox="0 0 481 652"`), filled with `currentColor` through `--logo`.
 
-**The Task Title Rule.** Lead utility pages with their task title and useful controls; keep the Latch mark at shared-shell scale.
+**Put the task title first.** Lead utility pages with what the user is doing and the useful controls. Keep the Latch mark at shared-shell scale.
 
 ## Layout
 
@@ -265,29 +263,29 @@ Groups are Backup & export, Appearance, and Legal. Setting rows are flat grids w
 
 Phone backup shares the utility-page width and padding. A back action and task title precede Receive backup / Restore to phone tabs. Below `lg`, the session content stacks QR first, then phone steps and disclosures. At `lg`, it becomes a two-column grid: QR/status/actions left (280px), phone steps and disclosures right (`minmax(0, 1fr)`), separated by 32px. The QR plate is 232px square around a 200px canvas, centered when stacked and left-aligned on desktop.
 
-The manual/USB details remain in the phone-instructions column. The trusted-network note and cancel action form a shared footer below both columns. This supersedes the old QR-right, branded-left two-panel account.
+The manual/USB details stay in the phone-instructions column. The trusted-network note and cancel action form a shared footer below both columns. This replaces the old QR-right, branded-left two-panel layout.
 
-### Incumbent file browser
+### File browser
 
 The file-browser context header remains sticky and wraps controls. File grids retain `repeat(auto-fill, minmax(180px, 1fr))`, with a 14px gap and 4:3 media. The table hides Modified below `sm`, retains right-aligned Size, and uses 32px thumbnail/glyph tiles. Photos defaults to grid; other views default to list. `latchd-layout` retains per-view layout, and `latchd-sort` retains sorting.
 
-**The Destination Continuity Rule.** Moving between files, settings, and phone backup preserves file-view selection and mounted operation state; navigation closes the viewer, and returning to pairing adopts the current session.
+**Keep your place.** Moving between files, settings, and phone backup keeps file-view selection and mounted operation state. Navigation closes the viewer, and returning to pairing picks up the current session.
 
 ## Elevation & Depth
 
-The scoped shell and utility pages are flat at rest: tonal grounds, pane silhouettes, borders, and dividers carry hierarchy. Settings does not turn each row into a card. A neutral panel appears for a concrete USB approval request; the QR retains a white scanning plate. No physical decorative surface is part of this world.
+The shell and utility pages are flat at rest: tonal grounds, pane silhouettes, borders, and dividers carry the hierarchy. Settings doesn't turn every row into a card. A neutral panel shows up for a concrete USB approval request; the QR keeps a white scanning plate. There are no decorative surfaces.
 
-Overlay depth is functional. The mobile drawer has a black 40% scrim and sits above the shell; the incumbent viewer uses `rgba(12,12,14,0.86)` over the full viewport. The file-browser sticky header retains a 95% page ground with backdrop blur, and viewer zoom controls retain their translucent backdrop. Those existing treatments do not establish a general glass-panel style.
+Overlay depth is functional. The mobile drawer has a black 40% scrim and sits above the shell; the existing viewer uses `rgba(12,12,14,0.86)` over the full viewport. The file-browser sticky header retains a 95% page ground with backdrop blur, and viewer zoom controls retain their translucent backdrop. Those existing treatments do not establish a general glass-panel style.
 
 Focus is also functional depth: shared buttons/inputs/switches use an accent ring (3px, 50% ring color) and accent border; global button, summary, and link focus adds a foreground outline (2px, 3px offset). File-grid focus uses a narrower accent ring. These are state treatments, not ambient shadows.
 
 Motion is state-driven: ordinary shared transitions use the Tailwind default (150ms); the mobile drawer enters with a 220ms clip reveal and `cubic-bezier(0.16, 1, 0.3, 1)`. Busy indicators spin or pulse; pairing's dot pulses while transferring, not simply while waiting. The global reduced-motion rule shortens animations/transitions to 0.01ms and limits animation iterations to one. There is no scroll-reveal choreography in these surfaces.
 
-**The Flat Utility Rule.** Use tonal grounds and row dividers for routine settings; reserve a separate panel for a concrete grouped interaction such as USB approval.
+**Keep utility pages flat.** Use tonal grounds and row dividers for routine settings. Save a separate panel for a concrete grouped interaction such as USB approval.
 
 ## Shapes
 
-The frontmatter's `sm` / `md` / `lg` / `xl` radii are the stylesheet's existing multiples of `--radius` (0.75rem), resolved at the normal root size. Shared controls and navigation use `lg`; file-grid and QR corners also use that radius. The desktop outer pane uses the distinct `pane` radius. Compact browser controls retain their incumbent `browser-control` radius. These are established variants, not interchangeable rounded-card defaults.
+The frontmatter's `sm` / `md` / `lg` / `xl` radii are the stylesheet's existing multiples of `--radius` (0.75rem), resolved at the normal root size. Shared controls and navigation use `lg`; file-grid and QR corners also use that radius. The desktop outer pane uses the distinct `pane` radius. Compact browser controls retain their existing `browser-control` radius. These are established variants, not interchangeable rounded-card defaults.
 
 Circles are functional: status dots, numbered phone steps, accent choices, and switch tracks/thumbs. Accent swatches are 28px circles inside 44px radio-label targets, with a small white/dark check marker for selection. Pairing credentials use softly rounded secondary-ground blocks and wrap instead of truncating.
 
@@ -297,7 +295,7 @@ Circles are functional: status dots, numbered phone steps, accent choices, and s
 
 Restrained, recognizable actions. The primary variant uses live accent/on-accent roles; outline uses the page ground and divider stroke, with a stronger input stroke and translucent input ground in dark mode; ghost gains a neutral hover ground. All retain the shared `lg` shape, medium small text, focus ring, disabled opacity (50%), and one-pixel press translation for non-popup actions.
 
-Settings and pairing generally override the primitive's 32px default height to 44px; their primary/outline actions commonly use 16px horizontal padding and copy/ghost actions 12px. Primary hover reduces accent opacity to 80%. The implementation has secondary, destructive, and link library variants; this scoped record's previews focus on the primary, outline, and ghost variants actually used here. Verify/export change labels to “Verifying…” / “Exporting…”; a frozen label plus overlaid spinner is not their current pattern.
+Settings and pairing generally override the primitive's 32px default height to 44px; their primary/outline actions commonly use 16px horizontal padding and copy/ghost actions 12px. Primary hover reduces accent opacity to 80%. The implementation has secondary, destructive, and link library variants; this doc's previews focus on the primary, outline, and ghost variants actually used here. Verify/export change labels to “Verifying…” / “Exporting…”; a frozen label plus overlaid spinner is not their current pattern.
 
 ### Inputs / Fields
 
@@ -328,10 +326,10 @@ Phone steps use small numbered circles. Native `details`/`summary` disclosures e
 - **Table:** flat hairline-divided rows, secondary-ground hover/focus, truncated names, optional favorite star, sortable headers and a sort selector. Focusable rows open with Enter/Space.
 - **Grid:** bordered rounded tiles with contain-fit 4:3 media and compact name/star rows. Thumbnails are lazy, retain a type-glyph fallback, and can be disabled through the existing appearance preference. Images remain contain-fit in both layouts.
 - **Search:** deferred filename filtering takes precedence over the selected file category and changes context to “Search results.” `/` focuses search on unlocked files. Escape in the current search input blurs it; it does not clear the query or restore the category. Clearing the query restores the selected view. Rendering remains incremental in 200-item chunks with a scroll sentinel.
-- **Viewer:** full-viewport dark overlay with filename, type/size/date, download, autofocus close, and previous/next navigation through the filtered list using arrows/Escape. Images support contain-fit, cursor-centered wheel zoom, clamped pan above 1×, double-click fit/2.5×, an 8× maximum, and an on-screen zoom/reset bar. Ctrl/Meta-wheel retains browser zoom. Video/audio use native controls; PDF uses an iframe; text preview caps at 2MB; other formats offer download. Legacy-file and missing-blob errors retain the incumbent export/re-pair recovery guidance.
-- **Empty states:** distinguish an empty backup (“Back up from your phone to fill this folder.”), no filename matches, and an empty category. Unlock remains the incumbent centered password pane.
+- **Viewer:** full-viewport dark overlay with filename, type/size/date, download, autofocus close, and previous/next navigation through the filtered list using arrows/Escape. Images support contain-fit, cursor-centered wheel zoom, clamped pan above 1×, double-click fit/2.5×, an 8× maximum, and an on-screen zoom/reset bar. Ctrl/Meta-wheel retains browser zoom. Video/audio use native controls; PDF uses an iframe; text preview caps at 2MB; other formats offer download. Legacy-file and missing-blob errors retain the existing export/re-pair recovery guidance.
+- **Empty states:** distinguish an empty backup (“Back up from your phone to fill this folder.”), no filename matches, and an empty category. Unlock remains the existing centered password pane.
 
-Protocol, receiver lifecycle, and thumbnail storage behavior belong to `docs/desktop_backup.md` and their implementation, rather than being new visual-system guarantees. The desktop credential creation and unlocked browse/preview/export model remain incumbent product behavior.
+Protocol, receiver lifecycle, and thumbnail storage behavior belong to `docs/desktop_backup.md` and their implementation, rather than being new visual-system guarantees. The desktop credential creation and unlocked browse/preview/export model remain existing product behavior.
 
 ## Do's and Don'ts
 
@@ -344,8 +342,8 @@ Protocol, receiver lifecycle, and thumbnail storage behavior belong to `docs/des
 - **Do** retain visible keyboard focus, the enlarged settings-switch touch area, and textual status/recovery alongside indicators.
 
 ### Don't:
-- **Don't** replace the confirmed Latch assets or estimate new brand colors.
-- **Don't** introduce physical decorative materials or oversized logo presentations into the approved utility surfaces.
+- **Don't** replace the existing Latch assets or guess new brand colors.
+- **Don't** add decorative materials or oversized logo presentations to utility surfaces.
 - **Don't** move settings controls back into the navigation sidebar or make Settings a dialog.
 - **Don't** carry forward the obsolete horizontal mobile navigation, QR-right pairing layout, or click-to-copy credential-row account.
 - **Don't** crop file previews or truncate pairing credentials to fit the redesigned shell.
