@@ -147,7 +147,7 @@ observability for now.
 | Symptom | Meaning |
 |---|---|
 | "PocketBase binary missing at …" in logs | APK built without `make pb` first |
-| `no READY handshake within 15s` | sidecar spawned but never served — likely exec blocked (check `android:extractNativeLibs="true"` still set) |
+| `no READY handshake within 15s` | sidecar spawned but never served — likely exec blocked; confirm `jniLibs.useLegacyPackaging = true` in `android/app/build.gradle` so the `.so` is extracted |
 | `[PB] activation failed, staying on legacy store` | sidecar up but a later step (migration, first load) failed — the app is still fully usable via the fallback |
 | Rows missing after unlock | check the `pb_legacy_index_migrated` flag path: if the flag is set but the DB was wiped, PB starts empty and only *new* writes land there |
 

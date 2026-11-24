@@ -36,7 +36,7 @@ pure modules in `lib/crypto/`. Heavy encrypt/decrypt runs on a 2-worker
 
 1. User selects file(s) from gallery / documents / camera
 2. `FileImportService` orchestrates: duplicate detection (`MediaScannerService`) → optional compression → streaming encryption (`CryptoIsolatePool`) → index update (`VaultService`)
-3. `VaultedFile` metadata written to `vault_file_index`
+3. `VaultedFile` metadata written through `LocalStore` (PocketBase preferred, legacy secure-storage index as fallback)
 
 ## Compression
 

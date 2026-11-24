@@ -1,399 +1,208 @@
-# Desktop Backup & Restore (Web)
+# Desktop Backup & Restore (latchd)
 
-## Overview
+## Status
 
-The vault has three persistence paths today: the on-device store (legacy
-JSON or embedded PocketBase), the manual *decrypted* ZIP export
-(`BackupService`), and WebDAV sync to a server the user operates. What is
-missing is the case the 2026-09-05 incident exposed: a direct, restorable
-backup of the whole vault onto storage the user physically controls — an
-external USB drive or a desktop machine — without a server to set up and
-without a project-run service. File payloads retain their on-device encryption
-state: **hidden-only files are plaintext**, including during HTTP transfer.
+**Implemented through P6.4; P6.5 (retention/polish) deferred; hardware
+acceptance pending.** This is the snapshot path for the 2026-09-05 incident:
+back up the whole vault to storage the user controls, then restore it — even
+into a fresh install with no vault yet.
 
-This document specifies **P6**: a desktop companion process (`latchd`)
-that the phone pairs with over Wi-Fi or USB. **The companion creates the
-pairing credentials** — it runs a token-gated LAN receiver while a pairing
-session is active and shows a QR code in its web UI; the phone scans (or
-enters the address + code by hand) and **pushes** the snapshot
-to it. The companion stores it on any local path, verifies it, and can
-restore it back — including into a fresh install that has no vault set up
-yet. The companion's primary interface is a web UI served on the desktop's
-loopback interface.
+Hardware sign-off is not recorded. Follow the approval and isolation preflight
+in the [Stable release checklist](stable_release_checklist.md) before any
+install, upgrade, restore, or wipe. Do not test against a live vault or an
+existing backup.
 
-> **2026-09 revision — pairing direction flipped.** The original P6.1/P6.2
-> had the phone host the transfer server and latchd pull. User decision:
-> the desktop creates the credentials, the phone scans. The phone-side
-> `TransferServer` was removed and replaced by a push client; the
-> phone-hosted model is gone.
+## What it is
 
-Status: **P6.0 + P6.1r + P6.2r + P6.3 + P6.4 done** (flipped model).
-P6.5 remains deferred.
+`latchd` is a Go companion that runs on a desktop or laptop. It serves a
+loopback web UI, opens a short-lived token-gated receiver on the LAN while a
+pairing session is active, and stores the backup on a user-chosen path. The
+phone pushes the snapshot; the companion verifies and stores it. Restore works
+in both directions, including before first-run setup.
 
-Relationship to the existing paths:
+This is **not sync**. WebDAV ([local_server_sync.md](local_server_sync.md))
+remains the reconcile path. Desktop backup is a snapshot of active files and
+the key bundle; it does not carry Recently Deleted, folder/album definitions,
+smart collections, or all settings.
 
-| Path | Sees plaintext | Restorable | Needs server setup | Survives app uninstall |
+| Path | Sees plaintext | Restorable | Needs server setup | Survives uninstall |
 |---|---|---|---|---|
-| `BackupService` ZIP (kept, unchanged) | Yes — on local export | Manual, by hand | No | Yes (wherever written) |
-| WebDAV sync | Hidden-only payloads; use HTTPS for transport | With the same master key | Yes (WebDAV host) | Remote data survives; key continuity required |
-| **Desktop backup (this doc)** | **Hidden-only payloads, including in HTTP transit** | **With a valid backup and original credential** | No | Yes; verify before relying on it |
+| `BackupService` ZIP export | Yes, on local export | Manual | No | Yes |
+| WebDAV sync | Hidden-only payloads; use HTTPS | With the original key | Yes | Remote data survives; key continuity required |
+| **Desktop backup** | **Hidden-only payloads, including HTTP transit** | **With a valid backup and original credential** | No | Yes; verify before relying on it |
 
-## Goals
+## Quick start
 
-- Back up active file contents/metadata and a wrapped key bundle from the phone to a
-  user-chosen directory on the desktop or an external drive mounted on it
-  (e.g. `/run/media/…/backups`).
-- One-click restore, including the disaster case: fresh install after an
-  uninstall, no vault configured yet.
-- Preserve file encryption choices during transfer. Encrypt the manifest;
-  send file payloads as stored. The companion decrypts encrypted files locally
-  after the user enters the vault credential in its UI.
-- Optional explicit "export decrypted" in the companion, writing readable
-  files to the target directory (decryption happens on the desktop, after
-  transfer). Hidden-only files already contain plaintext before export.
-- Wi-Fi and USB transports, same pairing model.
-- No server setup, no project-run accounts or cloud storage.
+Build or install:
 
-## Non-goals
+```bash
+make latchd                     # source build: latchd/latchd
+scripts/install-latchd.sh       # Linux installer (releases)
+```
 
-- **Sync.** This is snapshot backup/restore, not reconcile. The WebDAV
-  engine (`SyncService`) stays the sync answer; this path reuses its
-  formats, not its diff logic.
-- **Receiver beyond the session.** The pairing receiver exists only while
-  a pairing session is active in the companion web UI (and, on the phone,
-  only inside the visible Desktop Backup screen). No background service
-  in v1.
-- **Decoy vault.** Out of scope, per the standing rule in both prior docs.
-- **Remote access.** The companion web UI binds loopback only; the pairing
-  receiver binds the LAN only while a session is active and requires a
-  256-bit session token. Do not expose either service publicly or configure
-  port forwarding; access still depends on the host's routing/firewall.
-- **Incremental snapshots / retention management.** Content addressing
-  already avoids re-transferring unchanged blobs; dated-snapshot retention
-  and pruning are P6.5.
+Prebuilt `latchd-linux-amd64`, `latchd-linux-arm64`, and
+`latchd-windows-amd64.exe` are published by
+`.github/workflows/release-latchd.yml` on app-version tags.
+
+Back up:
+
+1. Run `latchd serve` (defaults: `127.0.0.1:7800`, `latch-backup/`).
+2. Open `http://127.0.0.1:7800` and start a pairing session. The UI shows a
+   QR, address, and 256-bit code.
+3. On the phone: **Settings → Storage → Desktop Backup**, scan the QR or enter
+   the address and code, then push.
+4. The phone sends the key bundle, missing blobs, and the manifest last. The
+   receiver verifies, reaps unreferenced blobs, closes the session, and the UI
+   can unlock browsing.
+
+USB variant: connect the phone, run the `adb reverse` command shown in the web
+UI, choose **Connect via USB** on the phone, and tap **Allow** once on the
+desktop. No address or code is needed. The reverse mapping proves possession of
+an adb-authorized device; the tap binds the session.
+
+Restore:
+
+- **Existing vault:** pull the backup into the unlocked vault. Matching file
+  IDs are replaced, new IDs are added, and unrelated local entries stay.
+  The current master key is kept.
+- **Fresh install:** choose **Restore from desktop backup**, pull blobs +
+  manifest + `keybundle.json`, then enter the **original** vault password. The
+  phone unwraps the bundle to verify it; this is the only path that installs a
+  received key bundle. Normal setup resumes after the restore.
 
 ## Security model
 
-| Asset | Where | Exposure if the backup drive / desktop is compromised |
+| Asset | Where | Exposure if the drive or desktop is compromised |
 |---|---|---|
-| File payloads | Backup dir (`ab/cd/<sha256>.enc`) | As stored: encrypted files need the key; hidden-only files are readable. The `.enc` suffix is not proof of encryption. |
-| Manifest (file metadata and collection references, not collection definitions) | Backup dir, `manifest.enc` | Encrypted with the vault master key (sync manifest v2). Compromise of an unlocked device/key can expose it. |
-| Wrapped master key + Argon2id salt/IV + KDF params | Backup dir, `keybundle.json` | Unwrapping requires the original credential. Protect this bundle against offline credential guessing; do not assume a lost backup drive contains only ciphertext. |
-| Pairing token | Companion memory + web UI QR | One-time, per-session, regenerates on every pairing session. A stolen old token is useless once the session stops (completion, cancel, or idle timeout). |
-| Vault password | Typed in the companion web UI; held in memory only | Never written to disk by the companion; never sent to the phone. |
+| File payloads | `latch-backup/ab/cd/<sha256>.enc` | As stored: encrypted files need the key; hidden-only files are readable. The `.enc` suffix is not proof of encryption. |
+| Manifest | `manifest.enc` | AES-GCM under the vault master key. |
+| Wrapped key + Argon2id params | `keybundle.json` | Unwrapping requires the original credential. Protect against offline guessing; a lost drive may not contain only ciphertext. |
+| Pairing token | Companion memory + QR | One-time, per session, dies on completion, cancel, or idle timeout. |
+| Vault password | Companion memory only | Never written to disk by `latchd`; never sent to the phone. |
 
 Hard rules:
 
-- **Never claim hiding is encryption.** Both directions preserve payload bytes.
-  Hidden-only files can cross HTTP as plaintext. Encrypt files first when that
-  protection is required; backing them up does not add encryption.
-- **The PB sidecar stays loopback-only.** The pairing receiver is a
-  separate Go listener, not the PocketBase process; the
-  `embedded_pocketbase.md` rule ("never `0.0.0.0`") applies to the sidecar
-  and is not relaxed.
-- **The receiver exists only inside an active pairing session.** No
-  session (user cancelled, push completed and verified, or idle timeout
-  elapsed) → listener closed, token dead. The receiver is never
-  long-running.
-- **Plain HTTP on the LAN is allowed only with an explicit warning** in
-  both UIs (same stance as WebDAV sync: warn, never silently downgrade).
-  v1 has no per-pair TLS. The token gates access, not network confidentiality;
-  a network observer may read hidden-only payloads and capture the token.
-- **The companion web UI binds `127.0.0.1` only.** The UI is not
-  reachable from other machines; only the token-gated receiver is, and
-  only while a session is active.
-- **The phone never trusts the receiver blindly.** A pushed blob whose
-  sha256 mismatches its address is rejected (422) before touching disk;
-  the manifest swap is atomic and only happens after every referenced
-  blob is present; the post-write verify pass re-hashes everything.
+- **Never claim hiding is encryption.** Payload bytes are preserved in both
+  directions. Hidden-only files can cross HTTP as plaintext; encrypt files
+  first when that protection is required.
+- **The PocketBase sidecar stays loopback-only.** The pairing receiver is a
+  separate listener; the embedded-PocketBase rule still applies.
+- **The receiver exists only during an active pairing session.** No session
+  means no listener and a dead token. It is never long-running.
+- **Plain HTTP on the LAN is allowed only with an explicit warning.** v1 has no
+  per-pair TLS; the token gates access, not confidentiality. A network observer
+  may read hidden-only payloads and capture the token.
+- **The web UI binds `127.0.0.1` only.** Only the token-gated receiver is
+  reachable from the LAN, and only while pairing.
+- **The phone verifies what it receives.** Blob sha256 is checked before use;
+  the manifest swap is atomic and happens only after all referenced blobs are
+  present; the post-write verify pass re-hashes everything.
 
 ## Architecture
 
 ```
-Phone (Latch, vault unlocked)                Desktop
-┌────────────────────────────────┐          ┌─────────────────────────────────┐
-│ DesktopBackupScreen            │          │ latchd (Go static binary)       │
-│  • scans QR / enters addr+code │  Wi-Fi   │  • loopback web UI :7800        │
-│  • DesktopPushClient pushes    │─────────►│  • pairing receiver (LAN, only │
-│    snapshot while screen open  │  or USB  │    while a session is active): │
-│                                │ adb fwd. │      token-gated, PUT set      │
-│ DesktopPushClient (dart:io)    │          │  • Argon2id/PBKDF2/AES-GCM in  │
-│  GET  /info (diff hashes)      │          │    Go (golang.org/x/crypto)    │
-│  PUT  /keybundle               │          │  • writes backup dir:           │
-│  PUT  /blob/<sha256>           │          │    <target>/latch-backup/       │
-│  PUT  /manifest (last = done)  │          │      manifest.enc               │
-│  Bearer <session token> on all │          │      keybundle.json             │
-│                                │          │      ab/cd/<sha256>.enc         │
-│                                │          │  • QR + creds in web UI         │
-│                                │          │  • "export decrypted" writes    │
-│                                │          │    plaintext locally, post-push │
-└────────────────────────────────┘          └─────────────────────────────────┘
+Phone (vault unlocked)                    Desktop
+┌──────────────────────────────┐          ┌────────────────────────────────┐
+│ DesktopBackupScreen          │          │ latchd (Go static binary)      │
+│  scan QR / enter addr+code   │  Wi-Fi   │  loopback web UI :7800         │
+│  DesktopPushClient           │─────────►│  pairing receiver :7801 (LAN)  │
+│   GET  /info (diff hashes)   │  or USB  │   token-gated PUT/GET sets     │
+│   PUT  /keybundle            │ adb rev. │  Argon2id / PBKDF2 / AES-GCM   │
+│   PUT  /blob/<sha256>        │          │  <target>/latch-backup/        │
+│   PUT  /manifest (last)      │          │   manifest.enc                 │
+│  Bearer <session token>      │          │   keybundle.json               │
+│                              │          │   ab/cd/<sha256>.enc           │
+└──────────────────────────────┘          └────────────────────────────────┘
 ```
 
-The companion hosts the credentials and the storage; the phone holds all
-vault intelligence (what constitutes the vault, manifest format, crypto) —
-shared with the sync engine: the backup directory is intentionally the
-same layout as a WebDAV sync directory plus `keybundle.json`, so a future
-`RemoteStore` implementation could read a mounted backup directory
-verbatim.
-
-### Backup directory layout
+The backup directory is the same layout as a WebDAV sync directory plus
+`keybundle.json`, so a future `RemoteStore` could read a mounted backup
+directly.
 
 ```
 <target>/latch-backup/
-  manifest.enc        # sync-manifest v2 envelope: IV + AES-GCM(master key)
-  keybundle.json      # { wrappedKey, wrapSalt, wrapIv, argon2: {t, m, p} }
+  manifest.enc        # sync-manifest v2: IV + AES-GCM(master key)
+  keybundle.json      # wrappedKey, wrapSalt, wrapIv, argon2 {t,m,p}
   ab/cd/<sha256>.enc  # verbatim vault bytes, content-addressed as stored
 ```
 
-A backup is "complete" iff `manifest.enc` decrypts, its GCM tag verifies,
-and every `contentHash` it references exists on disk with a matching
-sha256. The receiver runs exactly this check when the phone PUTs the
-manifest (the completion signal); the companion's `verify` re-runs it on
+A backup is complete only when `manifest.enc` decrypts, its GCM tag verifies,
+and every `contentHash` it references exists with a matching sha256. The
+receiver runs this check on manifest upload; `latchd verify` re-runs it on
 demand.
-
-### Pairing
-
-1. User opens the companion web UI (`latchd serve` →
-   `http://127.0.0.1:7800`) and the pairing view starts a session: the
-   receiver binds `0.0.0.0:7801` (fixed port, so a single firewall rule
-   covers every session; falls back to an ephemeral port if taken),
-   generates a 256-bit session token, and the UI renders a QR:
-   `http://<lan-ip>:7801/#<token>` (plus the address + code in readable
-   form, with copy buttons).
-   On Linux hosts running ufw, inbound pairing traffic needs one rule:
-   `sudo ufw allow from <lan-subnet> to any port 7801 proto tcp` —
-   latchd detects ufw and prints the exact command at session start.
-2. User opens **Settings → Storage → Desktop Backup** on the phone
-   (vault unlocked) and scans the QR — or types the address + code by
-   hand (the USB variant path).
-3. The phone's push client proves the pairing with `GET /info` (bearer
-   token), diffs its blob set against the desktop's existing hashes, and
-   pushes `keybundle` + missing blobs + `manifest` (always last).
-4. The receiver verifies the manifest, reaps orphans, marks the session
-   **complete**, and closes. The web UI prompts for the vault password
-   to unlock browsing (`/api/unlock`).
-
-The session (and its listener + token) dies on completion, on cancel in
-the web UI, or after an idle timeout with no successful requests.
-
-USB variant (P6.4, tap-to-approve): `adb reverse tcp:<port> tcp:<port>`
-maps the desktop's receiver port onto `127.0.0.1:<port>` **on the phone**
-over the cable. The phone probes its loopback, announces itself
-(`POST /usb-hello` — loopback-only, LAN callers get a bare 404), and the
-desktop owner taps Allow once in the web UI; the phone picks up the
-session token and runs the normal push/pull sets. No address, no code.
-Setting up the reverse already proves physical possession of an
-adb-authorized device, so the tap binds the session instead of a typed
-secret. Manual address+code entry stays as a fallback. A dropped cable
-surfaces as an explicit USB error with a retry; the desktop session keeps
-its 5-minute idle expiry.
-
-### Crypto on the desktop
-
-No new crypto anywhere; the companion re-implements the existing phone
-stack with `golang.org/x/crypto`:
-
-- unwrap: password → Argon2id(keybundle params) → AES-GCM-unwrap master
-  key (mirrors `EncryptionService.initialize`)
-- manifest: AES-GCM decrypt under master key (same envelope as
-  `RemoteManifest`)
-- per-file: PBKDF2-HMAC-SHA256(master key, per-file salt, iterations) →
-  AES-256-GCM/CTR decrypt (mirrors `lib/crypto/key_derivation.dart`; all
-  per-file params travel in the manifest v2 entries, which already carry
-  `encryptionIv`, `keyDerivationSalt`, `kdfIterations`)
 
 ## Protocol
 
-Receiver endpoints (all bearer-gated; anything else is 401):
+Receiver endpoints (bearer-gated; anything else is 401):
 
-| Endpoint | Dir | Purpose |
+| Endpoint | Direction | Purpose |
 |---|---|---|
-| `GET /info` | phone→desktop | `{app, protocol, hasManifest, hasKeybundle, hashes[]}` — the blob digests the desktop already holds, so the phone can diff |
-| `PUT /keybundle` | push | Install/refresh key bundle JSON (validated shape) |
+| `GET /info` | phone → desktop | `{app, protocol, hasManifest, hasKeybundle, hashes[]}` for diffing |
+| `PUT /keybundle` | push | Install/refresh the wrapped key bundle |
 | `PUT /blob/<sha256>` | push | One as-stored blob; sha256 checked before publication (422 on mismatch) |
-| `PUT /manifest` | push | Completion signal: atomic swap, then verify + reap; 200 only if the resulting backup verifies |
-| `POST /usb-hello` | phone→desktop (USB) | Tap-to-approve handshake: `{device, mode}` → pending until the desktop allows, then the session token. Loopback-only; anything else gets a bare 404 |
+| `PUT /manifest` | push | Completion signal: atomic swap, verify, reap; 200 only if the backup verifies |
+| `POST /usb-hello` | USB | Tap-to-approve handshake; loopback-only, LAN callers get 404 |
 
-Backup = the phone's `PUT` set against a session the desktop started.
-Restore (P6.3) = the same receiver serving the `GET` set (`/manifest`,
-`/blob/<sha>`, `/keybundle`) in a restore-authorized session; the phone
-pulls. The desktop never interprets phone state; a restore is offered,
-not pushed.
-
-### Loopback web UI API
-
-Served on `127.0.0.1:7800` for the companion's own UI (session-gated, not
-bearer-gated). The UI must not assume endpoints beyond this table.
+Loopback web UI API (`127.0.0.1:7800`, session-gated):
 
 | Endpoint | Purpose |
 |---|---|
 | `GET /api/status` | `{unlocked, files, dir, hasLocal, lastBackup}` |
-| `GET /api/browse` | Unlocked only (409 otherwise). `{files: [{id, name, type, size, favorite, mimeType, dateAdded, dateModified}]}` over live manifest entries |
-| `GET /api/file/<id>` | Unlocked only. Decrypts the blob in memory and serves plaintext with Range support (`http.ServeContent`); `Content-Type` from the manifest `mimeType` with extension fallback; `?dl=1` switches to attachment. Entries with `isEncrypted: false` (unencrypted vault files) are served as stored. Legacy pre-GCM blob → 422; missing/corrupt blob → 404 |
-| `GET /api/thumb/<id>` | Unlocked only. Server-generated JPEG thumbnail (~320px, q75) for image entries; in-memory LRU, ETag + 304 — plaintext never touches disk. Non-images → 404 (UI falls back to a type glyph) |
-| `POST /api/unlock` / `POST /api/lock` | Vault password → master key in memory / drop it (also clears thumbnails) |
-| `POST /api/verify` / `POST /api/export` | Hash-verify every blob / decrypt snapshot to `~/latchd-exports/<subdir>` |
-| `POST /api/pair/start` / `stop` / `allow` · `GET /api/pair/status` | Pairing receiver lifecycle + USB tap-to-approve verdict + 1.5s poll state |
+| `GET /api/browse` | Manifest entries when unlocked (409 otherwise) |
+| `GET /api/file/<id>` | Decrypt in memory and serve plaintext with Range support; `?dl=1` forces download |
+| `GET /api/thumb/<id>` | In-memory JPEG thumbnail for images; plaintext never touches disk |
+| `POST /api/unlock` / `lock` | Load/drop the master key and clear thumbnails |
+| `POST /api/verify` / `export` | Hash-verify all blobs / decrypt to `~/latchd-exports/<subdir>` |
+| `POST /api/pair/start` / `stop` / `allow`; `GET /api/pair/status` | Pairing lifecycle and USB approval polling |
 
-> **Follow-up — folder records.** The manifest carries `folderId` per file,
-> but folder rows live only in the phone's PocketBase, so the web UI offers
-> type views (Photos/Videos/Songs/Documents/Favorites), not a folder tree.
-> A manifest v3 with folder records would enable a real tree; tracked as an
-> open follow-up, not part of P6.2r.
+Crypto is a Go reimplementation of the phone stack with
+`golang.org/x/crypto`: Argon2id unwraps the master key, AES-GCM decrypts the
+manifest, and PBKDF2-HMAC-SHA256 + AES-256-GCM/CTR decrypts each file using the
+parameters carried in manifest v2.
 
+## Limits and deferred work
 
-## Sync model — none; snapshot semantics
+- **Snapshot only.** Deleted-on-phone entries disappear from the next backup;
+  superseded blobs are reaped after the manifest swap.
+- **Active files only.** No Recently Deleted, collection definitions, or full
+  settings.
+- **No folder tree in the UI.** Files carry `folderId`, but folder rows live
+  only on the phone; the UI offers type views. A manifest v3 with folder
+  records is a follow-up.
+- **No retention.** Single mutable `latch-backup/`; dated snapshots and pruning
+  are P6.5.
+- **Memory:** desktop snapshot construction buffers payloads in memory. Large
+  snapshots need hardware measurement before being treated as safe.
+- **ZIP export coexistence:** `BackupService` remains; revisit its
+  `_passwords_index.json` inclusion as a hardening item.
+- **Receiver idle timeout:** 5 minutes without a successful authenticated
+  request.
 
-- A backup is a snapshot of **active files**: the phone builds the manifest from the
-  live vault, diffs its content hashes against the desktop's `/info`
-  hash list, transfers only missing/changed blobs (content addressing
-  makes this free), then PUTs the manifest last. Semantically it is
-  the active file contents/metadata and key bundle, not Recently Deleted,
-  folder/album definitions, saved smart collections, or all app settings.
-- No LWW or conflict UI. Existing-vault restore replaces entries by file ID,
-  adds new entries, and leaves unrelated local entries intact. It is not a
-  wholesale replacement or a way to merge independently keyed vaults.
-- Deleted-on-phone since last backup simply disappears from the new
-  snapshot; superseded blobs are reaped from the backup dir during the
-  receiver's post-manifest `verify` pass (they are unreferenced after
-  the manifest swap).
+## Verification
 
-## Restore semantics
+Per phase, one runnable check plus one security failure path:
 
-Two modes, same data:
+- `test/desktop_push_test.dart` — push against a stub receiver; unauthenticated
+  requests abort; only missing blobs and the manifest-last sequence are sent.
+- `latchd` receiver tests — bearer-gated round trip; tampered blob → 422 with
+  nothing written; manifest completes and verifies.
+- `test/desktop_restore_test.dart` — push → wipe → restore → unlock.
+- Manual acceptance still required: fresh install, restore from the USB drive,
+  open with the original password.
 
-1. **Into an existing unlocked vault** (device-to-device or undo): the
-   desktop opens a restore session; the phone pulls blobs + manifest,
-   decrypts the manifest and checks each available blob's `contentHash`
-   before import. File decryption happens when opened; the transfer hash
-   check alone is not per-file authenticated decryption. The existing master
-   key is kept. Matching file IDs are replaced, new IDs added, and local IDs
-   absent from the manifest retained. Missing blobs are reported as skipped.
-2. **Restore-before-setup** (the incident case): a fresh install, no
-   vault yet. First-run offers "Restore from desktop backup"; the user
-   scans the desktop's QR (or enters address + code), the phone pulls
-   blobs + manifest + `keybundle.json` over the session, then the user
-   types the **original** vault password on the phone; the phone unwraps
-   the bundle to verify (Argon2id unwrap success = correct password),
-   installs the key material as the vault's own, and imports the
-   manifest. Setup (PIN/biometric choice) resumes around it. This is the
-   only path that installs a received `keybundle`.
-
-## Phased plan
-
-| Phase | Deliverable | Location | Status |
-|---|---|---|---|
-| P6.0 | This document | `docs/desktop_backup.md` | Done |
-| P6.1 | ~~Phone: `TransferServer` + QR screen~~ → **r**: phone push client + scanner screen | `lib/services/desktop_link/transfer_client.dart`, `lib/screens/desktop_backup_screen.dart`, `pubspec.yaml` (−`qr_flutter`, +`mobile_scanner`) | Done (flipped) |
-| P6.2 | ~~Companion puller~~ → **r**: companion pairing receiver + QR web UI + unlock-after-push, `verify`, browse-after-unlock, export-decrypted | `latchd/` (Go module: `cmd/latchd`, `internal/{receiver,backup,cryptoutil,webui}`, React web UI built from `web-src/` into `web/` via `go:embed`, vendored QR encoder) | Done (flipped) |
-| P6.3 | Restore both modes (GET set + restore sessions; phone-side pre-vault pull); first-run entry point | `latchd/internal/receiver` (GET set), phone `desktop_link/restore_controller.dart`, first-run flow | Done |
-| P6.4 | USB transport: adb reverse hint + tap-to-approve (no typing); manual-code fallback | web UI approval prompt, phone USB connect | Done |
-| P6.5 | Polish: snapshot retention (dated manifests), scheduled backup reminders, orphan reaping report | `latchd/`, phone settings | Deferred |
-
-Each phase keeps the repo's verification discipline: one runnable check
-plus one security failure path (401 without token; tampered blob
-sha mismatch → 422; wrong password fails Argon unwrap with a
-constant-time indistinguishable error).
-
-## Files
+## Key paths
 
 ```
-docs/desktop_backup.md                             this spec                     [P6.0]
-lib/services/desktop_link/transfer_client.dart     push client (scan → PUT set)  [P6.1r]
-lib/screens/desktop_backup_screen.dart             scanner + manual entry + push [P6.1r]
-test/desktop_push_test.dart                        push client auth + roundtrip  [P6.1r]
-latchd/go.mod                                      standalone Go module          [P6.2]
-latchd/cmd/latchd/main.go                          serve / verify / export CLI   [P6.2r]
-latchd/internal/receiver/                          pairing receiver (LAN, token) [P6.2r]
-latchd/internal/backup/                            snapshot store, verify, reap  [P6.2]
-latchd/internal/cryptoutil/                         argon2id unwrap, GCM, PBKDF2 [P6.2]
-latchd/internal/webui/                              loopback UI + file/thumb API server [P6.2r]
-latchd/web-src/                                     React+Vite source for the web UI (builds into web/, dist committed) [P6.2r]
-latchd/internal/webui/web/vendor/qrcode.js         vendored QR encoder (MIT, qrcode-generator) [P6.2r]
-lib/services/desktop_link/restore_controller.dart  restore client + import (both modes) [P6.3]
-lib/screens/restore_setup_screen.dart              first-run restore (scan → password) [P6.3]
-test/desktop_restore_test.dart                      e2e: push → wipe → restore → unlock [P6.3]
+latchd/cmd/latchd/                    serve / verify / export-decrypted CLI
+latchd/internal/receiver/             pairing receiver, restore sessions
+latchd/internal/backup/               snapshot store, verify, reap
+latchd/internal/cryptoutil/           Argon2id, AES-GCM, PBKDF2
+latchd/internal/webui/                loopback UI and file/thumb API
+latchd/web-src/                       React + Vite source (dist committed)
+lib/services/desktop_link/            push, USB, and restore clients
+lib/screens/desktop_backup_screen.dart
+lib/screens/restore_setup_screen.dart
 ```
 
-Removed by the flip: `lib/services/desktop_link/transfer_server.dart`,
-`test/desktop_link_test.dart`, `latchd/internal/link/` (phone client),
-`latchd` `pair`/`backup`/`restore-push` subcommands.
-
-Changed:
-
-```
-pubspec.yaml                           − qr_flutter, + mobile_scanner   [P6.1r]
-lib/screens/vault_settings_screen.dart  "Desktop Backup" entry (Storage) [P6.1]
-lib/services/backup_service.dart       unchanged — ZIP export stays as-is
-Makefile                               + latchd / clean-latchd targets   [P6.2]
-```
-
-## Dependencies
-
-- **Add (Flutter):** `mobile_scanner` (camera QR scanning; replaces
-  `qr_flutter`, which is removed — the phone no longer renders QRs).
-- **Vendored (web UI):** `qrcode-generator` 1.4.4 (MIT, single file) —
-  renders the pairing QR in the desktop browser; no build toolchain.
-- **Add (Go, `latchd/go.mod`):** `golang.org/x/crypto` (argon2, pbkdf2,
-  aes) — stdlib `net/http` for both listeners.
-- **Reuse:** sync manifest v2 format + blob layout (`SyncService`), key
-  wrap format (`EncryptionService` / `lib/crypto/`), cleartext-LAN
-  warning UX pattern (`sync_settings_screen.dart`).
-
-## Verification discipline
-
-**Hardware sign-off is not recorded yet.** Follow the approval and isolation
-preflight in [Stable release checks](stable_release_checklist.md) before any
-installation, upgrade, restore, or wipe. Do not test against a live phone vault
-or an existing desktop backup. Build-only checks do not install either app.
-
-Per the repo's test rules: no per-method suites. Per phase one runnable
-check:
-
-- P6.1r: `test/desktop_push_test.dart` — push against a stub receiver:
-  unauthenticated → 401 aborts; roundtrip sends only missing blobs and
-  the manifest last.
-- P6.2r: `latchd` receiver test — bearer-gated push roundtrip into a
-  temp dir; tampered blob sha → 422, nothing written; manifest completes
-  and verifies.
-- P6.3: end-to-end on host — build a backup by pushing from a test
-  vault, wipe the vault, restore via pre-vault pull, unlock with the
-  original password, index matches.
-- Acceptance (manual, once, on real hardware): the 2026-09-05 scenario —
-  fresh install, restore from the USB drive, vault opens with the
-  original password.
-
-## Open decisions
-
-1. **Snapshot retention:** single mutable `latch-backup/` (current
-   design) vs dated `snapshots/<date>/manifest.enc` sharing one blob
-   pool. Default: single; retention is P6.5.
-2. **Companion distribution:** source + `make latchd`, or commit a
-   prebuilt Linux binary. Default: Makefile-built; binary distribution
-   when a non-developer user exists.
-   **Decided (2026-09):** GitHub Releases prebuilt binaries
-   (`latchd-linux-amd64`, `latchd-linux-arm64`,
-   `latchd-windows-amd64.exe`) built by
-   `.github/workflows/release-latchd.yml` on app-version tags
-   (`0.x.y-beta.z`, same number as the mobile release — the app itself
-   ships via Google Play, so the release carries latchd instead of an
-   APK), plus `scripts/install-latchd.sh` for one-line Linux installs.
-   Source builds stay available via `make latchd`.
-3. **Web UI tech:** hand-rolled static HTML/JS with `go:embed` (no build
-   toolchain) vs a tiny framework SPA. Default: static, revisit if the
-   browse UI grows.
-4. **LAN discovery:** QR/manual IP (v1) vs mDNS advertisement (`_latch._tcp`).
-   Default: QR/manual; mDNS adds a dependency and a discovery-attack
-   surface.
-5. **Where restore-before-setup lives in first-run:** replacing the
-   auth-method selection flow vs a button beside it. UX call, P6.3.
-   **Decided (P6.3):** button beside the auth-method cards —
-   "Restore from desktop backup" on `AuthMethodSelectionScreen` pushes
-   `RestoreSetupScreen`; setup resumes after the restore completes.
-6. **`BackupService` ZIP coexistence:** kept deliberately (decided). Revisit
-   its `_passwords_index.json` inclusion as a hardening item — it writes
-   the password-store index verbatim into the decrypted ZIP.
-7. **Receiver idle timeout:** currently 5 minutes without a successful
-   authenticated request. Tunable constant; revisit after real-hardware
-   acceptance.
+`latchd` credentials come from `--password` or `LATCHD_PASSWORD`; they are
+never stored.

@@ -10,11 +10,11 @@ Enable file encryption before importing sensitive content and prefer HTTPS.
 
 Status: **Phase 3 complete** (2026-10-06). Streaming transfers, durable
 encrypted sync state, review-first conflict recovery, byte progress, and
-scoped cancellation land on top of the S0–S3 transport/manifest work. Hermetic
-checks: 219 tests passing, `flutter analyze` clean, debug APK builds. The
-env-gated live suite and physical-device hardware pass are user-run; see
+scoped cancellation land on top of the S0–S3 transport/manifest work. The full
+Flutter suite and analysis pass and debug APKs build. The env-gated live suite
+and physical-device hardware pass are still user-run; see
 [`docs/local_server_testing.md`](local_server_testing.md) for server setup and
-the Phase 3 hardware guide.
+the Phase 3 hardware guide. Hardware sign-off is pending.
 
 ## Goals
 

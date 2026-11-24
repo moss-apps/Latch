@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Check the [improvement roadmap](https://github.com/moss-apps/Latch/blob/main/docs/IMPROVEMENT_ROADMAP.md)
+        Check the [documentation index](https://github.com/moss-apps/Latch/blob/main/docs/README.md)
         and existing issues first — the project is deliberately scope-conscious.
   - type: textarea
     id: problem
