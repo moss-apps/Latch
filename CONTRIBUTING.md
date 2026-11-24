@@ -2,7 +2,7 @@
 
 Thanks for your interest. Latch is a local-first media vault with opt-in
 encryption for Android and a small Go desktop backup companion (`latchd`).
-The docs in [`docs/`](./docs) are the source of truth — if a change alters
+The docs in [`docs/`](./docs/README.md) are the source of truth — if a change alters
 behavior, scope, or setup, update the relevant doc in the same pull request.
 
 ## Invariants
@@ -37,7 +37,7 @@ These are non-negotiable; changes that violate them will not be merged:
 ## Setup
 
 ```sh
-flutter pub get
+flutter pub get --enforce-lockfile
 make pb          # build the arm64-v8a PocketBase sidecar into jniLibs
 make latchd      # build the desktop companion (optional)
 ```

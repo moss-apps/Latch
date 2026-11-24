@@ -264,7 +264,12 @@ are separate components/services rather than one screen. See
 
 ## Documentation
 
+Start with the [documentation index](docs/README.md) for the current guides and
+the archive of completed plans.
+
 - [Media Encryption & Compression](docs/architecture_media.md): compression, encryption, file ops
+- [Embedded PocketBase](docs/embedded_pocketbase.md): local metadata sidecar, security boundary, and hardware gate
+- [Desktop Backup & Restore](docs/desktop_backup.md): latchd pairing, backup layout, restore, and limits
 - [Unlock Autofill](docs/unlock_autofill.md): unlock credential autofill and its security model
 - [WebDAV Sync](docs/local_server_sync.md): setup model, server requirements, conflicts, and key continuity
 - [Recently Deleted](docs/recently_deleted.md): retention, permanent deletion, backup, and sync policy

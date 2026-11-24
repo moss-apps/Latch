@@ -80,3 +80,5 @@ docs/local_server_testing.md
 docs/baseline_artifacts/
 docs/phase1_artifacts/
 docs/*_artifacts/
+
+docs/archive/*_artifacts/
